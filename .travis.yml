@@ -1,0 +1,20 @@
+language: go
+
+go:
+    - "1.8"
+    - "1.9"
+
+notifications:
+  email: false
+
+install:
+    - go get -u github.com/golang/dep/cmd/dep
+
+before_script:
+    - dep ensure
+    - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/)
+
+script:
+    - test -z $(gofmt -s -l $GO_FILES)
+    - make test
+    - make build
