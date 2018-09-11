@@ -30,5 +30,9 @@ func RunBeastApiServer(port string) {
 		c.String(http.StatusOK, WELCOME_TEXT)
 	})
 
+	router.GET("/help", func(c *gin.Context) {
+		c.String(http.StatusOK, HELP_TEXT)
+	})
+
 	router.Run(port)
 }
