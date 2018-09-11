@@ -11,7 +11,7 @@ BUILD_USER=${BUILD_USER:-"${USER}@${HOSTNAME}"}
 BUILD_DATE=${BUILD_DATE:-$( date +%Y%m%d-%H:%M:%S )}
 VERBOSE=${VERBOSE:-}
 
-repo_path="github.com/fristonio/Beastv3"
+repo_path="github.com/fristonio/beast"
 
 # Get branch revision and  version
 version="0.1"

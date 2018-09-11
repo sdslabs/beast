@@ -1,9 +1,9 @@
 package main
 
 import (
-	"os"
+	"github.com/fristonio/beast/cmd"
 )
 
 func main() {
-	os.Exit(0)
+	cmd.Execute()
 }
