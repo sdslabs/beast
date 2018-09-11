@@ -4,8 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fristonio/beast/cmd/debug"
 	"github.com/spf13/cobra"
 )
+
+// Flag which defines verbose nature of beast
+// If true beast will run in Verbose mode and will log all logs in debug
+// error level.
+var Verbose bool
 
 // Root command `beast` all commands are either a flag to this command
 // or a subcommand for this.
@@ -13,7 +19,13 @@ var rootCmd = &cobra.Command{
 	Use:   "beast",
 	Short: "Beast is an automatic deployment tool for Backdoor",
 	Long:  LONG_DESCRIPTION_BEAST,
-
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if Verbose {
+			debug.Enable()
+		} else {
+			debug.Disable()
+		}
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -30,6 +42,12 @@ func Execute() {
 // Init function to add commands to the root command `beast`. It has the
 // following subcommands:
 // * versionCmd: A command to show version information for current build.
+// * Initialize Beast, run bootsteps and check if it is configured properly
+// * runCmd: Run beast API server.
 func init() {
+	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
+
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(runCmd)
 }
