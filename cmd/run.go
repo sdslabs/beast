@@ -19,6 +19,7 @@ var runCmd = &cobra.Command{
 			log.Error("Error while running Beast bootsteps.")
 			os.Exit(1)
 		}
-		api.RunBeastApiServer()
+
+		api.RunBeastApiServer(Port)
 	},
 }

@@ -13,6 +13,8 @@ import (
 // error level.
 var Verbose bool
 
+var Port string
+
 // Root command `beast` all commands are either a flag to this command
 // or a subcommand for this.
 var rootCmd = &cobra.Command{
@@ -46,6 +48,7 @@ func Execute() {
 // * runCmd: Run beast API server.
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
+	runCmd.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to run the beast server on.")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
