@@ -7,13 +7,13 @@ var CHALLENGE_CONFIG_FILE_TEMPLATE string = `
 id              = {{.ChallengeId}}               # ID of the challenge
 name            = {{.ChallengeName}}             # Name of the challenge
 challenge_type  = {{.ChallengeType}}             # Type of challenge -> web service ssh
-run_cmd         = {{.RunCmd}}
 
     [challenge.details]
     flag                 = {{.ChallengeFlag}}    # Flag for the challenge -> Can be left blank
     apt_dependencies     = {{.AptDeps}}          # Custom apt-dependencies for challenge
-    custom_setup_script  = {{.SetupScript}}      # Setup script to run additional steps for challenge deployment
+    setup_script         = {{.SetupScript}}      # Setup script to run additional steps for challenge deployment
     static_content_dir   = {{.StaticContentDir}} # Static directory to be served for the challenge
+    run_cmd              = {{.RunCmd}}
 
 [author]
 name      = {{.AuthorName}}                      # Name of the challenge creator
