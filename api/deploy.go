@@ -5,6 +5,7 @@ import (
 
 	"github.com/fristonio/beast/core/deploy"
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 )
 
 func deployAllHandler(c *gin.Context) {
@@ -22,7 +23,8 @@ func deployLocalChallengeHandler(c *gin.Context) {
 		return
 	}
 
-	err := DeployChallenge(challengeDir)
+	log.Info("In local deploy challenge Handler")
+	err := deploy.DeployChallenge(challDir)
 	if err != nil {
 		c.String(http.StatusBadRequest, err.Error())
 		return

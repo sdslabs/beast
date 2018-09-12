@@ -11,7 +11,7 @@ challenge_type = "service"				# Type of challenge -> web service ssh
     static_content_dir = "public/"		# Static directory to be served for the challenge
     run_cmd = "node server.js"
 
-[creator]
+[author]
 name = "fristonio"						# Name of the challenge creator
 email = "fristonio@protonmail.com"		# Email for contact
 ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author

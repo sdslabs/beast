@@ -6,25 +6,28 @@ func initGinRouter() *gin.Engine {
 	router := gin.New()
 
 	// Depoy routes group
-	deployGroup := router.Group("/deploy")
+	apiGroup := router.Group("/api")
 	{
-		deployGroup.POST("/all/:action", deployAllHandler)
-		deployGroup.POST("/challenge/:id/:action", deployChallengeHandler)
-		deployGroup.POST("/local", deployLocalChallengeHandler)
-	}
+		deployGroup := apiGroup.Group("/deploy")
+		{
+			deployGroup.POST("/all/:action", deployAllHandler)
+			deployGroup.POST("/challenge/:id/:action", deployChallengeHandler)
+			deployGroup.POST("/local/", deployLocalChallengeHandler)
+		}
 
-	// Status route group
-	statusGroup := router.Group("/status")
-	{
-		statusGroup.GET("/challenge/:id", challengeStatusHandler)
-		statusGroup.GET("/all", statusHandler)
-	}
+		// Status route group
+		statusGroup := apiGroup.Group("/status")
+		{
+			statusGroup.GET("/challenge/:id", challengeStatusHandler)
+			statusGroup.GET("/all/", statusHandler)
+		}
 
-	// Status route group
-	infoGroup := router.Group("/info")
-	{
-		infoGroup.GET("/challenge/:id", challengeInfoHandler)
-		infoGroup.GET("/available", availableChallengeInfoHandler)
+		// Status route group
+		infoGroup := apiGroup.Group("/info")
+		{
+			infoGroup.GET("/challenge/:id", challengeInfoHandler)
+			infoGroup.GET("/available/", availableChallengeInfoHandler)
+		}
 	}
 
 	return router
