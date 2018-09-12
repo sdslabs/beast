@@ -21,12 +21,15 @@ var Info = map[string]string{
 }
 
 var VersionStr = `
-****************** gvm ******************
-  Version    : %s
-  Revision   : %s
-  Branch     : %s
-  Build-User : %s
-  Build-Date : %s
-  Go-Version : %s
-*****************************************
+	****************** Beast ******************
+
+	    Version    : %s
+	    Revision   : %s
+	    Branch     : %s
+	    Build-User : %s
+	    Build-Date : %s
+	    Go-Version : %s
+
+	*******************************************
+
 `
