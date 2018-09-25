@@ -7,6 +7,12 @@ import (
 
 var (
 	BEAST_GLOBAL_DIR = filepath.Join(os.Getenv("HOME"), ".beast")
-	BEAST_LOG_FILE   = "beast.log"
-	BEAST_DATABASE   = "beast.db"
+)
+
+const (
+	CONFIG_FILE_NAME       string = "beast.toml"
+	DEFAULT_CHALLENGE_NAME string = "Backdoor-Challenge"
+	DEFAULT_AUTHOR_NAME    string = "ghost"
+	BEAST_LOG_FILE         string = "beast.log"
+	BEAST_DATABASE         string = "beast.db"
 )
