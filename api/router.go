@@ -5,9 +5,10 @@ import "github.com/gin-gonic/gin"
 func initGinRouter() *gin.Engine {
 	router := gin.New()
 
-	// Depoy routes group
+	// API routes group
 	apiGroup := router.Group("/api")
 	{
+		// Deploy route group
 		deployGroup := apiGroup.Group("/deploy")
 		{
 			deployGroup.POST("/all/:action", deployAllHandler)
@@ -22,7 +23,7 @@ func initGinRouter() *gin.Engine {
 			statusGroup.GET("/all/", statusHandler)
 		}
 
-		// Status route group
+		// Info route group
 		infoGroup := apiGroup.Group("/info")
 		{
 			infoGroup.GET("/challenge/:id", challengeInfoHandler)

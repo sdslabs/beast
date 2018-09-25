@@ -3,23 +3,19 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/fristonio/beast/cmd"
+	"github.com/fristonio/beast/core"
+	_ "github.com/fristonio/beast/core/database"
 	log "github.com/sirupsen/logrus"
-)
-
-var (
-	BEAST_GLOBAL_DIR = filepath.Join(os.Getenv("HOME"), ".beast")
-	BEAST_LOG_FILE   = "beast.log"
 )
 
 func init() {
 	// Check if the beast directory exist, if it does not exist then create it
 	// if an error occurs in between exit the utility printing the error.
-	if _, err := os.Stat(BEAST_GLOBAL_DIR); err != nil {
+	if _, err := os.Stat(core.BEAST_GLOBAL_DIR); err != nil {
 		if os.IsNotExist(err) {
-			if err = os.MkdirAll(BEAST_GLOBAL_DIR, 0755); err != nil {
+			if err = os.MkdirAll(core.BEAST_GLOBAL_DIR, 0755); err != nil {
 				fmt.Println("Error occured while creatind beast dir")
 				os.Exit(1)
 			}

@@ -41,6 +41,13 @@ func (config *BeastConfig) ValidateRequiredFields() error {
 	return nil
 }
 
+// This structure contains information related to challenge,
+// Challenge Metadata
+//
+// * Id - Unique ID of the challenge
+// * Name - Name of the challenge
+// * ChallengeType - Type of the challenge(web/service/ssh)
+// * ChallengeDetails - Another substructure cotaining details about challenge
 type Challenge struct {
 	Id               string           `toml:"id"`
 	Name             string           `toml:"name"`
@@ -66,6 +73,15 @@ func (config *Challenge) ValidateRequiredFields() error {
 	return nil
 }
 
+// This contains challenge specific properties which includes
+//
+// * Flag - Flag corresponding to the challenge
+// * AptDeps - Apt dependencies for the challenge
+// * SetupScript - relative path to the challenge setup script
+// * StaticContentDir - Relative path to the directory which you want
+// 		to serve statically for the challenge, for example a libc for binary
+// 		challenge.
+// * RunCmd - Command to run to start the challenge.
 type ChallengeDetails struct {
 	Flag             string   `toml:"flag"`
 	AptDeps          []string `toml:"apt_dependencies"`
@@ -82,6 +98,12 @@ func (config *ChallengeDetails) ValidateRequiredFields() error {
 	return nil
 }
 
+// Metadata related to author of the challenge, this structure includes
+//
+// * Name - Name of the author of the challenge
+// * Email - Email of the author
+// * SSHKey - Public SSH key for the challenge author, to give the access
+//		to the challenge container.
 type Author struct {
 	Name   string `toml:"name"`
 	Email  string `toml:"email"`

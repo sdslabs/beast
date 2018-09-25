@@ -11,5 +11,6 @@ func DeployChallenge(challengeDir string) error {
 		return err
 	}
 
+	// StartDeployPipeline(challengeDir)
 	return nil
 }
