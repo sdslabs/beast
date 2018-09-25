@@ -6,12 +6,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	CONFIG_FILE_NAME       string = "beast.toml"
-	DEFAULT_CHALLENGE_NAME string = "Backdoor-Challenge"
-	DEFAULT_AUTHOR_NAME    string = "ghost"
-)
-
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
 // will be ignored.
@@ -120,4 +114,8 @@ func (config *Author) ValidateRequiredFields() error {
 	}
 
 	return nil
+}
+
+func GenerateChallengeDockerfileCtx(beastConfigFile string) {
+
 }

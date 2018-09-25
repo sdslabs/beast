@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"errors"
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
@@ -51,4 +52,18 @@ func ValidateChallengeDir(challengeDir string) error {
 
 	log.Infof("Challenge directory validated")
 	return nil
+}
+
+func GetContextDirPath(dirPath string) (string, error) {
+	absContextDir, err := filepath.Abs(givenContextDir)
+	if err != nil {
+		return "", errors.Errorf("Unable to get absolute context directory of given context directory %q: %v", dirPath, err)
+	}
+
+	err := utils.ValidateDirExists(absContextDir)
+	if err != nil {
+		return "", err
+	}
+
+	return absContextDir, nil
 }
