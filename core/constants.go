@@ -15,4 +15,5 @@ const (
 	DEFAULT_AUTHOR_NAME    string = "ghost"
 	BEAST_LOG_FILE         string = "beast.log"
 	BEAST_DATABASE         string = "beast.db"
+	BEAST_STAGING_DIR      string = "staging"
 )

@@ -21,8 +21,12 @@ email     = {{.AuthorMail}}                      # Email for contact
 ssh_key   = {{.AuthorPubKey}}                    # Public SSH key for the challenge author
 `
 
-var BEAST_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
+var BEAST_BARE_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
 FROM debian:jessie
+
+LABEL version="0.1"
+LABEL author="fristonio"
+
 
 WORKDIR /challenge
 COPY . /challenge
@@ -30,8 +34,8 @@ COPY . /challenge
 RUN apt-get update && apt-get upgrade
 RUN apt-get install {{.AptDeps}}
 
-RUN chmod +x {{.SetupFile}} && \
-	./{{.SetupFile}}
+RUN chmod +x {{.SetupScript}} && \
+	./{{.SetupScript}}
 
 USER beast
 ENTRYPOINT ["{{.RunCmd}}"]

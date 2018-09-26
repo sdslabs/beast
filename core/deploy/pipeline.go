@@ -1,32 +1,39 @@
 package deploy
 
 import (
-	"io"
-	"ioutil"
-	"archive/tar"
 	"path/filepath"
-	"time"
 
-	"github.com/docker/docker/pkg/archive"
 	"github.com/fristonio/beast/core"
+	"github.com/fristonio/beast/utils"
 	log "github.com/sirupsen/logrus"
 )
 
+// Run the staging setp for the pipeline, this functions assumes the
+// directory of the challenge wihch will be staged.
 func StageChallenge(challengeDir string) error {
+	log.Debug("Starting staging stage of deploy pipeline")
 	contextDir, err := GetContextDirPath(challengeDir)
 	if err != nil {
 		return err
 	}
 
-	challengeConfig := filepath.Join(contextDir, core.CONFIG_FILE_NAME)
-	dockerfileCtx := GenerateChallengeDockerfileCtx(challengeConfig)
+	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
 
-	stageCtx, err := archive.Tar(contextDir, archive.Gzip)
+	challengeConfig := filepath.Join(contextDir, core.CONFIG_FILE_NAME)
+	dockerfileCtx, err := GenerateChallengeDockerfileCtx(challengeConfig)
 	if err != nil {
 		return err
 	}
 
-	addDockerfileToStagingContext(dockerfileCtx, stageCtx)
+	additionalCtx := make(map[string]string)
+	additionalCtx["Dockerfile"] = dockerfileCtx
+
+	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // This is the main function which starts the deploy pipeline for a locally
@@ -47,40 +54,8 @@ func StartDeployPipeline(challengeDir string) {
 	err := StageChallenge(challengeDir)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"DEPLOY_ERROR": "STAGING :: " + challangeName,
+			"DEPLOY_ERROR": "STAGING :: " + challengeName,
 		}).Errorf("%s", err)
 		return
 	}
-}
-
-
-// AddDockerfileToBuildContext from a ReadCloser, returns a new archive and
-// the relative path to the dockerfile in the context.
-func addDockerfileToStagingContext(dockerfileCtx io.ReadCloser, buildCtx io.ReadCloser) (io.ReadCloser, string, error) {
-	file, err := ioutil.ReadAll(dockerfileCtx)
-	dockerfileCtx.Close()
-	if err != nil {
-		return nil, "", err
-	}
-
-	now := time.Now()
-	hdrTmpl := &tar.Header{
-		Mode:       0600,
-		Uid:        0,
-		Gid:        0,
-		ModTime:    now,
-		Typeflag:   tar.TypeReg,
-		AccessTime: now,
-		ChangeTime: now,
-	}
-	
-	dockerfile = "Dockerfile"
-
-	buildCtx = archive.ReplaceFileTarWrapper(buildCtx, map[string]archive.TarModifierFunc{
-		dockerfile: func(_ string, h *tar.Header, content io.Reader) (*tar.Header, []byte, error) {
-			return hdrTmpl, file, nil
-		}
-	})
-
-	return buildCtx, dockerfile, nil
 }
