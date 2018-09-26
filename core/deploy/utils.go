@@ -84,6 +84,7 @@ func GetContextDirPath(dirPath string) (string, error) {
 // assumes that the validation for the configFile is done beforehand
 // before calling this function.
 func GenerateDockerfile(configFile string) (string, error) {
+	log.Debug("Generating dockerfile")
 	var config core.BeastConfig
 	_, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
@@ -97,16 +98,19 @@ func GenerateDockerfile(configFile string) (string, error) {
 	}
 
 	var dockerfile bytes.Buffer
+	log.Debugf("Preparing dockerfile template")
 	dockerfileTemplate, err := template.New("dockerfile").Parse(tools.BEAST_BARE_DOCKERFILE_TEMPLATE)
 	if err != nil {
 		return "", fmt.Errorf("Error while parsing Dockerfile template :: %s", err)
 	}
 
+	log.Debugf("Executing dockerfile template with challenge config")
 	err = dockerfileTemplate.Execute(&dockerfile, data)
 	if err != nil {
 		return "", fmt.Errorf("Error while executing Dockerfile template :: %s", err)
 	}
 
+	log.Debugf("Dockerfile generated for the challenge")
 	return dockerfile.String(), nil
 }
 
@@ -118,6 +122,7 @@ func GenerateDockerfile(configFile string) (string, error) {
 // not exist or there is some error  while parsing the setup file
 // this function will simply return the error without logging anything.
 func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
+	log.Debug("Generating challenge dockerfile context from config")
 	file, err := ioutil.TempFile("", "Dockerfile.*")
 	if err != nil {
 		return "", fmt.Errorf("Error while creating a tempfile for Dockerfile :: %s", err)
@@ -134,5 +139,6 @@ func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
 		return "", fmt.Errorf("Error while writing Dockerfile to file :: %s", err)
 	}
 
+	log.Debugf("Generated dockerfile lives in : %s", file.Name())
 	return file.Name(), nil
 }

@@ -15,10 +15,10 @@ func CheckPathValid(path string) (os.FileInfo, error) {
 	pathInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Warnf("Requested Path(%s) does not exist", path)
+			log.Debugf("Requested Path(%s) does not exist", path)
 			return nil, errors.New("Path does not exist")
 		} else {
-			log.Warnf("Requested Path(%s) is not accessbile", path)
+			log.Debugf("Requested Path(%s) is not accessbile", path)
 			return nil, errors.New("Not accessible path.")
 		}
 	}

@@ -115,7 +115,3 @@ func (config *Author) ValidateRequiredFields() error {
 
 	return nil
 }
-
-func GenerateChallengeDockerfileCtx(beastConfigFile string) {
-
-}

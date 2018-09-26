@@ -17,22 +17,29 @@ func StageChallenge(challengeDir string) error {
 		return err
 	}
 
+	log.Debugf("Found context directory for deploy : %s", contextDir)
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+	log.Debugf("Staging challenge to directory : %s", stagingDir)
 
 	challengeConfig := filepath.Join(contextDir, core.CONFIG_FILE_NAME)
+	log.Debugf("Reading challenge config from : %s", challengeConfig)
+
 	dockerfileCtx, err := GenerateChallengeDockerfileCtx(challengeConfig)
 	if err != nil {
 		return err
 	}
+	log.Debug("Got dockerfile context from the challenge config")
 
 	additionalCtx := make(map[string]string)
 	additionalCtx["Dockerfile"] = dockerfileCtx
 
+	log.Debug("Starting to build Tar file for the challenge to stage")
 	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx)
 	if err != nil {
 		return err
 	}
 
+	log.Debugf("Staging for challenge %s complete", filepath.Base(challengeDir))
 	return nil
 }
 
@@ -49,7 +56,7 @@ func StageChallenge(challengeDir string) error {
 //		for further steps in the pipeline.
 func StartDeployPipeline(challengeDir string) {
 	challengeName := filepath.Base(challengeDir)
-	log.Debug("Starting deploy pipeline for challenge %s", challengeName)
+	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)
 
 	err := StageChallenge(challengeDir)
 	if err != nil {

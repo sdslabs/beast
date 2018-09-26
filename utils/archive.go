@@ -51,7 +51,9 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 
 	// Create a Gzipped tar file writer from the file we just opened
 	var tarFile io.WriteCloser = targetFile
-	tarFileWriter := tar.NewWriter(gzip.NewWriter(tarFile))
+	fileWriter := gzip.NewWriter(tarFile)
+	tarFileWriter := tar.NewWriter(fileWriter)
+	defer fileWriter.Close()
 	defer tarFileWriter.Close()
 
 	baseDir := filepath.Base(contextDir)
