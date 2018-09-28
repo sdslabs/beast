@@ -3,9 +3,12 @@ package deploy
 import (
 	"path/filepath"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"github.com/fristonio/beast/core"
 	"github.com/fristonio/beast/utils"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 )
 
 // Run the staging setp for the pipeline, this functions assumes the
@@ -43,6 +46,35 @@ func StageChallenge(challengeDir string) error {
 	return nil
 }
 
+// Commit the challenge as a docker image removing the previously existing image
+// This first checks if there is an existing image for the challenge that exist
+// if it exists then first the new image is created and then the old image is removed.
+func CommitChallenge(stagedPath, challengeName string) error {
+	log.Debug("Starting commit stage for the challenge")
+	err := utils.ValidateFileExists(stagedPath)
+	if err != nil {
+		return err
+	}
+
+	// Implement client.ImageSearch() here to check if the image
+	// already exist first check the database and then
+	// the docker images.
+	builderContext, err := os.Open(stagedPath)
+	if err != nil {
+		log.Errorf("Error while opening staged file for the challenge")
+		return fmt.Errorf("Error while opening staged file :: %s", stagedPath)
+	}
+
+	ctx := context.Background()
+	imageBuildResp, err := core.DockerClient.ImageBuild(ctx, builderContext, types.ImageBuildOptions{})
+	if err != nil {
+		log.Errorf("An error while build image for challenge %s :: %s", challengeName, err)
+		return err
+	}
+
+	return nil
+}
+
 // This is the main function which starts the deploy pipeline for a locally
 // available challenge, it goes through all the stages of the challenge deployement
 // and hanles any error by logging into database if it occurs.
@@ -62,6 +94,16 @@ func StartDeployPipeline(challengeDir string) {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "STAGING :: " + challengeName,
+		}).Errorf("%s", err)
+		return
+	}
+
+	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+	stagedChallengePath := filepath.Join(stagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
+	err := CommitChallenge(stagedChallengePath, challengeName)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"DEPLOY_ERROR": "COMMIT :: " + challengeName,
 		}).Errorf("%s", err)
 		return
 	}
