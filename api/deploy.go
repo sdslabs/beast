@@ -24,7 +24,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	}
 
 	log.Info("In local deploy challenge Handler")
-	err := deploy.DeployChallenge(challDir)
+	err := deploy.DeployChallengePipeline(challDir)
 	if err != nil {
 		c.String(http.StatusBadRequest, err.Error())
 		return

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/fristonio/beast/core"
@@ -14,8 +15,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
-
-var DockerClient client.Client
 
 // Run the staging setp for the pipeline, this functions assumes the
 // directory of the challenge wihch will be staged.
@@ -120,6 +119,12 @@ func CommitChallenge(stagedPath, challengeName string) error {
 	return nil
 }
 
+func DeployChallenge(challengeId string) error {
+	log.Debug("Starting to deploy the challenge")
+
+	return nil
+}
+
 // This is the main function which starts the deploy pipeline for a locally
 // available challenge, it goes through all the stages of the challenge deployement
 // and hanles any error by logging into database if it occurs.
@@ -132,10 +137,20 @@ func CommitChallenge(stagedPath, challengeName string) error {
 // 		This challenge is then present in the staging area($BEAST_HOME/staging/challengeId/)
 //		for further steps in the pipeline.
 func StartDeployPipeline(challengeDir string) {
+	log.Debug("Loading Beast config")
+
 	challengeName := filepath.Base(challengeDir)
+	configFile := filepath.Join(challengeDir, core.CONFIG_FILE_NAME)
+	var config core.BeastConfig
+	_, err := toml.DecodeFile(configFile, &config)
+	if err != nil {
+		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
+		return
+	}
+
 	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)
 
-	err := StageChallenge(challengeDir)
+	err = StageChallenge(challengeDir)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "STAGING :: " + challengeName,
@@ -149,6 +164,14 @@ func StartDeployPipeline(challengeDir string) {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "COMMIT :: " + challengeName,
+		}).Errorf("%s", err)
+		return
+	}
+
+	err = DeployChallenge(config.Challenge.Id)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"DEPLOY_ERROR": "DEPLOY :: " + challengeName,
 		}).Errorf("%s", err)
 		return
 	}

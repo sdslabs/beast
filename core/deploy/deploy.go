@@ -6,7 +6,7 @@ import (
 
 // Main function which starts the deploy of a challenge provided
 // directory inside the hack git database.
-func DeployChallenge(challengeDir string) error {
+func DeployChallengePipeline(challengeDir string) error {
 	log.Infof("Deploying Challenge : %s", challengeDir)
 
 	if err := ValidateChallengeDir(challengeDir); err != nil {
