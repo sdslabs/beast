@@ -31,8 +31,8 @@ LABEL author="fristonio"
 WORKDIR /challenge
 COPY . /challenge
 
-RUN apt-get update && apt-get upgrade
-RUN apt-get install {{.AptDeps}}
+RUN apt-get -y update && apt-get -y upgrade
+RUN apt-get -y install {{.AptDeps}}
 
 RUN chmod +x {{.SetupScript}} && \
 	./{{.SetupScript}}

@@ -21,6 +21,10 @@ const (
 
 // Tar the provided context directory into the destination directory, additionalCtx is the context
 // of one or more file which is to be added to the tar file
+//
+// In this function the contextDir is the absolute path of the directory to be compressed
+// to the tar archive.
+// DestincationDir is the directory to put the obtained tar file into.
 func Tar(contextDir string, compression Compression, destinationDir string, additionalCtx map[string]string) error {
 	e := ValidateDirExists(contextDir)
 	if e != nil {
@@ -69,7 +73,7 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 			}
 
 			if baseDir != "" {
-				header.Name = filepath.Join(baseDir, strings.TrimPrefix(path, contextDir))
+				header.Name = filepath.Join(strings.TrimPrefix(path, contextDir))
 			}
 
 			if err := tarFileWriter.WriteHeader(header); err != nil {
@@ -104,7 +108,7 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 			continue
 		}
 
-		header.Name = filepath.Join(baseDir, fileName)
+		header.Name = filepath.Join(fileName)
 
 		if err := tarFileWriter.WriteHeader(header); err != nil {
 			log.Errorf("Cannot write tar header for %s while creating tar... Continuing", filePath)

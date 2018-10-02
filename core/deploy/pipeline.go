@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -24,9 +25,14 @@ func StageChallenge(challengeDir string) error {
 	if err != nil {
 		return err
 	}
+	challengeName := filepath.Base(contextDir)
 
 	log.Debugf("Found context directory for deploy : %s", contextDir)
-	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	if err = utils.CreateIfNotExistDir(stagingDir); err != nil {
+		return err
+	}
+
 	log.Debugf("Staging challenge to directory : %s", stagingDir)
 
 	challengeConfig := filepath.Join(contextDir, core.CONFIG_FILE_NAME)
@@ -54,7 +60,10 @@ func StageChallenge(challengeDir string) error {
 // Commit the challenge as a docker image removing the previously existing image
 // This first checks if there is an existing image for the challenge that exist
 // if it exists then first the new image is created and then the old image is removed.
+//
+// stagedPath is the complete path to the tar file for the challenge in the staging dir
 func CommitChallenge(stagedPath, challengeName string) error {
+	challengeStagingDir := filepath.Dir(stagedPath)
 	log.Debug("Starting commit stage for the challenge")
 	err := utils.ValidateFileExists(stagedPath)
 	if err != nil {
@@ -65,29 +74,48 @@ func CommitChallenge(stagedPath, challengeName string) error {
 	// already exist first check the database and then
 	// the docker images.
 	builderContext, err := os.Open(stagedPath)
-	defer builderContext.Close()
 	if err != nil {
 		log.Errorf("Error while opening staged file for the challenge")
 		return fmt.Errorf("Error while opening staged file :: %s", stagedPath)
 	}
+	defer builderContext.Close()
 
-	ctx := context.Background()
 	buildOptions := types.ImageBuildOptions{
 		Tags: []string{challengeName, "latest"},
 	}
 
-	imageBuildResp, err := DockerClient.ImageBuild(ctx, builderContext, buildOptions)
+	log.Debug("Connecting to docker daemon to build image")
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		log.Errorf("Error while creating a docker client for beast: %s", err)
+		return err
+	}
+
+	log.Debug("Image build in process")
+	imageBuildResp, err := dockerClient.ImageBuild(context.Background(), builderContext, buildOptions)
 	if err != nil {
 		log.Errorf("An error while build image for challenge %s :: %s", challengeName, err)
 		return err
 	}
 	defer imageBuildResp.Body.Close()
 
+	// TODO: Add entry to database - Image Build is Done
+
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(imageBuildResp.Body)
 
-	fmt.Println(buf)
-	log.Debug("Image build in process")
+	log.Debug("Writing image build logs from buffer to file")
+	logFilePath := filepath.Join(challengeStagingDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
+	logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+	if err != nil {
+		log.Errorf("Error while writing logs to file : %s", logFilePath)
+	}
+	defer logFile.Close()
+
+	logFile.Write(buf.Bytes())
+	log.Debug("Logs writterned to log file for the challenge")
+
+	log.Infof("Image build for `%s` done", challengeName)
 
 	return nil
 }
@@ -115,7 +143,7 @@ func StartDeployPipeline(challengeDir string) {
 		return
 	}
 
-	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	stagedChallengePath := filepath.Join(stagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
 	err = CommitChallenge(stagedChallengePath, challengeName)
 	if err != nil {
@@ -124,15 +152,4 @@ func StartDeployPipeline(challengeDir string) {
 		}).Errorf("%s", err)
 		return
 	}
-}
-
-func init() {
-	log.Info("Trying to connect to docker client for beast")
-
-	DockerClient, err := client.NewEnvClient()
-	if err != nil {
-		log.Fatalf("Error while creating a docker client for beast: %s", err)
-	}
-
-	log.Infof("Using docker client version %s", DockerClient.ClientVersion())
 }
