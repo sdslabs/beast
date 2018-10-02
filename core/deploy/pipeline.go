@@ -1,6 +1,9 @@
 package deploy
 
 import (
+	"bytes"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/docker/docker/api/types"
@@ -10,6 +13,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
+
+var DockerClient client.Client
 
 // Run the staging setp for the pipeline, this functions assumes the
 // directory of the challenge wihch will be staged.
@@ -56,21 +61,33 @@ func CommitChallenge(stagedPath, challengeName string) error {
 		return err
 	}
 
-	// Implement client.ImageSearch() here to check if the image
+	// TODO: Implement client.ImageSearch() here to check if the image
 	// already exist first check the database and then
 	// the docker images.
 	builderContext, err := os.Open(stagedPath)
+	defer builderContext.Close()
 	if err != nil {
 		log.Errorf("Error while opening staged file for the challenge")
 		return fmt.Errorf("Error while opening staged file :: %s", stagedPath)
 	}
 
 	ctx := context.Background()
-	imageBuildResp, err := core.DockerClient.ImageBuild(ctx, builderContext, types.ImageBuildOptions{})
+	buildOptions := types.ImageBuildOptions{
+		Tags: []string{challengeName, "latest"},
+	}
+
+	imageBuildResp, err := DockerClient.ImageBuild(ctx, builderContext, buildOptions)
 	if err != nil {
 		log.Errorf("An error while build image for challenge %s :: %s", challengeName, err)
 		return err
 	}
+	defer imageBuildResp.Body.Close()
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(imageBuildResp.Body)
+
+	fmt.Println(buf)
+	log.Debug("Image build in process")
 
 	return nil
 }
@@ -100,11 +117,22 @@ func StartDeployPipeline(challengeDir string) {
 
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
 	stagedChallengePath := filepath.Join(stagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
-	err := CommitChallenge(stagedChallengePath, challengeName)
+	err = CommitChallenge(stagedChallengePath, challengeName)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "COMMIT :: " + challengeName,
 		}).Errorf("%s", err)
 		return
 	}
+}
+
+func init() {
+	log.Info("Trying to connect to docker client for beast")
+
+	DockerClient, err := client.NewEnvClient()
+	if err != nil {
+		log.Fatalf("Error while creating a docker client for beast: %s", err)
+	}
+
+	log.Infof("Using docker client version %s", DockerClient.ClientVersion())
 }
