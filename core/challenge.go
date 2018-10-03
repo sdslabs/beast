@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -82,11 +83,16 @@ type ChallengeDetails struct {
 	SetupScript      string   `toml:"setup_script"`
 	StaticContentDir string   `toml:"static_content_dir"`
 	RunCmd           string   `toml:"run_cmd"`
+	Ports            []uint32 `toml:"ports"`
 }
 
 func (config *ChallengeDetails) ValidateRequiredFields() error {
 	if config.Flag == "" || config.RunCmd == "" {
 		return errors.New("Challenge `flag` and `run_cmd` are required")
+	}
+
+	if len(config.Ports) > int(MAX_PORT_PER_CHALL) {
+		return fmt.Errorf("Max ports allowed for challenge : %d given : %d", MAX_PORT_PER_CHALL, len(config.Ports))
 	}
 
 	return nil

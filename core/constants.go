@@ -16,4 +16,12 @@ const (
 	BEAST_LOG_FILE         string = "beast.log"
 	BEAST_DATABASE         string = "beast.db"
 	BEAST_STAGING_DIR      string = "staging"
+	MAX_PORT_PER_CHALL     uint32 = 3
 )
+
+var DEPLOY_STATUS = map[string]string{
+	"unknown": "Unknown",
+	"stage":   "Staging",
+	"commit":  "Commiting",
+	"deploy":  "Deploying",
+}
