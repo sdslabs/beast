@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/fristonio/beast/cmd"
-	"github.com/fristonio/beast/core"
-	_ "github.com/fristonio/beast/core/database"
+	"github.com/sdslabs/beastv4/cmd"
+	"github.com/sdslabs/beastv4/core"
+	_ "github.com/sdslabs/beastv4/core/database"
 	log "github.com/sirupsen/logrus"
 )
 

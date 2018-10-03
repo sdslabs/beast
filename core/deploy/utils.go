@@ -9,10 +9,10 @@ import (
 	"text/template"
 
 	"github.com/BurntSushi/toml"
-	"github.com/fristonio/beast/core"
-	"github.com/fristonio/beast/core/database"
-	tools "github.com/fristonio/beast/templates"
-	"github.com/fristonio/beast/utils"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/database"
+	tools "github.com/sdslabs/beastv4/templates"
+	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 )
 

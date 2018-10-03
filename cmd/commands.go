@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fristonio/beast/cmd/debug"
+	"github.com/sdslabs/beastv4/cmd/debug"
 	"github.com/spf13/cobra"
 )
 

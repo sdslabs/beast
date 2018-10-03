@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/fristonio/beast/core/deploy"
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core/deploy"
 	log "github.com/sirupsen/logrus"
 )
 

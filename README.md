@@ -8,7 +8,7 @@ Beast go version is under development, follow the below instructions to get star
 
 * Install go 1.11.x
 * Clone the repository.
-* Jump to `$GOPATH/src/github.com/fristonio/beast/` and start hacking.
+* Jump to `$GOPATH/src/github.com/sdslabs/beastv4/` and start hacking.
 
 **All the dependencies are already vendored with the project so no need to install any dependencies**. The projcet uses go modules from 
 go 1.11.X fo dependency management. Make sure you vendor any library used using `go mod vendor`

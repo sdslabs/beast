@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/fristonio/beast/core"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/sdslabs/beastv4/core"
 	log "github.com/sirupsen/logrus"
 )
 

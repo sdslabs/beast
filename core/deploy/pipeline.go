@@ -10,9 +10,9 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/fristonio/beast/core"
-	"github.com/fristonio/beast/core/database"
-	"github.com/fristonio/beast/utils"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )

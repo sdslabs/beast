@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/fristonio/beast/api"
+	"github.com/sdslabs/beastv4/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

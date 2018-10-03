@@ -1,4 +1,4 @@
-module github.com/fristonio/beast
+module github.com/sdslabs/beastv4
 
 require (
 	cloud.google.com/go v0.28.0 // indirect
