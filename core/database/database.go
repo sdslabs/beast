@@ -32,5 +32,5 @@ func init() {
 		}).Fatal(dberr)
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{})
+	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{})
 }

@@ -13,6 +13,7 @@ challenge_type  = {{.ChallengeType}}             # Type of challenge -> web serv
     apt_dependencies     = {{.AptDeps}}          # Custom apt-dependencies for challenge
     setup_script         = {{.SetupScript}}      # Setup script to run additional steps for challenge deployment
     static_content_dir   = {{.StaticContentDir}} # Static directory to be served for the challenge
+    ports				 = {{.Ports}}
     run_cmd              = {{.RunCmd}}
 
 [author]
@@ -33,6 +34,8 @@ COPY . /challenge
 
 RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install {{.AptDeps}}
+
+EXPOSE {{.Ports}}
 
 RUN chmod +x {{.SetupScript}} && \
 	./{{.SetupScript}}
