@@ -19,7 +19,7 @@ type Challenge struct {
 	gorm.Model
 
 	ChallengeId string `gorm:"not null;type:varchar(64);unique"`
-	Name        string
+	Name        string `gorm:"not null;type:varchar(64);unique"`
 	Author      string `gorm:"not null"`
 	Format      string `gorm:"not null"`
 	ContainerId string `gorm:"size:64;unique"`
@@ -84,7 +84,7 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 		return Challenge{}, err
 	}
 
-	if challenges == nil {
+	if len(challenges) == 0 {
 		return Challenge{}, nil
 	}
 

@@ -81,7 +81,7 @@ func CommitChallenge(stagedPath, challengeName string) error {
 	defer builderContext.Close()
 
 	buildOptions := types.ImageBuildOptions{
-		Tags: []string{challengeName, "latest"},
+		Tags: []string{challengeName},
 	}
 
 	log.Debug("Connecting to docker daemon to build image")
@@ -156,10 +156,19 @@ func StartDeployPipeline(challengeDir string) {
 		return
 	}
 
+	// Validate challenge directory name with the name of the challenge
+	// provided in the config file for the beast. THere should be no
+	// conflict in the name.
+	if challengeName != config.Challenge.Name {
+		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Name)
+		return
+	}
+
 	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)
+
 	challenge, err := UpdateOrCreateChallengeDbEntry(config)
 	if err != nil {
-		log.Error("An error occured while creating db entry for challenge %s", challengeName)
+		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
 		log.Errorf("Db error : %s", err)
 		return
 	}

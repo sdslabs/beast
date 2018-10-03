@@ -35,7 +35,7 @@ COPY . /challenge
 RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install {{.AptDeps}}
 
-EXPOSE {{.Ports}}
+{{if .Ports}} EXPOSE {{.Ports}} {{end}}
 
 RUN chmod +x {{.SetupScript}} && \
 	./{{.SetupScript}}

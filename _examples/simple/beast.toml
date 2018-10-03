@@ -10,6 +10,7 @@ challenge_type = "service"				# Type of challenge -> web service ssh
     setup_script = "setup.sh"	# Setup script to run additional steps for challenge deployment
     static_content_dir = "public/"		# Static directory to be served for the challenge
     run_cmd = "node server.js"
+    ports = [10000, 10001]
 
 [author]
 name = "fristonio"						# Name of the challenge creator

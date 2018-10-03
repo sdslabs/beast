@@ -23,6 +23,11 @@ type BeastBareDockerfile struct {
 	RunCmd      string
 }
 
+// This if the function which validates the challenge directory
+// which is provided as an arguments. This validtions includes
+// * A valid directory pointed by challengeDir
+// * Valid config file for the challenge in the challengeDir root named as beast.toml
+// * Valid challenge directory name in accordance to the challenge config.
 func ValidateChallengeConfig(challengeDir string) error {
 	configFile := filepath.Join(challengeDir, core.CONFIG_FILE_NAME)
 
@@ -38,6 +43,12 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return err
 	}
 
+	challengeName := filepath.Dir(challengeDir)
+	if challengeName != config.Challenge.Name {
+		return fmt.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Name)
+	}
+
+	log.Debugf("Parsed config file is : %s", config)
 	err = config.ValidateRequiredFields()
 	if err != nil {
 		return err
@@ -173,6 +184,9 @@ func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge
 	}
 
 	allocatedPorts, err := database.GetAllocatedPorts(challEntry)
+	if err != nil {
+		return challEntry, fmt.Errorf("Error while getting allocated ports for : %s : %s", challEntry.ChallengeId, err)
+	}
 
 	isAllocated := func(port uint32) bool {
 		for _, p := range allocatedPorts {
@@ -203,9 +217,7 @@ func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge
 			PortNo:      port,
 		}
 
-		gotPort, err := database.PortEntryGetOrCreate(portEntry, map[string]uint32{
-			"port_no": port,
-		})
+		gotPort, err := database.PortEntryGetOrCreate(portEntry)
 		if err != nil {
 			return database.Challenge{}, err
 		}
