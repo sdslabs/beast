@@ -10,12 +10,14 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/fristonio/beast/core"
+	"github.com/fristonio/beast/core/database"
 	tools "github.com/fristonio/beast/templates"
 	"github.com/fristonio/beast/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 type BeastBareDockerfile struct {
+	Ports       string
 	AptDeps     string
 	SetupScript string
 	RunCmd      string
@@ -92,6 +94,7 @@ func GenerateDockerfile(configFile string) (string, error) {
 	}
 
 	data := BeastBareDockerfile{
+		Ports:       strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.ChallengeDetails.Ports), " ", " ", -1), "[]"),
 		AptDeps:     strings.Join(config.Challenge.ChallengeDetails.AptDeps[:], " "),
 		SetupScript: config.Challenge.ChallengeDetails.SetupScript,
 		RunCmd:      config.Challenge.ChallengeDetails.RunCmd,
@@ -141,4 +144,79 @@ func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
 
 	log.Debugf("Generated dockerfile lives in : %s", file.Name())
 	return file.Name(), nil
+}
+
+func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge, error) {
+	challEntry, err := database.QueryFirstChallengeEntry("challenge_id", config.Challenge.Id)
+	if err != nil {
+		return challEntry, fmt.Errorf("Error while querying challenge with id %s : %s", config.Challenge.Id, err)
+	}
+
+	// Challenge is nil, which means the challenge entry does not exist
+	// So create a new challenge entry on the basis of the fields provided
+	// in the config file for the challenge.
+	if challEntry.ChallengeId == "" {
+		// For creating a new entry for the challenge first create an entry
+		// in the challenge table using the config file.
+		challEntry = database.Challenge{
+			ChallengeId: config.Challenge.Id,
+			Name:        config.Challenge.Name,
+			Author:      config.Author.Name,
+			Format:      config.Challenge.ChallengeType,
+			Status:      core.DEPLOY_STATUS["unknown"],
+		}
+
+		err = database.CreateChallengeEntry(&challEntry)
+		if err != nil {
+			return challEntry, fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
+		}
+	}
+
+	allocatedPorts, err := database.GetAllocatedPorts(challEntry)
+
+	isAllocated := func(port uint32) bool {
+		for _, p := range allocatedPorts {
+			if port == p.PortNo {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	// Once the challenge entry has been created, add entries to the ports
+	// table in the database with the ports to expose
+	// for the challenge.
+	// TODO: Do all this under a database transaction so that if any port
+	// request is not available
+	// TODO: delete previously allocated ports to the challenge if they are not
+	// in the current required port list.
+	for _, port := range config.Challenge.ChallengeDetails.Ports {
+		if isAllocated(port) {
+			// The port has already been allocated to the challenge
+			// Do nothing for this.
+			continue
+		}
+
+		portEntry := database.Port{
+			ChallengeID: challEntry.ID,
+			PortNo:      port,
+		}
+
+		gotPort, err := database.PortEntryGetOrCreate(portEntry, map[string]uint32{
+			"port_no": port,
+		})
+		if err != nil {
+			return database.Challenge{}, err
+		}
+
+		// var gotChall database.Challenge
+		// database.Db.Model(&gotPort).Related(&gotChall)
+
+		if gotPort.ChallengeID != challEntry.ID {
+			return database.Challenge{}, fmt.Errorf("The port %s requested is already in use by another challenge", gotPort.PortNo)
+		}
+	}
+
+	return challEntry, nil
 }

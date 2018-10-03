@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/fristonio/beast/core"
+	"github.com/fristonio/beast/core/database"
 	"github.com/fristonio/beast/utils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -141,6 +142,7 @@ func StartDeployPipeline(challengeDir string) {
 
 	challengeName := filepath.Base(challengeDir)
 	configFile := filepath.Join(challengeDir, core.CONFIG_FILE_NAME)
+
 	var config core.BeastConfig
 	_, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
@@ -148,7 +150,22 @@ func StartDeployPipeline(challengeDir string) {
 		return
 	}
 
+	err = config.ValidateRequiredFields()
+	if err != nil {
+		log.Errorf("An error occured while validating the config file : %s", err)
+		return
+	}
+
 	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)
+	challenge, err := UpdateOrCreateChallengeDbEntry(config)
+	if err != nil {
+		log.Error("An error occured while creating db entry for challenge %s", challengeName)
+		log.Errorf("Db error : %s", err)
+		return
+	}
+
+	challenge.Status = core.DEPLOY_STATUS["stage"]
+	database.Db.Save(&challenge)
 
 	err = StageChallenge(challengeDir)
 	if err != nil {
@@ -160,6 +177,10 @@ func StartDeployPipeline(challengeDir string) {
 
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	stagedChallengePath := filepath.Join(stagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
+
+	challenge.Status = core.DEPLOY_STATUS["commit"]
+	database.Db.Save(&challenge)
+
 	err = CommitChallenge(stagedChallengePath, challengeName)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -167,6 +188,9 @@ func StartDeployPipeline(challengeDir string) {
 		}).Errorf("%s", err)
 		return
 	}
+
+	challenge.Status = core.DEPLOY_STATUS["deploy"]
+	database.Db.Save(&challenge)
 
 	err = DeployChallenge(config.Challenge.Id)
 	if err != nil {
