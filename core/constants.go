@@ -24,4 +24,5 @@ var DEPLOY_STATUS = map[string]string{
 	"stage":   "Staging",
 	"commit":  "Commiting",
 	"deploy":  "Deploying",
+	"build":   "Building",
 }
