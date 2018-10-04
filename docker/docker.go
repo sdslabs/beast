@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -119,4 +122,55 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	}
 
 	return buf, "", err
+}
+
+func CreateContainerFromImage(portsList []uint32, imageId string, challengeName string) (string, error) {
+	ctx := context.Background()
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		return "", err
+	}
+
+	portSet := make(nat.PortSet)
+	portMap := make(nat.PortMap)
+
+	for _, port := range portsList {
+		natPort, err := nat.NewPort("tcp", strconv.Itoa(int(port)))
+		if err != nil {
+			return "", fmt.Errorf("Error while creating new port from port %d", port)
+		}
+
+		portSet[natPort] = struct{}{}
+
+		portMap[natPort] = []nat.PortBinding{{
+			HostIP:   "0.0.0.0",
+			HostPort: strconv.Itoa(int(port)),
+		}}
+	}
+
+	config := &container.Config{
+		Image:        imageId,
+		ExposedPorts: portSet,
+	}
+
+	hostConfig := &container.HostConfig{
+		PortBindings: portMap,
+	}
+
+	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, challengeName)
+	if err != nil {
+		log.Error("Error while creating the container with name %s", challengeName)
+		return "", err
+	}
+
+	containerId := createResp.ID
+	if len(createResp.Warnings) > 0 {
+		log.Warnf("Warnings while creating the container : %s", createResp.Warnings)
+	}
+
+	if err := cli.ContainerStart(ctx, containerId, types.ContainerStartOptions{}); err != nil {
+		log.Error("Error while starting the container")
+	}
+
+	return containerId, err
 }

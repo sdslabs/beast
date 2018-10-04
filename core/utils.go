@@ -39,7 +39,7 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 	return nil
 }
 
-func CleanupChallengeContainers(chall database.Challenge, config BeastConfig) error {
+func CleanupChallengeContainers(chall *database.Challenge, config BeastConfig) error {
 	if chall.ContainerId != "" {
 		err := CleanupContainerByFilter("id", chall.ContainerId)
 		if err != nil {
@@ -47,14 +47,14 @@ func CleanupChallengeContainers(chall database.Challenge, config BeastConfig) er
 		}
 
 		chall.ContainerId = ""
-		database.Db.Save(&chall)
+		database.Db.Save(chall)
 	}
 
 	err := CleanupContainerByFilter("name", config.Challenge.Name)
 	return err
 }
 
-func CleanupChallengeImage(chall database.Challenge) error {
+func CleanupChallengeImage(chall *database.Challenge) error {
 	err := docker.RemoveImage(chall.ImageId)
 	if err != nil {
 		log.Error("Error while cleaning up image with id ", chall.ImageId)
@@ -62,7 +62,7 @@ func CleanupChallengeImage(chall database.Challenge) error {
 	}
 
 	chall.ImageId = ""
-	database.Db.Save(&chall)
+	database.Db.Save(chall)
 
 	return nil
 }
@@ -79,7 +79,7 @@ func CleanupChallengeIfExist(config BeastConfig) error {
 		return nil
 	}
 
-	err = CleanupChallengeContainers(chall, config)
+	err = CleanupChallengeContainers(&chall, config)
 	if err != nil {
 		return err
 	}
@@ -88,6 +88,6 @@ func CleanupChallengeIfExist(config BeastConfig) error {
 		log.Warn("Looks like we don't have the image ID in database for challenge, Nothing to remove")
 		return nil
 	}
-	err = CleanupChallengeImage(chall)
+	err = CleanupChallengeImage(&chall)
 	return err
 }
