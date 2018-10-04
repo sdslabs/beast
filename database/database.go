@@ -1,12 +1,12 @@
 package database
 
 import (
+	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/sdslabs/beastv4/core"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -16,6 +16,11 @@ var (
 	dberr error
 )
 
+var (
+	BEAST_GLOBAL_DIR string = filepath.Join(os.Getenv("HOME"), ".beast")
+	BEAST_DATABASE   string = "beast.db"
+)
+
 // Set up the initial bootstrapping for interacting with the local
 // SQLite database for beast. The Db variable is the connection variable for the
 // database, which is not closed after creating a connection here and can
@@ -23,7 +28,7 @@ var (
 func init() {
 	mutex = &sync.Mutex{}
 
-	beastDb := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_DATABASE)
+	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
 	Db, dberr = gorm.Open("sqlite3", beastDb)
 
 	if dberr != nil {
