@@ -51,6 +51,35 @@ To build beast from Source use the Makefile provided.
 * **_examples**
 	* This directory contains example challenges for beast.
 
+### Testing
+
+To test use the sample challenges in the `_examples` directory. Use the challenge simple and try to deploy it using
+beast. Follow the below instructions.
+
+```bash
+# Build beast
+$ make build
+
+# Run beast server
+# Beast server will start running on port 5005 port by default
+$ beast run -v
+
+# In another terminal Start the local deployment of the challenge, using the directory
+$ curl -X POST localhost:5005/api/deploy/local/ --data "challenge_dir=<absolute_path_to_challenge_simple>"
+
+# Wait for beast to finish the image build and deployment of the challenge
+# This might take some time. Have some snacks ready!
+# Try connecting to the deployed service
+$ nc localhost 10001
+
+--- Menu ---
+1.New note
+2.Delete note
+3.Help
+4.Exit
+choice > 4
+```
+
 ### Development notes
 
 Beast uses `logrus` for logging purposes and follow standard effective go guidelines, so anytime you are writing a code keep in mind to 
