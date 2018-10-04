@@ -109,8 +109,27 @@ func CommitChallenge(challenge *database.Challenge, config core.BeastConfig, sta
 	return nil
 }
 
-func DeployChallenge(challengeId string) error {
+func DeployChallenge(challenge *database.Challenge, config core.BeastConfig) error {
 	log.Debug("Starting to deploy the challenge")
+
+	containerId, err := docker.CreateContainerFromImage(config.Challenge.ChallengeDetails.Ports, challenge.ImageId, config.Challenge.Name)
+	if err != nil {
+		if containerId != "" {
+			challenge.ContainerId = containerId
+			if e := database.Db.Save(challenge).Error; e != nil {
+				return fmt.Errorf("Error while starting container : %s and saving database : %s", err, e)
+			}
+
+			return fmt.Errorf("Error while starting the container : %s", err)
+		}
+
+		return fmt.Errorf("Error while trying to create a container for the challenge: %s", err)
+	}
+
+	challenge.ContainerId = containerId
+	if err = database.Db.Save(challenge).Error; err != nil {
+		return fmt.Errorf("Error while saving containerId to database : %s", err)
+	}
 
 	return nil
 }
@@ -190,11 +209,13 @@ func StartDeployPipeline(challengeDir string) {
 	challenge.Status = core.DEPLOY_STATUS["deploy"]
 	database.Db.Save(&challenge)
 
-	err = DeployChallenge(config.Challenge.Id)
+	err = DeployChallenge(&challenge, config)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "DEPLOY :: " + challengeName,
 		}).Errorf("%s", err)
 		return
 	}
+
+	log.Infof("CHALLENGE %s DEPLOYED SUCCESSFULLY", challengeName)
 }
