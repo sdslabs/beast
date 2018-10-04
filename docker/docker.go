@@ -28,7 +28,7 @@ func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, er
 	}
 
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
-		All:     false,
+		All:     true,
 		Filters: filterArgs,
 	})
 
@@ -46,10 +46,12 @@ func StopAndRemoveContainer(containerId string) error {
 	if err != nil {
 		return err
 	}
+	log.Debug("Stopped container with ID ", containerId)
 
+	log.Debug("Removing container with ID ", containerId)
 	err = cli.ContainerRemove(context.Background(), containerId, types.ContainerRemoveOptions{
 		RemoveVolumes: false,
-		RemoveLinks:   true,
+		RemoveLinks:   false,
 		Force:         true,
 	})
 
@@ -170,8 +172,9 @@ func CreateContainerFromImage(portsList []uint32, imageId string, challengeName 
 	}
 
 	if err := cli.ContainerStart(ctx, containerId, types.ContainerStartOptions{}); err != nil {
-		log.Error("Error while starting the container")
+		log.Error("Error while starting the container : %s", err)
+		return "", err
 	}
 
-	return containerId, err
+	return containerId, nil
 }
