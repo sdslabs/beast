@@ -8,11 +8,12 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/BurntSushi/toml"
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/database"
 	tools "github.com/sdslabs/beastv4/templates"
 	"github.com/sdslabs/beastv4/utils"
+
+	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -43,7 +44,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return err
 	}
 
-	challengeName := filepath.Dir(challengeDir)
+	challengeName := filepath.Base(challengeDir)
 	if challengeName != config.Challenge.Name {
 		return fmt.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Name)
 	}

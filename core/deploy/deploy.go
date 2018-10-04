@@ -10,6 +10,7 @@ func DeployChallengePipeline(challengeDir string) error {
 	log.Infof("Deploying Challenge : %s", challengeDir)
 
 	if err := ValidateChallengeDir(challengeDir); err != nil {
+		log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
 		return err
 	}
 
