@@ -97,7 +97,8 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	defer builderContext.Close()
 
 	buildOptions := types.ImageBuildOptions{
-		Tags: []string{challengeName},
+		Tags:   []string{challengeName},
+		Remove: true,
 	}
 
 	dockerClient, err := client.NewEnvClient()

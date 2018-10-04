@@ -74,21 +74,39 @@ func (config *Challenge) ValidateRequiredFields() error {
 // 		challenge.
 // * RunCmd - Command to run to start the challenge.
 type ChallengeDetails struct {
-	Flag             string   `toml:"flag"`
-	AptDeps          []string `toml:"apt_dependencies"`
-	SetupScript      string   `toml:"setup_script"`
-	StaticContentDir string   `toml:"static_content_dir"`
-	RunCmd           string   `toml:"run_cmd"`
-	Ports            []uint32 `toml:"ports"`
+	Flag                    string   `toml:"flag"`
+	AptDeps                 []string `toml:"apt_dependencies"`
+	SetupScript             string   `toml:"setup_script"`
+	StaticContentDir        string   `toml:"static_content_dir"`
+	StaticContentServerPort uint32   `toml:"static_content_port"`
+	RunCmd                  string   `toml:"run_cmd"`
+	Ports                   []uint32 `toml:"ports"`
 }
 
 func (config *ChallengeDetails) ValidateRequiredFields() error {
-	if config.Flag == "" || config.RunCmd == "" {
+	if config.Flag == "" {
 		return errors.New("Challenge `flag` and `run_cmd` are required")
 	}
 
 	if len(config.Ports) > int(MAX_PORT_PER_CHALL) {
 		return fmt.Errorf("Max ports allowed for challenge : %d given : %d", MAX_PORT_PER_CHALL, len(config.Ports))
+	}
+
+	if config.StaticContentDir != "" {
+		if config.StaticContentServerPort == 0 || len(config.Ports) == 0 {
+			return errors.New("Valid static content server port should be provided")
+		}
+
+		validPortMap := false
+		for _, port := range config.Ports {
+			if port == config.StaticContentServerPort {
+				validPortMap = true
+			}
+		}
+
+		if !validPortMap {
+			return errors.New("Static content dir server port should also be present in Ports array")
+		}
 	}
 
 	return nil

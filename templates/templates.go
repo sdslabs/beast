@@ -13,6 +13,7 @@ challenge_type  = {{.ChallengeType}}             # Type of challenge -> web serv
     apt_dependencies     = {{.AptDeps}}          # Custom apt-dependencies for challenge
     setup_script         = {{.SetupScript}}      # Setup script to run additional steps for challenge deployment
     static_content_dir   = {{.StaticContentDir}} # Static directory to be served for the challenge
+    static_content_port  = {{.StaticContentServerPort}}
     ports				 = {{.Ports}}
     run_cmd              = {{.RunCmd}}
 
