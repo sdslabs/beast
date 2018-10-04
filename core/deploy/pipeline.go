@@ -1,20 +1,18 @@
 package deploy
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/BurntSushi/toml"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/docker"
 	"github.com/sdslabs/beastv4/utils"
+
+	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 // Run the staging setp for the pipeline, this functions assumes the
@@ -62,49 +60,40 @@ func StageChallenge(challengeDir string) error {
 // if it exists then first the new image is created and then the old image is removed.
 //
 // stagedPath is the complete path to the tar file for the challenge in the staging dir
-func CommitChallenge(stagedPath, challengeName string) error {
+func CommitChallenge(challenge *database.Challenge, config core.BeastConfig, stagedPath string) error {
+	challengeName := config.Challenge.Name
 	challengeStagingDir := filepath.Dir(stagedPath)
+
 	log.Debug("Starting commit stage for the challenge")
 	err := utils.ValidateFileExists(stagedPath)
 	if err != nil {
 		return err
 	}
 
-	// TODO: Implement client.ImageSearch() here to check if the image
-	// already exist first check the database and then
-	// the docker images.
-	builderContext, err := os.Open(stagedPath)
+	err = core.CleanupChallengeIfExist(config)
 	if err != nil {
-		log.Errorf("Error while opening staged file for the challenge")
-		return fmt.Errorf("Error while opening staged file :: %s", stagedPath)
-	}
-	defer builderContext.Close()
-
-	buildOptions := types.ImageBuildOptions{
-		Tags: []string{challengeName},
-	}
-
-	log.Debug("Connecting to docker daemon to build image")
-	dockerClient, err := client.NewEnvClient()
-	if err != nil {
-		log.Errorf("Error while creating a docker client for beast: %s", err)
+		log.Errorf("Error while cleaning up the challenge")
 		return err
 	}
 
-	log.Debug("Image build in process")
-	imageBuildResp, err := dockerClient.ImageBuild(context.Background(), builderContext, buildOptions)
+	buff, imageId, err := docker.BuildImageFromTarContext(challengeName, stagedPath)
 	if err != nil {
-		log.Errorf("An error while build image for challenge %s :: %s", challengeName, err)
+		log.Error("Error while building image from the tar context of challenge")
 		return err
 	}
-	defer imageBuildResp.Body.Close()
 
-	// TODO: Add entry to database - Image Build is Done
+	if imageId == "" {
+		log.Error("Could not figure out the ImageID for the commited challenge")
+		return fmt.Errorf("Error while getting imageId for the commited challenge")
+	}
 
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(imageBuildResp.Body)
+	challenge.ImageId = imageId
+	if err = database.Db.Save(challenge).Error; err != nil {
+		return fmt.Errorf("Error while writing imageId to database : %s", err)
+	}
 
 	log.Debug("Writing image build logs from buffer to file")
+
 	logFilePath := filepath.Join(challengeStagingDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
 	logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
@@ -112,7 +101,7 @@ func CommitChallenge(stagedPath, challengeName string) error {
 	}
 	defer logFile.Close()
 
-	logFile.Write(buf.Bytes())
+	logFile.Write(buff.Bytes())
 	log.Debug("Logs writterned to log file for the challenge")
 
 	log.Infof("Image build for `%s` done", challengeName)
@@ -190,7 +179,7 @@ func StartDeployPipeline(challengeDir string) {
 	challenge.Status = core.DEPLOY_STATUS["commit"]
 	database.Db.Save(&challenge)
 
-	err = CommitChallenge(stagedChallengePath, challengeName)
+	err = CommitChallenge(&challenge, config, stagedChallengePath)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "COMMIT :: " + challengeName,

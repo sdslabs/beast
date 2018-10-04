@@ -1,10 +1,11 @@
 package core
 
 import (
-	"errors"
+	"fmt"
 
-	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/database"
 	"github.com/sdslabs/beastv4/docker"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -25,7 +26,7 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 		for _, container := range containers {
 			err = docker.StopAndRemoveContainer(container.ID)
 			if err != nil {
-				erroredContainers.append(container.ID)
+				erroredContainers = append(erroredContainers, container.ID)
 				log.Errorf("Error while cleaning up container %s : %s", container.ID, err)
 			}
 		}
@@ -40,7 +41,7 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 
 func CleanupChallengeContainers(chall database.Challenge, config BeastConfig) error {
 	if chall.ContainerId != "" {
-		err = CleanupContainerByFilter("id", chall.ContainerId)
+		err := CleanupContainerByFilter("id", chall.ContainerId)
 		if err != nil {
 			return err
 		}
@@ -49,7 +50,7 @@ func CleanupChallengeContainers(chall database.Challenge, config BeastConfig) er
 		database.Db.Save(&chall)
 	}
 
-	err = CleanupContainerByFilter("name", config.Challenge.Name)
+	err := CleanupContainerByFilter("name", config.Challenge.Name)
 	return err
 }
 
@@ -67,18 +68,18 @@ func CleanupChallengeImage(chall database.Challenge) error {
 }
 
 func CleanupChallengeIfExist(config BeastConfig) error {
-	chall, err := database.QueryFirstChallengeEntry("challenge_id", config.Challenge.ChallengeId)
+	chall, err := database.QueryFirstChallengeEntry("challenge_id", config.Challenge.Id)
 	if err != nil {
-		log.Errorf("Error while database query for challenge Id %s", config.Challenge.ChallengeId)
+		log.Errorf("Error while database query for challenge Id %s", config.Challenge.Id)
 		return err
 	}
 
-	if len(chall) == 0 {
+	if chall.ChallengeId == "" {
 		log.Info("No such challenge exist in the database")
 		return nil
 	}
 
-	err := CleanupChallengeContainers(chall, config)
+	err = CleanupChallengeContainers(chall, config)
 	if err != nil {
 		return err
 	}
