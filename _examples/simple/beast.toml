@@ -1,7 +1,7 @@
 # This a sample challenge configuration file.
 [challenge]
 id = "ce34dfeabc234c3" 					# ID of the challenge
-name = "BIN-50"							# Name of the challenge
+name = "simple"							# Name of the challenge
 challenge_type = "service"				# Type of challenge -> web service ssh
 
     [challenge.details]
