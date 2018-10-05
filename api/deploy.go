@@ -39,6 +39,15 @@ func deployChallengeHandler(c *gin.Context) {
 	c.String(http.StatusOK, respStr)
 }
 
+// Deploy local challenge
+// @Summary Deploy a local challenge using the path provided in the post parameter
+// @Description Handles deployment of a challenge using the absolute directory path
+// @Accept  json
+// @Produce text/plain
+// @Param challenge_dir query string true "Challenge Directory"
+// @Success 200 {string} Success
+// @Failure 400 {string} Error
+// @Router /api/deploy [post]
 func deployLocalChallengeHandler(c *gin.Context) {
 	challDir := c.PostForm("challenge_dir")
 	if challDir == "" {

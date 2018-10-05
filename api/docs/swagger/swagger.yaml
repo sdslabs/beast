@@ -1,0 +1,39 @@
+basePath: /
+host: beast.sdslabs.co
+info:
+  contact:
+    email: contact.sdslabs.co.in
+    name: SDSLabs
+    url: https://chat.sdslabs.co
+  description: Beast the automatic deployment tool for backdoor
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Beast API
+  version: "1.0"
+paths:
+  /api/deploy:
+    post:
+      consumes:
+      - application/json
+      description: Handles deployment of a challenge using the absolute directory
+        path
+      parameters:
+      - description: Challenge Directory
+        in: query
+        name: challenge_dir
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Deploy a local challenge using the path provided in the post parameter
+swagger: "2.0"

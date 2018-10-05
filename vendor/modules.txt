@@ -2,6 +2,10 @@
 github.com/BurntSushi/toml
 # github.com/Microsoft/go-winio v0.4.11
 github.com/Microsoft/go-winio
+# github.com/PuerkitoBio/purell v1.1.0
+github.com/PuerkitoBio/purell
+# github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
+github.com/PuerkitoBio/urlesc
 # github.com/docker/distribution v2.6.2+incompatible
 github.com/docker/distribution/reference
 github.com/docker/distribution/digest
@@ -35,6 +39,14 @@ github.com/gin-gonic/gin
 github.com/gin-gonic/gin/binding
 github.com/gin-gonic/gin/json
 github.com/gin-gonic/gin/render
+# github.com/go-openapi/jsonpointer v0.0.0-20180825180259-52eb3d4b47c6
+github.com/go-openapi/jsonpointer
+# github.com/go-openapi/jsonreference v0.0.0-20180825180305-1c6a3fa339f2
+github.com/go-openapi/jsonreference
+# github.com/go-openapi/spec v0.0.0-20180825180323-f1468acb3b29
+github.com/go-openapi/spec
+# github.com/go-openapi/swag v0.0.0-20180908172849-dd0dad036e67
+github.com/go-openapi/swag
 # github.com/golang/protobuf v1.2.0
 github.com/golang/protobuf/proto
 # github.com/inconshreveable/mousetrap v1.0.0
@@ -46,6 +58,10 @@ github.com/jinzhu/gorm/dialects/sqlite
 github.com/jinzhu/inflection
 # github.com/json-iterator/go v1.1.5
 github.com/json-iterator/go
+# github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
+github.com/mailru/easyjson/jlexer
+github.com/mailru/easyjson/jwriter
+github.com/mailru/easyjson/buffer
 # github.com/mattn/go-isatty v0.0.4
 github.com/mattn/go-isatty
 # github.com/mattn/go-sqlite3 v1.9.0
@@ -62,18 +78,32 @@ github.com/sirupsen/logrus
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.2
 github.com/spf13/pflag
+# github.com/swaggo/gin-swagger v1.0.0
+github.com/swaggo/gin-swagger
+github.com/swaggo/gin-swagger/swaggerFiles
+# github.com/swaggo/swag v1.3.2
+github.com/swaggo/swag
 # github.com/ugorji/go/codec v0.0.0-20180831062425-e253f1f20942
 github.com/ugorji/go/codec
 # golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b
 golang.org/x/crypto/ssh/terminal
 # golang.org/x/net v0.0.0-20180906233101-161cd47e91fd
 golang.org/x/net/context
+golang.org/x/net/webdav
 golang.org/x/net/context/ctxhttp
+golang.org/x/net/webdav/internal/xml
 golang.org/x/net/proxy
 golang.org/x/net/internal/socks
+golang.org/x/net/idna
 # golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# golang.org/x/text v0.3.0
+golang.org/x/text/unicode/norm
+golang.org/x/text/width
+golang.org/x/text/secure/bidirule
+golang.org/x/text/unicode/bidi
+golang.org/x/text/transform
 # gopkg.in/go-playground/validator.v8 v8.18.2
 gopkg.in/go-playground/validator.v8
 # gopkg.in/yaml.v2 v2.2.1
