@@ -172,16 +172,28 @@ func StartDeployPipeline(challengeDir string) {
 		return
 	}
 
-	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)
+	challenge, err := database.QueryFirstChallengeEntry("challenge_id", config.Challenge.Id)
+	if err != nil {
+		log.Errorf("Error while querying challenge with id %s : %s", config.Challenge.Id, err)
+		return
+	}
 
-	challenge, err := UpdateOrCreateChallengeDbEntry(config)
+	if challenge.Status != core.DEPLOY_STATUS["unknown"] &&
+		challenge.Status != core.DEPLOY_STATUS["deployed"] {
+		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
+		return
+	}
+
+	err = UpdateOrCreateChallengeDbEntry(&challenge, config)
 	if err != nil {
 		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
 		log.Errorf("Db error : %s", err)
 		return
 	}
 
-	challenge.Status = core.DEPLOY_STATUS["stage"]
+	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)
+
+	challenge.Status = core.DEPLOY_STATUS["staging"]
 	database.Db.Save(&challenge)
 
 	err = StageChallenge(challengeDir)
@@ -195,7 +207,7 @@ func StartDeployPipeline(challengeDir string) {
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	stagedChallengePath := filepath.Join(stagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
 
-	challenge.Status = core.DEPLOY_STATUS["commit"]
+	challenge.Status = core.DEPLOY_STATUS["committing"]
 	database.Db.Save(&challenge)
 
 	err = CommitChallenge(&challenge, config, stagedChallengePath)
@@ -206,7 +218,7 @@ func StartDeployPipeline(challengeDir string) {
 		return
 	}
 
-	challenge.Status = core.DEPLOY_STATUS["deploy"]
+	challenge.Status = core.DEPLOY_STATUS["deploying"]
 	database.Db.Save(&challenge)
 
 	err = DeployChallenge(&challenge, config)
@@ -216,6 +228,9 @@ func StartDeployPipeline(challengeDir string) {
 		}).Errorf("%s", err)
 		return
 	}
+
+	challenge.Status = core.DEPLOY_STATUS["deployed"]
+	database.Db.Save(&challenge)
 
 	log.Infof("CHALLENGE %s DEPLOYED SUCCESSFULLY", challengeName)
 }
