@@ -20,11 +20,11 @@ type Challenge struct {
 
 	ChallengeId string `gorm:"not null;type:varchar(64);unique"`
 	Name        string `gorm:"not null;type:varchar(64);unique"`
-	Author      string `gorm:"not null"`
 	Format      string `gorm:"not null"`
 	ContainerId string `gorm:"size:64;unique"`
 	ImageId     string `gorm:"size:64;unique"`
 	Status      string `gorm:"not null;default:'Unknown'"`
+	AuthorID    uint   `gorm:"not null"`
 	Ports       []Port
 }
 
