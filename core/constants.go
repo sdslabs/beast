@@ -20,9 +20,10 @@ const (
 )
 
 var DEPLOY_STATUS = map[string]string{
-	"unknown": "Unknown",
-	"stage":   "Staging",
-	"commit":  "Commiting",
-	"deploy":  "Deploying",
-	"build":   "Building",
+	"unknown":    "Unknown",
+	"staging":    "Staging",
+	"committing": "Commiting",
+	"deploying":  "Deploying",
+	"deployed":   "Deployed",
+	"building":   "Building",
 }

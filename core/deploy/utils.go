@@ -158,12 +158,7 @@ func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
 	return file.Name(), nil
 }
 
-func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge, error) {
-	challEntry, err := database.QueryFirstChallengeEntry("challenge_id", config.Challenge.Id)
-	if err != nil {
-		return challEntry, fmt.Errorf("Error while querying challenge with id %s : %s", config.Challenge.Id, err)
-	}
-
+func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config core.BeastConfig) error {
 	// Challenge is nil, which means the challenge entry does not exist
 	// So create a new challenge entry on the basis of the fields provided
 	// in the config file for the challenge.
@@ -172,7 +167,7 @@ func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge
 		// in the challenge table using the config file.
 		authorEntry, err := database.QueryFirstAuthorEntry("email", config.Author.Email)
 		if err != nil {
-			return challEntry, fmt.Errorf("Error while querying author with email %s", config.Author.Email)
+			return fmt.Errorf("Error while querying author with email %s", config.Author.Email)
 		}
 
 		if authorEntry.Email == "" {
@@ -184,17 +179,17 @@ func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge
 
 			err = database.CreateAuthorEntry(&authorEntry)
 			if err != nil {
-				return challEntry, fmt.Errorf("Error while creating author entry : %s", err)
+				return fmt.Errorf("Error while creating author entry : %s", err)
 			}
 		} else {
 			if authorEntry.Email != config.Author.Email &&
 				authorEntry.SshKey != config.Author.SSHKey &&
 				authorEntry.Name != config.Author.Name {
-				return challEntry, fmt.Errorf("ERROR, author details did not match with the ones in database")
+				return fmt.Errorf("ERROR, author details did not match with the ones in database")
 			}
 		}
 
-		challEntry = database.Challenge{
+		challEntry = &database.Challenge{
 			ChallengeId: config.Challenge.Id,
 			Name:        config.Challenge.Name,
 			AuthorID:    authorEntry.ID,
@@ -202,15 +197,15 @@ func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge
 			Status:      core.DEPLOY_STATUS["unknown"],
 		}
 
-		err = database.CreateChallengeEntry(&challEntry)
+		err = database.CreateChallengeEntry(challEntry)
 		if err != nil {
-			return challEntry, fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
+			return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
 		}
 	}
 
-	allocatedPorts, err := database.GetAllocatedPorts(challEntry)
+	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
 	if err != nil {
-		return challEntry, fmt.Errorf("Error while getting allocated ports for : %s : %s", challEntry.ChallengeId, err)
+		return fmt.Errorf("Error while getting allocated ports for : %s : %s", challEntry.ChallengeId, err)
 	}
 
 	isAllocated := func(port uint32) bool {
@@ -244,16 +239,16 @@ func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge
 
 		gotPort, err := database.PortEntryGetOrCreate(portEntry)
 		if err != nil {
-			return database.Challenge{}, err
+			return err
 		}
 
 		// var gotChall database.Challenge
 		// database.Db.Model(&gotPort).Related(&gotChall)
 
 		if gotPort.ChallengeID != challEntry.ID {
-			return database.Challenge{}, fmt.Errorf("The port %s requested is already in use by another challenge", gotPort.PortNo)
+			return fmt.Errorf("The port %s requested is already in use by another challenge", gotPort.PortNo)
 		}
 	}
 
-	return challEntry, nil
+	return nil
 }
