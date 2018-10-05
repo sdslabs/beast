@@ -170,10 +170,34 @@ func UpdateOrCreateChallengeDbEntry(config core.BeastConfig) (database.Challenge
 	if challEntry.ChallengeId == "" {
 		// For creating a new entry for the challenge first create an entry
 		// in the challenge table using the config file.
+		authorEntry, err := database.QueryFirstAuthorEntry("email", config.Author.Email)
+		if err != nil {
+			return challEntry, fmt.Errorf("Error while querying author with email %s", config.Author.Email)
+		}
+
+		if authorEntry.Email == "" {
+			authorEntry = database.Author{
+				Name:   config.Author.Name,
+				Email:  config.Author.Email,
+				SshKey: config.Author.SSHKey,
+			}
+
+			err = database.CreateAuthorEntry(&authorEntry)
+			if err != nil {
+				return challEntry, fmt.Errorf("Error while creating author entry : %s", err)
+			}
+		} else {
+			if authorEntry.Email != config.Author.Email &&
+				authorEntry.SshKey != config.Author.SSHKey &&
+				authorEntry.Name != config.Author.Name {
+				return challEntry, fmt.Errorf("ERROR, author details did not match with the ones in database")
+			}
+		}
+
 		challEntry = database.Challenge{
 			ChallengeId: config.Challenge.Id,
 			Name:        config.Challenge.Name,
-			Author:      config.Author.Name,
+			AuthorID:    authorEntry.ID,
 			Format:      config.Challenge.ChallengeType,
 			Status:      core.DEPLOY_STATUS["unknown"],
 		}

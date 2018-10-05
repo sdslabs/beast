@@ -10,7 +10,7 @@ import (
 type Port struct {
 	gorm.Model
 
-	ChallengeID uint
+	ChallengeID uint   `gorm:"not null"`
 	PortNo      uint32 `gorm:"not null;unique"`
 }
 
