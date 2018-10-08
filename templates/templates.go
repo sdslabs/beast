@@ -15,7 +15,7 @@ ssh_key   = {{.AuthorPubKey}}                    # Public SSH key for the challe
 	type            = {{.ChallengeType}}         # Type of challenge -> [web service ssh]
 	flag            = {{.ChallengeFlag}}		 # Challenge Flag
 
-	[challenge.build]
+	[challenge.env]
 	apt_deps         = {{.AptDeps}}              # Custom apt-dependencies for challenge
 	ports	    	 = {{.Ports}}				 # Port to expose for the challenge
 	setup_script     = {{.SetupScript}}          # Setup script to run additional steps for challenge deployment
@@ -51,8 +51,3 @@ WORKDIR /challenge
 
 CMD {{.RunCmd}}
 `
-
-var AUTHORIZED_KEY_TEMPLATE string = `
-# Challenge Name : {{.Name}}
-command="docker-enter {{.ContainerId}}",no-agent-forwarding,no-port-forwarding,no-X11-forwarding` +
-	` ssh-rsa {{.PubKey}} {{.Mail}}`
