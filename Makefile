@@ -30,6 +30,10 @@ format:
 
 # Ensure that the required tools are installed for beast to work
 tools:
+	@if ! test -x "`which nsenter 2>&1;true`"; then \
+	  echo 'Error: nsenter is not installed, Install it first' >&2 ; \
+	fi
+
 	@if ! test -x "`which docker-enter 2>&1;true`"; then \
 	  echo 'Warn: docker-enter is not installed, building....' >&2 ; \
 	  cp ./scripts/docker-enter "${GOPATH}/bin/" ; \
