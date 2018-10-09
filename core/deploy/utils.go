@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/sdslabs/beastv4/core"
+	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/database"
 	tools "github.com/sdslabs/beastv4/templates"
 	"github.com/sdslabs/beastv4/utils"
@@ -30,7 +31,7 @@ type BeastBareDockerfile struct {
 // * Valid config file for the challenge in the challengeDir root named as beast.toml
 // * Valid challenge directory name in accordance to the challenge config.
 func ValidateChallengeConfig(challengeDir string) error {
-	configFile := filepath.Join(challengeDir, core.CONFIG_FILE_NAME)
+	configFile := filepath.Join(challengeDir, core.CHALLENGE_CONFIG_FILE_NAME)
 
 	log.Debug("Checking beast.toml file existance validity")
 	err := utils.ValidateFileExists(configFile)
@@ -38,7 +39,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return err
 	}
 
-	var config core.BeastConfig
+	var config cfg.BeastChallengeConfig
 	_, err = toml.DecodeFile(configFile, &config)
 	if err != nil {
 		return err
@@ -99,7 +100,7 @@ func GetContextDirPath(dirPath string) (string, error) {
 // before calling this function.
 func GenerateDockerfile(configFile string) (string, error) {
 	log.Debug("Generating dockerfile")
-	var config core.BeastConfig
+	var config cfg.BeastChallengeConfig
 	_, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
 		return "", err
@@ -158,7 +159,7 @@ func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
 	return file.Name(), nil
 }
 
-func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config core.BeastConfig) error {
+func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
 	// Challenge is nil, which means the challenge entry does not exist
 	// So create a new challenge entry on the basis of the fields provided
 	// in the config file for the challenge.

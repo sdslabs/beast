@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
+	cfg "github.com/sdslabs/beastv4/core/config"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/database"
 	"github.com/sdslabs/beastv4/docker"
 	"github.com/sdslabs/beastv4/utils"
@@ -33,7 +35,7 @@ func StageChallenge(challengeDir string) error {
 
 	log.Debugf("Staging challenge to directory : %s", stagingDir)
 
-	challengeConfig := filepath.Join(contextDir, core.CONFIG_FILE_NAME)
+	challengeConfig := filepath.Join(contextDir, core.CHALLENGE_CONFIG_FILE_NAME)
 	log.Debugf("Reading challenge config from : %s", challengeConfig)
 
 	dockerfileCtx, err := GenerateChallengeDockerfileCtx(challengeConfig)
@@ -60,7 +62,7 @@ func StageChallenge(challengeDir string) error {
 // if it exists then first the new image is created and then the old image is removed.
 //
 // stagedPath is the complete path to the tar file for the challenge in the staging dir
-func CommitChallenge(challenge *database.Challenge, config core.BeastConfig, stagedPath string) error {
+func CommitChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig, stagedPath string) error {
 	challengeName := config.Challenge.Name
 	challengeStagingDir := filepath.Dir(stagedPath)
 
@@ -70,7 +72,7 @@ func CommitChallenge(challenge *database.Challenge, config core.BeastConfig, sta
 		return err
 	}
 
-	err = core.CleanupChallengeIfExist(config)
+	err = coreUtils.CleanupChallengeIfExist(config)
 	if err != nil {
 		log.Errorf("Error while cleaning up the challenge")
 		return err
@@ -109,7 +111,7 @@ func CommitChallenge(challenge *database.Challenge, config core.BeastConfig, sta
 	return nil
 }
 
-func DeployChallenge(challenge *database.Challenge, config core.BeastConfig) error {
+func DeployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
 	containerId, err := docker.CreateContainerFromImage(config.Challenge.ChallengeDetails.Ports, challenge.ImageId, config.Challenge.Name)
@@ -149,9 +151,9 @@ func StartDeployPipeline(challengeDir string) {
 	log.Debug("Loading Beast config")
 
 	challengeName := filepath.Base(challengeDir)
-	configFile := filepath.Join(challengeDir, core.CONFIG_FILE_NAME)
+	configFile := filepath.Join(challengeDir, core.CHALLENGE_CONFIG_FILE_NAME)
 
-	var config core.BeastConfig
+	var config cfg.BeastChallengeConfig
 	_, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
 		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)

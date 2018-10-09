@@ -1,8 +1,9 @@
-package core
+package utils
 
 import (
 	"fmt"
 
+	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/database"
 	"github.com/sdslabs/beastv4/docker"
 
@@ -39,7 +40,7 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 	return nil
 }
 
-func CleanupChallengeContainers(chall *database.Challenge, config BeastConfig) error {
+func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChallengeConfig) error {
 	if chall.ContainerId != "" {
 		err := CleanupContainerByFilter("id", chall.ContainerId)
 		if err != nil {
@@ -67,7 +68,7 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 	return nil
 }
 
-func CleanupChallengeIfExist(config BeastConfig) error {
+func CleanupChallengeIfExist(config cfg.BeastChallengeConfig) error {
 	chall, err := database.QueryFirstChallengeEntry("challenge_id", config.Challenge.Id)
 	if err != nil {
 		log.Errorf("Error while database query for challenge Id %s", config.Challenge.Id)
