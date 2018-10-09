@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -70,8 +71,8 @@ func CreateIfNotExistDir(dirPath string) error {
 	err := ValidateDirExists(dirPath)
 	if err != nil {
 		if e := os.MkdirAll(dirPath, 0755); e != nil {
-			log.Errorf("Could not create directory : %s", dirPath)
-			return e
+			eMsg := fmt.Errorf("Could not create directory : %s", dirPath)
+			return eMsg
 		}
 	}
 
@@ -81,9 +82,12 @@ func CreateIfNotExistDir(dirPath string) error {
 func CreateFileIfNotExist(filePath string) error {
 	err := ValidateFileExists(filePath)
 	if err != nil {
-		if e := os.Create(filePath); e != nil {
-			log.Errorf("Could not create file : %s", filePath)
-			return e
+		file, e := os.Create(filePath)
+		defer file.Close()
+
+		if e != nil {
+			eMsg := fmt.Errorf("Could not create file : %s", filePath)
+			return eMsg
 		}
 	}
 
