@@ -71,6 +71,19 @@ func CreateIfNotExistDir(dirPath string) error {
 	if err != nil {
 		if e := os.MkdirAll(dirPath, 0755); e != nil {
 			log.Errorf("Could not create directory : %s", dirPath)
+			return e
+		}
+	}
+
+	return nil
+}
+
+func CreateFileIfNotExist(filePath string) error {
+	err := ValidateFileExists(filePath)
+	if err != nil {
+		if e := os.Create(filePath); e != nil {
+			log.Errorf("Could not create file : %s", filePath)
+			return e
 		}
 	}
 
