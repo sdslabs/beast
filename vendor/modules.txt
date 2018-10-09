@@ -51,6 +51,8 @@ github.com/go-openapi/swag
 github.com/golang/protobuf/proto
 # github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
+# github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
+github.com/jbenet/go-context/io
 # github.com/jinzhu/gorm v1.9.1
 github.com/jinzhu/gorm
 github.com/jinzhu/gorm/dialects/sqlite
@@ -58,6 +60,8 @@ github.com/jinzhu/gorm/dialects/sqlite
 github.com/jinzhu/inflection
 # github.com/json-iterator/go v1.1.5
 github.com/json-iterator/go
+# github.com/kevinburke/ssh_config v0.0.0-20180830205328-81db2a75821e
+github.com/kevinburke/ssh_config
 # github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
@@ -66,10 +70,14 @@ github.com/mailru/easyjson/buffer
 github.com/mattn/go-isatty
 # github.com/mattn/go-sqlite3 v1.9.0
 github.com/mattn/go-sqlite3
+# github.com/mitchellh/go-homedir v1.0.0
+github.com/mitchellh/go-homedir
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
+# github.com/pelletier/go-buffruneio v0.2.0
+github.com/pelletier/go-buffruneio
 # github.com/pkg/errors v0.8.0
 github.com/pkg/errors
 # github.com/sirupsen/logrus v1.0.6
@@ -78,6 +86,11 @@ github.com/sirupsen/logrus
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.2
 github.com/spf13/pflag
+# github.com/src-d/gcfg v1.3.0
+github.com/src-d/gcfg
+github.com/src-d/gcfg/scanner
+github.com/src-d/gcfg/token
+github.com/src-d/gcfg/types
 # github.com/swaggo/gin-swagger v1.0.0
 github.com/swaggo/gin-swagger
 github.com/swaggo/gin-swagger/swaggerFiles
@@ -85,16 +98,27 @@ github.com/swaggo/gin-swagger/swaggerFiles
 github.com/swaggo/swag
 # github.com/ugorji/go/codec v0.0.0-20180831062425-e253f1f20942
 github.com/ugorji/go/codec
+# github.com/xanzy/ssh-agent v0.2.0
+github.com/xanzy/ssh-agent
 # golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b
+golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/terminal
+golang.org/x/crypto/curve25519
+golang.org/x/crypto/ed25519
+golang.org/x/crypto/internal/chacha20
+golang.org/x/crypto/poly1305
+golang.org/x/crypto/ssh/knownhosts
+golang.org/x/crypto/ed25519/internal/edwards25519
+golang.org/x/crypto/internal/subtle
+golang.org/x/crypto/ssh/agent
 # golang.org/x/net v0.0.0-20180906233101-161cd47e91fd
 golang.org/x/net/context
 golang.org/x/net/webdav
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/webdav/internal/xml
 golang.org/x/net/proxy
-golang.org/x/net/internal/socks
 golang.org/x/net/idna
+golang.org/x/net/internal/socks
 # golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -106,5 +130,25 @@ golang.org/x/text/unicode/bidi
 golang.org/x/text/transform
 # gopkg.in/go-playground/validator.v8 v8.18.2
 gopkg.in/go-playground/validator.v8
+# gopkg.in/src-d/go-git.v4 v4.7.0
+gopkg.in/src-d/go-git.v4/plumbing/transport/ssh
+gopkg.in/src-d/go-git.v4/plumbing/transport
+gopkg.in/src-d/go-git.v4/plumbing/transport/internal/common
+gopkg.in/src-d/go-git.v4/plumbing
+gopkg.in/src-d/go-git.v4/plumbing/protocol/packp
+gopkg.in/src-d/go-git.v4/plumbing/protocol/packp/capability
+gopkg.in/src-d/go-git.v4/plumbing/format/pktline
+gopkg.in/src-d/go-git.v4/plumbing/protocol/packp/sideband
+gopkg.in/src-d/go-git.v4/utils/ioutil
+gopkg.in/src-d/go-git.v4/plumbing/storer
+gopkg.in/src-d/go-git.v4/storage/memory
+gopkg.in/src-d/go-git.v4/plumbing/format/index
+gopkg.in/src-d/go-git.v4/config
+gopkg.in/src-d/go-git.v4/storage
+gopkg.in/src-d/go-git.v4/plumbing/filemode
+gopkg.in/src-d/go-git.v4/utils/binary
+gopkg.in/src-d/go-git.v4/plumbing/format/config
+# gopkg.in/warnings.v0 v0.1.2
+gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.2.1
 gopkg.in/yaml.v2
