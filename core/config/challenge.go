@@ -1,8 +1,10 @@
-package core
+package config
 
 import (
 	"errors"
 	"fmt"
+
+	"github.com/sdslabs/beastv4/core"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -13,13 +15,13 @@ import (
 //
 // Take a look at template beast.toml file in templates package
 // to see how to specify the file and what all fields are available.
-type BeastConfig struct {
+type BeastChallengeConfig struct {
 	Challenge Challenge `toml:"challenge"`
 	Author    Author    `toml:"author"`
 }
 
-func (config *BeastConfig) ValidateRequiredFields() error {
-	log.Debugf("Validating BeastConfig required fields")
+func (config *BeastChallengeConfig) ValidateRequiredFields() error {
+	log.Debugf("Validating BeastChallengeConfig required fields")
 	err := config.Challenge.ValidateRequiredFields()
 	if err != nil {
 		log.Debugf("Error while validating `Challenge` required fields : %s", err.Error())
@@ -32,7 +34,7 @@ func (config *BeastConfig) ValidateRequiredFields() error {
 		return err
 	}
 
-	log.Debugf("BeastConfig required fields validated")
+	log.Debugf("BeastChallengeConfig required fields validated")
 	return nil
 }
 
@@ -88,8 +90,8 @@ func (config *ChallengeDetails) ValidateRequiredFields() error {
 		return errors.New("Challenge `flag` and `run_cmd` are required")
 	}
 
-	if len(config.Ports) > int(MAX_PORT_PER_CHALL) {
-		return fmt.Errorf("Max ports allowed for challenge : %d given : %d", MAX_PORT_PER_CHALL, len(config.Ports))
+	if len(config.Ports) > int(core.MAX_PORT_PER_CHALL) {
+		return fmt.Errorf("Max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
 	}
 
 	if config.StaticContentDir != "" {
@@ -130,7 +132,7 @@ func (config *Author) ValidateRequiredFields() error {
 	}
 
 	if config.Name == "" {
-		config.Name = DEFAULT_AUTHOR_NAME
+		config.Name = core.DEFAULT_AUTHOR_NAME
 	}
 
 	return nil

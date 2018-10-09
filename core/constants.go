@@ -10,13 +10,13 @@ var (
 )
 
 const (
-	CONFIG_FILE_NAME       string = "beast.toml"
-	DEFAULT_CHALLENGE_NAME string = "Backdoor-Challenge"
-	DEFAULT_AUTHOR_NAME    string = "ghost"
-	BEAST_LOG_FILE         string = "beast.log"
-	BEAST_DATABASE         string = "beast.db"
-	BEAST_STAGING_DIR      string = "staging"
-	MAX_PORT_PER_CHALL     uint32 = 3
+	CHALLENGE_CONFIG_FILE_NAME string = "beast.toml"
+	DEFAULT_CHALLENGE_NAME     string = "Backdoor-Challenge"
+	DEFAULT_AUTHOR_NAME        string = "ghost"
+	BEAST_LOG_FILE             string = "beast.log"
+	BEAST_DATABASE             string = "beast.db"
+	BEAST_STAGING_DIR          string = "staging"
+	MAX_PORT_PER_CHALL         uint32 = 3
 )
 
 var DEPLOY_STATUS = map[string]string{
