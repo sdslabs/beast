@@ -9,11 +9,18 @@ import (
 	swaggerFiles "github.com/swaggo/gin-swagger/swaggerFiles"
 
 	_ "github.com/sdslabs/beastv4/api/docs"
+	"github.com/sdslabs/beastv4/git"
 )
 
 const (
 	DEFAULT_BEAST_PORT = ":5005"
 )
+
+func runBeastApiBootsteps() error {
+	git.RunBeastBootsetps()
+
+	return nil
+}
 
 // @title Beast API
 // @version 1.0
@@ -35,6 +42,8 @@ func RunBeastApiServer(port string) {
 	} else {
 		port = DEFAULT_BEAST_PORT
 	}
+
+	runBeastApiBootsteps()
 
 	// Initialize Gin router.
 	router := initGinRouter()
