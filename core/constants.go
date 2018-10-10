@@ -19,7 +19,9 @@ const (
 	DEFAULT_AUTH_KEYS_FILE     string = ".ssh/authorized_keys"
 	BEAST_STAGING_DIR          string = "staging"
 	BEAST_SCRIPTS_DIR          string = "scripts"
+	BEAST_REMOTES_DIR          string = "remote"
 	GIT_REMOTE_DEFAULT_BRANCH  string = "master"
+	GIT_DEFAULT_REMOTE         string = "origin"
 	MAX_PORT_PER_CHALL         uint32 = 3
 )
 

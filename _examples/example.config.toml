@@ -1,0 +1,26 @@
+# [fristonio] $ ~/.beast 
+# ❮❮ tree
+# .
+# ├── auth_file
+# ├── beast.db
+# ├── config.toml
+# ├── remote
+# │   └── hack-test
+# ├── secrets
+# │   ├── key.priv
+# │   └── key.pub
+# └── staging
+#
+# Sample snapshot of .beast directory.
+# Make sure the hack-test is a valid git directory
+# Make sure you provide a valid existing authorized_keys_file
+# Make sure key.pub is added to the deployed keys of the beast remote repo
+
+authorized_keys_file = "/home/fristonio/.beast/auth_file"
+scripts_dir = "/home/fristonio/.beast/scripts"
+
+[remote]
+url = "git@github.com:sdslabs/hack-test.git"
+name = "hack-test"
+branch = "master"
+ssh_key = "/home/fristonio/.beast/secrets/key.priv"
