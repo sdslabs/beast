@@ -1,7 +1,6 @@
 package git
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
@@ -18,9 +17,16 @@ func SyncBeastRemote() error {
 
 	err := utils.ValidateDirExists(remote)
 	if err != nil {
-		eMsg := fmt.Errorf("Directory for the remote does not exist, clone remote first")
-		log.Errorf("%s", eMsg)
-		return eMsg
+		log.Warnf("Directory for the remote(%s) does not exist", remote)
+		log.Infof("Performing initial repository clone, this may take a while...")
+
+		err = clone(remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Url, config.Cfg.GitRemote.Branch)
+		if err != nil {
+			log.Errorf("Error while cloning repository : %s", err)
+			return err
+		}
+
+		return nil
 	}
 
 	log.Debugf("Remote : %s, SSHKEY file : %s, Branch : %s", remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Branch)

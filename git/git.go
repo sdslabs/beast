@@ -7,6 +7,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/utils"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -69,5 +70,32 @@ func pull(gitDir string, sshKeyFile string, branch string) error {
 		return fmt.Errorf("Error while pulling from remote branch %s : %s", branch, err)
 	}
 
+	log.Debugf("Git pull completed for %s", gitDir)
+	return nil
+}
+
+// CLone the git repository to the specified git directory with the
+// provided remote repo name.
+// This function assumes that the arguments provided have been checked or
+// validated earlier, for example gitDir is an empty directory or does not exist.
+func clone(gitDir, sshKeyFile, repoUrl, branch string) error {
+	auth, err := getSSHAuth(sshKeyFile)
+	if err != nil {
+		return fmt.Errorf("Error while generating auth for git : %s", err)
+	}
+
+	refName := plumbing.ReferenceName(branch)
+	_, err = git.PlainClone(gitDir, false, &git.CloneOptions{
+		URL:           repoUrl,
+		Auth:          auth,
+		RemoteName:    core.GIT_DEFAULT_REMOTE,
+		ReferenceName: refName,
+		SingleBranch:  true,
+	})
+	if err != nil {
+		return fmt.Errorf("Error while cloning the repository : %s", err)
+	}
+
+	log.Debugf("Repository cloned to %s", gitDir)
 	return nil
 }

@@ -43,12 +43,9 @@ func (config *BeastConfig) ValidateConfig() error {
 	log.Debug("Validating BeastConfig structure")
 
 	if config.AuthorizedKeysFile != "" {
-		err := utils.ValidateFileExists(config.AuthorizedKeysFile)
+		err := utils.CreateFileIfNotExist(config.AuthorizedKeysFile)
 		if err != nil {
-			err = utils.CreateFileIfNotExist(config.AuthorizedKeysFile)
-			if err != nil {
-				log.Errorf("Error while creating authorized_keys file : %s", config.AuthorizedKeysFile)
-			}
+			log.Errorf("Error while creating authorized_keys file : %s", config.AuthorizedKeysFile)
 		}
 
 		config.AuthorizedKeysFile, err = filepath.Abs(config.AuthorizedKeysFile)
