@@ -21,7 +21,7 @@ import (
 // directory of the challenge wihch will be staged.
 func StageChallenge(challengeDir string) error {
 	log.Debug("Starting staging stage of deploy pipeline")
-	contextDir, err := GetContextDirPath(challengeDir)
+	contextDir, err := getContextDirPath(challengeDir)
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func StartDeployPipeline(challengeDir string) {
 		return
 	}
 
-	err = UpdateOrCreateChallengeDbEntry(&challenge, config)
+	err = updateOrCreateChallengeDbEntry(&challenge, config)
 	if err != nil {
 		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
 		log.Errorf("Db error : %s", err)

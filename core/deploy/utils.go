@@ -80,7 +80,7 @@ func ValidateChallengeDir(challengeDir string) error {
 	return nil
 }
 
-func GetContextDirPath(dirPath string) (string, error) {
+func getContextDirPath(dirPath string) (string, error) {
 	absContextDir, err := filepath.Abs(dirPath)
 	if err != nil {
 		return "", fmt.Errorf("Unable to get absolute context directory of given context directory %q: %v", dirPath, err)
@@ -159,7 +159,7 @@ func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
 	return file.Name(), nil
 }
 
-func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
+func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
 	// Challenge is nil, which means the challenge entry does not exist
 	// So create a new challenge entry on the basis of the fields provided
 	// in the config file for the challenge.

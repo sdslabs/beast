@@ -110,8 +110,9 @@ func (config *GitRemote) ValidateGitConfig() error {
 	}
 
 	err = utils.ValidateFileExists(config.Secret)
+	log.Debugf("Using git ssh secret : %s", config.Secret)
 	if err != nil {
-		return fmt.Errorf("Provided ssh key file does not exists : %s", err)
+		return fmt.Errorf("Provided ssh key file(%s) does not exists : %s", config.Secret, err)
 	}
 
 	return nil
@@ -142,4 +143,18 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 
 	log.Debug("Global beast config file config.toml has been verified")
 	return config, nil
+}
+
+var Cfg BeastConfig = InitConfig()
+
+func InitConfig() BeastConfig {
+	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
+	cfg, err := LoadBeastConfig(configPath)
+
+	if err != nil {
+		log.Errorf("Error while loading the beast global config : %s", err)
+		os.Exit(1)
+	}
+
+	return cfg
 }
