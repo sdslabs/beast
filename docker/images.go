@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/sdslabs/beastv4/core"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -53,8 +54,9 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	}
 	defer builderContext.Close()
 
+	imageName := fmt.Sprintf("%s%s", core.BEAST_STAGING_AREA_MOUNT_POINT, challengeName)
 	buildOptions := types.ImageBuildOptions{
-		Tags:   []string{challengeName},
+		Tags:   []string{imageName},
 		Remove: true,
 	}
 
@@ -73,7 +75,7 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(imageBuildResp.Body)
 
-	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", challengeName)})
+	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", imageName)})
 	if len(images) > 0 {
 		log.Infof("Image ID for the image built is : %s", images[0].ID[7:])
 		return buf, images[0].ID[7:], nil

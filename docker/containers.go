@@ -3,6 +3,7 @@ package docker
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -63,7 +64,6 @@ func CreateContainerFromImage(portsList []uint32, mountsMap map[string]string, i
 	if err != nil {
 		return "", err
 	}
-
 	portSet := make(nat.PortSet)
 	portMap := make(nat.PortMap)
 
