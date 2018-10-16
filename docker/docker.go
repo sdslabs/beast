@@ -140,6 +140,7 @@ func CreateContainerFromImage(portsList []uint32, imageId string, challengeName 
 	if err != nil {
 		return "", err
 	}
+
 	portSet := make(nat.PortSet)
 	portMap := make(nat.PortMap)
 
