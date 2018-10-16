@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -98,8 +99,14 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	}
 	defer builderContext.Close()
 
+	// Add beast namespace to docker image
+	values := []string{}
+	values = append(values, "beast/")
+	values = append(values, challengeName)
+	challengename := strings.Join(values, "")
+
 	buildOptions := types.ImageBuildOptions{
-		Tags:   []string{challengeName},
+		Tags:   []string{challengename},
 		Remove: true,
 	}
 
@@ -118,7 +125,7 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(imageBuildResp.Body)
 
-	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", challengeName)})
+	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", challengename)})
 	if len(images) > 0 {
 		log.Infof("Image ID for the image built is : %s", images[0].ID[7:])
 		return buf, images[0].ID[7:], nil
@@ -133,7 +140,6 @@ func CreateContainerFromImage(portsList []uint32, imageId string, challengeName 
 	if err != nil {
 		return "", err
 	}
-
 	portSet := make(nat.PortSet)
 	portMap := make(nat.PortMap)
 
