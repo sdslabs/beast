@@ -64,6 +64,7 @@ func CreateContainerFromImage(portsList []uint32, mountsMap map[string]string, i
 	if err != nil {
 		return "", err
 	}
+
 	portSet := make(nat.PortSet)
 	portMap := make(nat.PortMap)
 
