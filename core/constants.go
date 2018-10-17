@@ -23,6 +23,7 @@ const (
 	GIT_REMOTE_DEFAULT_BRANCH  string = "master"
 	GIT_DEFAULT_REMOTE         string = "origin"
 	MAX_PORT_PER_CHALL         uint32 = 3
+	BEAST_NAMESPACE            string = "/beast"
 )
 
 var DEPLOY_STATUS = map[string]string{
