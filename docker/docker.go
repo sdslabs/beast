@@ -99,8 +99,7 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	}
 	defer builderContext.Close()
 
-	imageName := fmt.Sprintf(core.BEAST_NAMESPACE"%s", challengeName)
-
+	imageName := fmt.Sprintf("%s%s",core.BEAST_NAMESPACE, challengeName)
 	buildOptions := types.ImageBuildOptions{
 		Tags:   []string{imageName},
 		Remove: true,
