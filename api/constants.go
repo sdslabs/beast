@@ -35,6 +35,10 @@ Namespaces with routes:
 	1. /info/challenge/{id}
 	2. /info/available
 
+* Remotes Namespaces
+	1. /remote/sync
+	2. /remote/reset
+
 `
 
 	WIP_TEXT = "WORK IN PROGRESS"

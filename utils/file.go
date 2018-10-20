@@ -93,3 +93,17 @@ func CreateFileIfNotExist(filePath string) error {
 
 	return nil
 }
+
+func RemoveDirRecursively(dirPath string) error {
+	err := ValidateDirExists(dirPath)
+	if err != nil {
+		return err
+	}
+
+	err = os.RemoveAll(dirPath)
+	if err != nil {
+		return fmt.Errorf("Error while removing directory %s : %s :: MAKE SURE TO CLEAN THE DIRECTORY YOURSELF", dirPath, err)
+	}
+
+	return nil
+}

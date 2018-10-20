@@ -29,6 +29,12 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/challenge/:id", challengeInfoHandler)
 			infoGroup.GET("/available/", availableChallengeInfoHandler)
 		}
+
+		remoteGroup := apiGroup.Group("/remote")
+		{
+			remoteGroup.GET("/sync", syncBeastGitRemote)
+			remoteGroup.GET("/reset", resetBeastGitRemote)
+		}
 	}
 
 	return router

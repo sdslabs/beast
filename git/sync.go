@@ -16,6 +16,8 @@ func SyncBeastRemote() error {
 	remote := filepath.Join(beastRemoteDir, config.Cfg.GitRemote.RemoteName)
 
 	err := utils.ValidateDirExists(remote)
+	log.Debugf("Remote : %s, SSHKEY file : %s, Branch : %s", remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Branch)
+
 	if err != nil {
 		log.Warnf("Directory for the remote(%s) does not exist", remote)
 		log.Infof("Performing initial repository clone, this may take a while...")
@@ -29,7 +31,7 @@ func SyncBeastRemote() error {
 		return nil
 	}
 
-	log.Debugf("Remote : %s, SSHKEY file : %s, Branch : %s", remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Branch)
+	log.Debugf("Pulling latest changes from the remote.")
 	err = pull(remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Branch)
 	if err != nil {
 		log.Error(err.Error())
@@ -37,6 +39,25 @@ func SyncBeastRemote() error {
 	}
 
 	log.Info("Beast git base synced with remote")
+	return nil
+}
+
+func ResetBeastRemote() error {
+	remoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName)
+
+	log.Debugf("Cleaning existing remote directory")
+	err := utils.RemoveDirRecursively(remoteDir)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	err = SyncBeastRemote()
+	if err != nil {
+		log.Errorf("Error while syncing remote after clean : %s", err)
+		return err
+	}
+
 	return nil
 }
 
