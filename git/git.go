@@ -59,7 +59,7 @@ func pull(gitDir string, sshKeyFile string, branch string) error {
 		return fmt.Errorf("Error while getting Worktree for git directory : %s", err)
 	}
 
-	refName := plumbing.ReferenceName(branch)
+	refName := plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", branch))
 	err = w.Pull(&git.PullOptions{
 		RemoteName:    core.GIT_DEFAULT_REMOTE,
 		ReferenceName: refName,
@@ -84,7 +84,8 @@ func clone(gitDir, sshKeyFile, repoUrl, branch string) error {
 		return fmt.Errorf("Error while generating auth for git : %s", err)
 	}
 
-	refName := plumbing.ReferenceName(branch)
+	refName := plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", branch))
+	log.Debugf("Performing clone for remote : %s & branch : %s", core.GIT_DEFAULT_REMOTE, refName)
 	_, err = git.PlainClone(gitDir, false, &git.CloneOptions{
 		URL:           repoUrl,
 		Auth:          auth,

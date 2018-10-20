@@ -22,6 +22,7 @@ const (
 	BEAST_REMOTES_DIR          string = "remote"
 	GIT_REMOTE_DEFAULT_BRANCH  string = "master"
 	GIT_DEFAULT_REMOTE         string = "origin"
+	BEAST_REMOTE_CHALLENGE_DIR string = "challenges"
 	MAX_PORT_PER_CHALL         uint32 = 3
 )
 
