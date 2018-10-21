@@ -9,11 +9,11 @@ func initGinRouter() *gin.Engine {
 	apiGroup := router.Group("/api")
 	{
 		// Deploy route group
-		deployGroup := apiGroup.Group("/deploy")
+		manageGroup := apiGroup.Group("/manage")
 		{
-			deployGroup.GET("/all/:action", deployAllHandler)
-			deployGroup.GET("/challenge/:id/:action", deployChallengeHandler)
-			deployGroup.POST("/local/", deployLocalChallengeHandler)
+			manageGroup.GET("/all/:action", manageAllHandler)
+			manageGroup.POST("/deploy/local/", deployLocalChallengeHandler)
+			manageGroup.POST("/challenge/:id", manageChallengeHandler)
 		}
 
 		// Status route group

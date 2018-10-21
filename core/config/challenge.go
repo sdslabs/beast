@@ -53,9 +53,10 @@ type Challenge struct {
 }
 
 func (config *Challenge) ValidateRequiredFields() error {
-	if config.Id == "" || config.ChallengeType == "" || config.Name == "" {
+	if config.ChallengeType == "" || config.Name == "" {
 		return errors.New("Challenge `id`, `name` and `challenge_type` are required")
 	}
+	// challenge.Id =
 
 	err := config.ChallengeDetails.ValidateRequiredFields()
 	if err != nil {

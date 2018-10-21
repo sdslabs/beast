@@ -6,28 +6,38 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sdslabs/beastv4/core/deploy"
+	"github.com/sdslabs/beastv4/core/manager"
 	log "github.com/sirupsen/logrus"
 )
 
-func deployAllHandler(c *gin.Context) {
+func manageAllHandler(c *gin.Context) {
 	c.String(http.StatusOK, WIP_TEXT)
 }
 
-func deployChallengeHandler(c *gin.Context) {
+func manageChallengeHandler(c *gin.Context) {
 	id := c.Param("id")
-	action := c.Param("action")
+	action := c.PostForm("action")
 
 	switch action {
-	case DEPLOY_ACTION_UNDEPLOY:
+	case MANAGE_ACTION_UNDEPLOY:
 		log.Infof("Trying %s for challenge with ID : %s", action, id)
-		if err := deploy.UndeployChallenge(id); err != nil {
+		if err := manager.UndeployChallenge(id); err != nil {
 			c.String(http.StatusBadRequest, err.Error())
 			return
 		}
 
 		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, id)
 		c.String(http.StatusOK, respStr)
+		return
+
+	case MANAGE_ACTION_DEPLOY:
+		log.Infof("Trying to %s challenge with ID %s", action, id)
+
+		if err := manager.DeployChallenge(id); err != nil {
+			c.String(http.StatusBadRequest, err.Error())
+			return
+		}
+		c.String(http.StatusOK, "Deploy for challenge %s has been triggered, check stats", id)
 		return
 
 	default:
@@ -47,7 +57,7 @@ func deployChallengeHandler(c *gin.Context) {
 // @Param challenge_dir query string true "Challenge Directory"
 // @Success 200 {string} Success
 // @Failure 400 {string} Error
-// @Router /api/deploy [post]
+// @Router /api/manage/deploy/local [post]
 func deployLocalChallengeHandler(c *gin.Context) {
 	challDir := c.PostForm("challenge_dir")
 	if challDir == "" {
@@ -56,7 +66,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	}
 
 	log.Info("In local deploy challenge Handler")
-	err := deploy.DeployChallengePipeline(challDir)
+	err := manager.DeployChallengePipeline(challDir)
 	if err != nil {
 		c.String(http.StatusBadRequest, err.Error())
 		return
