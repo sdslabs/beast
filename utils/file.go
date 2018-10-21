@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -106,4 +107,26 @@ func RemoveDirRecursively(dirPath string) error {
 	}
 
 	return nil
+}
+
+func CopyFile(src, dst string) error {
+	err := ValidateFileExists(src)
+	if err != nil {
+		return err
+	}
+
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		return fmt.Errorf("Error while creating destination file : %s", err)
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	return err
 }

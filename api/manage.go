@@ -16,7 +16,7 @@ func manageAllHandler(c *gin.Context) {
 
 func manageChallengeHandler(c *gin.Context) {
 	id := c.Param("id")
-	action := c.Param("action")
+	action := c.PostForm("action")
 
 	switch action {
 	case MANAGE_ACTION_UNDEPLOY:
@@ -33,6 +33,10 @@ func manageChallengeHandler(c *gin.Context) {
 	case MANAGE_ACTION_DEPLOY:
 		log.Infof("Trying to %s challenge with ID %s", action, id)
 
+		if err := manager.DeployChallenge(id); err != nil {
+			c.String(http.StatusBadRequest, err.Error())
+			return
+		}
 		c.String(http.StatusOK, "Deploy for challenge %s has been triggered, check stats", id)
 		return
 
