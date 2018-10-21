@@ -19,7 +19,7 @@ import (
 
 // Run the staging setp for the pipeline, this functions assumes the
 // directory of the challenge wihch will be staged.
-func StageChallenge(challengeDir string) error {
+func stageChallenge(challengeDir string) error {
 	log.Debug("Starting staging stage of deploy pipeline")
 	contextDir, err := getContextDirPath(challengeDir)
 	if err != nil {
@@ -53,6 +53,12 @@ func StageChallenge(challengeDir string) error {
 		return err
 	}
 
+	log.Debugf("Copying challenge config to staging directory")
+	err = utils.CopyFile(challengeConfig, filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME))
+	if err != nil {
+		return fmt.Errorf("Error while copying challenge config to staging : %s", err)
+	}
+
 	log.Debugf("Staging for challenge %s complete", filepath.Base(challengeDir))
 	return nil
 }
@@ -62,7 +68,7 @@ func StageChallenge(challengeDir string) error {
 // if it exists then first the new image is created and then the old image is removed.
 //
 // stagedPath is the complete path to the tar file for the challenge in the staging dir
-func CommitChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig, stagedPath string) error {
+func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig, stagedPath string) error {
 	challengeName := config.Challenge.Name
 	challengeStagingDir := filepath.Dir(stagedPath)
 
@@ -111,7 +117,7 @@ func CommitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	return nil
 }
 
-func DeployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
+func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
 	containerId, err := docker.CreateContainerFromImage(config.Challenge.ChallengeDetails.Ports, challenge.ImageId, config.Challenge.Name)
@@ -141,13 +147,22 @@ func DeployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 // and hanles any error by logging into database if it occurs.
 //
 // challengeDir corresponds to the directory to be used as a challenge context
+// For local challenge deployments this can be any directory.
 //
 // The pipeline goes through the following stages:
-// * StageChallenge - Add the challenge to the staging area for beast creating
+//
+// * stageChallenge - Add the challenge to the staging area for beast creating
 //		a tar for the challenge with Dockerfile embedded into the context.
 // 		This challenge is then present in the staging area($BEAST_HOME/staging/challengeId/)
 //		for further steps in the pipeline.
-func StartDeployPipeline(challengeDir string) {
+//
+// The skipStage flag is a boolean value to skip the staging step for the challenge
+// if this flag is true then the deployment to succeed the challenge should already
+// be staged.
+//
+// If you are skipping the stage step make sure that you provide the challenge
+// directory as the staged challenge directory, which contains the challenge config.
+func StartDeployPipeline(challengeDir string, skipStage bool) {
 	log.Debug("Loading Beast config")
 
 	challengeName := filepath.Base(challengeDir)
@@ -160,11 +175,14 @@ func StartDeployPipeline(challengeDir string) {
 		return
 	}
 
-	err = config.ValidateRequiredFields()
-	if err != nil {
-		log.Errorf("An error occured while validating the config file : %s", err)
-		return
-	}
+	// We do not validate challenge config here, make sure you have validated the config
+	// beforehand
+	//
+	// err = config.ValidateRequiredFields()
+	// if err != nil {
+	// 	log.Errorf("An error occured while validating the config file : %s", err)
+	//	return
+	//}
 
 	// Validate challenge directory name with the name of the challenge
 	// provided in the config file for the beast. THere should be no
@@ -180,12 +198,16 @@ func StartDeployPipeline(challengeDir string) {
 		return
 	}
 
+	// Look into the database to check if the deploy is already in progress
+	// or not, return if a deploy is already in progress or else continue
+	// deploying
 	if challenge.Status != core.DEPLOY_STATUS["unknown"] &&
 		challenge.Status != core.DEPLOY_STATUS["deployed"] {
 		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
 		return
 	}
 
+	// Using the challenge dir we got, update the database entries for the challenge.
 	err = updateOrCreateChallengeDbEntry(&challenge, config)
 	if err != nil {
 		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
@@ -195,24 +217,38 @@ func StartDeployPipeline(challengeDir string) {
 
 	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)
 
-	challenge.Status = core.DEPLOY_STATUS["staging"]
-	database.Db.Save(&challenge)
-
-	err = StageChallenge(challengeDir)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"DEPLOY_ERROR": "STAGING :: " + challengeName,
-		}).Errorf("%s", err)
-		return
-	}
-
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	stagedChallengePath := filepath.Join(stagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
+
+	if !skipStage {
+		challenge.Status = core.DEPLOY_STATUS["staging"]
+		database.Db.Save(&challenge)
+
+		err = stageChallenge(challengeDir)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"DEPLOY_ERROR": "STAGING :: " + challengeName,
+			}).Errorf("%s", err)
+			return
+		}
+	} else {
+		log.Debugf("Checking if challenge already staged")
+
+		err = utils.ValidateFileExists(stagedChallengePath)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"DEPLOY_ERROR": "STAGING :: " + challengeName,
+			}).Errorf("Challenge not already in staged, could not proceed further")
+			return
+		}
+
+		log.Infof("SKIPPING STAGING STEP IN THE DEPLOY PIPELINE")
+	}
 
 	challenge.Status = core.DEPLOY_STATUS["committing"]
 	database.Db.Save(&challenge)
 
-	err = CommitChallenge(&challenge, config, stagedChallengePath)
+	err = commitChallenge(&challenge, config, stagedChallengePath)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "COMMIT :: " + challengeName,
@@ -223,7 +259,7 @@ func StartDeployPipeline(challengeDir string) {
 	challenge.Status = core.DEPLOY_STATUS["deploying"]
 	database.Db.Save(&challenge)
 
-	err = DeployChallenge(&challenge, config)
+	err = deployChallenge(&challenge, config)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "DEPLOY :: " + challengeName,

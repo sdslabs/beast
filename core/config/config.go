@@ -29,7 +29,7 @@ import (
 //
 // [remote]
 // url = "git@github.com:sdslabs/hack-test.git"
-// name = "hack"
+// name = "hack-test"
 // branch = "master"
 // ssh_key = "~/.beast/secrets/key.priv"
 // ```
