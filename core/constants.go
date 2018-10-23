@@ -20,6 +20,7 @@ const (
 	BEAST_STAGING_DIR            string = "staging"
 	BEAST_SCRIPTS_DIR            string = "scripts"
 	BEAST_REMOTES_DIR            string = "remote"
+	BEAST_CHALLENGE_LOGS_DIR     string = "logs"
 	GIT_REMOTE_DEFAULT_BRANCH    string = "master"
 	GIT_DEFAULT_REMOTE           string = "origin"
 	BEAST_REMOTE_CHALLENGE_DIR   string = "challenges"
