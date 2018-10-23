@@ -10,7 +10,6 @@ ssh_key   = {{.AuthorPubKey}}                    # Public SSH key for the challe
 [challenge]
 
 	[challenge.metadata]
-	id              = {{.ChallengeId}}           # ID of the challenge
 	name            = {{.ChallengeName}}         # Name of the challenge
 	type            = {{.ChallengeType}}         # Type of challenge -> [web service ssh]
 	flag            = {{.ChallengeFlag}}		 # Challenge Flag

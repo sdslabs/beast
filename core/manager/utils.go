@@ -163,7 +163,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	// Challenge is nil, which means the challenge entry does not exist
 	// So create a new challenge entry on the basis of the fields provided
 	// in the config file for the challenge.
-	if challEntry.ChallengeId == "" {
+	if challEntry.Name == "" {
 		// For creating a new entry for the challenge first create an entry
 		// in the challenge table using the config file.
 		authorEntry, err := database.QueryFirstAuthorEntry("email", config.Author.Email)
@@ -191,11 +191,10 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 
 		challEntry = &database.Challenge{
-			ChallengeId: config.Challenge.Id,
-			Name:        config.Challenge.Name,
-			AuthorID:    authorEntry.ID,
-			Format:      config.Challenge.ChallengeType,
-			Status:      core.DEPLOY_STATUS["unknown"],
+			Name:     config.Challenge.Name,
+			AuthorID: authorEntry.ID,
+			Format:   config.Challenge.ChallengeType,
+			Status:   core.DEPLOY_STATUS["unknown"],
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
@@ -206,7 +205,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
 	if err != nil {
-		return fmt.Errorf("Error while getting allocated ports for : %s : %s", challEntry.ChallengeId, err)
+		return fmt.Errorf("Error while getting allocated ports for : %s : %s", challEntry.Name, err)
 	}
 
 	isAllocated := func(port uint32) bool {

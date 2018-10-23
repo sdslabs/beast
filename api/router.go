@@ -13,7 +13,7 @@ func initGinRouter() *gin.Engine {
 		{
 			manageGroup.GET("/all/:action", manageAllHandler)
 			manageGroup.POST("/deploy/local/", deployLocalChallengeHandler)
-			manageGroup.POST("/challenge/:id", manageChallengeHandler)
+			manageGroup.POST("/challenge/", manageChallengeHandler)
 		}
 
 		// Status route group

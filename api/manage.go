@@ -15,29 +15,30 @@ func manageAllHandler(c *gin.Context) {
 }
 
 func manageChallengeHandler(c *gin.Context) {
-	id := c.Param("id")
+	identifier := c.Param("name")
 	action := c.PostForm("action")
 
 	switch action {
 	case MANAGE_ACTION_UNDEPLOY:
-		log.Infof("Trying %s for challenge with ID : %s", action, id)
-		if err := manager.UndeployChallenge(id); err != nil {
+		log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
+		if err := manager.UndeployChallenge(identifier); err != nil {
 			c.String(http.StatusBadRequest, err.Error())
 			return
 		}
 
-		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, id)
+		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, identifier)
 		c.String(http.StatusOK, respStr)
 		return
 
 	case MANAGE_ACTION_DEPLOY:
-		log.Infof("Trying to %s challenge with ID %s", action, id)
+		// For deploy, identifier is name
+		log.Infof("Trying to %s challenge with name %s", action, identifier)
 
-		if err := manager.DeployChallenge(id); err != nil {
+		if err := manager.DeployChallenge(identifier); err != nil {
 			c.String(http.StatusBadRequest, err.Error())
 			return
 		}
-		c.String(http.StatusOK, "Deploy for challenge %s has been triggered, check stats", id)
+		c.String(http.StatusOK, "Deploy for challenge %s has been triggered, check stats", identifier)
 		return
 
 	default:
@@ -45,7 +46,7 @@ func manageChallengeHandler(c *gin.Context) {
 		return
 	}
 
-	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, id)
+	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
 	c.String(http.StatusOK, respStr)
 }
 

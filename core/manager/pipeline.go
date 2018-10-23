@@ -192,9 +192,9 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		return
 	}
 
-	challenge, err := database.QueryFirstChallengeEntry("challenge_id", config.Challenge.Id)
+	challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Name)
 	if err != nil {
-		log.Errorf("Error while querying challenge with id %s : %s", config.Challenge.Id, err)
+		log.Errorf("Error while querying challenge %s : %s", config.Challenge.Name, err)
 		return
 	}
 

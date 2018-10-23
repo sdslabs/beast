@@ -33,7 +33,8 @@ func DeployChallengePipeline(challengeDir string) error {
 	return nil
 }
 
-// Start deploying a challenge using the challenge ID, if the challenge is already present
+// Start deploying a challenge using the challenge Name(we are not using ID here),
+// if the challenge is already present
 // and the container is running, then don't do anything. If the challenge does not exist
 // then first check if the challenge is in staged state, if it is then deploy challenge
 // from there on or else start deploy pipeline for the challenge.
@@ -103,26 +104,26 @@ func DeployChallenge(challengeName string) error {
 // Do not touch any files in staging, commit phase.
 // This function returns a error if the challenge was not found or if
 // an error happened while removing the challenge instance.
-func UndeployChallenge(challengeId string) error {
-	log.Infof("Got request to Undeploy challenge : %s", challengeId)
+func UndeployChallenge(challengeName string) error {
+	log.Infof("Got request to Undeploy challenge : %s", challengeName)
 
-	challenge, err := database.QueryFirstChallengeEntry("challenge_id", challengeId)
+	challenge, err := database.QueryFirstChallengeEntry("name", challengeName)
 	if err != nil {
-		log.Errorf("Got an error while querying database for challenge : %s : %s", challengeId, err)
+		log.Errorf("Got an error while querying database for challenge : %s : %s", challengeName, err)
 		return errors.New("DATABASE SERVER ERROR")
 	}
 
-	if challenge.ChallengeId == "" {
-		log.Errorf("Invalid challengeID for undeploy action")
-		return fmt.Errorf("ChallengeId %s not valid", challengeId)
+	if challenge.Name == "" {
+		log.Errorf("Invalid challenge Name for undeploy action")
+		return fmt.Errorf("ChallengeName %s not valid", challengeName)
 	}
 
 	if challenge.ContainerId == "" {
-		log.Errorf("No instance of challenge(%s) deployed", challengeId)
-		return fmt.Errorf("No instance of challenge(%s) deployed", challengeId)
+		log.Errorf("No instance of challenge(%s) deployed", challengeName)
+		return fmt.Errorf("No instance of challenge(%s) deployed", challengeName)
 	}
 
-	log.Debug("Removing challenge instance for ", challengeId)
+	log.Debug("Removing challenge instance for ", challengeName)
 	err = docker.StopAndRemoveContainer(challenge.ContainerId)
 	if err != nil {
 		p := fmt.Errorf("Error while removing challenge instance : %s", err)

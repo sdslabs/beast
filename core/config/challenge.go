@@ -41,12 +41,10 @@ func (config *BeastChallengeConfig) ValidateRequiredFields() error {
 // This structure contains information related to challenge,
 // Challenge Metadata
 //
-// * Id - Unique ID of the challenge
-// * Name - Name of the challenge
+// * Name - Name of the challenge(This must be unique and will correspond to identifier)
 // * ChallengeType - Type of the challenge(web/service/ssh)
 // * ChallengeDetails - Another substructure cotaining details about challenge
 type Challenge struct {
-	Id               string           `toml:"id"`
 	Name             string           `toml:"name"`
 	ChallengeType    string           `toml:"challenge_type"`
 	ChallengeDetails ChallengeDetails `toml:"details"`
@@ -56,7 +54,6 @@ func (config *Challenge) ValidateRequiredFields() error {
 	if config.ChallengeType == "" || config.Name == "" {
 		return errors.New("Challenge `id`, `name` and `challenge_type` are required")
 	}
-	// challenge.Id =
 
 	err := config.ChallengeDetails.ValidateRequiredFields()
 	if err != nil {
