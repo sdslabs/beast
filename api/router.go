@@ -1,6 +1,14 @@
 package api
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+func dummyHandler(c *gin.Context) {
+	c.String(http.StatusOK, WIP_TEXT)
+}
 
 func initGinRouter() *gin.Engine {
 	router := gin.New()
@@ -11,9 +19,10 @@ func initGinRouter() *gin.Engine {
 		// Deploy route group
 		manageGroup := apiGroup.Group("/manage")
 		{
-			manageGroup.GET("/all/:action", manageAllHandler)
+			manageGroup.GET("/all/:action", dummyHandler)
 			manageGroup.POST("/deploy/local/", deployLocalChallengeHandler)
-			manageGroup.POST("/challenge/:id", manageChallengeHandler)
+			manageGroup.POST("/challenge/", manageChallengeHandler)
+			manageGroup.POST("/static/:action", beastStaticContentHandler)
 		}
 
 		// Status route group

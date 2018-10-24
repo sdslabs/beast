@@ -102,7 +102,14 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 	log.Debug("Writing image build logs from buffer to file")
 
-	logFilePath := filepath.Join(challengeStagingDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
+	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
+	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
+	if err != nil {
+		log.Errorf("Could not validate challenge logs directory : %s : %s", challengeStagingLogsDir, err)
+		return nil
+	}
+
+	logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
 	logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
 		log.Errorf("Error while writing logs to file : %s", logFilePath)
@@ -120,7 +127,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
-	containerId, err := docker.CreateContainerFromImage(config.Challenge.ChallengeDetails.Ports, challenge.ImageId, config.Challenge.Name)
+	containerId, err := docker.CreateContainerFromImage(config.Challenge.ChallengeDetails.Ports, nil, challenge.ImageId, config.Challenge.Name)
 	if err != nil {
 		if containerId != "" {
 			challenge.ContainerId = containerId
@@ -192,9 +199,9 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		return
 	}
 
-	challenge, err := database.QueryFirstChallengeEntry("challenge_id", config.Challenge.Id)
+	challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Name)
 	if err != nil {
-		log.Errorf("Error while querying challenge with id %s : %s", config.Challenge.Id, err)
+		log.Errorf("Error while querying challenge %s : %s", config.Challenge.Name, err)
 		return
 	}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 
@@ -58,7 +59,7 @@ func StopAndRemoveContainer(containerId string) error {
 	return err
 }
 
-func CreateContainerFromImage(portsList []uint32, imageId string, challengeName string) (string, error) {
+func CreateContainerFromImage(portsList []uint32, mountsMap map[string]string, imageId string, containerName string) (string, error) {
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -87,13 +88,25 @@ func CreateContainerFromImage(portsList []uint32, imageId string, challengeName 
 		ExposedPorts: portSet,
 	}
 
-	hostConfig := &container.HostConfig{
-		PortBindings: portMap,
+	var mountBindings []mount.Mount
+	for src, dest := range mountsMap {
+		mnt := mount.Mount{
+			Type:   mount.TypeBind,
+			Source: src,
+			Target: dest,
+		}
+
+		mountBindings = append(mountBindings, mnt)
 	}
 
-	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, challengeName)
+	hostConfig := &container.HostConfig{
+		PortBindings: portMap,
+		Mounts:       mountBindings,
+	}
+
+	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, containerName)
 	if err != nil {
-		log.Error("Error while creating the container with name %s", challengeName)
+		log.Error("Error while creating the container with name %s", containerName)
 		return "", err
 	}
 

@@ -8,7 +8,6 @@ import (
 )
 
 // The `challenges` table has the following columns
-// challenge_id
 // name
 // author
 // format
@@ -18,7 +17,6 @@ import (
 type Challenge struct {
 	gorm.Model
 
-	ChallengeId string `gorm:"not null;type:varchar(64);unique"`
 	Name        string `gorm:"not null;type:varchar(64);unique"`
 	Format      string `gorm:"not null"`
 	ContainerId string `gorm:"size:64;unique"`
