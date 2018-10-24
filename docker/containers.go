@@ -1,9 +1,7 @@
 package docker
 
 import (
-	"bytes"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/docker/docker/api/types"

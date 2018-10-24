@@ -19,14 +19,20 @@ To build beast from Source use the Makefile provided.
 
 * `make build`
 
+This will build beast and will place the binary in `$GOPATH/bin/` will also copy the necessery tools to desired place. To build this in production make sure you also have built the static-content docker image in `/extras/static-content`
+
+To run the API server for beast use command `beast run -v`
+
 ### Structure
 
 * **api**
 	* API exposed by beast
 	* This uses `gin` as rest API framework and routes are grouped under `/api`
+	* API Docs are served using swagger API specs.
 
-* **build**
+* **scripts**
 	* Build scripts for beast.
+	* Other relevent scripts for beast including docker-enter.
 
 * **cmd**
 	* Package containing command line functionality of beast.
@@ -35,7 +41,17 @@ To build beast from Source use the Makefile provided.
 
 * **core**
 	* Core functionalities of beast
-	* It includes package for beast database management and deploy pipeline.
+	* It includes package managing challenges.
+	* Inside package `manager` lives the code relating to all the core functionality that beast provides.
+
+* **database**
+	* Database wrapper using gorm for beast.
+
+* **docker**
+	* Docker wrapper for beast container API provider
+
+* **git**
+	* Git functions wrapper provider for beast functions.
 
 * **templates**
 	* Tempaltes used by beast.
@@ -50,6 +66,7 @@ To build beast from Source use the Makefile provided.
 
 * **_examples**
 	* This directory contains example challenges for beast.
+	* An example beast global root config to be placed in `$HOME/.beast/config.toml`
 
 ### Testing
 
@@ -65,7 +82,7 @@ $ make build
 $ beast run -v
 
 # In another terminal Start the local deployment of the challenge, using the directory
-$ curl -X POST localhost:5005/api/deploy/local/ --data "challenge_dir=<absolute_path_to_challenge_simple>"
+$ curl -X POST localhost:5005/api/manage/deploy/local/ --data "challenge_dir=<absolute_path_to_challenge_simple>"
 
 # Wait for beast to finish the image build and deployment of the challenge
 # This might take some time. Have some snacks ready!
@@ -84,6 +101,8 @@ choice > 4
 
 Beast uses `logrus` for logging purposes and follow standard effective go guidelines, so anytime you are writing a code keep in mind to 
 add necessery logs and documentation. Also format the code before commiting using `gofmt`. Or simply run the make command `make test`
+
+For any API routes you add to the beast API do write Swagger API documentation.
 
 The design documentation for the new Beast can be found [here](https://docs.google.com/document/d/1BlRes900aFS2s8jicrSx2W7b1t1FnYZhx70jGQu__HE/edit)
 
