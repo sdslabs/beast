@@ -127,7 +127,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
-	containerId, err := docker.CreateContainerFromImage(config.Challenge.ChallengeDetails.Ports, challenge.ImageId, config.Challenge.Name)
+	containerId, err := docker.CreateContainerFromImage(config.Challenge.ChallengeDetails.Ports, nil, challenge.ImageId, config.Challenge.Name)
 	if err != nil {
 		if containerId != "" {
 			challenge.ContainerId = containerId
