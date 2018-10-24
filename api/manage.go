@@ -75,6 +75,15 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	c.String(http.StatusOK, respStr)
 }
 
+// Handles route related to beast static content serving container
+// @Summary Handles route related to beast static content serving container, takes action as route parameter and perform that action
+// @Description Handles beast static content serving container routes.
+// @Accept  json
+// @Produce text/plain
+// @Param action query string true "Action on the static container"
+// @Success 200 {string} Success
+// @Failure 400 {string} Error
+// @Router /api/manage/static/:action [post]
 func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
 
@@ -82,6 +91,11 @@ func beastStaticContentHandler(c *gin.Context) {
 	case MANAGE_ACTION_DEPLOY:
 		go manager.DeployStaticContentContainer()
 		c.String(http.StatusOK, "Static container deploy started")
+		return
+
+	case MANAGE_ACTION_UNDEPLOY:
+		go manager.UndeployStaticContentContainer()
+		c.String(http.StatusOK, "Static content container undeploy started")
 		return
 
 	default:

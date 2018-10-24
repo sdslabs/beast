@@ -54,3 +54,12 @@ func DeployStaticContentContainer() error {
 
 	return nil
 }
+
+func UndeployStaticContentContainer() {
+	err := coreutils.CleanupContainerByFilter("name", core.BEAST_STATIC_CONTAINER_NAME)
+	if err != nil {
+		log.Errorf("Error while cleaning old static content container : %s", err)
+	} else {
+		log.Infof("Static content container undeployed")
+	}
+}
