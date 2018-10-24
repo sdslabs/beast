@@ -10,12 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func manageAllHandler(c *gin.Context) {
-	c.String(http.StatusOK, WIP_TEXT)
-}
-
 func manageChallengeHandler(c *gin.Context) {
-	identifier := c.Param("name")
+	identifier := c.PostForm("name")
 	action := c.PostForm("action")
 
 	switch action {
@@ -77,4 +73,18 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	respStr := fmt.Sprintf("Deploy for challenge %s has been triggered.\n", challengeName)
 
 	c.String(http.StatusOK, respStr)
+}
+
+func beastStaticContentHandler(c *gin.Context) {
+	action := c.Param("action")
+
+	switch action {
+	case MANAGE_ACTION_DEPLOY:
+		go manager.DeployStaticContentContainer()
+		c.String(http.StatusOK, "Static container deploy started")
+		return
+
+	default:
+		c.String(http.StatusBadRequest, fmt.Sprintf("Invalid Action : %s", action))
+	}
 }
