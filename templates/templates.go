@@ -39,9 +39,8 @@ RUN apt-get -y install {{.AptDeps}}
 {{if .Ports}} EXPOSE {{.Ports}} {{end}}
 
 RUN cd /challenge && \
-	chmod +x {{.SetupScript}} && \
-	./{{.SetupScript}}
-
+	chmod +x {{ range $index, $elem := .SetupScript}} {{$elem}} {{end}} \
+	{{ range $index, $elem := .SetupScript}} && ./{{$elem}} \ {{end}}
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 RUN useradd -ms /bin/bash beast
 

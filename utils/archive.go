@@ -25,7 +25,7 @@ const (
 // In this function the contextDir is the absolute path of the directory to be compressed
 // to the tar archive.
 // DestincationDir is the directory to put the obtained tar file into.
-func Tar(contextDir string, compression Compression, destinationDir string, additionalCtx map[string]string, subDirToSkip string) error {
+func Tar(contextDir string, compression Compression, destinationDir string, additionalCtx map[string]string, subDirToSkip []string) error {
 	e := ValidateDirExists(contextDir)
 	if e != nil {
 		return e
@@ -60,6 +60,15 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 	defer fileWriter.Close()
 	defer tarFileWriter.Close()
 
+	dirToSkip := func(dir string) bool {
+		for _, d := range subDirToSkip {
+			if dir == d {
+				return true
+			}
+		}
+		return false
+	}
+
 	baseDir := filepath.Base(contextDir)
 	err = filepath.Walk(contextDir,
 		func(path string, info os.FileInfo, err error) error {
@@ -67,7 +76,7 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 				return err
 			}
 
-			if info.IsDir() && info.Name() == subDirToSkip {
+			if info.IsDir() && dirToSkip(path) {
 				log.Debugf("skipping a dir without errors: %s", info.Name())
 				return filepath.SkipDir
 			}

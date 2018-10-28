@@ -28,7 +28,8 @@ const (
 	BEAST_CHALLENGES_STATIC_PORT   uint32 = 80
 	BEAST_STATIC_CONTAINER_NAME    string = "beast-static"
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
-	RELATIVE_STATIC_FOLDER         string = "public"
+	BEAST_STATIC_FOLDER            string = "static"
+	PUBLIC                         string = "public"
 )
 
 var DEPLOY_STATUS = map[string]string{

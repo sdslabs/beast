@@ -47,8 +47,21 @@ func stageChallenge(challengeDir string) error {
 	additionalCtx := make(map[string]string)
 	additionalCtx["Dockerfile"] = dockerfileCtx
 
+	log.Debug("Copying Content to Static Folder")
+
+	staticContentDir, err := GetStaticContentDir(challengeConfig, contextDir)
+	if err != nil {
+		return err
+	}
+
+	err = CopyToStaticContent(challengeName, staticContentDir)
+	if err != nil {
+		return err
+	}
+
 	log.Debug("Starting to build Tar file for the challenge to stage")
-	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, core.RELATIVE_STATIC_FOLDER)
+	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir})
+
 	if err != nil {
 		return err
 	}

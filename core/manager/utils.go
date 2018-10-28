@@ -21,7 +21,7 @@ import (
 type BeastBareDockerfile struct {
 	Ports       string
 	AptDeps     string
-	SetupScript string
+	SetupScript []string
 	RunCmd      string
 }
 
@@ -257,4 +257,29 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	}
 
 	return nil
+}
+
+//Provides the Static Content Folder Name from the config
+func GetStaticContentDir(configFile, contextDir string) (string, error) {
+	var config cfg.BeastChallengeConfig
+	_, err := toml.DecodeFile(configFile, &config)
+	if err != nil {
+		return "", err
+	}
+	relativeStaticContentDir := config.Challenge.ChallengeDetails.StaticContentDir
+	if relativeStaticContentDir == "" {
+		relativeStaticContentDir = core.PUBLIC
+	}
+	return filepath.Join(contextDir, relativeStaticContentDir), nil
+}
+
+//Copies the Static content to the staging/static/folder
+func CopyToStaticContent(challengeName, staticContentDir string) error {
+	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, core.BEAST_STATIC_FOLDER, challengeName)
+	err := utils.CreateIfNotExistDir(dirPath)
+	if err != nil {
+		return err
+	}
+	err = utils.CopyDirectory(staticContentDir, dirPath)
+	return err
 }

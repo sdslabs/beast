@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -129,4 +131,37 @@ func CopyFile(src, dst string) error {
 
 	_, err = io.Copy(destination, source)
 	return err
+}
+
+func CopyDirectory(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(dst, srcInfo.Mode())
+	if err != nil {
+		return err
+	}
+
+	fds, err := ioutil.ReadDir(src)
+
+	if err != nil {
+		return err
+	}
+	for _, fd := range fds {
+		srcn := path.Join(src, fd.Name())
+		dstn := path.Join(dst, fd.Name())
+
+		if fd.IsDir() {
+			if err = CopyDirectory(srcn, dstn); err != nil {
+				fmt.Println(err)
+			}
+		} else {
+			if err = CopyFile(srcn, dstn); err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
+	return nil
 }

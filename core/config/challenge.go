@@ -76,7 +76,7 @@ func (config *Challenge) ValidateRequiredFields() error {
 type ChallengeDetails struct {
 	Flag                    string   `toml:"flag"`
 	AptDeps                 []string `toml:"apt_dependencies"`
-	SetupScript             string   `toml:"setup_script"`
+	SetupScript             []string `toml:"setup_script"`
 	StaticContentDir        string   `toml:"static_content_dir"`
 	StaticContentServerPort uint32   `toml:"static_content_port"`
 	RunCmd                  string   `toml:"run_cmd"`
