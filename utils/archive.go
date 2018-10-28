@@ -25,7 +25,7 @@ const (
 // In this function the contextDir is the absolute path of the directory to be compressed
 // to the tar archive.
 // DestincationDir is the directory to put the obtained tar file into.
-func Tar(contextDir string, compression Compression, destinationDir string, additionalCtx map[string]string) error {
+func Tar(contextDir string, compression Compression, destinationDir string, additionalCtx map[string]string, subDirToSkip string) error {
 	e := ValidateDirExists(contextDir)
 	if e != nil {
 		return e
@@ -65,6 +65,11 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
+			}
+
+			if info.IsDir() && info.Name() == subDirToSkip {
+				log.Debugf("skipping a dir without errors: %s", info.Name())
+				return filepath.SkipDir
 			}
 
 			header, err := tar.FileInfoHeader(info, info.Name())

@@ -48,7 +48,7 @@ func stageChallenge(challengeDir string) error {
 	additionalCtx["Dockerfile"] = dockerfileCtx
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
-	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx)
+	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, core.RELATIVE_STATIC_FOLDER)
 	if err != nil {
 		return err
 	}
@@ -205,20 +205,20 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		return
 	}
 
+	// Using the challenge dir we got, update the database entries for the challenge.
+	err = updateOrCreateChallengeDbEntry(&challenge, config)
+	if err != nil {
+		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
+		log.Errorf("Db error : %s", err)
+		return
+	}
+
 	// Look into the database to check if the deploy is already in progress
 	// or not, return if a deploy is already in progress or else continue
 	// deploying
 	if challenge.Status != core.DEPLOY_STATUS["unknown"] &&
 		challenge.Status != core.DEPLOY_STATUS["deployed"] {
 		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
-		return
-	}
-
-	// Using the challenge dir we got, update the database entries for the challenge.
-	err = updateOrCreateChallengeDbEntry(&challenge, config)
-	if err != nil {
-		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
-		log.Errorf("Db error : %s", err)
 		return
 	}
 

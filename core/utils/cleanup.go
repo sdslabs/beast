@@ -34,7 +34,7 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 	}
 
 	if len(erroredContainers) != 0 {
-		return fmt.Errorf("Error wihle cleaning up container : %s", erroredContainers)
+		return fmt.Errorf("Error while cleaning up container : %s", erroredContainers)
 	}
 
 	return nil

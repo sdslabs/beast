@@ -209,8 +209,10 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	}
 
 	isAllocated := func(port uint32) bool {
-		for _, p := range allocatedPorts {
+		for i, p := range allocatedPorts {
 			if port == p.PortNo {
+				allocatedPorts[len(allocatedPorts)-1], allocatedPorts[i] = allocatedPorts[i], allocatedPorts[len(allocatedPorts)-1]
+				allocatedPorts = allocatedPorts[:len(allocatedPorts)-1]
 				return true
 			}
 		}
@@ -223,8 +225,6 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	// for the challenge.
 	// TODO: Do all this under a database transaction so that if any port
 	// request is not available
-	// TODO: delete previously allocated ports to the challenge if they are not
-	// in the current required port list.
 	for _, port := range config.Challenge.ChallengeDetails.Ports {
 		if isAllocated(port) {
 			// The port has already been allocated to the challenge
@@ -247,6 +247,12 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		if gotPort.ChallengeID != challEntry.ID {
 			return fmt.Errorf("The port %s requested is already in use by another challenge", gotPort.PortNo)
+		}
+	}
+
+	if len(allocatedPorts) > 0 {
+		if err = database.DeleteRelatedPorts(allocatedPorts); err != nil {
+			return fmt.Errorf("There was an error while deleting the ports which were already allocated to the challenge : %s : %s", challEntry.Name, err)
 		}
 	}
 
