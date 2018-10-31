@@ -14,6 +14,20 @@ import (
 // container_id
 // image_id
 // status
+//
+// Some hooks needs to be attached to these database transaction, and on the basis of
+// the type of the transaction that is performed on the challenge table, we need to
+// perform some action.
+//
+// Use gorm hooks for these purpose, currently the following hooks are
+// implemented.
+// * AfterUpdate
+// * AfterCreate
+// * AfterSave
+// * AfterDelete
+//
+// All these hooks are used for generating the access shell script for the challenge
+// to the challenge author
 type Challenge struct {
 	gorm.Model
 
