@@ -10,6 +10,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Handles route related to managing a challenge
+// @Summary Handles challenge management actions.
+// @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY.
+// @Accept  json
+// @Produce application/json
+// @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
+// @Param action query string true "Action for the challenge"
+// @Success 200 {JSON} Success
+// @Failure 402 {JSON} BadRequest
+// @Router /api/manage/challenge/ [post]
 func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")

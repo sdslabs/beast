@@ -12,7 +12,37 @@ info:
   title: Beast API
   version: "1.0"
 paths:
-  /api/deploy:
+  /api/manage/challenge/:
+    post:
+      consumes:
+      - application/json
+      description: Handles challenge management routes with actions which includes
+        - DEPLOY, UNDEPLOY.
+      parameters:
+      - description: Name of the challenge to be managed, here name is the unique
+          identifier for challenge
+        in: query
+        name: name
+        required: true
+        type: string
+      - description: Action for the challenge
+        in: query
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: JSON
+        "402":
+          description: Payment Required
+          schema:
+            type: JSON
+      summary: Handles challenge management actions.
+  /api/manage/deploy/local:
     post:
       consumes:
       - application/json
@@ -25,15 +55,75 @@ paths:
         required: true
         type: string
       produces:
-      - text/plain
+      - application/json
       responses:
         "200":
           description: OK
           schema:
-            type: string
+            type: JSON
         "400":
           description: Bad Request
           schema:
-            type: string
+            type: JSON
       summary: Deploy a local challenge using the path provided in the post parameter
+  /api/manage/static/:
+    post:
+      consumes:
+      - application/json
+      description: Handles beast static content serving container routes.
+      parameters:
+      - description: Action on the static container
+        in: query
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: JSON
+        "400":
+          description: Bad Request
+          schema:
+            type: JSON
+      summary: Handles route related to beast static content serving container, takes
+        action as route parameter and perform that action
+  /api/remote/reset/:
+    post:
+      consumes:
+      - application/json
+      description: Resets local copy of remote git directory, it first deletes the
+        existing directory and then clone from the remote again.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: JSON
+        "500":
+          description: Internal Server Error
+          schema:
+            type: JSON
+      summary: Resets beast local copy of remote git repository.
+  /api/remote/sync/:
+    post:
+      consumes:
+      - application/json
+      description: Syncs beasts local challenges database with the remote git repository(hack)
+        the local copy of the challenge database is located at $HOME/.beast/remote/$REMOTE_NAME.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: JSON
+        "500":
+          description: Internal Server Error
+          schema:
+            type: JSON
+      summary: Syncs beast's local copy of remote git repository for challenges.
 swagger: "2.0"

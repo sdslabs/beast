@@ -43,8 +43,8 @@ func initGinRouter() *gin.Engine {
 
 		remoteGroup := apiGroup.Group("/remote")
 		{
-			remoteGroup.GET("/sync", syncBeastGitRemote)
-			remoteGroup.GET("/reset", resetBeastGitRemote)
+			remoteGroup.POST("/sync", syncBeastGitRemote)
+			remoteGroup.POST("/reset", resetBeastGitRemote)
 		}
 	}
 
