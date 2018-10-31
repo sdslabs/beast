@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
 
@@ -74,13 +75,12 @@ func (config *Challenge) ValidateRequiredFields() error {
 // 		challenge.
 // * RunCmd - Command to run to start the challenge.
 type ChallengeDetails struct {
-	Flag                    string   `toml:"flag"`
-	AptDeps                 []string `toml:"apt_dependencies"`
-	SetupScript             []string `toml:"setup_script"`
-	StaticContentDir        string   `toml:"static_content_dir"`
-	StaticContentServerPort uint32   `toml:"static_content_port"`
-	RunCmd                  string   `toml:"run_cmd"`
-	Ports                   []uint32 `toml:"ports"`
+	Flag             string   `toml:"flag"`
+	AptDeps          []string `toml:"apt_dependencies"`
+	SetupScript      []string `toml:"setup_script"`
+	StaticContentDir string   `toml:"static_content_dir"`
+	RunCmd           string   `toml:"run_cmd"`
+	Ports            []uint32 `toml:"ports"`
 }
 
 func (config *ChallengeDetails) ValidateRequiredFields() error {
@@ -93,19 +93,8 @@ func (config *ChallengeDetails) ValidateRequiredFields() error {
 	}
 
 	if config.StaticContentDir != "" {
-		if config.StaticContentServerPort == 0 || len(config.Ports) == 0 {
-			return errors.New("Valid static content server port should be provided")
-		}
-
-		validPortMap := false
-		for _, port := range config.Ports {
-			if port == config.StaticContentServerPort {
-				validPortMap = true
-			}
-		}
-
-		if !validPortMap {
-			return errors.New("Static content dir server port should also be present in Ports array")
+		if filepath.IsAbs(config.StaticContentDir) {
+			return fmt.Errorf("Static content directory path should be relative to challenge directory root")
 		}
 	}
 
