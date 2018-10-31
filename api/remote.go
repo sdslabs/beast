@@ -13,20 +13,28 @@ func syncBeastGitRemote(c *gin.Context) {
 	err := git.SyncBeastRemote()
 	if err != nil {
 		log.Errorf("Error while syncing beast remote....")
-		c.String(http.StatusInternalServerError, "Error while syncing beast remote")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Error while syncing beast remote",
+		})
 		return
 	}
 
-	c.String(http.StatusOK, "REMOTE SYNC DONE")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "REMOTE SYNC DONE",
+	})
 }
 
 func resetBeastGitRemote(c *gin.Context) {
 	err := git.ResetBeastRemote()
 	if err != nil {
 		log.Errorf("Error while resetting beast remote....")
-		c.String(http.StatusInternalServerError, "Error while resetting beast remote")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Error while resetting beast remote",
+		})
 		return
 	}
 
-	c.String(http.StatusOK, "REMOTE RESET DONE")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "REMOTE RESET DONE",
+	})
 }

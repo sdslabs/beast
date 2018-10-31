@@ -21,7 +21,7 @@ import (
 type BeastBareDockerfile struct {
 	Ports       string
 	AptDeps     string
-	SetupScript string
+	SetupScript []string
 	RunCmd      string
 }
 
@@ -209,8 +209,10 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	}
 
 	isAllocated := func(port uint32) bool {
-		for _, p := range allocatedPorts {
+		for i, p := range allocatedPorts {
 			if port == p.PortNo {
+				allocatedPorts[len(allocatedPorts)-1], allocatedPorts[i] = allocatedPorts[i], allocatedPorts[len(allocatedPorts)-1]
+				allocatedPorts = allocatedPorts[:len(allocatedPorts)-1]
 				return true
 			}
 		}
@@ -223,8 +225,6 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	// for the challenge.
 	// TODO: Do all this under a database transaction so that if any port
 	// request is not available
-	// TODO: delete previously allocated ports to the challenge if they are not
-	// in the current required port list.
 	for _, port := range config.Challenge.ChallengeDetails.Ports {
 		if isAllocated(port) {
 			// The port has already been allocated to the challenge
@@ -250,5 +250,36 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 	}
 
+	if len(allocatedPorts) > 0 {
+		if err = database.DeleteRelatedPorts(allocatedPorts); err != nil {
+			return fmt.Errorf("There was an error while deleting the ports which were already allocated to the challenge : %s : %s", challEntry.Name, err)
+		}
+	}
+
 	return nil
+}
+
+//Provides the Static Content Folder Name from the config
+func GetStaticContentDir(configFile, contextDir string) (string, error) {
+	var config cfg.BeastChallengeConfig
+	_, err := toml.DecodeFile(configFile, &config)
+	if err != nil {
+		return "", err
+	}
+	relativeStaticContentDir := config.Challenge.ChallengeDetails.StaticContentDir
+	if relativeStaticContentDir == "" {
+		relativeStaticContentDir = core.PUBLIC
+	}
+	return filepath.Join(contextDir, relativeStaticContentDir), nil
+}
+
+//Copies the Static content to the staging/static/folder
+func CopyToStaticContent(challengeName, staticContentDir string) error {
+	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
+	err := utils.CreateIfNotExistDir(dirPath)
+	if err != nil {
+		return err
+	}
+	err = utils.CopyDirectory(staticContentDir, dirPath)
+	return err
 }

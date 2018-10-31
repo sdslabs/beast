@@ -53,3 +53,13 @@ func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 
 	return ports, nil
 }
+
+func DeleteRelatedPorts(portList []Port) error {
+	tx := Db.Begin()
+
+	if tx.Error != nil {
+		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
+	}
+
+	return tx.Delete(portList).Error
+}

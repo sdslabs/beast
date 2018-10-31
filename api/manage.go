@@ -18,12 +18,16 @@ func manageChallengeHandler(c *gin.Context) {
 	case MANAGE_ACTION_UNDEPLOY:
 		log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 		if err := manager.UndeployChallenge(identifier); err != nil {
-			c.String(http.StatusBadRequest, err.Error())
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
 			return
 		}
 
 		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, identifier)
-		c.String(http.StatusOK, respStr)
+		c.JSON(http.StatusOK, gin.H{
+			"message": respStr,
+		})
 		return
 
 	case MANAGE_ACTION_DEPLOY:
@@ -31,58 +35,72 @@ func manageChallengeHandler(c *gin.Context) {
 		log.Infof("Trying to %s challenge with name %s", action, identifier)
 
 		if err := manager.DeployChallenge(identifier); err != nil {
-			c.String(http.StatusBadRequest, err.Error())
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
 			return
 		}
-		c.String(http.StatusOK, "Deploy for challenge %s has been triggered, check stats", identifier)
+		c.JSON(http.StatusOK, gin.H{
+			"message": fmt.Sprintf("Deploy for challenge %s has been triggered, check stats", identifier),
+		})
 		return
 
 	default:
-		c.String(http.StatusBadRequest, fmt.Sprintf("Invalid Action : %s", action))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": fmt.Sprintf("Invalid Action : %s", action),
+		})
 		return
 	}
 
 	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
-	c.String(http.StatusOK, respStr)
+	c.JSON(http.StatusOK, gin.H{
+		"message": respStr,
+	})
 }
 
 // Deploy local challenge
 // @Summary Deploy a local challenge using the path provided in the post parameter
 // @Description Handles deployment of a challenge using the absolute directory path
 // @Accept  json
-// @Produce text/plain
+// @Produce application/json
 // @Param challenge_dir query string true "Challenge Directory"
-// @Success 200 {string} Success
-// @Failure 400 {string} Error
+// @Success 200 {JSON} Success
+// @Failure 400 {JSON} Error
 // @Router /api/manage/deploy/local [post]
 func deployLocalChallengeHandler(c *gin.Context) {
 	challDir := c.PostForm("challenge_dir")
 	if challDir == "" {
-		c.String(http.StatusNotAcceptable, "No challenge directory specified")
+		c.JSON(http.StatusNotAcceptable, gin.H{
+			"message": "No challenge directory specified",
+		})
 		return
 	}
 
 	log.Info("In local deploy challenge Handler")
 	err := manager.DeployChallengePipeline(challDir)
 	if err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
 		return
 	}
 
 	challengeName := filepath.Base(challDir)
 	respStr := fmt.Sprintf("Deploy for challenge %s has been triggered.\n", challengeName)
 
-	c.String(http.StatusOK, respStr)
+	c.JSON(http.StatusOK, gin.H{
+		"message": respStr,
+	})
 }
 
 // Handles route related to beast static content serving container
 // @Summary Handles route related to beast static content serving container, takes action as route parameter and perform that action
 // @Description Handles beast static content serving container routes.
 // @Accept  json
-// @Produce text/plain
+// @Produce application/json
 // @Param action query string true "Action on the static container"
-// @Success 200 {string} Success
-// @Failure 400 {string} Error
+// @Success 200 {JSON} Success
+// @Failure 400 {JSON} Error
 // @Router /api/manage/static/:action [post]
 func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
@@ -90,15 +108,21 @@ func beastStaticContentHandler(c *gin.Context) {
 	switch action {
 	case MANAGE_ACTION_DEPLOY:
 		go manager.DeployStaticContentContainer()
-		c.String(http.StatusOK, "Static container deploy started")
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Static container deploy started",
+		})
 		return
 
 	case MANAGE_ACTION_UNDEPLOY:
 		go manager.UndeployStaticContentContainer()
-		c.String(http.StatusOK, "Static content container undeploy started")
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Static content container undeploy started",
+		})
 		return
 
 	default:
-		c.String(http.StatusBadRequest, fmt.Sprintf("Invalid Action : %s", action))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": fmt.Sprintf("Invalid Action : %s", action),
+		})
 	}
 }

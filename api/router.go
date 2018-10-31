@@ -7,7 +7,9 @@ import (
 )
 
 func dummyHandler(c *gin.Context) {
-	c.String(http.StatusOK, WIP_TEXT)
+	c.JSON(http.StatusOK, gin.H{
+		"message": WIP_TEXT,
+	})
 }
 
 func initGinRouter() *gin.Engine {
