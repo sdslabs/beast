@@ -275,7 +275,7 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 
 //Copies the Static content to the staging/static/folder
 func CopyToStaticContent(challengeName, staticContentDir string) error {
-	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, core.BEAST_STATIC_FOLDER, challengeName)
+	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
 	err := utils.CreateIfNotExistDir(dirPath)
 	if err != nil {
 		return err
