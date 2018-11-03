@@ -1,0 +1,90 @@
+#!/bin/sh
+
+# Usage:
+# login_script {Username} {FileName}
+# FileName file : contains all the container names space separated which are accessible to the Username
+
+#Global vars
+SSH_USER=$1
+DOCKER_ACCESS_FILE=$2
+IS_VALID_CONTAINER=false
+command=""
+BOLD=$(tput bold)
+NORMAL=$(tput sgr0)
+CYAN='\033[0;36m'
+NORM='\033[0;37m'
+ACCESSIBLE_CONTAINERS=""
+
+
+#helper function
+print_container() 
+{ 
+   echo $2 
+}
+
+#Initiate
+read -r ACCESSIBLE_CONTAINERS < $DOCKER_ACCESS_FILE
+/bin/echo "Welcome ${SSH_USER}!
+To see the commands available Type 'help'"
+
+#main loop
+while [ "$command" != "exit" ]
+do
+/bin/echo -n "${BOLD}${SSH_USER}@beast: ${NORMAL}"
+read command
+   case "$command" in
+
+   help) 
+      /bin/echo -e "
+${CYAN}docker ps${NORM}
+Prints a list of containers running and which you have access to.
+
+${CYAN}docker-enter [CONTAINER-NAME] [COMMAND [ARG]...]${NORM}
+Runs command in the docker with the name given
+
+${CYAN}clear${NORM}
+clears the screen
+
+${CYAN}exit${NORM}
+Exits the session
+      "
+      ;;
+
+   docker\ ps)
+      echo $ACCESSIBLE_CONTAINERS
+      ;;
+
+   clear)
+      clear
+      ;;
+
+   exit)
+      /bin/echo "Goodbye"
+      ;;
+
+   docker-enter\ *)
+      container="$(print_container $command)"
+
+      #checks if valid container name
+      for i in $ACCESSIBLE_CONTAINERS; do
+         if [ $i = $container ]; then        
+            IS_VALID_CONTAINER=true
+            break;
+         fi
+      done
+
+      # run command
+      if [ "$IS_VALID_CONTAINER" = true ]; then
+         eval $command
+         IS_VALID_CONTAINER=false
+      else
+         /bin/echo "Sorry the container you provided was not available"
+      fi
+      ;;
+
+   *)
+      /bin/echo "command not found: $command"
+      ;;
+   esac
+done
+exit 0
