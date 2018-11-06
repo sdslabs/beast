@@ -118,8 +118,15 @@ func UndeployChallenge(challengeName string) error {
 		return fmt.Errorf("ChallengeName %s not valid", challengeName)
 	}
 
+	// If a existing container ID is not found make sure that you atleast
+	// set the deploy status to unknown. This earlier caused problem since if a challenge
+	// was in staging state(and deployed is cancled) then we can neither deploy new
+	// version nor we can undeploy the existing version(since it does not exist)
+	// So this....
 	if challenge.ContainerId == "" {
-		log.Errorf("No instance of challenge(%s) deployed", challengeName)
+		log.Warnf("No instance of challenge(%s) deployed", challengeName)
+		challenge.Status = core.DEPLOY_STATUS["unknown"]
+		database.Db.Save(&challenge)
 		return fmt.Errorf("No instance of challenge(%s) deployed", challengeName)
 	}
 

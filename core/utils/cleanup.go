@@ -51,7 +51,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 		database.Db.Save(chall)
 	}
 
-	err := CleanupContainerByFilter("name", config.Challenge.Name)
+	err := CleanupContainerByFilter("name", config.Challenge.Metadata.Name)
 	return err
 }
 
@@ -69,9 +69,9 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 }
 
 func CleanupChallengeIfExist(config cfg.BeastChallengeConfig) error {
-	chall, err := database.QueryFirstChallengeEntry("name", config.Challenge.Name)
+	chall, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 	if err != nil {
-		log.Errorf("Error while database query for challenge %s", config.Challenge.Name)
+		log.Errorf("Error while database query for challenge %s", config.Challenge.Metadata.Name)
 		return err
 	}
 

@@ -108,7 +108,6 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // @Description Handles beast static content serving container routes.
 // @Accept  json
 // @Produce application/json
-// @Param action query string true "Action on the static container"
 // @Success 200 {JSON} Success
 // @Failure 400 {JSON} Error
 // @Router /api/manage/static/:action [post]
