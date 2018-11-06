@@ -13,6 +13,22 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Deploy the static content container for beast
+// The image for the static container should be prebuilt, which can be found
+// in /extras/static-content/ of the root of the project
+// The image name for the static content docker image shoule be specified in the
+// BEAST_STATIC_CONTAINER_NAME:latest variable
+// This function does not build the image for static containers.
+// The port for the deployment of the static container is specified in the variable
+// BEAST_CHALLENGES_STATIC_PORT, this port should be free and will be the port on which
+// nginx container for static files will be running.
+//
+// Each challenges have its own static file folder inside the challenges directory.
+// The whole staging area of beast configuration is mounted on the docker container
+// to serve the static files to the user. The location of the static content for each
+// challenge for staging area is $BEAST_ROOT/staging/$CHALLENGE/static
+// This directory is automatically populated with the desired challenge static files
+// when the challenge is commanded to be staged.
 func DeployStaticContentContainer() error {
 	err := coreutils.CleanupContainerByFilter("name", core.BEAST_STATIC_CONTAINER_NAME)
 	if err != nil {
@@ -55,6 +71,8 @@ func DeployStaticContentContainer() error {
 	return nil
 }
 
+// This cleans up the container deployed by DeployStaticContentContainer function
+// The image is preserved after calling the function and thus need not be build again.
 func UndeployStaticContentContainer() {
 	err := coreutils.CleanupContainerByFilter("name", core.BEAST_STATIC_CONTAINER_NAME)
 	if err != nil {

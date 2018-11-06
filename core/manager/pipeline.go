@@ -82,7 +82,7 @@ func stageChallenge(challengeDir string) error {
 //
 // stagedPath is the complete path to the tar file for the challenge in the staging dir
 func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig, stagedPath string) error {
-	challengeName := config.Challenge.Name
+	challengeName := config.Challenge.Metadata.Name
 	challengeStagingDir := filepath.Dir(stagedPath)
 
 	log.Debug("Starting commit stage for the challenge")
@@ -140,7 +140,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
-	containerId, err := docker.CreateContainerFromImage(config.Challenge.ChallengeDetails.Ports, nil, challenge.ImageId, config.Challenge.Name)
+	containerId, err := docker.CreateContainerFromImage(config.Challenge.Env.Ports, nil, challenge.ImageId, config.Challenge.Metadata.Name)
 	if err != nil {
 		if containerId != "" {
 			challenge.ContainerId = containerId
@@ -182,6 +182,9 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 //
 // If you are skipping the stage step make sure that you provide the challenge
 // directory as the staged challenge directory, which contains the challenge config.
+//
+// During the staging steup if any error occurs, then the state of the challenge
+// in the database is set to unknown.
 func StartDeployPipeline(challengeDir string, skipStage bool) {
 	log.Debug("Loading Beast config")
 
@@ -207,14 +210,14 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 	// Validate challenge directory name with the name of the challenge
 	// provided in the config file for the beast. THere should be no
 	// conflict in the name.
-	if challengeName != config.Challenge.Name {
-		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Name)
+	if challengeName != config.Challenge.Metadata.Name {
+		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
 		return
 	}
 
-	challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Name)
+	challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 	if err != nil {
-		log.Errorf("Error while querying challenge %s : %s", config.Challenge.Name, err)
+		log.Errorf("Error while querying challenge %s : %s", config.Challenge.Metadata.Name, err)
 		return
 	}
 
@@ -249,6 +252,9 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 			log.WithFields(log.Fields{
 				"DEPLOY_ERROR": "STAGING :: " + challengeName,
 			}).Errorf("%s", err)
+
+			challenge.Status = core.DEPLOY_STATUS["unknown"]
+			database.Db.Save(&challenge)
 			return
 		}
 	} else {
@@ -273,6 +279,9 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "COMMIT :: " + challengeName,
 		}).Errorf("%s", err)
+
+		challenge.Status = core.DEPLOY_STATUS["unknown"]
+		database.Db.Save(&challenge)
 		return
 	}
 
@@ -284,6 +293,9 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		log.WithFields(log.Fields{
 			"DEPLOY_ERROR": "DEPLOY :: " + challengeName,
 		}).Errorf("%s", err)
+
+		challenge.Status = core.DEPLOY_STATUS["unknown"]
+		database.Db.Save(&challenge)
 		return
 	}
 

@@ -19,10 +19,10 @@ import (
 )
 
 type BeastBareDockerfile struct {
-	Ports       string
-	AptDeps     string
-	SetupScript []string
-	RunCmd      string
+	Ports        string
+	AptDeps      string
+	SetupScripts []string
+	RunCmd       string
 }
 
 // This if the function which validates the challenge directory
@@ -46,8 +46,8 @@ func ValidateChallengeConfig(challengeDir string) error {
 	}
 
 	challengeName := filepath.Base(challengeDir)
-	if challengeName != config.Challenge.Name {
-		return fmt.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Name)
+	if challengeName != config.Challenge.Metadata.Name {
+		return fmt.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
 	}
 
 	log.Debugf("Parsed config file is : %s", config)
@@ -107,10 +107,10 @@ func GenerateDockerfile(configFile string) (string, error) {
 	}
 
 	data := BeastBareDockerfile{
-		Ports:       strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.ChallengeDetails.Ports), " ", " ", -1), "[]"),
-		AptDeps:     strings.Join(config.Challenge.ChallengeDetails.AptDeps[:], " "),
-		SetupScript: config.Challenge.ChallengeDetails.SetupScript,
-		RunCmd:      config.Challenge.ChallengeDetails.RunCmd,
+		Ports:        strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
+		AptDeps:      strings.Join(config.Challenge.Env.AptDeps[:], " "),
+		SetupScripts: config.Challenge.Env.SetupScripts,
+		RunCmd:       config.Challenge.Env.RunCmd,
 	}
 
 	var dockerfile bytes.Buffer
@@ -191,9 +191,9 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 
 		challEntry = &database.Challenge{
-			Name:     config.Challenge.Name,
+			Name:     config.Challenge.Metadata.Name,
 			AuthorID: authorEntry.ID,
-			Format:   config.Challenge.ChallengeType,
+			Format:   config.Challenge.Metadata.Type,
 			Status:   core.DEPLOY_STATUS["unknown"],
 		}
 
@@ -225,7 +225,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	// for the challenge.
 	// TODO: Do all this under a database transaction so that if any port
 	// request is not available
-	for _, port := range config.Challenge.ChallengeDetails.Ports {
+	for _, port := range config.Challenge.Env.Ports {
 		if isAllocated(port) {
 			// The port has already been allocated to the challenge
 			// Do nothing for this.
@@ -266,7 +266,7 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	relativeStaticContentDir := config.Challenge.ChallengeDetails.StaticContentDir
+	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
 		relativeStaticContentDir = core.PUBLIC
 	}

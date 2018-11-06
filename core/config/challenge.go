@@ -42,23 +42,23 @@ func (config *BeastChallengeConfig) ValidateRequiredFields() error {
 // This structure contains information related to challenge,
 // Challenge Metadata
 //
-// * Name - Name of the challenge(This must be unique and will correspond to identifier)
-// * ChallengeType - Type of the challenge(web/service/ssh)
-// * ChallengeDetails - Another substructure cotaining details about challenge
+// * ChallengeEnv - Challenge environment configuration variables
+// * ChallengeMetadata - Challenge Metadata configuration variables
 type Challenge struct {
-	Name             string           `toml:"name"`
-	ChallengeType    string           `toml:"challenge_type"`
-	ChallengeDetails ChallengeDetails `toml:"details"`
+	Metadata ChallengeMetadata `toml:"metadata"`
+	Env      ChallengeEnv      `toml:"env"`
 }
 
 func (config *Challenge) ValidateRequiredFields() error {
-	if config.ChallengeType == "" || config.Name == "" {
-		return errors.New("Challenge `id`, `name` and `challenge_type` are required")
+	err := config.Metadata.ValidateRequiredFields()
+	if err != nil {
+		log.Debugf("Error while validating `ChallengeMetadata`'s required fields : %s", err.Error())
+		return err
 	}
 
-	err := config.ChallengeDetails.ValidateRequiredFields()
+	err = config.Env.ValidateRequiredFields()
 	if err != nil {
-		log.Debugf("Error while validating `ChallengeDetails`'s required fields : %s", err.Error())
+		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
 		return err
 	}
 
@@ -67,25 +67,45 @@ func (config *Challenge) ValidateRequiredFields() error {
 
 // This contains challenge specific properties which includes
 //
-// * Flag - Flag corresponding to the challenge
 // * AptDeps - Apt dependencies for the challenge
-// * SetupScript - relative path to the challenge setup script
+// * SetupScripts - relative path to the challenge setup scripts
 // * StaticContentDir - Relative path to the directory which you want
 // 		to serve statically for the challenge, for example a libc for binary
 // 		challenge.
-// * RunCmd - Command to run to start the challenge.
-type ChallengeDetails struct {
-	Flag             string   `toml:"flag"`
-	AptDeps          []string `toml:"apt_dependencies"`
-	SetupScript      []string `toml:"setup_script"`
-	StaticContentDir string   `toml:"static_content_dir"`
-	RunCmd           string   `toml:"run_cmd"`
-	Ports            []uint32 `toml:"ports"`
+// * RunCmd - Command to run or start the challenge.
+// * Base for the challenge, this might be extension to dockerfile usage
+// 		like for a php challenge this can be php:web, for node node:web
+// 		for xinetd services xinetd:service
+// * Ports: A list of ports to be used by the challenge.
+type ChallengeMetadata struct {
+	Flag string `toml:"flag"`
+	Name string `toml:"name"`
+	Type string `toml:"type"`
 }
 
-func (config *ChallengeDetails) ValidateRequiredFields() error {
-	if config.Flag == "" {
-		return errors.New("Challenge `flag` and `run_cmd` are required")
+func (config *ChallengeMetadata) ValidateRequiredFields() error {
+	if config.Name == "" || config.Flag == "" {
+		return fmt.Errorf("Name and Flag required for the challenge")
+	}
+
+	// Check if the config type is static here and if it is
+	// then return an indication for that, so that caller knows if it need
+	// to check a valid environment or not.
+	return nil
+}
+
+type ChallengeEnv struct {
+	AptDeps          []string `toml:"apt_deps"`
+	Ports            []uint32 `toml:"ports"`
+	SetupScripts     []string `toml:"setup_scripts"`
+	StaticContentDir string   `toml:"static_dir"`
+	RunCmd           string   `toml:"run_cmd"`
+	Base             string   `toml:"base"`
+}
+
+func (config *ChallengeEnv) ValidateRequiredFields() error {
+	if len(config.Ports) == 0 {
+		return errors.New("Are you sure you have specified the ports used by challenge")
 	}
 
 	if len(config.Ports) > int(core.MAX_PORT_PER_CHALL) {
@@ -96,6 +116,10 @@ func (config *ChallengeDetails) ValidateRequiredFields() error {
 		if filepath.IsAbs(config.StaticContentDir) {
 			return fmt.Errorf("Static content directory path should be relative to challenge directory root")
 		}
+	}
+
+	if config.RunCmd == "" {
+		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
 	}
 
 	return nil
