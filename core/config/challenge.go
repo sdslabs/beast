@@ -10,6 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var AVAILABLE_CHALLENGE_TYPES = []string{"web", "service", core.STATIC_CHALLENGE_TYPE_NAME}
+
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
 // will be ignored.
@@ -50,10 +52,13 @@ type Challenge struct {
 }
 
 func (config *Challenge) ValidateRequiredFields() error {
-	err := config.Metadata.ValidateRequiredFields()
+	err, staticChall := config.Metadata.ValidateRequiredFields()
 	if err != nil {
 		log.Debugf("Error while validating `ChallengeMetadata`'s required fields : %s", err.Error())
 		return err
+	} else if staticChall {
+		log.Debugf("Challenge provided is a static challenge.")
+		return nil
 	}
 
 	err = config.Env.ValidateRequiredFields()
@@ -83,15 +88,26 @@ type ChallengeMetadata struct {
 	Type string `toml:"type"`
 }
 
-func (config *ChallengeMetadata) ValidateRequiredFields() error {
+func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if config.Name == "" || config.Flag == "" {
-		return fmt.Errorf("Name and Flag required for the challenge")
+		return fmt.Errorf("Name and Flag required for the challenge"), false
 	}
 
 	// Check if the config type is static here and if it is
 	// then return an indication for that, so that caller knows if it need
 	// to check a valid environment or not.
-	return nil
+	for i := range AVAILABLE_CHALLENGE_TYPES {
+		if AVAILABLE_CHALLENGE_TYPES[i] == config.Type {
+			if config.Type == core.STATIC_CHALLENGE_TYPE_NAME {
+				// Challenge is a standalone static challenge
+				return nil, true
+			}
+
+			return nil, false
+		}
+	}
+
+	return fmt.Errorf("Not a valid challenge type : %s", config.Type), false
 }
 
 type ChallengeEnv struct {

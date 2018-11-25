@@ -1,0 +1,9 @@
+[author]
+name = "fristonio"						# Name of the challenge creator
+email = "fristonio@protonmail.com"		# Email for contact
+ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author
+
+[challenge.metadata]
+name = "static-chall"
+flag = "BACKDOOR{SAMPLE_FLAG}"
+type = "static"

@@ -3,9 +3,11 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
+	cfg "github.com/sdslabs/beastv4/core/config"
 	coreutils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/docker"
 	"github.com/sdslabs/beastv4/utils"
@@ -79,5 +81,37 @@ func UndeployStaticContentContainer() {
 		log.Errorf("Error while cleaning old static content container : %s", err)
 	} else {
 		log.Infof("Static content container undeployed")
+	}
+}
+
+// Deploy a static challenge
+func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig) {
+	log.Infof("Starting static challenge deploy pipeline")
+	challengeDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, cfg.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challConf.Challenge.Metadata.Name)
+	challengeStagingRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challConf.Challenge.Metadata.Name)
+	challengeStagingDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
+
+	// Check if the challenge is already in staged state
+	// Remove the already staged challenge and then copy the new files.
+	err := utils.ValidateDirExists(challengeStagingDir)
+	if err == nil {
+		err = utils.RemoveDirRecursively(challengeStagingDir)
+		if err != nil {
+			log.Errorf("Error while cleaning already staged static challenge %s : %s", challConf.Challenge.Metadata.Name, err)
+			return
+		}
+	}
+
+	err = utils.CopyDirectory(challengeDir, challengeStagingDir)
+	if err != nil {
+		log.Errorf("Error while copying the staging directory: %s", err)
+	} else {
+		log.Infof("Challenge %s has been deployed as a static challenge", challConf.Challenge.Metadata.Name)
+
+		configFile := filepath.Join(challengeStagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
+		err = os.Rename(configFile, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))
+		if err != nil {
+			log.Errorf("Error while removing challenge config file.")
+		}
 	}
 }
