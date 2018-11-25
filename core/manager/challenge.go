@@ -47,6 +47,9 @@ func DeployChallenge(challengeName string) error {
 		return errors.New("DATABASE SERVER ERROR")
 	}
 
+	// Check if a container for the challenge is already deployed.
+	// If the challange is already deployed, return an error.
+	// If not then start the deploy pipeline for the challenge.
 	if challenge.ContainerId != "" {
 		containers, err := docker.SearchContainerByFilter(map[string]string{"id": challenge.ContainerId})
 		if err != nil {
@@ -72,6 +75,10 @@ func DeployChallenge(challengeName string) error {
 	}
 
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	// TODO: Later replace this with a manifest file, containing information about the
+	// staged challenge. Currently this staging will only check for non static challenges
+	// so static challenges will be redeployed each time. Later we can improve this by adding this
+	// test to the manifest file.
 	stagedFileName := filepath.Join(challengeStagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
 	log.Infof("No challenge exists with the provided challenge name, starting deploy for new instance")
 
@@ -85,7 +92,7 @@ func DeployChallenge(challengeName string) error {
 
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
-			return errors.New("CHALLENGE ERROR")
+			return errors.New("CHALLENGE VALIDATION ERROR")
 		}
 
 		go StartDeployPipeline(challengeDir, false)

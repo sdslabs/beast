@@ -229,6 +229,15 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		return
 	}
 
+	// Check if the challenge type is static, if it is traditional deploy pipeline would not
+	// follow, rather we would follow a static challenge deploy pipeline.
+	if config.Challenge.Metadata.Type == core.STATIC_CHALLENGE_TYPE_NAME {
+		if !skipStage {
+			// Deploy pipeline for static challenge will follow.
+			DeployStaticChallenge(&config)
+		}
+		return
+	}
 	// Look into the database to check if the deploy is already in progress
 	// or not, return if a deploy is already in progress or else continue
 	// deploying
@@ -264,7 +273,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		if err != nil {
 			log.WithFields(log.Fields{
 				"DEPLOY_ERROR": "STAGING :: " + challengeName,
-			}).Errorf("Challenge not already in staged, could not proceed further")
+			}).Errorf("Challenge not already in staged(but skipping asked), could not proceed further")
 			return
 		}
 

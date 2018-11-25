@@ -29,6 +29,7 @@ const (
 	BEAST_STATIC_CONTAINER_NAME    string = "beast-static"
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
 	BEAST_STATIC_FOLDER            string = "static"
+	STATIC_CHALLENGE_TYPE_NAME     string = "static"
 	PUBLIC                         string = "public"
 )
 
