@@ -13,5 +13,5 @@ $ docker build . --tag beast-static:latest
 To run the nginx powered static content serving container for beast run
 
 ```bash
-$ docker run -d -p 80:8080 -v <beast-staging-directory>:/beast [IMAGE ID]
+$ docker run -d -p 80:80 -v <beast-staging-directory>:/beast [IMAGE ID]
 ```
