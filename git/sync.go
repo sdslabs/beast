@@ -2,6 +2,7 @@ package git
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
@@ -34,8 +35,12 @@ func SyncBeastRemote() error {
 	log.Debugf("Pulling latest changes from the remote.")
 	err = pull(remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Branch)
 	if err != nil {
-		log.Error(err.Error())
-		return err
+		if !strings.Contains(err.Error(), "already up-to-date") {
+			log.Errorf("Error while syncing beast with git remote : %s ...", err)
+			return err
+		} else {
+			log.Infof("GIT remote already synced")
+		}
 	}
 
 	log.Info("Beast git base synced with remote")

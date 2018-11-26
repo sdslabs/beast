@@ -21,9 +21,9 @@ func initGinRouter() *gin.Engine {
 		// Deploy route group
 		manageGroup := apiGroup.Group("/manage")
 		{
-			manageGroup.GET("/all/:action", dummyHandler)
 			manageGroup.POST("/deploy/local/", deployLocalChallengeHandler)
 			manageGroup.POST("/challenge/", manageChallengeHandler)
+			manageGroup.POST("/all/:action", manageMultipleChallengeHandler)
 			manageGroup.POST("/static/:action", beastStaticContentHandler)
 		}
 
