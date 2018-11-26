@@ -17,6 +17,41 @@
     "host": "beast.sdslabs.co",
     "basePath": "/",
     "paths": {
+        "/api/manage/all/": {
+            "post": {
+                "description": "Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Handles challenge management actions for multiple(all) challenges.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Action for the challenge",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "JSON"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "type": "JSON"
+                        }
+                    }
+                }
+            }
+        },
         "/api/manage/challenge/": {
             "post": {
                 "description": "Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY.",
@@ -104,15 +139,6 @@
                     "application/json"
                 ],
                 "summary": "Handles route related to beast static content serving container, takes action as route parameter and perform that action",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Action on the static container",
-                        "name": "action",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",

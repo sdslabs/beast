@@ -12,6 +12,30 @@ info:
   title: Beast API
   version: "1.0"
 paths:
+  /api/manage/all/:
+    post:
+      consumes:
+      - application/json
+      description: Handles challenge management routes for all the challenges with
+        actions which includes - DEPLOY, UNDEPLOY.
+      parameters:
+      - description: Action for the challenge
+        in: query
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: JSON
+        "402":
+          description: Payment Required
+          schema:
+            type: JSON
+      summary: Handles challenge management actions for multiple(all) challenges.
   /api/manage/challenge/:
     post:
       consumes:
@@ -71,12 +95,6 @@ paths:
       consumes:
       - application/json
       description: Handles beast static content serving container routes.
-      parameters:
-      - description: Action on the static container
-        in: query
-        name: action
-        required: true
-        type: string
       produces:
       - application/json
       responses:
