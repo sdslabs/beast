@@ -66,3 +66,12 @@ func CreateAuthorEntry(author *Author) error {
 
 	return tx.Commit().Error
 }
+
+//Get Related Challenges
+func GetRelatedChallenges(author *Author) []Challenge {
+	var challenges []Challenge
+
+	Db.Model(author).Related(&challenges)
+
+	return challenges
+}

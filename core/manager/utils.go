@@ -2,8 +2,10 @@ package manager
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -182,6 +184,11 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			if err != nil {
 				return fmt.Errorf("Error while creating author entry : %s", err)
 			}
+
+			if err = addToAuthorizedKeys(authorEntry); err != nil {
+				return fmt.Errorf("Error while adding authorized_keys : %s", err)
+			}
+
 		} else {
 			if authorEntry.Email != config.Author.Email &&
 				authorEntry.SshKey != config.Author.SSHKey &&
@@ -282,4 +289,21 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 	}
 	err = utils.CopyDirectory(staticContentDir, dirPath)
 	return err
+}
+
+//adds to authorized keys
+func addToAuthorizedKeys(author database.Author) error {
+	SHA256 := sha256.New()
+	SHA256.Write([]byte(author.Email))
+	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
+	f, err := os.OpenFile(core.AUTHORIZED_KEYS_FILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("Error while opening authorized keys file : %s", err)
+	}
+	defer f.Close()
+	key := fmt.Sprintf("command=\"%s\" %s\n", scriptPath, author.SshKey)
+	if _, err := f.Write([]byte(key)); err != nil {
+		return fmt.Errorf("Error while appending key to authorized keys file : %s", err)
+	}
+	return nil
 }

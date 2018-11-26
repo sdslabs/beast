@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	BEAST_GLOBAL_DIR = filepath.Join(os.Getenv("HOME"), ".beast")
+	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
+	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
 )
 
 const (

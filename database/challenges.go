@@ -1,10 +1,17 @@
 package database
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
+	"html/template"
+	"io/ioutil"
+	"path/filepath"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/sdslabs/beastv4/core"
+	tools "github.com/sdslabs/beastv4/templates"
 )
 
 // The `challenges` table has the following columns
@@ -125,4 +132,55 @@ func UpdateChallengeEntry(whereMap map[string]interface{}, chall Challenge) erro
 	tx = Db.Model(&challenge).Updates(chall)
 
 	return tx.Error
+}
+
+//hook after save of challenge
+func (challenge *Challenge) AfterSave() error {
+	if challenge.Status == core.DEPLOY_STATUS["deployed"] {
+		var author Author
+		Db.Model(challenge).Related(&author)
+		return updateScript(author)
+	}
+	return nil
+}
+
+type ScriptFile struct {
+	Author     string
+	Challenges map[string]string
+}
+
+//updates user script
+func updateScript(author Author) error {
+
+	SHA256 := sha256.New()
+	SHA256.Write([]byte(author.Email))
+	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
+
+	challs := GetRelatedChallenges(&author)
+
+	mapOfChall := make(map[string]string)
+
+	for _, chall := range challs {
+		if chall.ContainerId != "" {
+			mapOfChall[chall.Name] = chall.ContainerId
+		}
+	}
+
+	data := ScriptFile{
+		Author:     author.Name,
+		Challenges: mapOfChall,
+	}
+
+	var script bytes.Buffer
+	scriptTemplate, err := template.New("script").Parse(tools.SSH_LOGIN_SCRIPT_TEMPLATE)
+	if err != nil {
+		return fmt.Errorf("Error while parsing script template :: %s", err)
+	}
+
+	err = scriptTemplate.Execute(&script, data)
+	if err != nil {
+		return fmt.Errorf("Error while executing script template :: %s", err)
+	}
+
+	return ioutil.WriteFile(scriptPath, script.Bytes(), 0755)
 }
