@@ -27,22 +27,21 @@ ssh_key   = {{.AuthorPubKey}}                    # Public SSH key for the challe
 var BEAST_BARE_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
 FROM debian:jessie
 
-LABEL version="0.1"
+LABEL version="0.2"
 LABEL author="fristonio"
 
-COPY . /challenge
+RUN useradd -ms /bin/bash beast
 
 RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install {{.AptDeps}}
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 {{if .Ports}} EXPOSE {{.Ports}} {{end}}
 
+COPY . /challenge
 RUN cd /challenge && \
 	chmod +x {{ range $index, $elem := .SetupScripts}} {{$elem}} {{end}} \
 	{{ range $index, $elem := .SetupScripts}} && ./{{$elem}} \ {{end}}
-
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-RUN useradd -ms /bin/bash beast
 
 USER beast
 WORKDIR /challenge
