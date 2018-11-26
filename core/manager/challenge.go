@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/database"
 	"github.com/sdslabs/beastv4/docker"
+	"github.com/sdslabs/beastv4/git"
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -103,6 +105,60 @@ func DeployChallenge(challengeName string) error {
 		go StartDeployPipeline(challengeStagingDir, true)
 	}
 
+	return nil
+}
+
+// Deploy multiple challenges simultaneously.
+// When we have multiple challenges we spawn X goroutines and distribute
+// deployments in those goroutines. The work for these worker goroutines is specified
+// in deployList, which contains the name of the challenges to be deployed.
+func DeployMultipleChallenges(deployList []string) {
+	deployList = utils.GetUniqueStrings(deployList)
+	log.Infof("Starting deploy for the following challenge list : %v", deployList)
+
+	for _, chall := range deployList {
+		log.Infof("Starting to push %s challenge to deploy queue", chall)
+		// TODO: Discuss if to make this challenge force redeploy or not.
+		err := DeployChallenge(chall)
+		if err != nil {
+			log.Errorf("Cannot start deploy for challenge : %s due to : %s", chall, err)
+			continue
+		}
+
+		log.Infof("Started deploy for challenge : %s", chall)
+	}
+}
+
+// Deploy all challenges.
+func DeployAll(sync bool) error {
+	log.Infof("Got request to deploy ALL CHALLENGES")
+	if sync {
+		err := git.SyncBeastRemote()
+		if err != nil {
+			// A hack for go-git which returns error when the git repo
+			// is up to date. This ignores this error.
+			if !strings.Contains(err.Error(), "already up-to-date") {
+				log.Warnf("Error while syncing beast for DEPLOY_ALL : %s ...", err)
+				return fmt.Errorf("GIT_REMOTE_SYNC_ERROR")
+			}
+		}
+
+		log.Debugf("Sync for beast remote done for DEPLOY_ALL")
+	}
+
+	challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+	err, challenges := utils.GetDirsInDir(challengesDirRoot)
+	if err != nil {
+		log.Errorf("DEPLOY_ALL : Error while getting available challenges : %s", err)
+		return fmt.Errorf("DIRECTORY_ACCESS_ERROR")
+	}
+
+	var challsNameList []string
+	for _, chall := range challenges {
+		challsNameList = append(challsNameList, chall)
+	}
+
+	go DeployMultipleChallenges(challsNameList)
 	return nil
 }
 

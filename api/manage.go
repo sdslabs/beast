@@ -10,6 +10,41 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Handles route related to manage all the challenges for current beast remote.
+// @Summary Handles challenge management actions for multiple(all) challenges.
+// @Description Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.
+// @Accept  json
+// @Produce application/json
+// @Param action query string true "Action for the challenge"
+// @Success 200 {JSON} Success
+// @Failure 402 {JSON} BadRequest
+// @Router /api/manage/all/:action [post]
+func manageMultipleChallengeHandler(c *gin.Context) {
+	action := c.Param("action")
+
+	switch action {
+	case MANAGE_ACTION_DEPLOY:
+		log.Infof("Starting deploy for all challenges")
+		err := manager.DeployAll(true)
+		var msg string
+		if err != nil {
+			msg = fmt.Sprintf("%s", err)
+		} else {
+			msg = "Deploy for all challeges started"
+		}
+
+		c.JSON(http.StatusNotAcceptable, gin.H{
+			"message": msg,
+		})
+		break
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": fmt.Sprintf("Invalid Action : %s", action),
+		})
+	}
+}
+
 // Handles route related to managing a challenge
 // @Summary Handles challenge management actions.
 // @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY.
