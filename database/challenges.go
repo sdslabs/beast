@@ -135,13 +135,22 @@ func UpdateChallengeEntry(whereMap map[string]interface{}, chall Challenge) erro
 }
 
 //hook after save of challenge
-func (challenge *Challenge) AfterSave() error {
-	if challenge.Status == core.DEPLOY_STATUS["deployed"] {
+func (challenge *Challenge) AfterSave(scope *gorm.Scope) error {
+	iFace, _ := scope.InstanceGet("gorm:update_attrs")
+	updatedAttr := iFace.(map[string]interface{})
+	if _, ok := updatedAttr["container_id"]; ok {
 		var author Author
 		Db.Model(challenge).Related(&author)
-		return updateScript(author)
+		return updateScript(&author)
 	}
 	return nil
+}
+
+//hook after deleting the challenge
+func (challenge *Challenge) AfterDelete() error {
+	var author Author
+	Db.Model(challenge).Related(&author)
+	return updateScript(&author)
 }
 
 type ScriptFile struct {
@@ -150,13 +159,13 @@ type ScriptFile struct {
 }
 
 //updates user script
-func updateScript(author Author) error {
+func updateScript(author *Author) error {
 
 	SHA256 := sha256.New()
 	SHA256.Write([]byte(author.Email))
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
 
-	challs := GetRelatedChallenges(&author)
+	challs := GetRelatedChallenges(author)
 
 	mapOfChall := make(map[string]string)
 

@@ -201,6 +201,17 @@ func UndeployChallenge(challengeName string) error {
 		return p
 	}
 
+	challenge.Status = core.DEPLOY_STATUS["unknown"]
+	challenge.ContainerId = ""
+	challenge.ImageId = ""
+
+	database.Db.Save(&challenge)
+
+	if err != nil {
+		log.Error(err)
+		return fmt.Errorf("Error while updating the challenge : %s", err)
+	}
+
 	log.Infof("Challenge undeploy successful for %s", challenge.Name)
 
 	return nil
