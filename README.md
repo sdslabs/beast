@@ -7,8 +7,27 @@
 Beast go version is under development, follow the below instructions to get started.
 
 * Install go 1.11.x
+* Make sure that `GO111MODULES` environment variable should be set to `on`, or do `export GO111MODULES=on`
 * Clone the repository.
 * Jump to `$GOPATH/src/github.com/sdslabs/beastv4/` and start hacking.
+
+```bash
+$ go version
+go version go1.11 linux/amd64
+
+$ export GO111MODULES=on
+
+$ git clone git@github.com:sdslabs/beastv4.git
+
+$ cd beastv4 && make help
+BEAST: An automated challenge deployment tool for backdoor
+
+* build: Build beast and copy binary to PATH set for go build binaries.
+* check_format: Check for formatting errors using gofmt
+* format: format the go files using go_fmt in the project directory.
+* test: Run tests for beast
+* tools: Set up required tools for beast which includes - docker-enter, importenv
+```
 
 **All the dependencies are already vendored with the project so no need to install any dependencies**. The projcet uses go modules from 
 go 1.11.X fo dependency management. Make sure you vendor any library used using `go mod vendor`
