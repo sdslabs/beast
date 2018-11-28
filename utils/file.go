@@ -155,11 +155,11 @@ func CopyDirectory(src, dst string) error {
 
 		if fd.IsDir() {
 			if err = CopyDirectory(srcn, dstn); err != nil {
-				fmt.Println(err)
+				return err
 			}
 		} else {
 			if err = CopyFile(srcn, dstn); err != nil {
-				fmt.Println(err)
+				return err
 			}
 		}
 	}

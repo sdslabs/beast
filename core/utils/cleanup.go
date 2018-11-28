@@ -47,8 +47,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 			return err
 		}
 
-		chall.ContainerId = ""
-		database.Db.Save(chall)
+		database.Db.Model(chall).Update("ContainerId", "")
 	}
 
 	err := CleanupContainerByFilter("name", config.Challenge.Metadata.Name)
@@ -62,8 +61,7 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 		return err
 	}
 
-	chall.ImageId = ""
-	database.Db.Save(chall)
+	database.Db.Model(&chall).Update("ImageId", "")
 
 	return nil
 }

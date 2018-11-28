@@ -69,7 +69,7 @@ func CreateAuthorEntry(author *Author) error {
 		return fmt.Errorf("Error while starting transaction", tx.Error)
 	}
 
-	if err := tx.FirstOrCreate(author).Error; err != nil {
+	if err := tx.FirstOrCreate(author, *author).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -133,13 +133,13 @@ func generateContentAuthorizedKeyFile(author *Author) ([]byte, error) {
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
 
 	data := AuthorizedKeyTemplate{
-		AuthorID: strconv.Itoa(int(author.ID)),
+		AuthorID: strconv.Itoa(int(author.Model.ID)),
 		Command:  scriptPath,
 		PubKey:   author.SshKey,
 	}
 
 	var authKey bytes.Buffer
-	authKeyTemplate, err := template.New("authKey").Parse(tools.SSH_LOGIN_SCRIPT_TEMPLATE)
+	authKeyTemplate, err := template.New("authKey").Parse(tools.AUTHORIZED_KEY_TEMPLATE)
 	if err != nil {
 		return []byte(""), fmt.Errorf("Error while parsing script template :: %s", err)
 	}

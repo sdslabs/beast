@@ -108,8 +108,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return fmt.Errorf("Error while getting imageId for the commited challenge")
 	}
 
-	challenge.ImageId = imageId
-	if err = database.Db.Save(challenge).Error; err != nil {
+	if err = database.Db.Model(&challenge).Update("ImageId", imageId).Error; err != nil {
 		return fmt.Errorf("Error while writing imageId to database : %s", err)
 	}
 
@@ -143,8 +142,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	containerId, err := docker.CreateContainerFromImage(config.Challenge.Env.Ports, nil, challenge.ImageId, config.Challenge.Metadata.Name)
 	if err != nil {
 		if containerId != "" {
-			challenge.ContainerId = containerId
-			if e := database.Db.Save(challenge).Error; e != nil {
+			if e := database.Db.Model(&challenge).Update("ContainerId", containerId).Error; e != nil {
 				return fmt.Errorf("Error while starting container : %s and saving database : %s", err, e)
 			}
 
@@ -155,7 +153,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	challenge.ContainerId = containerId
-	if err = database.Db.Save(challenge).Error; err != nil {
+	if err = database.Db.Model(&challenge).Update("ContainerId", containerId).Error; err != nil {
 		return fmt.Errorf("Error while saving containerId to database : %s", err)
 	}
 
@@ -253,8 +251,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 	stagedChallengePath := filepath.Join(stagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
 
 	if !skipStage {
-		challenge.Status = core.DEPLOY_STATUS["staging"]
-		database.Db.Save(&challenge)
+		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["staging"])
 
 		err = stageChallenge(challengeDir)
 		if err != nil {
@@ -262,8 +259,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 				"DEPLOY_ERROR": "STAGING :: " + challengeName,
 			}).Errorf("%s", err)
 
-			challenge.Status = core.DEPLOY_STATUS["unknown"]
-			database.Db.Save(&challenge)
+			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
 			return
 		}
 	} else {
@@ -280,8 +276,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		log.Infof("SKIPPING STAGING STEP IN THE DEPLOY PIPELINE")
 	}
 
-	challenge.Status = core.DEPLOY_STATUS["committing"]
-	database.Db.Save(&challenge)
+	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["committing"])
 
 	err = commitChallenge(&challenge, config, stagedChallengePath)
 	if err != nil {
@@ -289,13 +284,11 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 			"DEPLOY_ERROR": "COMMIT :: " + challengeName,
 		}).Errorf("%s", err)
 
-		challenge.Status = core.DEPLOY_STATUS["unknown"]
-		database.Db.Save(&challenge)
+		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
 		return
 	}
 
-	challenge.Status = core.DEPLOY_STATUS["deploying"]
-	database.Db.Save(&challenge)
+	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["deploying"])
 
 	err = deployChallenge(&challenge, config)
 	if err != nil {
@@ -303,13 +296,11 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 			"DEPLOY_ERROR": "DEPLOY :: " + challengeName,
 		}).Errorf("%s", err)
 
-		challenge.Status = core.DEPLOY_STATUS["unknown"]
-		database.Db.Save(&challenge)
+		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
 		return
 	}
 
-	challenge.Status = core.DEPLOY_STATUS["deployed"]
-	database.Db.Save(&challenge)
+	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["deployed"])
 
 	log.Infof("CHALLENGE %s DEPLOYED SUCCESSFULLY", challengeName)
 }

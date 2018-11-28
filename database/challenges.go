@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"path/filepath"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -57,7 +58,7 @@ func CreateChallengeEntry(challenge *Challenge) error {
 		return fmt.Errorf("Error while starting transaction", tx.Error)
 	}
 
-	if err := tx.FirstOrCreate(challenge).Error; err != nil {
+	if err := tx.FirstOrCreate(challenge, *challenge).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -134,15 +135,24 @@ func UpdateChallengeEntry(whereMap map[string]interface{}, chall Challenge) erro
 	return tx.Error
 }
 
-//hook after save of challenge
-func (challenge *Challenge) AfterSave(scope *gorm.Scope) error {
+//hook after update of challenge
+func (challenge *Challenge) AfterUpdate(scope *gorm.Scope) error {
 	iFace, _ := scope.InstanceGet("gorm:update_attrs")
 	updatedAttr := iFace.(map[string]interface{})
+
 	if _, ok := updatedAttr["container_id"]; ok {
 		var author Author
 		Db.Model(challenge).Related(&author)
-		return updateScript(&author)
+		go updateScript(&author)
 	}
+	return nil
+}
+
+//hook after create of challenge
+func (challenge *Challenge) AfterCreate(scope *gorm.Scope) error {
+	var author Author
+	Db.Model(challenge).Related(&author)
+	go updateScript(&author)
 	return nil
 }
 
@@ -150,7 +160,8 @@ func (challenge *Challenge) AfterSave(scope *gorm.Scope) error {
 func (challenge *Challenge) AfterDelete() error {
 	var author Author
 	Db.Model(challenge).Related(&author)
-	return updateScript(&author)
+	go updateScript(&author)
+	return nil
 }
 
 type ScriptFile struct {
@@ -160,6 +171,8 @@ type ScriptFile struct {
 
 //updates user script
 func updateScript(author *Author) error {
+
+	time.Sleep(time.Second)
 
 	SHA256 := sha256.New()
 	SHA256.Write([]byte(author.Email))
