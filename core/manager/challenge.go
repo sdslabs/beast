@@ -68,8 +68,7 @@ func DeployChallenge(challengeName string) error {
 			log.Debugf("Found an already running instance of the challenge with container ID %s", challenge.ContainerId)
 			return fmt.Errorf("Challenge already deployed")
 		} else {
-			challenge.ContainerId = ""
-			if err = database.Db.Save(challenge).Error; err != nil {
+			if err = database.Db.Model(&challenge).Update("ContainerId", "").Error; err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
 				return errors.New("DATABASE ERROR")
 			}
@@ -188,8 +187,7 @@ func UndeployChallenge(challengeName string) error {
 	// So this....
 	if challenge.ContainerId == "" {
 		log.Warnf("No instance of challenge(%s) deployed", challengeName)
-		challenge.Status = core.DEPLOY_STATUS["unknown"]
-		database.Db.Save(&challenge)
+		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
 		return fmt.Errorf("No instance of challenge(%s) deployed", challengeName)
 	}
 
@@ -199,6 +197,17 @@ func UndeployChallenge(challengeName string) error {
 		p := fmt.Errorf("Error while removing challenge instance : %s", err)
 		log.Error(p.Error())
 		return p
+	}
+
+	database.Db.Model(&challenge).Updates(map[string]interface{}{
+		"Status":      core.DEPLOY_STATUS["unknown"],
+		"ContainerId": "",
+		"ImageId":     "",
+	})
+
+	if err != nil {
+		log.Error(err)
+		return fmt.Errorf("Error while updating the challenge : %s", err)
 	}
 
 	log.Infof("Challenge undeploy successful for %s", challenge.Name)

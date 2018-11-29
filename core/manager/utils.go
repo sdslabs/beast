@@ -182,6 +182,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			if err != nil {
 				return fmt.Errorf("Error while creating author entry : %s", err)
 			}
+
 		} else {
 			if authorEntry.Email != config.Author.Email &&
 				authorEntry.SshKey != config.Author.SSHKey &&

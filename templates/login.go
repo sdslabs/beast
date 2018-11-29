@@ -3,9 +3,8 @@ package templates
 // This template is to be inserted in the authorized_keys file which contains
 // authorized ssh keys to login to the challenge container
 var AUTHORIZED_KEY_TEMPLATE string = `
-# Challenge Name : {{.Name}}
-command="{{.Command}}",no-agent-forwarding,no-port-forwarding,no-X11-forwarding` +
-	` ssh-rsa {{.PubKey}} {{.Mail}}`
+command="{{.Command}}",environment="SSH_USER={{.AuthorID}}",no-agent-forwarding,no-port-forwarding,no-X11-forwarding` +
+	` {{.PubKey}} `
 
 // This script will be run for each login, and command will be forced
 // to enter the container on the basis of the command used by the
@@ -22,7 +21,7 @@ case "$SSH_ORIGINAL_COMMAND" in
 
 	{{range $name, $containerId := .Challenges}}
     "{{ $name }}")
-        docker-enter {{ $containerId }}
+        exec docker-enter {{ $containerId }}
         ;;
     {{end}}
 

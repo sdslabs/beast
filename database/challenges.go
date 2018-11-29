@@ -1,10 +1,18 @@
 package database
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
+	"html/template"
+	"io/ioutil"
+	"path/filepath"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/sdslabs/beastv4/core"
+	tools "github.com/sdslabs/beastv4/templates"
 )
 
 // The `challenges` table has the following columns
@@ -14,6 +22,20 @@ import (
 // container_id
 // image_id
 // status
+//
+// Some hooks needs to be attached to these database transaction, and on the basis of
+// the type of the transaction that is performed on the challenge table, we need to
+// perform some action.
+//
+// Use gorm hooks for these purpose, currently the following hooks are
+// implemented.
+// * AfterUpdate
+// * AfterCreate
+// * AfterSave
+// * AfterDelete
+//
+// All these hooks are used for generating the access shell script for the challenge
+// to the challenge author
 type Challenge struct {
 	gorm.Model
 
@@ -36,7 +58,7 @@ func CreateChallengeEntry(challenge *Challenge) error {
 		return fmt.Errorf("Error while starting transaction", tx.Error)
 	}
 
-	if err := tx.FirstOrCreate(challenge).Error; err != nil {
+	if err := tx.FirstOrCreate(challenge, *challenge).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -111,4 +133,76 @@ func UpdateChallengeEntry(whereMap map[string]interface{}, chall Challenge) erro
 	tx = Db.Model(&challenge).Updates(chall)
 
 	return tx.Error
+}
+
+//hook after update of challenge
+func (challenge *Challenge) AfterUpdate(scope *gorm.Scope) error {
+	iFace, _ := scope.InstanceGet("gorm:update_attrs")
+	updatedAttr := iFace.(map[string]interface{})
+
+	if _, ok := updatedAttr["container_id"]; ok {
+		var author Author
+		Db.Model(challenge).Related(&author)
+		go updateScript(&author)
+	}
+	return nil
+}
+
+//hook after create of challenge
+func (challenge *Challenge) AfterCreate(scope *gorm.Scope) error {
+	var author Author
+	Db.Model(challenge).Related(&author)
+	go updateScript(&author)
+	return nil
+}
+
+//hook after deleting the challenge
+func (challenge *Challenge) AfterDelete() error {
+	var author Author
+	Db.Model(challenge).Related(&author)
+	go updateScript(&author)
+	return nil
+}
+
+type ScriptFile struct {
+	Author     string
+	Challenges map[string]string
+}
+
+//updates user script
+func updateScript(author *Author) error {
+
+	time.Sleep(time.Second)
+
+	SHA256 := sha256.New()
+	SHA256.Write([]byte(author.Email))
+	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
+
+	challs := GetRelatedChallenges(author)
+
+	mapOfChall := make(map[string]string)
+
+	for _, chall := range challs {
+		if chall.ContainerId != "" {
+			mapOfChall[chall.Name] = chall.ContainerId
+		}
+	}
+
+	data := ScriptFile{
+		Author:     author.Name,
+		Challenges: mapOfChall,
+	}
+
+	var script bytes.Buffer
+	scriptTemplate, err := template.New("script").Parse(tools.SSH_LOGIN_SCRIPT_TEMPLATE)
+	if err != nil {
+		return fmt.Errorf("Error while parsing script template :: %s", err)
+	}
+
+	err = scriptTemplate.Execute(&script, data)
+	if err != nil {
+		return fmt.Errorf("Error while executing script template :: %s", err)
+	}
+
+	return ioutil.WriteFile(scriptPath, script.Bytes(), 0755)
 }

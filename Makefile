@@ -36,12 +36,12 @@ tools:
 
 	@if ! test -x "`which docker-enter 2>&1;true`"; then \
 	  echo 'Warn: docker-enter is not installed, building....' >&2 ; \
-	  cp ./scripts/docker-enter "${GOPATH}/bin/" ; \
+	  cp ./scripts/docker-enter "/usr/bin/" ; \
 	fi
 
 	@if ! test -x "`which importenv 2>&1;true`"; then \
 	  echo 'Warn: importenv is not installed, building....' >&2 ; \
-	  gcc -o "${GOPATH}/bin/importenv" ./scripts/importenv.c ; \
+	  gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
 	fi
 
 
