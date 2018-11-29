@@ -15,15 +15,22 @@ func dummyHandler(c *gin.Context) {
 func initGinRouter() *gin.Engine {
 	router := gin.New()
 
+	// Authorization routes group
+	authGroup := router.Group("/auth")
+	{
+		authGroup.GET("/:username", getRandomMessage)
+		authGroup.POST("/:username", getJWT)
+	}
+
 	// API routes group
-	apiGroup := router.Group("/api")
+	apiGroup := router.Group("/api", authorize)
 	{
 		// Deploy route group
 		manageGroup := apiGroup.Group("/manage")
 		{
+			manageGroup.GET("/all/:action", dummyHandler)
 			manageGroup.POST("/deploy/local/", deployLocalChallengeHandler)
 			manageGroup.POST("/challenge/", manageChallengeHandler)
-			manageGroup.POST("/all/:action", manageMultipleChallengeHandler)
 			manageGroup.POST("/static/:action", beastStaticContentHandler)
 		}
 

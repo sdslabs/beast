@@ -33,6 +33,7 @@ const (
 	STATIC_CHALLENGE_TYPE_NAME     string = "static"
 	PUBLIC                         string = "public"
 	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
+	SECRET_STRING                  string = "beast" //Must be strong
 )
 
 var DEPLOY_STATUS = map[string]string{
