@@ -117,6 +117,7 @@ type ChallengeEnv struct {
 	StaticContentDir string   `toml:"static_dir"`
 	RunCmd           string   `toml:"run_cmd"`
 	Base             string   `toml:"base"`
+	BaseImage        string   `toml:"base_image"`
 }
 
 func (config *ChallengeEnv) ValidateRequiredFields() error {
@@ -136,6 +137,10 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 
 	if config.RunCmd == "" {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
+	}
+
+	if config.BaseImage == "" {
+		config.BaseImage = "debian:jessie"
 	}
 
 	return nil

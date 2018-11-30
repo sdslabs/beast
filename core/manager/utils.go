@@ -19,10 +19,12 @@ import (
 )
 
 type BeastBareDockerfile struct {
-	Ports        string
-	AptDeps      string
-	SetupScripts []string
-	RunCmd       string
+	Author          string
+	DockerBaseImage string
+	Ports           string
+	AptDeps         string
+	SetupScripts    []string
+	RunCmd          string
 }
 
 // This if the function which validates the challenge directory
@@ -107,10 +109,12 @@ func GenerateDockerfile(configFile string) (string, error) {
 	}
 
 	data := BeastBareDockerfile{
-		Ports:        strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
-		AptDeps:      strings.Join(config.Challenge.Env.AptDeps[:], " "),
-		SetupScripts: config.Challenge.Env.SetupScripts,
-		RunCmd:       config.Challenge.Env.RunCmd,
+		Author:          config.Author.Name,
+		DockerBaseImage: config.Challenge.Env.BaseImage,
+		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
+		AptDeps:         strings.Join(config.Challenge.Env.AptDeps[:], " "),
+		SetupScripts:    config.Challenge.Env.SetupScripts,
+		RunCmd:          config.Challenge.Env.RunCmd,
 	}
 
 	var dockerfile bytes.Buffer
