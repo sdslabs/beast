@@ -1,7 +1,6 @@
 package config
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"os"
@@ -79,10 +78,8 @@ func (config *BeastConfig) ValidateConfig() error {
 	}
 
 	if config.SecretString == "" {
-		buff := make([]byte, 64)
-		rand.Read(buff)
-		log.Infof("Secret string not provided using \"%s\" as secret", string(buff))
-		config.SecretString = string(buff)
+		log.Error("The secret string is empty in beast config")
+		return fmt.Error("Invalid config")
 	}
 
 	err := config.GitRemote.ValidateGitConfig()
