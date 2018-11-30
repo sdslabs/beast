@@ -36,6 +36,7 @@ import (
 type BeastConfig struct {
 	AuthorizedKeysFile string    `toml:"authorized_keys_file"`
 	BeastScriptsDir    string    `toml:"scripts_dir"`
+	AllowedBaseImages  []string  `toml:"allowed_base_images"`
 	GitRemote          GitRemote `toml:"remote"`
 }
 
@@ -68,6 +69,10 @@ func (config *BeastConfig) ValidateConfig() error {
 			log.Error("Error while creating beast scripts directory")
 			return err
 		}
+	}
+
+	if !utils.StringInSlice(core.DEFAULT_BASE_IMAGE, config.AllowedBaseImages) {
+		config.AllowedBaseImages = append(config.AllowedBaseImages, core.DEFAULT_BASE_IMAGE)
 	}
 
 	err := config.GitRemote.ValidateGitConfig()

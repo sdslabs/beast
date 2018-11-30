@@ -16,6 +16,7 @@ ssh_key   = {{.AuthorPubKey}}                    # Public SSH key for the challe
 
 	[challenge.env]
 	apt_deps         = {{.AptDeps}}              # Custom apt-dependencies for challenge
+	base_image       = {{.BaseImage}}            # Base Image
 	ports	    	 = {{.Ports}}				 # Port to expose for the challenge
 	setup_script     = {{.SetupScript}}          # Setup script to run additional steps for challenge deployment
 	static_dir       = {{.StaticContentDir}}     # Static directory to be served for the challenge
@@ -25,10 +26,10 @@ ssh_key   = {{.AuthorPubKey}}                    # Public SSH key for the challe
 `
 
 var BEAST_BARE_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
-FROM debian:jessie
+FROM {{.DockerBaseImage}}
 
 LABEL version="0.2"
-LABEL author="fristonio"
+LABEL author="SDSLabs"
 
 RUN useradd -ms /bin/bash beast
 

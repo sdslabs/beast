@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -117,6 +118,7 @@ type ChallengeEnv struct {
 	StaticContentDir string   `toml:"static_dir"`
 	RunCmd           string   `toml:"run_cmd"`
 	Base             string   `toml:"base"`
+	BaseImage        string   `toml:"base_image"`
 }
 
 func (config *ChallengeEnv) ValidateRequiredFields() error {
@@ -136,6 +138,14 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 
 	if config.RunCmd == "" {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
+	}
+
+	if config.BaseImage == "" {
+		config.BaseImage = core.DEFAULT_BASE_IMAGE
+	}
+
+	if !utils.StringInSlice(config.BaseImage, Cfg.AllowedBaseImages) {
+		return fmt.Errorf("The base image: %s is not supported", config.BaseImage)
 	}
 
 	return nil
