@@ -18,7 +18,7 @@ func initGinRouter() *gin.Engine {
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
-		authGroup.GET("/:username", getRandomMessage)
+		authGroup.GET("/:username", getAuthChallenge)
 		authGroup.POST("/:username", getJWT)
 	}
 

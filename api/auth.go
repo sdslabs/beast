@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/auth"
@@ -9,22 +11,26 @@ import (
 
 func authorize(c *gin.Context) {
 
-	cookie, err := c.Cookie("JWT")
+	authHeader := c.GetHeader("Authorization")
 
-	if err != nil {
+	values := strings.Split(authHeader, " ")
+
+	if len(values) < 2 || values[0] != "Bearer" {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"message": err.Error(),
+			"message": fmt.Errorf("No Token Provided"),
 		})
 		c.Abort()
+		return
 	}
 
-	err = auth.Authorize(cookie)
+	err := auth.Authorize(values[1])
 
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"message": err.Error(),
 		})
 		c.Abort()
+		return
 	}
 
 	c.Next()
@@ -45,15 +51,15 @@ func getJWT(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"token":   jwt,
-		"message": "Expires in 30 mins\tTo access APIs send the token as cookie \"JWT\"",
+		"message": "Expires in 6 hours\tTo access APIs send the token in header as \"Authorization: Bearer <token>\"",
 	})
 	return
 }
 
-func getRandomMessage(c *gin.Context) {
+func getAuthChallenge(c *gin.Context) {
 	username := c.Param("username")
 
-	encrmess, err := auth.GenerateEncryptedMessage(username)
+	challenge, err := auth.GenerateAuthChallenge(username)
 
 	if err != nil {
 		c.JSON(http.StatusNotAcceptable, gin.H{
@@ -63,7 +69,7 @@ func getRandomMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"encrmess": encrmess,
+		"challenge": challenge,
 	})
 	return
 }

@@ -28,12 +28,12 @@ func (c CustomClaims) Valid() error {
 	return nil
 }
 
-func Authorize(cookie string) error {
-	token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
+func Authorize(jwtTokenString string) error {
+	token, err := jwt.Parse(jwtTokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Token invalid")
 		}
-		return []byte(config.Cfg.SecretString), nil
+		return []byte(config.Cfg.JWTSecret), nil
 	})
 
 	if err != nil {
@@ -53,7 +53,7 @@ func GenerateJWT(username, decrmess string) (string, error) {
 		return "", err
 	}
 
-	if string(author.RandomMessage) != decrmess {
+	if string(author.AuthChallenge) != decrmess {
 		return "", fmt.Errorf("Error : The messages are not same")
 	}
 
@@ -61,15 +61,15 @@ func GenerateJWT(username, decrmess string) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, CustomClaims{
 		User:      username,
-		ExpiresAt: t + 30*60,
+		ExpiresAt: t + 6*60*60,
 		IssuedAt:  t,
 		Issuer:    "beast-sds",
 	})
 
-	return token.SignedString([]byte(config.Cfg.SecretString))
+	return token.SignedString([]byte(config.Cfg.JWTSecret))
 }
 
-func GenerateEncryptedMessage(username string) (string, error) {
+func GenerateAuthChallenge(username string) (string, error) {
 	author, err := database.QueryFirstAuthorEntry("username", username)
 
 	if err != nil {
@@ -79,7 +79,7 @@ func GenerateEncryptedMessage(username string) (string, error) {
 	rMessage := make([]byte, 128)
 	rand.Read(rMessage)
 
-	database.Db.Model(&author).Update("RandomMessage", rMessage)
+	database.Db.Model(&author).Update("AuthChallenge", rMessage)
 
 	encMessage, err := EncryptMessage(rMessage, author.SshKey)
 	if err != nil {

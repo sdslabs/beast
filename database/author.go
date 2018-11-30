@@ -24,7 +24,7 @@ type Author struct {
 	Name          string `gorm:"not null"`
 	SshKey        string
 	Email         string `gorm:"non null"`
-	RandomMessage []byte
+	AuthChallenge []byte
 }
 
 // Queries all the authors entries where the column represented by key

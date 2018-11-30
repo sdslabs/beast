@@ -183,7 +183,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				Name:          config.Author.Name,
 				Email:         config.Author.Email,
 				SshKey:        config.Author.SSHKey,
-				RandomMessage: rMessage,
+				AuthChallenge: rMessage,
 			}
 
 			err = database.CreateAuthorEntry(&authorEntry)
