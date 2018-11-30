@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -140,7 +141,11 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 	}
 
 	if config.BaseImage == "" {
-		config.BaseImage = "debian:jessie"
+		config.BaseImage = core.DEFAULT_BASE_IMAGE
+	}
+
+	if !utils.StringInSlice(config.BaseImage, Cfg.AllowedBaseImages) {
+		return fmt.Errorf("The base image: %s is not supported", config.BaseImage)
 	}
 
 	return nil

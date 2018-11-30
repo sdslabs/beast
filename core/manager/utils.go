@@ -19,7 +19,6 @@ import (
 )
 
 type BeastBareDockerfile struct {
-	Author          string
 	DockerBaseImage string
 	Ports           string
 	AptDeps         string
@@ -109,7 +108,6 @@ func GenerateDockerfile(configFile string) (string, error) {
 	}
 
 	data := BeastBareDockerfile{
-		Author:          config.Author.Name,
 		DockerBaseImage: config.Challenge.Env.BaseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
 		AptDeps:         strings.Join(config.Challenge.Env.AptDeps[:], " "),

@@ -32,6 +32,7 @@ const (
 	BEAST_STATIC_FOLDER            string = "static"
 	STATIC_CHALLENGE_TYPE_NAME     string = "static"
 	PUBLIC                         string = "public"
+	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
 )
 
 var DEPLOY_STATUS = map[string]string{

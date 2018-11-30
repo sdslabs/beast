@@ -29,7 +29,7 @@ var BEAST_BARE_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
 FROM {{.DockerBaseImage}}
 
 LABEL version="0.2"
-LABEL author="{{.Author}}"
+LABEL author="SDSLabs"
 
 RUN useradd -ms /bin/bash beast
 
