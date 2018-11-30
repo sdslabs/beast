@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"os"
@@ -20,6 +21,7 @@ import (
 //	file should be modified to give user the access to challenge container.
 // GitRemote: It represents git remote we fetch the details from.
 // BeastScriptsDir: Directory containing beast scripts for user login etc.
+// SecretString: It contains the string used for HMAC signing the token.
 //
 // An example of a config file
 //
@@ -38,6 +40,7 @@ type BeastConfig struct {
 	BeastScriptsDir    string    `toml:"scripts_dir"`
 	AllowedBaseImages  []string  `toml:"allowed_base_images"`
 	GitRemote          GitRemote `toml:"remote"`
+	SecretString       string    `toml:"secret_string"`
 }
 
 func (config *BeastConfig) ValidateConfig() error {
@@ -73,6 +76,13 @@ func (config *BeastConfig) ValidateConfig() error {
 
 	if !utils.StringInSlice(core.DEFAULT_BASE_IMAGE, config.AllowedBaseImages) {
 		config.AllowedBaseImages = append(config.AllowedBaseImages, core.DEFAULT_BASE_IMAGE)
+	}
+
+	if config.SecretString == "" {
+		buff := make([]byte, 64)
+		rand.Read(buff)
+		log.Infof("Secret string not provided using \"%s\" as secret", string(buff))
+		config.SecretString = string(buff)
 	}
 
 	err := config.GitRemote.ValidateGitConfig()

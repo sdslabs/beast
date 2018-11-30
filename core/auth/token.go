@@ -10,7 +10,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/database"
 )
 
@@ -33,7 +33,7 @@ func Authorize(cookie string) error {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Token invalid")
 		}
-		return []byte(core.SECRET_STRING), nil
+		return []byte(config.Cfg.SecretString), nil
 	})
 
 	if err != nil {
@@ -66,7 +66,7 @@ func GenerateJWT(username, decrmess string) (string, error) {
 		Issuer:    "beast-sds",
 	})
 
-	return token.SignedString([]byte(core.SECRET_STRING))
+	return token.SignedString([]byte(config.Cfg.SecretString))
 }
 
 func GenerateEncryptedMessage(username string) (string, error) {
