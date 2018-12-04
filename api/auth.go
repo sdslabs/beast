@@ -9,6 +9,11 @@ import (
 	"github.com/sdslabs/beastv4/core/auth"
 )
 
+// Acts as a middleware to authorize user
+// @Summary Handles authorization of user
+// @Description Authorizes user by checking if JWT token exists and is valid
+// @Produce application/json
+// @Failure 401 {JSON} StatusUnauthorized
 func authorize(c *gin.Context) {
 
 	authHeader := c.GetHeader("Authorization")
@@ -36,6 +41,13 @@ func authorize(c *gin.Context) {
 	c.Next()
 }
 
+// Handles route related to receive JWT token
+// @Summary Handles solution check and token production
+// @Description JWT can be received by sending back correct answer to challenge
+// @Produce application/json
+// @Success 200 {JSON} Success
+// @Failure 401 {JSON} StatusUnauthorized
+// @Router /auth/:username [post]
 func getJWT(c *gin.Context) {
 	username := c.Param("username")
 	decrMess := c.PostForm("decrmess")
@@ -56,6 +68,13 @@ func getJWT(c *gin.Context) {
 	return
 }
 
+// Handles route related to getting user challenge for authorization
+// @Summary Handles challenge generation
+// @Description Sends challenge for authorization of user
+// @Produce application/json
+// @Success 200 {JSON} Success
+// @Failure 406 {JSON} StatusNotAcceptable
+// @Router /auth/:username [get]
 func getAuthChallenge(c *gin.Context) {
 	username := c.Param("username")
 
