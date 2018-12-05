@@ -2,6 +2,7 @@ package manager
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -174,10 +175,15 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 
 		if authorEntry.Email == "" {
+
+			rMessage := make([]byte, 128)
+			rand.Read(rMessage)
+
 			authorEntry = database.Author{
-				Name:   config.Author.Name,
-				Email:  config.Author.Email,
-				SshKey: config.Author.SSHKey,
+				Name:          config.Author.Name,
+				Email:         config.Author.Email,
+				SshKey:        config.Author.SSHKey,
+				AuthChallenge: rMessage,
 			}
 
 			err = database.CreateAuthorEntry(&authorEntry)

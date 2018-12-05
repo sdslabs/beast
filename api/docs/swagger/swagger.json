@@ -206,6 +206,50 @@
                     }
                 }
             }
+        },
+        "/auth/": {
+            "get": {
+                "description": "Sends challenge for authorization of user",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Handles challenge generation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "JSON"
+                        }
+                    },
+                    "406": {
+                        "description": "Not Acceptable",
+                        "schema": {
+                            "type": "JSON"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "JWT can be received by sending back correct answer to challenge",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Handles solution check and token production",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "JSON"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "JSON"
+                        }
+                    }
+                }
+            }
         }
     }
 }

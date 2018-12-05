@@ -27,6 +27,8 @@ func ParseAuthorizedKeysFile(filePath string) (map[string][]string, error) {
 		return authorizedKeysMap, eMsg
 	}
 
+	var eMsg error
+
 	for len(authorizedKeysBytes) > 0 {
 		pubKey, _, options, rest, err := ssh.ParseAuthorizedKey(authorizedKeysBytes)
 		if err != nil {

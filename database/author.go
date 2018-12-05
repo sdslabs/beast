@@ -20,10 +20,11 @@ import (
 type Author struct {
 	gorm.Model
 
-	Challenges []Challenge
-	Name       string `gorm:"not null"`
-	SshKey     string
-	Email      string `gorm:"non null"`
+	Challenges    []Challenge
+	Name          string `gorm:"not null"`
+	SshKey        string
+	Email         string `gorm:"non null"`
+	AuthChallenge []byte
 }
 
 // Queries all the authors entries where the column represented by key

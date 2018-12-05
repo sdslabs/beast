@@ -19,6 +19,7 @@
 authorized_keys_file = "/home/fristonio/.beast/auth_file"
 scripts_dir = "/home/fristonio/.beast/scripts"
 allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
+jwt_secret = "beast"
 
 [remote]
 url = "git@github.com:sdslabs/hack-test.git"
