@@ -139,7 +139,16 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
-	containerId, err := docker.CreateContainerFromImage(config.Challenge.Env.Ports, nil, challenge.ImageId, config.Challenge.Metadata.Name)
+	staticMount := make(map[string]string)
+	staticMountDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
+	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
+	if relativeStaticContentDir == "" {
+		relativeStaticContentDir = core.PUBLIC
+	}
+	staticMount[staticMountDir] = filepath.Join("/challenge", relativeStaticContentDir)
+	log.Debugf("Static mount config for deploy : %s", staticMount)
+
+	containerId, err := docker.CreateContainerFromImage(config.Challenge.Env.Ports, staticMount, challenge.ImageId, config.Challenge.Metadata.Name)
 	if err != nil {
 		if containerId != "" {
 			if e := database.Db.Model(&challenge).Update("ContainerId", containerId).Error; e != nil {
