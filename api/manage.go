@@ -47,7 +47,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 
 // Handles route related to managing a challenge
 // @Summary Handles challenge management actions.
-// @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY.
+// @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.
 // @Accept  json
 // @Produce application/json
 // @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
@@ -62,7 +62,22 @@ func manageChallengeHandler(c *gin.Context) {
 	switch action {
 	case MANAGE_ACTION_UNDEPLOY:
 		log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
-		if err := manager.UndeployChallenge(identifier); err != nil {
+		if err := manager.UndeployChallenge(identifier, false); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+
+		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, identifier)
+		c.JSON(http.StatusOK, gin.H{
+			"message": respStr,
+		})
+		return
+
+	case MANAGE_ACTION_PURGE:
+		log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
+		if err := manager.UndeployChallenge(identifier, true); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})

@@ -8,11 +8,13 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/database"
 	"github.com/sdslabs/beastv4/docker"
 	"github.com/sdslabs/beastv4/git"
 	"github.com/sdslabs/beastv4/utils"
 
+	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -161,12 +163,24 @@ func DeployAll(sync bool) error {
 	return nil
 }
 
+// Unstage a challenge based on the challenge name.
+// This simply removes the staging directory for the challenge from the staging area.
+func unstageChallenge(challengeName string) error {
+	challengeStagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	err := utils.RemoveDirRecursively(challengeStagedDir)
+	if err != nil {
+		return fmt.Errorf("Error while removing staged directory : %s", err)
+	}
+
+	return nil
+}
+
 // Undeploy a challenge, remove the container for the challenge in question
 // update the database entries for the challenge.
 // Do not touch any files in staging, commit phase.
 // This function returns a error if the challenge was not found or if
 // an error happened while removing the challenge instance.
-func UndeployChallenge(challengeName string) error {
+func UndeployChallenge(challengeName string, purge bool) error {
 	log.Infof("Got request to Undeploy challenge : %s", challengeName)
 
 	challenge, err := database.QueryFirstChallengeEntry("name", challengeName)
@@ -187,16 +201,14 @@ func UndeployChallenge(challengeName string) error {
 	// So this....
 	if challenge.ContainerId == "" {
 		log.Warnf("No instance of challenge(%s) deployed", challengeName)
-		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
-		return fmt.Errorf("No instance of challenge(%s) deployed", challengeName)
-	}
-
-	log.Debug("Removing challenge instance for ", challengeName)
-	err = docker.StopAndRemoveContainer(challenge.ContainerId)
-	if err != nil {
-		p := fmt.Errorf("Error while removing challenge instance : %s", err)
-		log.Error(p.Error())
-		return p
+	} else {
+		log.Debug("Removing challenge instance for ", challengeName)
+		err = docker.StopAndRemoveContainer(challenge.ContainerId)
+		if err != nil {
+			p := fmt.Errorf("Error while removing challenge instance : %s", err)
+			log.Error(p.Error())
+			return p
+		}
 	}
 
 	database.Db.Model(&challenge).Updates(map[string]interface{}{
@@ -211,6 +223,31 @@ func UndeployChallenge(challengeName string) error {
 	}
 
 	log.Infof("Challenge undeploy successful for %s", challenge.Name)
+
+	// If purge is true then first cleanup the challenge image and container
+	// and then remove the challenge from the staging directory.
+	if purge {
+		configFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName, core.CHALLENGE_CONFIG_FILE_NAME)
+		var cfg config.BeastChallengeConfig
+		_, err = toml.DecodeFile(configFile, &cfg)
+		if err != nil {
+			return err
+		}
+
+		err = coreUtils.CleanupChallengeIfExist(cfg)
+		if err != nil {
+			log.Errorf("Error while cleaning up the challenge")
+			return err
+		}
+
+		log.Infof("Purging the challenge : %s", challenge.Name)
+		err = unstageChallenge(challenge.Name)
+		if err != nil {
+			return fmt.Errorf("Error while purging in unstage step: %s", err)
+		}
+
+		log.Infof("Challenge purge successful")
+	}
 
 	return nil
 }

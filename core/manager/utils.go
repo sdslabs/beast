@@ -25,6 +25,7 @@ type BeastBareDockerfile struct {
 	AptDeps         string
 	SetupScripts    []string
 	RunCmd          string
+	MountVolume     string
 }
 
 // This if the function which validates the challenge directory
@@ -108,12 +109,21 @@ func GenerateDockerfile(configFile string) (string, error) {
 		return "", err
 	}
 
+	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
+	if relativeStaticContentDir == "" {
+		relativeStaticContentDir = core.PUBLIC
+	}
+
+	if config.Challenge.Env.BaseImage == "" {
+		config.Challenge.Env.BaseImage = core.DEFAULT_BASE_IMAGE
+	}
 	data := BeastBareDockerfile{
 		DockerBaseImage: config.Challenge.Env.BaseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
 		AptDeps:         strings.Join(config.Challenge.Env.AptDeps[:], " "),
 		SetupScripts:    config.Challenge.Env.SetupScripts,
 		RunCmd:          config.Challenge.Env.RunCmd,
+		MountVolume:     filepath.Join("/challenge", relativeStaticContentDir),
 	}
 
 	var dockerfile bytes.Buffer
