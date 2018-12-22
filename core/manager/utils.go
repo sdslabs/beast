@@ -114,6 +114,9 @@ func GenerateDockerfile(configFile string) (string, error) {
 		relativeStaticContentDir = core.PUBLIC
 	}
 
+	if config.Challenge.Env.BaseImage == "" {
+		config.Challenge.Env.BaseImage = core.DEFAULT_BASE_IMAGE
+	}
 	data := BeastBareDockerfile{
 		DockerBaseImage: config.Challenge.Env.BaseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),

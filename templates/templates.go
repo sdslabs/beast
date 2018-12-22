@@ -39,9 +39,9 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 VOLUME ["{{.MountVolume}}"]
 
 COPY . /challenge
-WORKDIR /challenge
 
-RUN chmod u+x {{ range $index, $elem := .SetupScripts}} {{$elem}} {{end}} \
+RUN cd /challenge && \
+	chmod u+x {{ range $index, $elem := .SetupScripts}} {{$elem}} {{end}} \
     {{ range $index, $elem := .SetupScripts}} && ./{{$elem}} \ {{end}}
 
 RUN touch /entrypoint.sh && \
@@ -51,7 +51,7 @@ RUN touch /entrypoint.sh && \
     echo "    chmod u+x /challenge/post-build.sh && /challenge/post-build.sh" >> /entrypoint.sh && \
     echo "fi" >> /entrypoint.sh && \
     echo "exec su beast /bin/bash -c \"{{.RunCmd}}\"" >> /entrypoint.sh && \
-    chmod +x /entrypoint.sh
+    chmod u+x /entrypoint.sh
 
 WORKDIR /challenge
 
