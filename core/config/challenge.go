@@ -126,6 +126,7 @@ type ChallengeEnv struct {
 	Base             string   `toml:"base"`
 	BaseImage        string   `toml:"base_image"`
 	WebRoot          string   `toml:"web_root"`
+	WebPort          uint32   `toml:"web_port"`
 }
 
 func (config *ChallengeEnv) ValidateRequiredFields() error {

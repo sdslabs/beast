@@ -3,8 +3,10 @@ package manager
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -26,7 +28,6 @@ type BeastBareDockerfile struct {
 	SetupScripts    []string
 	RunCmd          string
 	MountVolume     string
-	WebRoot         string
 }
 
 // This if the function which validates the challenge directory
@@ -98,13 +99,28 @@ func getContextDirPath(dirPath string) (string, error) {
 	return absContextDir, nil
 }
 
-func GetCommandForWebLanguage(WebRoot, language string) string {
+func GetCommandForWebLanguage(webRoot, language, port string) string {
 	switch language {
 	case "php7.1":
-		return "cd /challenge/" + WebRoot + " && php -S 0.0.0.0"
+		return "cd " + filepath.Join("/challenge", webRoot) + " && php -S 0.0.0.0 " + port
 	default:
-		return "ls"
+		os.Exit(1)
 	}
+	return ""
+}
+
+func ValidateWebChallengeReq(config cfg.BeastChallengeConfig) error {
+	if strings.HasPrefix(config.Challenge.Metadata.Type, "web") {
+		if config.Challenge.Env.WebRoot == "" {
+			return errors.New("Web root can not be empty for web challenges")
+		}
+
+		if config.Challenge.Env.WebPort == 0 {
+			return errors.New("Please specify the web port")
+		}
+	}
+
+	return nil
 }
 
 // From the provided configFIle path it generates the dockerfile for
@@ -130,11 +146,11 @@ func GenerateDockerfile(configFile string) (string, error) {
 
 	RunCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
-	var webLanguage string
 	if strings.HasPrefix(challengeType, "web") {
-		webLanguage = strings.Split(challengeType, ":")[1]
-		webRoot := config.Challenge.Metadata.WebRoot
-		RunCmd = GetCommandForWebLanguage(webRoot, webLanguage)
+		webLanguage := strings.Split(challengeType, ":")[1]
+		webRoot := config.Challenge.Env.WebRoot
+		webPort := fmt.Sprint(config.Challenge.Env.WebPort)
+		RunCmd = GetCommandForWebLanguage(webRoot, webLanguage, webPort)
 	}
 
 	data := BeastBareDockerfile{
@@ -144,7 +160,6 @@ func GenerateDockerfile(configFile string) (string, error) {
 		SetupScripts:    config.Challenge.Env.SetupScripts,
 		RunCmd:          RunCmd,
 		MountVolume:     filepath.Join("/challenge", relativeStaticContentDir),
-		WebRoot:         filepath.Join("/challenge", config.Challenge.Env.WebRoot),
 	}
 
 	var dockerfile bytes.Buffer
@@ -311,23 +326,6 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 		relativeStaticContentDir = core.PUBLIC
 	}
 	return filepath.Join(contextDir, relativeStaticContentDir), nil
-}
-
-// Provides the Web Root Folder Name from the config
-func GetWebRootDir(configFile, contextDir string) (string, error) {
-	var config cfg.BeastChallengeConfig
-
-	_, err := toml.DecodeFile(configFile, &config)
-	if err != nil {
-		return "", err
-	}
-
-	relativeWebRootDir := config.Challenge.Env.WebRoot
-	if relativeWebRootDir == "" {
-		relativeWebRootDir = core.PUBLIC
-	}
-
-	return filepath.Join(contextDir, relativeWebRootDir), nil
 }
 
 //Copies the Static content to the staging/static/folder
