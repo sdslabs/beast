@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var AVAILABLE_CHALLENGE_TYPES = []string{"web", "service", core.STATIC_CHALLENGE_TYPE_NAME}
+var AVAILABLE_CHALLENGE_TYPES = []string{"web:php7.1", "web:node", "service", core.STATIC_CHALLENGE_TYPE_NAME}
 
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
@@ -71,18 +71,11 @@ func (config *Challenge) ValidateRequiredFields() error {
 	return nil
 }
 
-// This contains challenge specific properties which includes
+// This contains challenge meta data
 //
-// * AptDeps - Apt dependencies for the challenge
-// * SetupScripts - relative path to the challenge setup scripts
-// * StaticContentDir - Relative path to the directory which you want
-// 		to serve statically for the challenge, for example a libc for binary
-// 		challenge.
-// * RunCmd - Command to run or start the challenge.
-// * Base for the challenge, this might be extension to dockerfile usage
-// 		like for a php challenge this can be php:web, for node node:web
-// 		for xinetd services xinetd:service
-// * Ports: A list of ports to be used by the challenge.
+// * Flag - Apt dependencies for the challenge
+// * Name - relative path to the challenge setup scripts
+// * Type - Relative path to the directory which you want
 type ChallengeMetadata struct {
 	Flag string `toml:"flag"`
 	Name string `toml:"name"`
@@ -111,6 +104,19 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	return fmt.Errorf("Not a valid challenge type : %s", config.Type), false
 }
 
+// This contains challenge specific properties which includes
+//
+// * AptDeps: Apt dependencies for the challenge
+// * SetupScripts: relative path to the challenge setup scripts
+// * StaticContentDir: Relative path to the directory which you want
+// 		to serve statically for the challenge, for example a libc for binary
+// 		challenge.
+// * RunCmd: Command to run or start the challenge.
+// * Base for the challenge, this might be extension to dockerfile usage
+// 		like for a php challenge this can be php:web, for node node:web
+// 		for xinetd services xinetd:service
+// * Ports: A list of ports to be used by the challenge.
+// * WebRoot: relative path to web challenge directory
 type ChallengeEnv struct {
 	AptDeps          []string `toml:"apt_deps"`
 	Ports            []uint32 `toml:"ports"`
@@ -119,6 +125,7 @@ type ChallengeEnv struct {
 	RunCmd           string   `toml:"run_cmd"`
 	Base             string   `toml:"base"`
 	BaseImage        string   `toml:"base_image"`
+	WebRoot          string   `toml:"web_root"`
 }
 
 func (config *ChallengeEnv) ValidateRequiredFields() error {
@@ -138,6 +145,12 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 
 	if config.RunCmd == "" {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
+	}
+
+	if config.WebRoot != "" {
+		if filepath.IsAbs(config.WebRoot) {
+			return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
+		}
 	}
 
 	if config.BaseImage == "" {

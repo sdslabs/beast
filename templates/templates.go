@@ -35,7 +35,7 @@ RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install {{.AptDeps}}
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-{{if .Ports}} EXPOSE {{.Ports}} {{end}}
+{{if .Ports}}EXPOSE {{.Ports}} {{end}}
 VOLUME ["{{.MountVolume}}"]
 
 COPY . /challenge

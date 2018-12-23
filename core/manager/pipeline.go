@@ -17,7 +17,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Run the staging setp for the pipeline, this functions assumes the
+// Run the staging step for the pipeline, this functions assumes the
 // directory of the challenge wihch will be staged.
 func stageChallenge(challengeDir string) error {
 	log.Debug("Starting staging stage of deploy pipeline")
@@ -245,6 +245,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		}
 		return
 	}
+
 	// Look into the database to check if the deploy is already in progress
 	// or not, return if a deploy is already in progress or else continue
 	// deploying
