@@ -1,6 +1,10 @@
 package auth
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 
@@ -42,4 +46,23 @@ func ParseAuthorizedKeysFile(filePath string) (map[string][]string, error) {
 	}
 
 	return authorizedKeysMap, eMsg
+}
+
+//This function parses ssh Private Key
+func ParsePrivateKey(keyFile string) (*rsa.PrivateKey, error) {
+	keyString, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode(keyString)
+	if block == nil {
+		return nil, errors.New("Unable to decode")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }

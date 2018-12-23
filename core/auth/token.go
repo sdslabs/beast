@@ -48,7 +48,7 @@ func Authorize(jwtTokenString string) error {
 }
 
 func GenerateJWT(username, decrmess string) (string, error) {
-	author, err := database.QueryFirstAuthorEntry("username", username)
+	author, err := database.QueryFirstAuthorEntry("name", username)
 	if err != nil {
 		return "", err
 	}
@@ -70,7 +70,7 @@ func GenerateJWT(username, decrmess string) (string, error) {
 }
 
 func GenerateAuthChallenge(username string) (string, error) {
-	author, err := database.QueryFirstAuthorEntry("username", username)
+	author, err := database.QueryFirstAuthorEntry("name", username)
 
 	if err != nil {
 		return "", err

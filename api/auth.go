@@ -92,7 +92,7 @@ func getAuthChallenge(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"challenge": challenge,
+		"challenge": []byte(challenge),
 		"message":   "Solve the above challenge and POST to this route to get AUTHORIZATION KEY",
 	})
 	return
