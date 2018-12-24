@@ -117,6 +117,7 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // 		for xinetd services xinetd:service
 // * Ports: A list of ports to be used by the challenge.
 // * WebRoot: relative path to web challenge directory
+// * DefaultPort: default port for application
 type ChallengeEnv struct {
 	AptDeps          []string `toml:"apt_deps"`
 	Ports            []uint32 `toml:"ports"`
@@ -126,7 +127,7 @@ type ChallengeEnv struct {
 	Base             string   `toml:"base"`
 	BaseImage        string   `toml:"base_image"`
 	WebRoot          string   `toml:"web_root"`
-	WebPort          uint32   `toml:"web_port"`
+	DefaultPort      uint32   `toml:"default_port"`
 }
 
 func (config *ChallengeEnv) ValidateRequiredFields() error {

@@ -84,7 +84,7 @@ var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	},
 	"default": map[string]map[string]string{
 		"default": map[string]string{
-			"default": "exit",
+			"default": DEFAULT_BASE_IMAGE,
 		},
 	},
 }

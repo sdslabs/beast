@@ -100,8 +100,8 @@ func getContextDirPath(dirPath string) (string, error) {
 
 // This function provides the run command and image for a particular type of web challenge
 //  * webRoot:  relative path to web challenge directory
-//  * language
 //  * port:     web port
+//  * challengeInfo
 //
 //  It returns the run command for challenge
 //  and the docker base image corresponding to language
@@ -135,7 +135,7 @@ func ValidateWebChallengeReq(config cfg.BeastChallengeConfig) error {
 			return errors.New("Web root can not be empty for web challenges")
 		}
 
-		if config.Challenge.Env.WebPort == 0 {
+		if config.Challenge.Env.DefaultPort == 0 {
 			return errors.New("Please specify the web port")
 		}
 	}
@@ -169,7 +169,7 @@ func GenerateDockerfile(configFile string) (string, error) {
 	challengeType := config.Challenge.Metadata.Type
 	if strings.HasPrefix(challengeType, "web") {
 		challengeInfo := strings.Split(challengeType, ":")
-		webPort := fmt.Sprint(config.Challenge.Env.WebPort)
+		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
 		runCmd, baseImage = GetCommandAndImageForWebLanguage(config.Challenge.Env.WebRoot, webPort, challengeInfo)
 	}
 
