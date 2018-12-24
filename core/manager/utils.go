@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -99,14 +98,35 @@ func getContextDirPath(dirPath string) (string, error) {
 	return absContextDir, nil
 }
 
-func GetCommandForWebLanguage(webRoot, language, port string) string {
+// This function provides the run command and image for a particular type of web challenge
+//  * webRoot:  relative path to web challenge directory
+//  * language
+//  * port:     web port
+//
+//  It returns the run command for challenge
+//  and the docker base image corresponding to language
+func GetCommandAndImageForWebLanguage(webRoot, port string, challengeInfo []string) (string, string) {
+	var cmd string
+	language := challengeInfo[1]
+	version := challengeInfo[2]
+	framework := challengeInfo[3]
+
 	switch language {
-	case "php7.1":
-		return "cd " + filepath.Join("/challenge", webRoot) + " && php -S 0.0.0.0 " + port
-	default:
-		os.Exit(1)
+	case "php":
+		cmd = "cd " + filepath.Join("/challenge", webRoot) + " && php -S 0.0.0.0 " + port
 	}
-	return ""
+
+	length := len(challengeInfo)
+	reqLength := 4
+
+	if length < reqLength {
+		for i := length; i < reqLength; i++ {
+			challengeInfo = append(challengeInfo, "default")
+		}
+	}
+	image := core.DockerBaseImageForWebChall[language][version][framework]
+
+	return cmd, image
 }
 
 func ValidateWebChallengeReq(config cfg.BeastChallengeConfig) error {
@@ -140,25 +160,25 @@ func GenerateDockerfile(configFile string) (string, error) {
 		relativeStaticContentDir = core.PUBLIC
 	}
 
-	if config.Challenge.Env.BaseImage == "" {
-		config.Challenge.Env.BaseImage = core.DEFAULT_BASE_IMAGE
+	baseImage := config.Challenge.Env.BaseImage
+	if baseImage == "" {
+		baseImage = core.DEFAULT_BASE_IMAGE
 	}
 
-	RunCmd := config.Challenge.Env.RunCmd
+	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
 	if strings.HasPrefix(challengeType, "web") {
-		webLanguage := strings.Split(challengeType, ":")[1]
-		webRoot := config.Challenge.Env.WebRoot
+		challengeInfo := strings.Split(challengeType, ":")
 		webPort := fmt.Sprint(config.Challenge.Env.WebPort)
-		RunCmd = GetCommandForWebLanguage(webRoot, webLanguage, webPort)
+		runCmd, baseImage = GetCommandAndImageForWebLanguage(config.Challenge.Env.WebRoot, webPort, challengeInfo)
 	}
 
 	data := BeastBareDockerfile{
-		DockerBaseImage: config.Challenge.Env.BaseImage,
+		DockerBaseImage: baseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
 		AptDeps:         strings.Join(config.Challenge.Env.AptDeps[:], " "),
 		SetupScripts:    config.Challenge.Env.SetupScripts,
-		RunCmd:          RunCmd,
+		RunCmd:          runCmd,
 		MountVolume:     filepath.Join("/challenge", relativeStaticContentDir),
 	}
 

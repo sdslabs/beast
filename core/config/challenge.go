@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var AVAILABLE_CHALLENGE_TYPES = []string{"web:php7.1", "web:node", "service", core.STATIC_CHALLENGE_TYPE_NAME}
+var AVAILABLE_CHALLENGE_TYPES = []string{"web:php:7.1", "web:node", "service", core.STATIC_CHALLENGE_TYPE_NAME}
 
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure

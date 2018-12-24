@@ -43,3 +43,48 @@ var DEPLOY_STATUS = map[string]string{
 	"deployed":   "Deployed",
 	"building":   "Building",
 }
+
+var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
+	"php": map[string]map[string]string{
+		"7.1": map[string]string{
+			"cli":     "php:7.1-cli",
+			"apache":  "php:7.1-apache",
+			"default": "php:7.1-cli",
+		},
+		"5.6": map[string]string{
+			"cli":     "php:5.6-cli",
+			"apache":  "php:5.6-apache",
+			"default": "php:5.6-cli",
+		},
+		"default": map[string]string{
+			"default": "php:5.6-cli",
+		},
+	},
+	"node": map[string]map[string]string{
+		"10": map[string]string{
+			"default": "node:10-jessie",
+		},
+		"default": map[string]string{
+			"default": "node:10-jessie",
+		},
+	},
+	"python": map[string]map[string]string{
+		"2.7": map[string]string{
+			"default": "python:2.7-jessie",
+		},
+		"3.5": map[string]string{
+			"default": "python:3.5-jessie",
+		},
+		"3.6": map[string]string{
+			"default": "python:3.6-jessie",
+		},
+		"default": map[string]string{
+			"default": "python:2.7-jessie",
+		},
+	},
+	"default": map[string]map[string]string{
+		"default": map[string]string{
+			"default": "exit",
+		},
+	},
+}
