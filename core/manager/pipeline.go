@@ -222,12 +222,6 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		return
 	}
 
-	e := ValidateWebChallengeReq(config)
-	if e != nil {
-		log.Errorf("%s", e)
-		return
-	}
-
 	challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 	if err != nil {
 		log.Errorf("Error while querying challenge %s : %s", config.Challenge.Metadata.Name, err)

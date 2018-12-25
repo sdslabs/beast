@@ -60,6 +60,11 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return err
 	}
 
+	err = ValidateWebChallengeReq(config)
+	if err != nil {
+		return err
+	}
+
 	log.Debug("Challenge config file beast.toml is valid")
 	return nil
 }
@@ -98,6 +103,15 @@ func getContextDirPath(dirPath string) (string, error) {
 	return absContextDir, nil
 }
 
+func getCommandForWebChall(language, framework, webRoot, port string) (cmd string) {
+	switch language {
+	case "php":
+		cmd = "cd " + filepath.Join("/challenge", webRoot) + " && php -S 0.0.0.0 " + port
+	}
+
+	return
+}
+
 // This function provides the run command and image for a particular type of web challenge
 //  * webRoot:  relative path to web challenge directory
 //  * port:     web port
@@ -105,7 +119,7 @@ func getContextDirPath(dirPath string) (string, error) {
 //
 //  It returns the run command for challenge
 //  and the docker base image corresponding to language
-func GetCommandAndImageForWebLanguage(webRoot, port string, challengeInfo []string) (string, string) {
+func GetCommandAndImageForWebChall(webRoot, port string, challengeInfo []string) (string, string) {
 	length := len(challengeInfo)
 	reqLength := 4
 
@@ -119,12 +133,7 @@ func GetCommandAndImageForWebLanguage(webRoot, port string, challengeInfo []stri
 	version := challengeInfo[2]
 	framework := challengeInfo[3]
 
-	var cmd string
-	switch language {
-	case "php":
-		cmd = "cd " + filepath.Join("/challenge", webRoot) + " && php -S 0.0.0.0 " + port
-	}
-
+	cmd := getCommandForWebChall(language, framework, webRoot, port)
 	image := core.DockerBaseImageForWebChall[language][version][framework]
 
 	return cmd, image
@@ -163,7 +172,7 @@ func GenerateDockerfile(configFile string) (string, error) {
 	if strings.HasPrefix(challengeType, "web") {
 		challengeInfo := strings.Split(challengeType, ":")
 		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
-		runCmd, baseImage = GetCommandAndImageForWebLanguage(config.Challenge.Env.WebRoot, webPort, challengeInfo)
+		runCmd, baseImage = GetCommandAndImageForWebChall(config.Challenge.Env.WebRoot, webPort, challengeInfo)
 	}
 
 	if baseImage == "" {
