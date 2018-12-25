@@ -31,6 +31,7 @@ const (
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
 	BEAST_STATIC_FOLDER            string = "static"
 	STATIC_CHALLENGE_TYPE_NAME     string = "static"
+	SERVICE_CHALLENGE_TYPE_NAME    string = "service"
 	PUBLIC                         string = "public"
 	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
 )
@@ -43,6 +44,8 @@ var DEPLOY_STATUS = map[string]string{
 	"deployed":   "Deployed",
 	"building":   "Building",
 }
+
+var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME}
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	"php": map[string]map[string]string{

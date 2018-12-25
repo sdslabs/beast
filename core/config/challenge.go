@@ -11,8 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var AVAILABLE_CHALLENGE_TYPES = []string{"web:php:7.1", "web:node", "service", core.STATIC_CHALLENGE_TYPE_NAME}
-
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
 // will be ignored.
@@ -90,8 +88,9 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	// Check if the config type is static here and if it is
 	// then return an indication for that, so that caller knows if it need
 	// to check a valid environment or not.
-	for i := range AVAILABLE_CHALLENGE_TYPES {
-		if AVAILABLE_CHALLENGE_TYPES[i] == config.Type {
+	challengeTypes := GetAvailableChallengeTypes()
+	for i := range challengeTypes {
+		if challengeTypes[i] == config.Type {
 			if config.Type == core.STATIC_CHALLENGE_TYPE_NAME {
 				// Challenge is a standalone static challenge
 				return nil, true
@@ -164,7 +163,7 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 	}
 
 	if config.DefaultPort == 0 {
-		config.DefaultPort = 80
+		config.DefaultPort = config.Ports[0]
 	}
 
 	return nil
