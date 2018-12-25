@@ -11,6 +11,7 @@ import (
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/database"
 	"github.com/sdslabs/beastv4/docker"
+	"github.com/sdslabs/beastv4/notify"
 	"github.com/sdslabs/beastv4/utils"
 
 	"github.com/BurntSushi/toml"
@@ -192,7 +193,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 //
 // During the staging steup if any error occurs, then the state of the challenge
 // in the database is set to unknown.
-func StartDeployPipeline(challengeDir string, skipStage bool) {
+func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
 	log.Debug("Loading Beast config")
 
 	challengeName := filepath.Base(challengeDir)
@@ -202,7 +203,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 	_, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
 		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
-		return
+		return fmt.Errorf("CONFIG ERROR: %s : %s", challengeName, err)
 	}
 
 	// We do not validate challenge config here, make sure you have validated the config
@@ -219,13 +220,13 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 	// conflict in the name.
 	if challengeName != config.Challenge.Metadata.Name {
 		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
-		return
+		return fmt.Errorf("CONFIG ERROR: %s : Inconsistent configuration name and challengeName", challengeName)
 	}
 
 	challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 	if err != nil {
 		log.Errorf("Error while querying challenge %s : %s", config.Challenge.Metadata.Name, err)
-		return
+		return fmt.Errorf("DB ERROR: %s : %s", challengeName, err)
 	}
 
 	// Using the challenge dir we got, update the database entries for the challenge.
@@ -233,7 +234,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 	if err != nil {
 		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
 		log.Errorf("Db error : %s", err)
-		return
+		return fmt.Errorf("DB ERROR: %s : %s", challengeName, err)
 	}
 
 	// Check if the challenge type is static, if it is traditional deploy pipeline would not
@@ -241,9 +242,10 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 	if config.Challenge.Metadata.Type == core.STATIC_CHALLENGE_TYPE_NAME {
 		if !skipStage {
 			// Deploy pipeline for static challenge will follow.
+			log.Infof("Deploy static challenge request.")
 			DeployStaticChallenge(&config)
 		}
-		return
+		return nil
 	}
 	// Look into the database to check if the deploy is already in progress
 	// or not, return if a deploy is already in progress or else continue
@@ -251,7 +253,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 	if challenge.Status != core.DEPLOY_STATUS["unknown"] &&
 		challenge.Status != core.DEPLOY_STATUS["deployed"] {
 		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
-		return
+		return fmt.Errorf("PIPELINE START ERROR: %s : Deploy already in progress.", challengeName)
 	}
 
 	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)
@@ -269,17 +271,19 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 			}).Errorf("%s", err)
 
 			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
-			return
+			return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, err)
 		}
 	} else {
 		log.Debugf("Checking if challenge already staged")
 
 		err = utils.ValidateFileExists(stagedChallengePath)
 		if err != nil {
+			msg := "Challenge not already in staged(but skipping asked), could not proceed further"
 			log.WithFields(log.Fields{
 				"DEPLOY_ERROR": "STAGING :: " + challengeName,
-			}).Errorf("Challenge not already in staged(but skipping asked), could not proceed further")
-			return
+			}).Errorf("%s", msg)
+
+			return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, msg)
 		}
 
 		log.Infof("SKIPPING STAGING STEP IN THE DEPLOY PIPELINE")
@@ -294,7 +298,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		}).Errorf("%s", err)
 
 		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
-		return
+		return fmt.Errorf("COMMIT ERROR: %s : %s", challengeName, err)
 	}
 
 	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["deploying"])
@@ -306,10 +310,29 @@ func StartDeployPipeline(challengeDir string, skipStage bool) {
 		}).Errorf("%s", err)
 
 		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
-		return
+
+		return fmt.Errorf("DEPLOY ERROR: %s : %s", challengeName, err)
 	}
 
 	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["deployed"])
 
 	log.Infof("CHALLENGE %s DEPLOYED SUCCESSFULLY", challengeName)
+
+	return nil
+}
+
+// This is just a decorator function over bootstrapDeployPipeline and generate
+// notifications to slack on the basis of the result of the deploy pipeline.
+func StartDeployPipeline(challengeDir string, skipStage bool) {
+	challengeName := filepath.Base(challengeDir)
+
+	err := bootstrapDeployPipeline(challengeDir, skipStage)
+	if err != nil {
+		notify.SendNotificationToSlack(notify.Error, err.Error())
+	} else {
+		msg := fmt.Sprintf("DEPLOY SUCCESS : %s : Challenge deployment pieline successful.", challengeName)
+		notify.SendNotificationToSlack(notify.Success, msg)
+	}
+
+	log.Debugf("%s: Notification sent to slack", challengeName)
 }
