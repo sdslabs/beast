@@ -103,13 +103,35 @@ func getContextDirPath(dirPath string) (string, error) {
 	return absContextDir, nil
 }
 
-func getCommandForWebChall(language, framework, webRoot, port string) (cmd string) {
+func getCommandForWebChall(language, framework, webRoot, port string) string {
+	dir := "cd " + filepath.Join("/challenge", webRoot) + " && "
+	var cmd string
 	switch language {
 	case "php":
-		cmd = "cd " + filepath.Join("/challenge", webRoot) + " && php -S 0.0.0.0 " + port
+		switch framework {
+		case "apache":
+			cmd = "<some command>"
+		case "cli":
+		default:
+			cmd = "php -S 0.0.0.0 "
+		}
+	case "node":
+		cmd = "node server.js"
+	case "python":
+		switch framework {
+		case "django":
+			cmd = "python manage.py runserver 0.0.0.0:"
+		case "flask":
+			cmd = "flask run --host=0.0.0.0 --port="
+		default:
+			cmd = ""
+		}
+	default:
+		// If only `web` is specified in type
+		cmd = ""
 	}
 
-	return
+	return dir + cmd + port
 }
 
 // This function provides the run command and image for a particular type of web challenge

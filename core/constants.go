@@ -52,11 +52,13 @@ var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 		"7.1": map[string]string{
 			"cli":     "php:7.1-cli",
 			"apache":  "php:7.1-apache",
+			"fpm":     "php:7.1-fpm",
 			"default": "php:7.1-cli",
 		},
 		"5.6": map[string]string{
 			"cli":     "php:5.6-cli",
 			"apache":  "php:5.6-apache",
+			"fpm":     "php:5.6-fpm",
 			"default": "php:5.6-cli",
 		},
 		"default": map[string]string{
@@ -64,6 +66,9 @@ var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 		},
 	},
 	"node": map[string]map[string]string{
+		"8": map[string]string{
+			"default": "node:8-jessie",
+		},
 		"10": map[string]string{
 			"default": "node:10-jessie",
 		},
