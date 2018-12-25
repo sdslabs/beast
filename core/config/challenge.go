@@ -149,18 +149,22 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
 	}
 
-	if config.WebRoot != "" {
-		if filepath.IsAbs(config.WebRoot) {
-			return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
-		}
-	}
-
 	if config.BaseImage == "" {
 		config.BaseImage = core.DEFAULT_BASE_IMAGE
 	}
 
 	if !utils.StringInSlice(config.BaseImage, Cfg.AllowedBaseImages) {
 		return fmt.Errorf("The base image: %s is not supported", config.BaseImage)
+	}
+
+	if config.WebRoot != "" {
+		if filepath.IsAbs(config.WebRoot) {
+			return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
+		}
+	}
+
+	if config.DefaultPort == 0 {
+		config.DefaultPort = 80
 	}
 
 	return nil

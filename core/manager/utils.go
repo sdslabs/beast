@@ -106,16 +106,6 @@ func getContextDirPath(dirPath string) (string, error) {
 //  It returns the run command for challenge
 //  and the docker base image corresponding to language
 func GetCommandAndImageForWebLanguage(webRoot, port string, challengeInfo []string) (string, string) {
-	var cmd string
-	language := challengeInfo[1]
-	version := challengeInfo[2]
-	framework := challengeInfo[3]
-
-	switch language {
-	case "php":
-		cmd = "cd " + filepath.Join("/challenge", webRoot) + " && php -S 0.0.0.0 " + port
-	}
-
 	length := len(challengeInfo)
 	reqLength := 4
 
@@ -124,6 +114,17 @@ func GetCommandAndImageForWebLanguage(webRoot, port string, challengeInfo []stri
 			challengeInfo = append(challengeInfo, "default")
 		}
 	}
+
+	language := challengeInfo[1]
+	version := challengeInfo[2]
+	framework := challengeInfo[3]
+
+	var cmd string
+	switch language {
+	case "php":
+		cmd = "cd " + filepath.Join("/challenge", webRoot) + " && php -S 0.0.0.0 " + port
+	}
+
 	image := core.DockerBaseImageForWebChall[language][version][framework]
 
 	return cmd, image
@@ -133,10 +134,6 @@ func ValidateWebChallengeReq(config cfg.BeastChallengeConfig) error {
 	if strings.HasPrefix(config.Challenge.Metadata.Type, "web") {
 		if config.Challenge.Env.WebRoot == "" {
 			return errors.New("Web root can not be empty for web challenges")
-		}
-
-		if config.Challenge.Env.DefaultPort == 0 {
-			return errors.New("Please specify the web port")
 		}
 	}
 
@@ -161,16 +158,16 @@ func GenerateDockerfile(configFile string) (string, error) {
 	}
 
 	baseImage := config.Challenge.Env.BaseImage
-	if baseImage == "" {
-		baseImage = core.DEFAULT_BASE_IMAGE
-	}
-
 	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
 	if strings.HasPrefix(challengeType, "web") {
 		challengeInfo := strings.Split(challengeType, ":")
 		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
 		runCmd, baseImage = GetCommandAndImageForWebLanguage(config.Challenge.Env.WebRoot, webPort, challengeInfo)
+	}
+
+	if baseImage == "" {
+		baseImage = core.DEFAULT_BASE_IMAGE
 	}
 
 	data := BeastBareDockerfile{
