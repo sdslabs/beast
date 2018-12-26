@@ -4,14 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
-
-var AVAILABLE_CHALLENGE_TYPES = []string{"web", "service", core.STATIC_CHALLENGE_TYPE_NAME}
 
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
@@ -62,7 +61,7 @@ func (config *Challenge) ValidateRequiredFields() error {
 		return nil
 	}
 
-	err = config.Env.ValidateRequiredFields()
+	err = config.Env.ValidateRequiredFields(config.Metadata.Type)
 	if err != nil {
 		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
 		return err
@@ -71,18 +70,11 @@ func (config *Challenge) ValidateRequiredFields() error {
 	return nil
 }
 
-// This contains challenge specific properties which includes
+// This contains challenge meta data
 //
-// * AptDeps - Apt dependencies for the challenge
-// * SetupScripts - relative path to the challenge setup scripts
-// * StaticContentDir - Relative path to the directory which you want
-// 		to serve statically for the challenge, for example a libc for binary
-// 		challenge.
-// * RunCmd - Command to run or start the challenge.
-// * Base for the challenge, this might be extension to dockerfile usage
-// 		like for a php challenge this can be php:web, for node node:web
-// 		for xinetd services xinetd:service
-// * Ports: A list of ports to be used by the challenge.
+// * Flag - Apt dependencies for the challenge
+// * Name - relative path to the challenge setup scripts
+// * Type - Relative path to the directory which you want
 type ChallengeMetadata struct {
 	Flag string `toml:"flag"`
 	Name string `toml:"name"`
@@ -97,8 +89,9 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	// Check if the config type is static here and if it is
 	// then return an indication for that, so that caller knows if it need
 	// to check a valid environment or not.
-	for i := range AVAILABLE_CHALLENGE_TYPES {
-		if AVAILABLE_CHALLENGE_TYPES[i] == config.Type {
+	challengeTypes := GetAvailableChallengeTypes()
+	for i := range challengeTypes {
+		if challengeTypes[i] == config.Type {
 			if config.Type == core.STATIC_CHALLENGE_TYPE_NAME {
 				// Challenge is a standalone static challenge
 				return nil, true
@@ -111,6 +104,20 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	return fmt.Errorf("Not a valid challenge type : %s", config.Type), false
 }
 
+// This contains challenge specific properties which includes
+//
+// * AptDeps: Apt dependencies for the challenge
+// * SetupScripts: relative path to the challenge setup scripts
+// * StaticContentDir: Relative path to the directory which you want
+// 		to serve statically for the challenge, for example a libc for binary
+// 		challenge.
+// * RunCmd: Command to run or start the challenge.
+// * Base for the challenge, this might be extension to dockerfile usage
+// 		like for a php challenge this can be php:web, for node node:web
+// 		for xinetd services xinetd:service
+// * Ports: A list of ports to be used by the challenge.
+// * WebRoot: relative path to web challenge directory
+// * DefaultPort: default port for application
 type ChallengeEnv struct {
 	AptDeps          []string `toml:"apt_deps"`
 	Ports            []uint32 `toml:"ports"`
@@ -119,9 +126,11 @@ type ChallengeEnv struct {
 	RunCmd           string   `toml:"run_cmd"`
 	Base             string   `toml:"base"`
 	BaseImage        string   `toml:"base_image"`
+	WebRoot          string   `toml:"web_root"`
+	DefaultPort      uint32   `toml:"default_port"`
 }
 
-func (config *ChallengeEnv) ValidateRequiredFields() error {
+func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 	if len(config.Ports) == 0 {
 		return errors.New("Are you sure you have specified the ports used by challenge")
 	}
@@ -136,7 +145,8 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 		}
 	}
 
-	if config.RunCmd == "" {
+	// Run command is not required in case of web challenges.
+	if config.RunCmd == "" && !strings.HasPrefix(challType, "web") {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
 	}
 
@@ -146,6 +156,19 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 
 	if !utils.StringInSlice(config.BaseImage, Cfg.AllowedBaseImages) {
 		return fmt.Errorf("The base image: %s is not supported", config.BaseImage)
+	}
+
+	// Validation for web challenges.
+	if strings.HasPrefix(challType, "web") {
+		if config.WebRoot == "" {
+			return errors.New("Web root can not be empty for web challenges")
+		} else if config.WebRoot != "" && filepath.IsAbs(config.WebRoot) {
+			return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
+		}
+	}
+
+	if config.DefaultPort == 0 {
+		config.DefaultPort = config.Ports[0]
 	}
 
 	return nil

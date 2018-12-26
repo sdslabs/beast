@@ -97,6 +97,65 @@ func getContextDirPath(dirPath string) (string, error) {
 	return absContextDir, nil
 }
 
+func getCommandForWebChall(language, framework, webRoot, port string) string {
+	dir := "cd " + filepath.Join("/challenge", webRoot) + " && "
+	var cmd string
+
+	switch language {
+	case "php":
+		switch framework {
+		case "apache":
+			cmd = "<some command>"
+		case "cli":
+			cmd = "php -S 0.0.0.0:"
+		default:
+			cmd = "php -S 0.0.0.0:"
+		}
+	case "node":
+		cmd = "node server.js"
+	case "python":
+		switch framework {
+		case "django":
+			cmd = "python manage.py runserver 0.0.0.0:"
+		case "flask":
+			cmd = "flask run --host=0.0.0.0 --port="
+		default:
+			return ""
+		}
+	default:
+		return ""
+	}
+
+	return dir + cmd + port
+}
+
+// This function provides the run command and image for a particular type of web challenge
+//  * webRoot:  relative path to web challenge directory
+//  * port:     web port
+//  * challengeInfo
+//
+//  It returns the run command for challenge
+//  and the docker base image corresponding to language
+func GetCommandAndImageForWebChall(webRoot, port string, challengeInfo []string) (string, string) {
+	length := len(challengeInfo)
+	reqLength := 4
+
+	if length < reqLength {
+		for i := length; i < reqLength; i++ {
+			challengeInfo = append(challengeInfo, "default")
+		}
+	}
+
+	language := challengeInfo[1]
+	version := challengeInfo[2]
+	framework := challengeInfo[3]
+
+	cmd := getCommandForWebChall(language, framework, webRoot, port)
+	image := core.DockerBaseImageForWebChall[language][version][framework]
+
+	return cmd, image
+}
+
 // From the provided configFIle path it generates the dockerfile for
 // the challenge and returns it as a string. This function again
 // assumes that the validation for the configFile is done beforehand
@@ -114,15 +173,32 @@ func GenerateDockerfile(configFile string) (string, error) {
 		relativeStaticContentDir = core.PUBLIC
 	}
 
-	if config.Challenge.Env.BaseImage == "" {
-		config.Challenge.Env.BaseImage = core.DEFAULT_BASE_IMAGE
+	baseImage := config.Challenge.Env.BaseImage
+	runCmd := config.Challenge.Env.RunCmd
+	challengeType := config.Challenge.Metadata.Type
+
+	if strings.HasPrefix(challengeType, "web") {
+		challengeInfo := strings.Split(challengeType, ":")
+		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
+		defaultRunCmd, webBaseImage := GetCommandAndImageForWebChall(config.Challenge.Env.WebRoot, webPort, challengeInfo)
+
+		// runCmd can only be empty when the challenge has a web prefix.
+		if runCmd == "" {
+			runCmd = defaultRunCmd
+		}
+		baseImage = webBaseImage
 	}
+
+	if baseImage == "" {
+		baseImage = core.DEFAULT_BASE_IMAGE
+	}
+
 	data := BeastBareDockerfile{
-		DockerBaseImage: config.Challenge.Env.BaseImage,
+		DockerBaseImage: baseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
 		AptDeps:         strings.Join(config.Challenge.Env.AptDeps[:], " "),
 		SetupScripts:    config.Challenge.Env.SetupScripts,
-		RunCmd:          config.Challenge.Env.RunCmd,
+		RunCmd:          runCmd,
 		MountVolume:     filepath.Join("/challenge", relativeStaticContentDir),
 	}
 

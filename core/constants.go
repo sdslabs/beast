@@ -31,6 +31,7 @@ const (
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
 	BEAST_STATIC_FOLDER            string = "static"
 	STATIC_CHALLENGE_TYPE_NAME     string = "static"
+	SERVICE_CHALLENGE_TYPE_NAME    string = "service"
 	PUBLIC                         string = "public"
 	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
 )
@@ -42,4 +43,56 @@ var DEPLOY_STATUS = map[string]string{
 	"deploying":  "Deploying",
 	"deployed":   "Deployed",
 	"building":   "Building",
+}
+
+var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME}
+
+var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
+	"php": map[string]map[string]string{
+		"7.1": map[string]string{
+			"cli":     "php:7.1-cli",
+			"apache":  "php:7.1-apache",
+			"fpm":     "php:7.1-fpm",
+			"default": "php:7.1-cli",
+		},
+		"5.6": map[string]string{
+			"cli":     "php:5.6-cli",
+			"apache":  "php:5.6-apache",
+			"fpm":     "php:5.6-fpm",
+			"default": "php:5.6-cli",
+		},
+		"default": map[string]string{
+			"default": "php:5.6-cli",
+		},
+	},
+	"node": map[string]map[string]string{
+		"8": map[string]string{
+			"default": "node:8-jessie",
+		},
+		"10": map[string]string{
+			"default": "node:10-jessie",
+		},
+		"default": map[string]string{
+			"default": "node:10-jessie",
+		},
+	},
+	"python": map[string]map[string]string{
+		"2.7": map[string]string{
+			"default": "python:2.7-jessie",
+		},
+		"3.5": map[string]string{
+			"default": "python:3.5-jessie",
+		},
+		"3.6": map[string]string{
+			"default": "python:3.6-jessie",
+		},
+		"default": map[string]string{
+			"default": "python:2.7-jessie",
+		},
+	},
+	"default": map[string]map[string]string{
+		"default": map[string]string{
+			"default": DEFAULT_BASE_IMAGE,
+		},
+	},
 }
