@@ -40,9 +40,9 @@ VOLUME ["{{.MountVolume}}"]
 
 COPY . /challenge
 
-RUN cd /challenge && \
-	chmod u+x {{ range $index, $elem := .SetupScripts}} {{$elem}} {{end}} \
-    {{ range $index, $elem := .SetupScripts}} && ./{{$elem}} \ {{end}}
+RUN cd /challenge {{ range $index, $elem := .SetupScripts}} && \
+	chmod u+x {{$elem}} {{end}} {{ range $index, $elem := .SetupScripts}} && \
+    ./{{$elem}} {{end}}
 
 RUN touch /entrypoint.sh && \
     echo "#!/bin/bash" > /entrypoint.sh && \
