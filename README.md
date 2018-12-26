@@ -72,6 +72,9 @@ To run the API server for beast use command `beast run -v`
 * **git**
 	* Git functions wrapper provider for beast functions.
 
+* **notify**
+	* Package implementing notification functionality for beast, this includes slack notifications.
+
 * **templates**
 	* Tempaltes used by beast.
 	* For example - Beast dockerfile template, beast challenge config template etc.
@@ -92,6 +95,8 @@ To run the API server for beast use command `beast run -v`
 To test use the sample challenges in the `_examples` directory. Use the challenge simple and try to deploy it using
 beast. Follow the below instructions.
 
+You can find swagger API documentation here: http://localhost:5005/api/docs/index.html
+
 ```bash
 # Build beast
 $ make build
@@ -102,6 +107,9 @@ $ beast run -v
 
 # In another terminal Start the local deployment of the challenge, using the directory
 $ curl -X POST localhost:5005/api/manage/deploy/local/ --data "challenge_dir=<absolute_path_to_challenge_simple>"
+
+# Or you can directly deploy the challenge using name in the remote
+$ curl -X POST --data "action=deploy&name=<challenge_name>" localhost:5005/api/manage/challenge/
 
 # Wait for beast to finish the image build and deployment of the challenge
 # This might take some time. Have some snacks ready!
