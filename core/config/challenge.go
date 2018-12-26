@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/utils"
@@ -60,7 +61,7 @@ func (config *Challenge) ValidateRequiredFields() error {
 		return nil
 	}
 
-	err = config.Env.ValidateRequiredFields()
+	err = config.Env.ValidateRequiredFields(config.Metadata.Type)
 	if err != nil {
 		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
 		return err
@@ -129,7 +130,7 @@ type ChallengeEnv struct {
 	DefaultPort      uint32   `toml:"default_port"`
 }
 
-func (config *ChallengeEnv) ValidateRequiredFields() error {
+func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 	if len(config.Ports) == 0 {
 		return errors.New("Are you sure you have specified the ports used by challenge")
 	}
@@ -144,7 +145,8 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 		}
 	}
 
-	if config.RunCmd == "" {
+	// Run command is not required in case of web challenges.
+	if config.RunCmd == "" && !strings.HasPrefix(challType, "web") {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
 	}
 
@@ -156,8 +158,11 @@ func (config *ChallengeEnv) ValidateRequiredFields() error {
 		return fmt.Errorf("The base image: %s is not supported", config.BaseImage)
 	}
 
-	if config.WebRoot != "" {
-		if filepath.IsAbs(config.WebRoot) {
+	// Validation for web challenges.
+	if strings.HasPrefix(challType, "web") {
+		if config.WebRoot == "" {
+			return errors.New("Web root can not be empty for web challenges")
+		} else if config.WebRoot != "" && filepath.IsAbs(config.WebRoot) {
 			return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
 		}
 	}

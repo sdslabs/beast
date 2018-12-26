@@ -3,7 +3,6 @@ package manager
 import (
 	"bytes"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -60,11 +59,6 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return err
 	}
 
-	err = ValidateWebChallengeReq(config)
-	if err != nil {
-		return err
-	}
-
 	log.Debug("Challenge config file beast.toml is valid")
 	return nil
 }
@@ -106,14 +100,16 @@ func getContextDirPath(dirPath string) (string, error) {
 func getCommandForWebChall(language, framework, webRoot, port string) string {
 	dir := "cd " + filepath.Join("/challenge", webRoot) + " && "
 	var cmd string
+
 	switch language {
 	case "php":
 		switch framework {
 		case "apache":
 			cmd = "<some command>"
 		case "cli":
+			cmd = "php -S 0.0.0.0:"
 		default:
-			cmd = "php -S 0.0.0.0 "
+			cmd = "php -S 0.0.0.0:"
 		}
 	case "node":
 		cmd = "node server.js"
@@ -124,11 +120,10 @@ func getCommandForWebChall(language, framework, webRoot, port string) string {
 		case "flask":
 			cmd = "flask run --host=0.0.0.0 --port="
 		default:
-			cmd = ""
+			return ""
 		}
 	default:
-		// If only `web` is specified in type
-		cmd = ""
+		return ""
 	}
 
 	return dir + cmd + port
@@ -161,16 +156,6 @@ func GetCommandAndImageForWebChall(webRoot, port string, challengeInfo []string)
 	return cmd, image
 }
 
-func ValidateWebChallengeReq(config cfg.BeastChallengeConfig) error {
-	if strings.HasPrefix(config.Challenge.Metadata.Type, "web") {
-		if config.Challenge.Env.WebRoot == "" {
-			return errors.New("Web root can not be empty for web challenges")
-		}
-	}
-
-	return nil
-}
-
 // From the provided configFIle path it generates the dockerfile for
 // the challenge and returns it as a string. This function again
 // assumes that the validation for the configFile is done beforehand
@@ -191,10 +176,17 @@ func GenerateDockerfile(configFile string) (string, error) {
 	baseImage := config.Challenge.Env.BaseImage
 	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
+
 	if strings.HasPrefix(challengeType, "web") {
 		challengeInfo := strings.Split(challengeType, ":")
 		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
-		runCmd, baseImage = GetCommandAndImageForWebChall(config.Challenge.Env.WebRoot, webPort, challengeInfo)
+		defaultRunCmd, webBaseImage := GetCommandAndImageForWebChall(config.Challenge.Env.WebRoot, webPort, challengeInfo)
+
+		// runCmd can only be empty when the challenge has a web prefix.
+		if runCmd == "" {
+			runCmd = defaultRunCmd
+		}
+		baseImage = webBaseImage
 	}
 
 	if baseImage == "" {
