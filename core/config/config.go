@@ -40,6 +40,7 @@ type BeastConfig struct {
 	AllowedBaseImages  []string  `toml:"allowed_base_images"`
 	GitRemote          GitRemote `toml:"remote"`
 	JWTSecret          string    `toml:"jwt_secret"`
+	SlackWebHookURL    string    `toml:"slack_webhook"`
 }
 
 func (config *BeastConfig) ValidateConfig() error {

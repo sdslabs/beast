@@ -44,6 +44,7 @@ RUN cd /challenge && \
 	chmod u+x {{ range $index, $elem := .SetupScripts}} {{$elem}} {{end}} \
     {{ range $index, $elem := .SetupScripts}} && ./{{$elem}} \ {{end}}
 
+WORKDIR /challenge
 RUN touch /entrypoint.sh && \
     echo "#!/bin/bash" > /entrypoint.sh && \
     echo "set -euxo pipefail" >> /entrypoint.sh && \
