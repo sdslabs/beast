@@ -1,4 +1,29 @@
 basePath: /
+definitions:
+  api.AuthorizationChallengeResp:
+    properties:
+      challenge:
+        example: Challenge String
+        type: string
+      message:
+        example: Response message
+        type: string
+    type: object
+  api.HTTPAuthorizeResp:
+    properties:
+      message:
+        example: Response message
+        type: string
+      token:
+        example: YOUR_AUTHENTICATION_TOKEN
+        type: string
+    type: object
+  api.HTTPPlainResp:
+    properties:
+      message:
+        example: Messsage in response to your request
+        type: string
+    type: object
 host: beast.sdslabs.co
 info:
   contact:
@@ -12,6 +37,27 @@ info:
   title: Beast API
   version: "1.0"
 paths:
+  /api/config/reaload/:
+    patch:
+      consumes:
+      - application/json
+      description: Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
+      tags:
+      - config
   /api/manage/all/:
     post:
       consumes:
@@ -30,18 +76,22 @@ paths:
         "200":
           description: OK
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
         "402":
           description: Payment Required
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Handles challenge management actions for multiple(all) challenges.
+      tags:
+      - manage
   /api/manage/challenge/:
     post:
       consumes:
       - application/json
       description: Handles challenge management routes with actions which includes
-        - DEPLOY, UNDEPLOY.
+        - DEPLOY, UNDEPLOY, PURGE.
       parameters:
       - description: Name of the challenge to be managed, here name is the unique
           identifier for challenge
@@ -60,12 +110,16 @@ paths:
         "200":
           description: OK
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
         "402":
           description: Payment Required
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Handles challenge management actions.
+      tags:
+      - manage
   /api/manage/deploy/local:
     post:
       consumes:
@@ -84,12 +138,16 @@ paths:
         "200":
           description: OK
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
         "400":
           description: Bad Request
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Deploy a local challenge using the path provided in the post parameter
+      tags:
+      - manage
   /api/manage/static/:
     post:
       consumes:
@@ -101,13 +159,17 @@ paths:
         "200":
           description: OK
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
         "400":
           description: Bad Request
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Handles route related to beast static content serving container, takes
         action as route parameter and perform that action
+      tags:
+      - manage
   /api/remote/reset/:
     post:
       consumes:
@@ -120,11 +182,13 @@ paths:
         "200":
           description: OK
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Resets beast local copy of remote git repository.
   /api/remote/sync/:
     post:
@@ -138,11 +202,13 @@ paths:
         "200":
           description: OK
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Syncs beast's local copy of remote git repository for challenges.
   /auth/:
     get:
@@ -153,13 +219,19 @@ paths:
         "200":
           description: OK
           schema:
-            type: JSON
+            $ref: '#/definitions/api.AuthorizationChallengeResp'
+            type: object
         "406":
           description: Not Acceptable
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Handles challenge generation
+      tags:
+      - auth
     post:
+      consumes:
+      - application/json
       description: JWT can be received by sending back correct answer to challenge
       produces:
       - application/json
@@ -167,10 +239,14 @@ paths:
         "200":
           description: OK
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPAuthorizeResp'
+            type: object
         "401":
           description: Unauthorized
           schema:
-            type: JSON
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Handles solution check and token production
+      tags:
+      - auth
 swagger: "2.0"

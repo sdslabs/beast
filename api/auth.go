@@ -12,8 +12,9 @@ import (
 // Acts as a middleware to authorize user
 // @Summary Handles authorization of user
 // @Description Authorizes user by checking if JWT token exists and is valid
+// @Tags auth
 // @Produce application/json
-// @Failure 401 {JSON} StatusUnauthorized
+// @Failure 401 {object} api.HTTPPlainResp
 func authorize(c *gin.Context) {
 
 	authHeader := c.GetHeader("Authorization")
@@ -44,9 +45,11 @@ func authorize(c *gin.Context) {
 // Handles route related to receive JWT token
 // @Summary Handles solution check and token production
 // @Description JWT can be received by sending back correct answer to challenge
+// @Tags auth
+// @Accept json
 // @Produce application/json
-// @Success 200 {JSON} Success
-// @Failure 401 {JSON} StatusUnauthorized
+// @Success 200 {object} api.HTTPAuthorizeResp
+// @Failure 401 {object} api.HTTPPlainResp
 // @Router /auth/:username [post]
 func getJWT(c *gin.Context) {
 	username := c.Param("username")
@@ -63,7 +66,7 @@ func getJWT(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"token":   jwt,
-		"message": "Expires in 6 hours\tTo access APIs send the token in header as \"Authorization: Bearer <token>\"",
+		"message": "Expires in 6 hours\nTo access APIs send the token in header as \"Authorization: Bearer <token>\"",
 	})
 	return
 }
@@ -71,9 +74,10 @@ func getJWT(c *gin.Context) {
 // Handles route related to getting user challenge for authorization
 // @Summary Handles challenge generation
 // @Description Sends challenge for authorization of user
+// @Tags auth
 // @Produce application/json
-// @Success 200 {JSON} Success
-// @Failure 406 {JSON} StatusNotAcceptable
+// @Success 200 {object} api.AuthorizationChallengeResp
+// @Failure 406 {object} api.HTTPPlainResp
 // @Router /auth/:username [get]
 func getAuthChallenge(c *gin.Context) {
 	username := c.Param("username")
@@ -89,6 +93,7 @@ func getAuthChallenge(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"challenge": challenge,
+		"message":   "Solve the above challenge and POST to this route to get AUTHORIZATION KEY",
 	})
 	return
 }

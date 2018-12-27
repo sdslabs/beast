@@ -11,10 +11,11 @@ import (
 // This reloads the beast global configuration
 // @Summary Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
 // @Description Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
+// @Tags config
 // @Accept  json
-// @Produce application/json
-// @Success 200 {JSON} Success
-// @Failure 500 {JSON} InternalServerError
+// @Produce json
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/config/reaload/ [patch]
 func reloadBeastConfig(c *gin.Context) {
 	err := config.ReloadBeastConfig()
