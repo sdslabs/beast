@@ -1,0 +1,7 @@
+site_name: Beast
+nav:
+    - Home: README.md
+    - Usage: Usage.md
+    - Architecture: Architecture.md
+    - API Authentication: Auth.md
+theme: material
