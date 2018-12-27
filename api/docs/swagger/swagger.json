@@ -17,6 +17,37 @@
     "host": "beast.sdslabs.co",
     "basePath": "/",
     "paths": {
+        "/api/config/reaload/": {
+            "patch": {
+                "description": "Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "config"
+                ],
+                "summary": "Reloads any changes in beast global configuration, located at ~/.beast/config.toml.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
         "/api/manage/all/": {
             "post": {
                 "description": "Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.",
@@ -25,6 +56,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "manage"
                 ],
                 "summary": "Handles challenge management actions for multiple(all) challenges.",
                 "parameters": [
@@ -40,13 +74,15 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     },
                     "402": {
                         "description": "Payment Required",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -54,12 +90,15 @@
         },
         "/api/manage/challenge/": {
             "post": {
-                "description": "Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY.",
+                "description": "Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "manage"
                 ],
                 "summary": "Handles challenge management actions.",
                 "parameters": [
@@ -82,13 +121,15 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     },
                     "402": {
                         "description": "Payment Required",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -102,6 +143,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "manage"
                 ],
                 "summary": "Deploy a local challenge using the path provided in the post parameter",
                 "parameters": [
@@ -117,13 +161,15 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -138,18 +184,23 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "manage"
+                ],
                 "summary": "Handles route related to beast static content serving container, takes action as route parameter and perform that action",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -169,13 +220,15 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -195,13 +248,15 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -213,41 +268,91 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "auth"
+                ],
                 "summary": "Handles challenge generation",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.AuthorizationChallengeResp"
                         }
                     },
                     "406": {
                         "description": "Not Acceptable",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
             },
             "post": {
                 "description": "JWT can be received by sending back correct answer to challenge",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "auth"
                 ],
                 "summary": "Handles solution check and token production",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPAuthorizeResp"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "type": "JSON"
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.AuthorizationChallengeResp": {
+            "type": "object",
+            "properties": {
+                "challenge": {
+                    "type": "string",
+                    "example": "Challenge String"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Response message"
+                }
+            }
+        },
+        "api.HTTPAuthorizeResp": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Response message"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "YOUR_AUTHENTICATION_TOKEN"
+                }
+            }
+        },
+        "api.HTTPPlainResp": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Messsage in response to your request"
                 }
             }
         }

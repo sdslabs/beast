@@ -166,5 +166,19 @@ func InitConfig() BeastConfig {
 		os.Exit(1)
 	}
 
+	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
 	return cfg
+}
+
+func ReloadBeastConfig() error {
+	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
+	cfg, err := LoadBeastConfig(configPath)
+
+	if err != nil {
+		return fmt.Errorf("Error while loading beast config: %s", err)
+	}
+
+	Cfg = cfg
+	log.Debugf("CONFIG LOAD: New Config : %v", Cfg)
+	return nil
 }

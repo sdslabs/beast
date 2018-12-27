@@ -22,6 +22,20 @@ func runBeastApiBootsteps() error {
 	return nil
 }
 
+type HTTPPlainResp struct {
+	Message string `json:"message" example:"Messsage in response to your request"`
+}
+
+type HTTPAuthorizeResp struct {
+	Token   string `json:"token" example:"YOUR_AUTHENTICATION_TOKEN"`
+	Message string `json:"message" example:"Response message"`
+}
+
+type AuthorizationChallengeResp struct {
+	Challenge string `json:"challenge" example:"Challenge String"`
+	Message   string `json:"message" example:"Response message"`
+}
+
 // @title Beast API
 // @version 1.0
 // @description Beast the automatic deployment tool for backdoor

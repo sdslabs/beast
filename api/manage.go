@@ -13,11 +13,12 @@ import (
 // Handles route related to manage all the challenges for current beast remote.
 // @Summary Handles challenge management actions for multiple(all) challenges.
 // @Description Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.
+// @Tags manage
 // @Accept  json
 // @Produce application/json
 // @Param action query string true "Action for the challenge"
-// @Success 200 {JSON} Success
-// @Failure 402 {JSON} BadRequest
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/manage/all/:action [post]
 func manageMultipleChallengeHandler(c *gin.Context) {
 	action := c.Param("action")
@@ -48,12 +49,13 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 // Handles route related to managing a challenge
 // @Summary Handles challenge management actions.
 // @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.
+// @Tags manage
 // @Accept  json
 // @Produce application/json
 // @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
 // @Param action query string true "Action for the challenge"
-// @Success 200 {JSON} Success
-// @Failure 402 {JSON} BadRequest
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/manage/challenge/ [post]
 func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
@@ -121,11 +123,12 @@ func manageChallengeHandler(c *gin.Context) {
 // Deploy local challenge
 // @Summary Deploy a local challenge using the path provided in the post parameter
 // @Description Handles deployment of a challenge using the absolute directory path
+// @Tags manage
 // @Accept  json
 // @Produce application/json
 // @Param challenge_dir query string true "Challenge Directory"
-// @Success 200 {JSON} Success
-// @Failure 400 {JSON} Error
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/deploy/local [post]
 func deployLocalChallengeHandler(c *gin.Context) {
 	challDir := c.PostForm("challenge_dir")
@@ -156,10 +159,11 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // Handles route related to beast static content serving container
 // @Summary Handles route related to beast static content serving container, takes action as route parameter and perform that action
 // @Description Handles beast static content serving container routes.
+// @Tags manage
 // @Accept  json
 // @Produce application/json
-// @Success 200 {JSON} Success
-// @Failure 400 {JSON} Error
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/static/:action [post]
 func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")

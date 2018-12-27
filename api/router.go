@@ -53,6 +53,11 @@ func initGinRouter() *gin.Engine {
 			remoteGroup.POST("/sync", syncBeastGitRemote)
 			remoteGroup.POST("/reset", resetBeastGitRemote)
 		}
+
+		configGroup := apiGroup.Group("/config")
+		{
+			configGroup.PATCH("/reload", reloadBeastConfig)
+		}
 	}
 
 	return router
