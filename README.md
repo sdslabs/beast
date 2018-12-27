@@ -42,7 +42,7 @@ This will build beast and will place the binary in `$GOPATH/bin/` will also copy
 
 To run the API server for beast use command `beast run -v`
 
-### Structure
+### Directory Structure
 
 * **api**
 	* API exposed by beast
@@ -122,6 +122,20 @@ $ nc localhost 10001
 3.Help
 4.Exit
 choice > 4
+```
+
+### Documentation
+
+The documentation for the project lies in [/docs](/docs). We use `mkdocs` to automatically generate documentation from markdown. The configuration file for the same can be found at [mkdocs.yml](/mkdocs.yml). To view the documentation locally create a virtual environment locally and install [requirements](/requirements-dev.txt).
+
+```bash
+$ virtualenv venv && source venv/bin/activate
+
+$ pip install -r requirements-dev.txt
+
+$ mkdocs serve
+
+Serving on http://127.0.0.1:8000
 ```
 
 ### Development notes
