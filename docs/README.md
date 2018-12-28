@@ -26,6 +26,8 @@ Beast uses Docker as a container runtimes to run challenges in a sandboxed envir
 
 We use Swagger for automatic generation of API documentation and you can find the docs at `/api/docs/index.html` from beast server root.
 
+To save the state of the deployments and challenges beast uses SQLite as a database, all the information ranging from challenge deployment state to allocated ports and author information is stored in this database. This database is created automatically in the root of your beast configuration directory.
+
 ### Note
 
 * To run challenges in a highly secure mode you can change the runtime for docker(by default it is runc) to gVisor(runsc) which provides a much better security layer in the containerized sandboxed environment.

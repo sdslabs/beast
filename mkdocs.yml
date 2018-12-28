@@ -1,7 +1,11 @@
 site_name: Beast
 nav:
-    - Home: README.md
-    - Usage: Usage.md
-    - Architecture: Architecture.md
-    - API Authentication: Auth.md
+  - Home: README.md
+  - Usage: Usage.md
+  - Architecture: Architecture.md
+  - API Authentication: APIAuth.md
+  - Deployment Pipeline: Deployment.md
+  - Database Structure: Database.md
+  - Challenge Configuration: ChallConfig.md
+  - First Challenge: GettingStarted.md
 theme: material
