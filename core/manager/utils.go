@@ -160,13 +160,8 @@ func GetCommandAndImageForWebChall(webRoot, port string, challengeInfo []string)
 // the challenge and returns it as a string. This function again
 // assumes that the validation for the configFile is done beforehand
 // before calling this function.
-func GenerateDockerfile(configFile string) (string, error) {
+func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	log.Debug("Generating dockerfile")
-	var config cfg.BeastChallengeConfig
-	_, err := toml.DecodeFile(configFile, &config)
-	if err != nil {
-		return "", err
-	}
 
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
@@ -176,8 +171,14 @@ func GenerateDockerfile(configFile string) (string, error) {
 	baseImage := config.Challenge.Env.BaseImage
 	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
+	var runAsRoot bool = false
 
-	if strings.HasPrefix(challengeType, "web") {
+	// The challenge type we are looking at is service. This should be deployed
+	// using xinetd. The Dockerfile is different for this.
+	if challengeType == core.SERVICE_CHALLENGE_TYPE_NAME {
+		runAsRoot = true
+		runCmd = cfg.SERVICE_CHALL_RUN_CMD
+	} else if strings.HasPrefix(challengeType, "web") {
 		challengeInfo := strings.Split(challengeType, ":")
 		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
 		defaultRunCmd, webBaseImage := GetCommandAndImageForWebChall(config.Challenge.Env.WebRoot, webPort, challengeInfo)
@@ -192,6 +193,8 @@ func GenerateDockerfile(configFile string) (string, error) {
 	if baseImage == "" {
 		baseImage = core.DEFAULT_BASE_IMAGE
 	}
+
+	log.Debugf("Command type inside root[true/false] %s", runAsRoot)
 
 	data := BeastBareDockerfile{
 		DockerBaseImage: baseImage,
@@ -221,12 +224,12 @@ func GenerateDockerfile(configFile string) (string, error) {
 
 // Generate dockerfile context for the challnge from the challenge config
 // file path provided as an argument.
-// The challengeConfig provided must be a valid path, which is to be ensured by
+// The config provided must be a valid beast configuration, which is to be ensured by
 // the caller. It does not check if the config even exist or is valid. The validation
 // for the dockerfile should be done before calling this function. If the file does
 // not exist or there is some error  while parsing the setup file
 // this function will simply return the error without logging anything.
-func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
+func GenerateChallengeDockerfileCtx(config *cfg.BeastChallengeConfig) (string, error) {
 	log.Debug("Generating challenge dockerfile context from config")
 	file, err := ioutil.TempFile("", "Dockerfile.*")
 	if err != nil {
@@ -234,7 +237,7 @@ func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
 	}
 	defer file.Close()
 
-	dockerfile, err := GenerateDockerfile(challengeConfig)
+	dockerfile, err := GenerateDockerfile(config)
 	if err != nil {
 		return "", err
 	}
@@ -248,6 +251,7 @@ func GenerateChallengeDockerfileCtx(challengeConfig string) (string, error) {
 	return file.Name(), nil
 }
 
+// TODO: Refactor this.
 func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
 	// Challenge is nil, which means the challenge entry does not exist
 	// So create a new challenge entry on the basis of the fields provided
