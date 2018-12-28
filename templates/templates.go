@@ -1,7 +1,6 @@
 package templates
 
-var CHALLENGE_CONFIG_FILE_TEMPLATE string = `
-# This a sample challenge configuration file.
+var CHALLENGE_CONFIG_FILE_TEMPLATE string = `# This a sample challenge configuration file.
 [author]
 name      = {{.AuthorName}}                      # Required: Name of the challenge creator
 email     = {{.AuthorMail}}                      # Required: Email for contact
@@ -51,10 +50,12 @@ RUN touch /entrypoint.sh && \
     echo "if [ -f /challenge/post-build.sh ]; then" >> /entrypoint.sh && \
     echo "    chmod u+x /challenge/post-build.sh && /challenge/post-build.sh" >> /entrypoint.sh && \
     echo "fi" >> /entrypoint.sh && \
-    echo "exec su beast /bin/bash -c \"{{.RunCmd}}\"" >> /entrypoint.sh && \
+    echo "cd /challenge" >> /entrypoint.sh && \
+    echo {{if .RunAsRoot}} "mv xinetd.conf /etc/xinetd.d/pwn_service && exec {{.RunCmd}}" {{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
     chmod u+x /entrypoint.sh
 
 WORKDIR /challenge
-
+RUN chmod 600 /challenge/beast.toml {{ range $index, $elem := .Executables}} && \
+	chmod +x {{$elem}} {{end}}
 ENTRYPOINT ["/entrypoint.sh"]
 `

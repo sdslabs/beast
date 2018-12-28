@@ -1,6 +1,6 @@
 package templates
 
-var XINETD_CONFIGURATION_TEMPLATE string = `\
+var XINETD_CONFIGURATION_TEMPLATE string = `# Xinetd configuration.
 service {{.ServiceName}} 
 {
     disable 	= no
@@ -13,7 +13,6 @@ service {{.ServiceName}}
     user        = beast 
     port        = {{.Port}}
     bind        = 0.0.0.0
-    banner_fail = /etc/banner_fail
 
     instances   = UNLIMITED
     flags       = REUSE
