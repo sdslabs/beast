@@ -20,7 +20,7 @@ import (
 
 // Run the staging step for the pipeline, this functions assumes the
 // directory of the challenge wihch will be staged.
-func stageChallenge(challengeDir string) error {
+func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error {
 	log.Debug("Starting staging stage of deploy pipeline")
 	contextDir, err := getContextDirPath(challengeDir)
 	if err != nil {
@@ -39,7 +39,7 @@ func stageChallenge(challengeDir string) error {
 	challengeConfig := filepath.Join(contextDir, core.CHALLENGE_CONFIG_FILE_NAME)
 	log.Debugf("Reading challenge config from : %s", challengeConfig)
 
-	dockerfileCtx, err := GenerateChallengeDockerfileCtx(challengeConfig)
+	dockerfileCtx, err := GenerateChallengeDockerfileCtx(config)
 	if err != nil {
 		return err
 	}
@@ -47,6 +47,15 @@ func stageChallenge(challengeDir string) error {
 
 	additionalCtx := make(map[string]string)
 	additionalCtx["Dockerfile"] = dockerfileCtx
+
+	// Here we try to add all the additional context that are required like xinetd.conf
+	// instead of mounting these files inside the container, since we want reproducibility
+	// in the docker build if we provide the tar file to author himself. Embedding these
+	// files inside the tar itself will make the tar build to be reproducible anywhere.
+	err = appendAdditionalFileContexts(additionalCtx, config)
+	if err != nil {
+		return fmt.Errorf("Error while adding additional context : %s", err)
+	}
 
 	log.Debug("Copying Content to Static Folder")
 
@@ -265,7 +274,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
 	if !skipStage {
 		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["staging"])
 
-		err = stageChallenge(challengeDir)
+		err = stageChallenge(challengeDir, &config)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"DEPLOY_ERROR": "STAGING :: " + challengeName,

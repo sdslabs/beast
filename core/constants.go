@@ -25,6 +25,7 @@ const (
 	GIT_REMOTE_DEFAULT_BRANCH      string = "master"
 	GIT_DEFAULT_REMOTE             string = "origin"
 	BEAST_REMOTE_CHALLENGE_DIR     string = "challenges"
+	BEAST_DOCKER_CHALLENGE_DIR     string = "/challenge"
 	MAX_PORT_PER_CHALL             uint32 = 3
 	BEAST_CHALLENGES_STATIC_PORT   uint32 = 80
 	BEAST_STATIC_CONTAINER_NAME    string = "beast-static"
@@ -32,8 +33,10 @@ const (
 	BEAST_STATIC_FOLDER            string = "static"
 	STATIC_CHALLENGE_TYPE_NAME     string = "static"
 	SERVICE_CHALLENGE_TYPE_NAME    string = "service"
+	BARE_CHALLENGE_TYPE_NAME       string = "bare"
 	PUBLIC                         string = "public"
 	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
+	DEFAULT_XINETD_CONF_FILE       string = "xinetd.conf"
 )
 
 var DEPLOY_STATUS = map[string]string{
@@ -45,53 +48,54 @@ var DEPLOY_STATUS = map[string]string{
 	"building":   "Building",
 }
 
-var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME}
+// Available challenge types
+var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME}
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
-	"php": map[string]map[string]string{
-		"7.1": map[string]string{
+	"php": {
+		"7.1": {
 			"cli":     "php:7.1-cli",
 			"apache":  "php:7.1-apache",
 			"fpm":     "php:7.1-fpm",
 			"default": "php:7.1-cli",
 		},
-		"5.6": map[string]string{
+		"5.6": {
 			"cli":     "php:5.6-cli",
 			"apache":  "php:5.6-apache",
 			"fpm":     "php:5.6-fpm",
 			"default": "php:5.6-cli",
 		},
-		"default": map[string]string{
+		"default": {
 			"default": "php:5.6-cli",
 		},
 	},
-	"node": map[string]map[string]string{
-		"8": map[string]string{
+	"node": {
+		"8": {
 			"default": "node:8-jessie",
 		},
-		"10": map[string]string{
+		"10": {
 			"default": "node:10-jessie",
 		},
-		"default": map[string]string{
+		"default": {
 			"default": "node:10-jessie",
 		},
 	},
-	"python": map[string]map[string]string{
-		"2.7": map[string]string{
+	"python": {
+		"2.7": {
 			"default": "python:2.7-jessie",
 		},
-		"3.5": map[string]string{
+		"3.5": {
 			"default": "python:3.5-jessie",
 		},
-		"3.6": map[string]string{
+		"3.6": {
 			"default": "python:3.6-jessie",
 		},
-		"default": map[string]string{
+		"default": {
 			"default": "python:2.7-jessie",
 		},
 	},
-	"default": map[string]map[string]string{
-		"default": map[string]string{
+	"default": {
+		"default": {
 			"default": DEFAULT_BASE_IMAGE,
 		},
 	},

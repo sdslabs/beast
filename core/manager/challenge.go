@@ -205,21 +205,23 @@ func UndeployChallenge(challengeName string, purge bool) error {
 		log.Debug("Removing challenge instance for ", challengeName)
 		err = docker.StopAndRemoveContainer(challenge.ContainerId)
 		if err != nil {
+			// This should not return from here, this should assume that
+			// the container instance does not exist and hence should update the database
+			// with the container ID.
 			p := fmt.Errorf("Error while removing challenge instance : %s", err)
 			log.Error(p.Error())
-			return p
 		}
 	}
 
-	database.Db.Model(&challenge).Updates(map[string]interface{}{
+	tx := database.Db.Model(&challenge).Updates(map[string]interface{}{
 		"Status":      core.DEPLOY_STATUS["unknown"],
 		"ContainerId": "",
 		"ImageId":     "",
 	})
 
-	if err != nil {
-		log.Error(err)
-		return fmt.Errorf("Error while updating the challenge : %s", err)
+	if tx.Error != nil {
+		log.Error(tx.Error.Error())
+		return fmt.Errorf("Error while updating the challenge : %s", tx.Error)
 	}
 
 	log.Infof("Challenge undeploy successful for %s", challenge.Name)

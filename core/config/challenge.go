@@ -12,6 +12,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const SERVICE_CONTAINER_DEPS string = "xinetd"
+const SERVICE_CHALL_RUN_CMD string = "xinetd -dontfork"
+
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
 // will be ignored.
@@ -94,6 +97,7 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 		if challengeTypes[i] == config.Type {
 			if config.Type == core.STATIC_CHALLENGE_TYPE_NAME {
 				// Challenge is a standalone static challenge
+				// No need to validate environment, since we don't need that.
 				return nil, true
 			}
 
@@ -128,6 +132,7 @@ type ChallengeEnv struct {
 	BaseImage        string   `toml:"base_image"`
 	WebRoot          string   `toml:"web_root"`
 	DefaultPort      uint32   `toml:"default_port"`
+	ServicePath      string   `toml:"service_path"`
 }
 
 func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
@@ -145,8 +150,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 		}
 	}
 
-	// Run command is not required in case of web challenges.
-	if config.RunCmd == "" && !strings.HasPrefix(challType, "web") {
+	// Run command is only a required value in case of bare challenge types.
+	if config.RunCmd == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
 	}
 
@@ -158,8 +163,14 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 		return fmt.Errorf("The base image: %s is not supported", config.BaseImage)
 	}
 
-	// Validation for web challenges.
-	if strings.HasPrefix(challType, "web") {
+	if challType == core.SERVICE_CHALLENGE_TYPE_NAME {
+		// Challenge type is service.
+		// ServicePath must be realtive.
+		if config.ServicePath != "" && filepath.IsAbs(config.ServicePath) {
+			return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
+		}
+	} else if strings.HasPrefix(challType, "web") {
+		// Challenge type is web.
 		if config.WebRoot == "" {
 			return errors.New("Web root can not be empty for web challenges")
 		} else if config.WebRoot != "" && filepath.IsAbs(config.WebRoot) {
@@ -167,6 +178,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 		}
 	}
 
+	// By default if no port is specified to be default, the first port
+	// from the list is assumed to be default and the service is deployed accordingly.
 	if config.DefaultPort == 0 {
 		config.DefaultPort = config.Ports[0]
 	}
