@@ -48,6 +48,15 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	additionalCtx := make(map[string]string)
 	additionalCtx["Dockerfile"] = dockerfileCtx
 
+	// Here we try to add all the additional context that are required like xinetd.conf
+	// instead of mounting these files inside the container, since we want reproducibility
+	// in the docker build if we provide the tar file to author himself. Embedding these
+	// files inside the tar itself will make the tar build to be reproducible anywhere.
+	err = appendAdditionalFileContexts(additionalCtx, config)
+	if err != nil {
+		return fmt.Errorf("Error while adding additional context : %s", err)
+	}
+
 	log.Debug("Copying Content to Static Folder")
 
 	staticContentDir, err := GetStaticContentDir(challengeConfig, contextDir)

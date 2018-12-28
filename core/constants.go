@@ -25,6 +25,7 @@ const (
 	GIT_REMOTE_DEFAULT_BRANCH      string = "master"
 	GIT_DEFAULT_REMOTE             string = "origin"
 	BEAST_REMOTE_CHALLENGE_DIR     string = "challenges"
+	BEAST_DOCKER_CHALLENGE_DIR     string = "/challenge"
 	MAX_PORT_PER_CHALL             uint32 = 3
 	BEAST_CHALLENGES_STATIC_PORT   uint32 = 80
 	BEAST_STATIC_CONTAINER_NAME    string = "beast-static"
@@ -35,6 +36,7 @@ const (
 	BARE_CHALLENGE_TYPE_NAME       string = "bare"
 	PUBLIC                         string = "public"
 	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
+	DEFAULT_XINETD_CONF_FILE       string = "xinetd.conf"
 )
 
 var DEPLOY_STATUS = map[string]string{

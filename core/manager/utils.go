@@ -24,8 +24,16 @@ type BeastBareDockerfile struct {
 	Ports           string
 	AptDeps         string
 	SetupScripts    []string
+	Executables     []string
 	RunCmd          string
 	MountVolume     string
+	RunAsRoot       bool
+}
+
+type BeastXinetdConf struct {
+	Port        string
+	ServicePath string
+	ServiceName string
 }
 
 // This if the function which validates the challenge directory
@@ -171,14 +179,21 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	baseImage := config.Challenge.Env.BaseImage
 	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
+	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
 	var runAsRoot bool = false
+	var executables []string
 
 	// The challenge type we are looking at is service. This should be deployed
-	// using xinetd. The Dockerfile is different for this.
+	// using xinetd. The Dockerfile is different for this. Change the runCmd and the
+	// apt dependencies to add xinetd.
 	if challengeType == core.SERVICE_CHALLENGE_TYPE_NAME {
 		runAsRoot = true
 		runCmd = cfg.SERVICE_CHALL_RUN_CMD
+		aptDeps = fmt.Sprintf("%s %s", cfg.SERVICE_CONTAINER_DEPS, aptDeps)
+		serviceExecutable := filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath)
+		executables = append(executables, serviceExecutable)
 	} else if strings.HasPrefix(challengeType, "web") {
+		// Challenge type is web here, so set the required variables.
 		challengeInfo := strings.Split(challengeType, ":")
 		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
 		defaultRunCmd, webBaseImage := GetCommandAndImageForWebChall(config.Challenge.Env.WebRoot, webPort, challengeInfo)
@@ -199,10 +214,12 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	data := BeastBareDockerfile{
 		DockerBaseImage: baseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
-		AptDeps:         strings.Join(config.Challenge.Env.AptDeps[:], " "),
+		AptDeps:         aptDeps,
 		SetupScripts:    config.Challenge.Env.SetupScripts,
 		RunCmd:          runCmd,
 		MountVolume:     filepath.Join("/challenge", relativeStaticContentDir),
+		RunAsRoot:       runAsRoot,
+		Executables:     executables,
 	}
 
 	var dockerfile bytes.Buffer
@@ -251,6 +268,53 @@ func GenerateChallengeDockerfileCtx(config *cfg.BeastChallengeConfig) (string, e
 	return file.Name(), nil
 }
 
+// Add any additional file contexts to the map additionalCtx which needs to be inside docker /challenge
+// directory.
+func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.BeastChallengeConfig) error {
+	log.Debug("Adding additional required file context to docker context.")
+	// If the challenge type is service, we need to add xinetd configuration to the
+	// docker directory context.
+	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
+		log.Debug("Challenge type is service, trying to embed xinetd configuration.")
+		file, err := ioutil.TempFile("", "xinetd.conf.*")
+		if err != nil {
+			return fmt.Errorf("Error while creating a tempfile for xinetdconf :: %s", err)
+		}
+		defer file.Close()
+
+		var xinetd bytes.Buffer
+		xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
+		if err != nil {
+			return fmt.Errorf("Error while parsing Xinetd config template :: %s", err)
+		}
+
+		port := config.Challenge.Env.DefaultPort
+		if port == 0 {
+			port = config.Challenge.Env.Ports[0]
+		}
+
+		data := BeastXinetdConf{
+			Port:        fmt.Sprintf("%d", port),
+			ServiceName: config.Challenge.Metadata.Name,
+			ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
+		}
+		err = xinetdTemplate.Execute(&xinetd, data)
+		if err != nil {
+			return fmt.Errorf("Error while executing Xinetd Config template :: %s", err)
+		}
+
+		_, err = file.WriteString(xinetd.String())
+		if err != nil {
+			return fmt.Errorf("Error while writing xinetd config to file :: %s", err)
+		}
+
+		log.Debugf("Successfully added xinetd config context in docker context.")
+		additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = file.Name()
+	}
+
+	return nil
+}
+
 // TODO: Refactor this.
 func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
 	// Challenge is nil, which means the challenge entry does not exist
@@ -265,7 +329,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 
 		if authorEntry.Email == "" {
-
+			// Create a new authentication challenge message for the user.
 			rMessage := make([]byte, 128)
 			rand.Read(rMessage)
 
@@ -379,6 +443,13 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 	if err != nil {
 		return err
 	}
+
+	err = utils.ValidateDirExists(staticContentDir)
+	if err != nil {
+		log.Warnf("%s : There is no static directory inside challenge, skipping copy.", challengeName)
+		return nil
+	}
+
 	err = utils.CopyDirectory(staticContentDir, dirPath)
 	return err
 }
