@@ -53,8 +53,17 @@ func DeployStaticContentContainer() error {
 		return errors.New("INVALID_STAGING_AREA")
 	}
 
+	beastStaticAuthFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STATIC_AUTH_FILE)
+	err = utils.ValidateFileExists(beastStaticAuthFile)
+	if err != nil {
+		p := fmt.Errorf("BEAST STATIC: Authentication file does not exist for beast static container, cannot proceed deployment")
+		log.Error(p.Error())
+		return p
+	}
+
 	staticMount := make(map[string]string)
 	staticMount[stagingDirPath] = core.BEAST_STAGING_AREA_MOUNT_POINT
+	staticMount[beastStaticAuthFile] = filepath.Join("/", core.BEAST_STATIC_AUTH_FILE)
 	port := []uint32{core.BEAST_CHALLENGES_STATIC_PORT}
 
 	containerId, err := docker.CreateContainerFromImage(port, staticMount, imageId, core.BEAST_STATIC_CONTAINER_NAME)
