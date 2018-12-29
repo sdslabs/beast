@@ -202,8 +202,14 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 //
 // During the staging steup if any error occurs, then the state of the challenge
 // in the database is set to unknown.
-func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
+func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) error {
 	log.Debug("Loading Beast config")
+
+	// If we are skipping commit step then we are automatically skipping
+	// staging step.
+	if skipCommit {
+		skipStage = true
+	}
 
 	challengeName := filepath.Base(challengeDir)
 	configFile := filepath.Join(challengeDir, core.CHALLENGE_CONFIG_FILE_NAME)
@@ -261,7 +267,8 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
 	// or not, return if a deploy is already in progress or else continue
 	// deploying
 	if challenge.Status != core.DEPLOY_STATUS["unknown"] &&
-		challenge.Status != core.DEPLOY_STATUS["deployed"] {
+		challenge.Status != core.DEPLOY_STATUS["deployed"] &&
+		challenge.Status != "" {
 		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
 		return fmt.Errorf("PIPELINE START ERROR: %s : Deploy already in progress.", challengeName)
 	}
@@ -299,16 +306,24 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
 		log.Infof("SKIPPING STAGING STEP IN THE DEPLOY PIPELINE")
 	}
 
-	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["committing"])
+	if !skipCommit {
+		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["committing"])
 
-	err = commitChallenge(&challenge, config, stagedChallengePath)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"DEPLOY_ERROR": "COMMIT :: " + challengeName,
-		}).Errorf("%s", err)
+		err = commitChallenge(&challenge, config, stagedChallengePath)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"DEPLOY_ERROR": "COMMIT :: " + challengeName,
+			}).Errorf("%s", err)
 
-		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
-		return fmt.Errorf("COMMIT ERROR: %s : %s", challengeName, err)
+			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
+			return fmt.Errorf("COMMIT ERROR: %s : %s", challengeName, err)
+		}
+	} else {
+		if challenge.ImageId == "" {
+			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
+			return fmt.Errorf("COMMIT ERROR: Cannot skip commit step, no Image ID found for challenge.")
+		}
+		log.Debugf("Skipping commit phase")
 	}
 
 	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["deploying"])
@@ -333,10 +348,10 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
 
 // This is just a decorator function over bootstrapDeployPipeline and generate
 // notifications to slack on the basis of the result of the deploy pipeline.
-func StartDeployPipeline(challengeDir string, skipStage bool) {
+func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) {
 	challengeName := filepath.Base(challengeDir)
 
-	err := bootstrapDeployPipeline(challengeDir, skipStage)
+	err := bootstrapDeployPipeline(challengeDir, skipStage, skipCommit)
 	if err != nil {
 		notify.SendNotificationToSlack(notify.Error, err.Error())
 	} else {
