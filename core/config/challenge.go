@@ -79,11 +79,14 @@ func (config *Challenge) ValidateRequiredFields() error {
 // * Name - relative path to the challenge setup scripts
 // * Type - Relative path to the directory which you want
 type ChallengeMetadata struct {
-	Flag string `toml:"flag"`
-	Name string `toml:"name"`
-	Type string `toml:"type"`
+	Flag    string `toml:"flag"`
+	Name    string `toml:"name"`
+	Type    string `toml:"type"`
+	Sidecar string `toml:"sidecar"`
 }
 
+// In this validation returned boolean value represents if the challenge type is
+// static or not.
 func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if config.Name == "" || config.Flag == "" {
 		return fmt.Errorf("Name and Flag required for the challenge"), false
@@ -103,6 +106,10 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 
 			return nil, false
 		}
+	}
+
+	if !utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) {
+		return fmt.Errorf("Sidecar provided is not an available sidecar."), false
 	}
 
 	return fmt.Errorf("Not a valid challenge type : %s", config.Type), false
