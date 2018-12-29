@@ -8,4 +8,5 @@ nav:
   - Database Structure: Database.md
   - Challenge Configuration: ChallConfig.md
   - First Challenge: GettingStarted.md
+  - Challenge Sidecars: Sidecars.md
 theme: material
