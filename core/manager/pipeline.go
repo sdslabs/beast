@@ -107,10 +107,28 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return err
 	}
 
-	buff, imageId, err := docker.BuildImageFromTarContext(challengeName, stagedPath)
+	buff, imageId, buildErr := docker.BuildImageFromTarContext(challengeName, stagedPath)
+
+	// Create logs directory for the challenge in staging directory.
+	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
+	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
 	if err != nil {
+		log.Errorf("Could not validate challenge logs directory : %s : %s", challengeStagingLogsDir, err)
+	} else {
+		logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
+		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+		if err != nil {
+			log.Errorf("Error while writing logs to file : %s", logFilePath)
+		}
+		defer logFile.Close()
+
+		logFile.Write(buff.Bytes())
+		log.Debug("Logs writterned to log file for the challenge")
+	}
+
+	if buildErr != nil {
 		log.Error("Error while building image from the tar context of challenge")
-		return err
+		return buildErr
 	}
 
 	if imageId == "" {
@@ -121,25 +139,6 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	if err = database.Db.Model(&challenge).Update("ImageId", imageId).Error; err != nil {
 		return fmt.Errorf("Error while writing imageId to database : %s", err)
 	}
-
-	log.Debug("Writing image build logs from buffer to file")
-
-	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
-	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
-	if err != nil {
-		log.Errorf("Could not validate challenge logs directory : %s : %s", challengeStagingLogsDir, err)
-		return nil
-	}
-
-	logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
-	logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
-	if err != nil {
-		log.Errorf("Error while writing logs to file : %s", logFilePath)
-	}
-	defer logFile.Close()
-
-	logFile.Write(buff.Bytes())
-	log.Debug("Logs writterned to log file for the challenge")
 
 	log.Infof("Image build for `%s` done", challengeName)
 
