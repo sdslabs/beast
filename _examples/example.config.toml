@@ -4,12 +4,13 @@
 # ├── auth_file
 # ├── beast.db
 # ├── config.toml
-# ├── remote
+# └── .static.beast.htpasswd
+# ├── remote/
 # │   └── hack-test
-# ├── secrets
+# ├── secrets/
 # │   ├── key.priv
 # │   └── key.pub
-# └── staging
+# └── staging/
 #
 # Sample snapshot of .beast directory.
 # Make sure the hack-test is a valid git directory
