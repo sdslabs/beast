@@ -107,10 +107,28 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return err
 	}
 
-	buff, imageId, err := docker.BuildImageFromTarContext(challengeName, stagedPath)
+	buff, imageId, buildErr := docker.BuildImageFromTarContext(challengeName, stagedPath)
+
+	// Create logs directory for the challenge in staging directory.
+	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
+	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
 	if err != nil {
+		log.Errorf("Could not validate challenge logs directory : %s : %s", challengeStagingLogsDir, err)
+	} else {
+		logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
+		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+		if err != nil {
+			log.Errorf("Error while writing logs to file : %s", logFilePath)
+		}
+		defer logFile.Close()
+
+		logFile.Write(buff.Bytes())
+		log.Debug("Logs writterned to log file for the challenge")
+	}
+
+	if buildErr != nil {
 		log.Error("Error while building image from the tar context of challenge")
-		return err
+		return buildErr
 	}
 
 	if imageId == "" {
@@ -122,26 +140,18 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return fmt.Errorf("Error while writing imageId to database : %s", err)
 	}
 
-	log.Debug("Writing image build logs from buffer to file")
-
-	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
-	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
-	if err != nil {
-		log.Errorf("Could not validate challenge logs directory : %s : %s", challengeStagingLogsDir, err)
-		return nil
-	}
-
-	logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
-	logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
-	if err != nil {
-		log.Errorf("Error while writing logs to file : %s", logFilePath)
-	}
-	defer logFile.Close()
-
-	logFile.Write(buff.Bytes())
-	log.Debug("Logs writterned to log file for the challenge")
-
 	log.Infof("Image build for `%s` done", challengeName)
+
+	if config.Challenge.Metadata.Sidecar != "" {
+		// Need to configure the sidecar container, so we can use the configuration
+		// during deployment. We don't want sidecar configuration to change each time we
+		// make a deployment, so we are doing it in commit phase, so unless the challenge is purged
+		// we can use the same sidecar configuration.
+		err = configureSidecar(&config)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -158,7 +168,26 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	staticMount[staticMountDir] = filepath.Join("/challenge", relativeStaticContentDir)
 	log.Debugf("Static mount config for deploy : %s", staticMount)
 
-	containerId, err := docker.CreateContainerFromImage(config.Challenge.Env.Ports, staticMount, challenge.ImageId, config.Challenge.Metadata.Name)
+	var containerEnv []string
+	var containerNetwork string
+	if config.Challenge.Metadata.Sidecar != "" {
+		// We need to configure the sidecar for the challenge container.
+		// Push the environment variables to the container and link to the sidecar.
+		env := getSidecarEnv(&config)
+		containerEnv = append(containerEnv, env...)
+
+		containerNetwork = getSidecarNetwork(config.Challenge.Metadata.Sidecar)
+	}
+
+	containerConfig := docker.CreateContainerConfig{
+		PortsList:        config.Challenge.Env.Ports,
+		MountsMap:        staticMount,
+		ImageId:          challenge.ImageId,
+		ContainerName:    config.Challenge.Metadata.Name,
+		ContainerEnv:     containerEnv,
+		ContainerNetwork: containerNetwork,
+	}
+	containerId, err := docker.CreateContainerFromImage(&containerConfig)
 	if err != nil {
 		if containerId != "" {
 			if e := database.Db.Model(&challenge).Update("ContainerId", containerId).Error; e != nil {
@@ -202,8 +231,14 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 //
 // During the staging steup if any error occurs, then the state of the challenge
 // in the database is set to unknown.
-func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
+func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) error {
 	log.Debug("Loading Beast config")
+
+	// If we are skipping commit step then we are automatically skipping
+	// staging step.
+	if skipCommit {
+		skipStage = true
+	}
 
 	challengeName := filepath.Base(challengeDir)
 	configFile := filepath.Join(challengeDir, core.CHALLENGE_CONFIG_FILE_NAME)
@@ -261,7 +296,8 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
 	// or not, return if a deploy is already in progress or else continue
 	// deploying
 	if challenge.Status != core.DEPLOY_STATUS["unknown"] &&
-		challenge.Status != core.DEPLOY_STATUS["deployed"] {
+		challenge.Status != core.DEPLOY_STATUS["deployed"] &&
+		challenge.Status != "" {
 		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
 		return fmt.Errorf("PIPELINE START ERROR: %s : Deploy already in progress.", challengeName)
 	}
@@ -299,16 +335,24 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
 		log.Infof("SKIPPING STAGING STEP IN THE DEPLOY PIPELINE")
 	}
 
-	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["committing"])
+	if !skipCommit {
+		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["committing"])
 
-	err = commitChallenge(&challenge, config, stagedChallengePath)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"DEPLOY_ERROR": "COMMIT :: " + challengeName,
-		}).Errorf("%s", err)
+		err = commitChallenge(&challenge, config, stagedChallengePath)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"DEPLOY_ERROR": "COMMIT :: " + challengeName,
+			}).Errorf("%s", err)
 
-		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
-		return fmt.Errorf("COMMIT ERROR: %s : %s", challengeName, err)
+			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
+			return fmt.Errorf("COMMIT ERROR: %s : %s", challengeName, err)
+		}
+	} else {
+		if challenge.ImageId == "" {
+			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
+			return fmt.Errorf("COMMIT ERROR: Cannot skip commit step, no Image ID found for challenge.")
+		}
+		log.Debugf("Skipping commit phase")
 	}
 
 	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["deploying"])
@@ -333,10 +377,10 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool) error {
 
 // This is just a decorator function over bootstrapDeployPipeline and generate
 // notifications to slack on the basis of the result of the deploy pipeline.
-func StartDeployPipeline(challengeDir string, skipStage bool) {
+func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) {
 	challengeName := filepath.Base(challengeDir)
 
-	err := bootstrapDeployPipeline(challengeDir, skipStage)
+	err := bootstrapDeployPipeline(challengeDir, skipStage, skipCommit)
 	if err != nil {
 		notify.SendNotificationToSlack(notify.Error, err.Error())
 	} else {

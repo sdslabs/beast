@@ -15,6 +15,15 @@ import (
 	"golang.org/x/net/context"
 )
 
+type CreateContainerConfig struct {
+	PortsList        []uint32
+	MountsMap        map[string]string
+	ImageId          string
+	ContainerName    string
+	ContainerEnv     []string
+	ContainerNetwork string
+}
+
 func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -57,7 +66,8 @@ func StopAndRemoveContainer(containerId string) error {
 	return err
 }
 
-func CreateContainerFromImage(portsList []uint32, mountsMap map[string]string, imageId string, containerName string) (string, error) {
+func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
+	containerName := containerConfig.ContainerName
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -67,7 +77,7 @@ func CreateContainerFromImage(portsList []uint32, mountsMap map[string]string, i
 	portSet := make(nat.PortSet)
 	portMap := make(nat.PortMap)
 
-	for _, port := range portsList {
+	for _, port := range containerConfig.PortsList {
 		natPort, err := nat.NewPort("tcp", strconv.Itoa(int(port)))
 		if err != nil {
 			return "", fmt.Errorf("Error while creating new port from port %d", port)
@@ -82,12 +92,13 @@ func CreateContainerFromImage(portsList []uint32, mountsMap map[string]string, i
 	}
 
 	config := &container.Config{
-		Image:        imageId,
+		Image:        containerConfig.ImageId,
 		ExposedPorts: portSet,
+		Env:          containerConfig.ContainerEnv,
 	}
 
 	var mountBindings []mount.Mount
-	for src, dest := range mountsMap {
+	for src, dest := range containerConfig.MountsMap {
 		mnt := mount.Mount{
 			Type:   mount.TypeBind,
 			Source: src,
@@ -100,6 +111,7 @@ func CreateContainerFromImage(portsList []uint32, mountsMap map[string]string, i
 	hostConfig := &container.HostConfig{
 		PortBindings: portMap,
 		Mounts:       mountBindings,
+		NetworkMode:  container.NetworkMode(containerConfig.ContainerNetwork),
 	}
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, containerName)

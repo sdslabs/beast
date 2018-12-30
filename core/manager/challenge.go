@@ -32,7 +32,7 @@ func DeployChallengePipeline(challengeDir string) error {
 	}
 
 	// Start a goroutine to start a deploy pipeline for the challenge
-	go StartDeployPipeline(challengeDir, false)
+	go StartDeployPipeline(challengeDir, false, false)
 
 	return nil
 }
@@ -62,7 +62,7 @@ func DeployChallenge(challengeName string) error {
 		}
 
 		if len(containers) > 1 {
-			log.Error("Got more than one containers, something fishy here. Check manually")
+			log.Error("Got more than one containers, something fishy here. Contact admin to check manually.")
 			return errors.New("DOCKER ERROR")
 		}
 
@@ -78,6 +78,29 @@ func DeployChallenge(challengeName string) error {
 	}
 
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+
+	if challenge.ImageId != "" {
+		imageExist, err := docker.CheckIfImageExists(challenge.ImageId)
+		if err != nil {
+			log.Errorf("Error while searching for image with id %s: %s", challenge.ImageId, err)
+			return errors.New("DOCKER ERROR")
+		}
+
+		if imageExist {
+			log.Debugf("Found a commited instance of the challenge with image ID %s", challenge.ImageId)
+			log.Debugf("Challenge is already in commited stage, deploying from existing image.")
+			// Challenge is already in commited stage here, so skip commit and stage step and start
+			// deployment of the challenge.
+			go StartDeployPipeline(challengeStagingDir, true, true)
+			return nil
+		} else {
+			if err = database.Db.Model(&challenge).Update("ImageId", "").Error; err != nil {
+				log.Errorf("Error while saving challenge state in database : %s", err)
+				return errors.New("DATABASE ERROR")
+			}
+		}
+	}
+
 	// TODO: Later replace this with a manifest file, containing information about the
 	// staged challenge. Currently this staging will only check for non static challenges
 	// so static challenges will be redeployed each time. Later we can improve this by adding this
@@ -98,12 +121,12 @@ func DeployChallenge(challengeName string) error {
 			return errors.New("CHALLENGE VALIDATION ERROR")
 		}
 
-		go StartDeployPipeline(challengeDir, false)
+		go StartDeployPipeline(challengeDir, false, false)
 	} else {
 		// Challenge is in staged state, so start the deploy pipeline and skip
 		// the staging state.
 		log.Infof("The requested challenge with Name %s is already staged, starting deploy...", challengeName)
-		go StartDeployPipeline(challengeStagingDir, true)
+		go StartDeployPipeline(challengeStagingDir, true, false)
 	}
 
 	return nil
@@ -216,7 +239,6 @@ func UndeployChallenge(challengeName string, purge bool) error {
 	tx := database.Db.Model(&challenge).Updates(map[string]interface{}{
 		"Status":      core.DEPLOY_STATUS["unknown"],
 		"ContainerId": "",
-		"ImageId":     "",
 	})
 
 	if tx.Error != nil {

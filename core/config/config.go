@@ -38,6 +38,7 @@ type BeastConfig struct {
 	AuthorizedKeysFile string    `toml:"authorized_keys_file"`
 	BeastScriptsDir    string    `toml:"scripts_dir"`
 	AllowedBaseImages  []string  `toml:"allowed_base_images"`
+	AvailableSidecars  []string  `toml:"available_sidecars"`
 	GitRemote          GitRemote `toml:"remote"`
 	JWTSecret          string    `toml:"jwt_secret"`
 	SlackWebHookURL    string    `toml:"slack_webhook"`

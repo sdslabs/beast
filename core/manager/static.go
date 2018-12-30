@@ -66,7 +66,13 @@ func DeployStaticContentContainer() error {
 	staticMount[beastStaticAuthFile] = filepath.Join("/", core.BEAST_STATIC_AUTH_FILE)
 	port := []uint32{core.BEAST_CHALLENGES_STATIC_PORT}
 
-	containerId, err := docker.CreateContainerFromImage(port, staticMount, imageId, core.BEAST_STATIC_CONTAINER_NAME)
+	containerConfig := docker.CreateContainerConfig{
+		PortsList:     port,
+		MountsMap:     staticMount,
+		ImageId:       imageId,
+		ContainerName: core.BEAST_STATIC_CONTAINER_NAME,
+	}
+	containerId, err := docker.CreateContainerFromImage(&containerConfig)
 	if err != nil {
 		if containerId != "" {
 			log.Errorf("Error while starting the container : %s", err)
