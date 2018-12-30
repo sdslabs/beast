@@ -1,0 +1,15 @@
+[author]
+name = "fristonio"						# Name of the challenge creator
+email = "fristonio@protonmail.com"		# Email for contact
+ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author
+
+[challenge.metadata]
+name = "xinetd-service"
+flag = "BACKDOOR{SERVICE_CHALLENGE_FLAG}"
+type = "service"
+
+[challenge.env]
+apt_deps = ["gcc", "socat"]
+setup_scripts = ["setup.sh"]
+service_path = "pwn"
+ports = [10003]

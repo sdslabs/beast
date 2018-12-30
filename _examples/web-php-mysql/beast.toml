@@ -1,0 +1,17 @@
+[author]
+name = "fristonio"						# Name of the challenge creator
+email = "fristonio@protonmail.com"		# Email for contact
+ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author
+
+[challenge.metadata]
+name = "web-php-mysql"
+flag = "BACKDOOR{WEB_CHALLENGE_FLAG}"
+type = "web:php:7.1:cli"
+sidecar = "mysql"
+
+[challenge.env]
+apt_deps = ["gcc", "php*-mysql"]
+setup_scripts = ["setup.sh"]
+ports = [10004]
+web_root = "challenge"
+default_port = 10004
