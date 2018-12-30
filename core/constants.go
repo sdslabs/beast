@@ -49,6 +49,14 @@ var DEPLOY_STATUS = map[string]string{
 	"building":   "Building",
 }
 
+var SIDECAR_CONTAINER_MAP = map[string]string{
+	"mysql": "mysql",
+}
+
+var SIDECAR_ENV_PREFIX = map[string]string{
+	"mysql": "MYSQL",
+}
+
 // Available challenge types
 var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME}
 

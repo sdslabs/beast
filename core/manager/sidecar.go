@@ -1,7 +1,10 @@
 package manager
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
@@ -59,4 +62,38 @@ func cleanSidecar(config *cfg.BeastChallengeConfig) error {
 
 	log.Infof("Sidecar configuration cleanup complete.")
 	return nil
+}
+
+// Read the environment variables from the challenge sidecar environment
+// file and return a list of the same.
+func getSidecarEnv(config *cfg.BeastChallengeConfig) []string {
+	var env []string
+	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name)
+	envFile := filepath.Join(stagingDir, fmt.Sprintf(".%s.env", config.Challenge.Metadata.Sidecar))
+
+	cont := make(map[string]interface{})
+	file, err := os.Open(envFile)
+	if err != nil {
+		log.Warnf("Error while reading env file %s : %s", envFile, err)
+		return env
+	}
+	defer file.Close()
+
+	byteValue, _ := ioutil.ReadAll(file)
+	err = json.Unmarshal([]byte(byteValue), &cont)
+	if err != nil {
+		log.Warnf("Error while reading json env: %s", err)
+		return env
+	}
+
+	for key, val := range env {
+		env = append(env, fmt.Sprintf("%s_%s=%s", core.SIDECAR_ENV_PREFIX[config.Challenge.Metadata.Sidecar], key, val))
+	}
+
+	return env
+}
+
+func getSidecarLink(sidecar string) string {
+	var container string = core.SIDECAR_CONTAINER_MAP[sidecar]
+	return fmt.Sprintf("%s:%s", container, container)
 }

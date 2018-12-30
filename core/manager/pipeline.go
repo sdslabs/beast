@@ -170,6 +170,15 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 	var containerEnv []string
 	var containerLinks []string
+	if config.Challenge.Metadata.Sidecar != "" {
+		// We need to configure the sidecar for the challenge container.
+		// Push the environment variables to the container and link to the sidecar.
+		env := getSidecarEnv(&config)
+		containerEnv = append(containerEnv, env...)
+
+		link := getSidecarLink(config.Challenge.Metadata.Sidecar)
+		containerLinks = append(containerLinks, link)
+	}
 
 	containerConfig := docker.CreateContainerConfig{
 		PortsList:      config.Challenge.Env.Ports,
