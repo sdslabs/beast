@@ -12,6 +12,8 @@ BUILD_DATE=${BUILD_DATE:-$( date +%Y%m%d-%H:%M:%S )}
 VERBOSE=${VERBOSE:-}
 
 repo_path="github.com/sdslabs/beastv4"
+main_package="github.com/sdslabs/beastv4/cmd/beast"
+mysql_agent="github.com/sdslabs/beastv4/cmd/agents/mysql"
 
 # Get branch revision and  version
 version="0.1"
@@ -44,6 +46,10 @@ if [ -n "$VERBOSE" ]; then
   echo "Building with -ldflags $ldflags"
 fi
 
-GOBIN=$PWD go "${GO_CMD}" -o "${GOPATH}/bin/beast" ${GO_FLAGS} -ldflags "${ldflags}" "${repo_path}"
+GOBIN=$PWD go "${GO_CMD}" -o "${GOPATH}/bin/beast" ${GO_FLAGS} -ldflags "${ldflags}" "${main_package}"
 
+echo ">>> Build beast sidecar agents..."
+GOBIN=$PWD go "${GO_CMD}" -o "${GOPATH}/bin/mysql_agent" ${GO_FLAGS} "${mysql_agent}"
+
+echo "[*] Build Complete."
 exit 0
