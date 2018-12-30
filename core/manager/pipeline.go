@@ -142,6 +142,17 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 	log.Infof("Image build for `%s` done", challengeName)
 
+	if config.Challenge.Metadata.Sidecar != "" {
+		// Need to configure the sidecar container, so we can use the configuration
+		// during deployment. We don't want sidecar configuration to change each time we
+		// make a deployment, so we are doing it in commit phase, so unless the challenge is purged
+		// we can use the same sidecar configuration.
+		err = configureSidecar(&config)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -157,7 +168,18 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	staticMount[staticMountDir] = filepath.Join("/challenge", relativeStaticContentDir)
 	log.Debugf("Static mount config for deploy : %s", staticMount)
 
-	containerId, err := docker.CreateContainerFromImage(config.Challenge.Env.Ports, staticMount, challenge.ImageId, config.Challenge.Metadata.Name)
+	var containerEnv []string
+	var containerLinks []string
+
+	containerConfig := docker.CreateContainerConfig{
+		PortsList:      config.Challenge.Env.Ports,
+		MountsMap:      staticMount,
+		ImageId:        challenge.ImageId,
+		ContainerName:  config.Challenge.Metadata.Name,
+		ContainerEnv:   containerEnv,
+		ContainerLinks: containerLinks,
+	}
+	containerId, err := docker.CreateContainerFromImage(&containerConfig)
 	if err != nil {
 		if containerId != "" {
 			if e := database.Db.Model(&challenge).Update("ContainerId", containerId).Error; e != nil {
