@@ -25,7 +25,7 @@ require (
 	github.com/go-openapi/jsonreference v0.0.0-20180825180305-1c6a3fa339f2 // indirect
 	github.com/go-openapi/spec v0.0.0-20180825180323-f1468acb3b29 // indirect
 	github.com/go-openapi/swag v0.0.0-20180908172849-dd0dad036e67 // indirect
-	github.com/go-sql-driver/mysql v1.4.0 // indirect
+	github.com/go-sql-driver/mysql v1.4.0
 	github.com/golang/protobuf v1.2.0
 	github.com/google/go-cmp v0.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
