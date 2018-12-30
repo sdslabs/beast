@@ -11,13 +11,15 @@ import (
 
 	"google.golang.org/grpc"
 
+	_ "github.com/go-sql-driver/mysql"
 	pb "github.com/sdslabs/beastv4/core/sidecar/protos/mysql"
+	"log"
 )
 
 const MYSQL_AGENT_PORT uint32 = 9500
 
 // Root user credentials for mysql sidecar.
-var dbHost = "localhost"
+var dbHost = `%`
 var dbUser = "root"
 var dbPass = os.Getenv("MYSQL_ROOT_PASSWORD")
 
@@ -38,7 +40,8 @@ func randString(n int) string {
 }
 
 func (s *mysqlAgentServer) CreateMySQLInstance(ctx context.Context, none *pb.None) (*pb.MySQLInstance, error) {
-	connection := fmt.Sprintf("%s:%s@tcp(%s:3306)/", dbUser, dbPass, dbHost)
+	log.Println("Creating mysql database and user instance")
+	connection := fmt.Sprintf("%s:%s@/", dbUser, dbPass)
 	database := randString(16)
 	username := randString(16)
 	password := randString(16)
@@ -60,9 +63,16 @@ func (s *mysqlAgentServer) CreateMySQLInstance(ctx context.Context, none *pb.Non
 		return instance, fmt.Errorf("Error while creating the database : %s", err)
 	}
 
-	_, err = db.Exec("GRANT ALL PRIVILEGES ON %s.* TO '%s'@'%s' IDENTIFIED BY '%s'", database, username, dbHost, password)
+	query := fmt.Sprintf("CREATE USER '%s'@'%s' IDENTIFIED BY '%s'", username, dbHost, password)
+	_, err = db.Exec(query)
 	if err != nil {
 		return instance, fmt.Errorf("Error while creating user : %s", err)
+	}
+
+	query = fmt.Sprintf("GRANT ALL ON %s.* TO '%s'@'%s'", database, username, dbHost)
+	_, err = db.Exec(query)
+	if err != nil {
+		return instance, fmt.Errorf("Error granting permissions to user : %s", err)
 	}
 
 	_, err = db.Exec("FLUSH PRIVILEGES")
@@ -75,7 +85,7 @@ func (s *mysqlAgentServer) CreateMySQLInstance(ctx context.Context, none *pb.Non
 
 func (s *mysqlAgentServer) DeleteMySQLInstance(ctx context.Context, instance *pb.MySQLInstance) (*pb.None, error) {
 	none := &pb.None{}
-	connection := fmt.Sprintf("%s:%s@tcp(%s:3306)/", dbUser, dbPass, dbHost)
+	connection := fmt.Sprintf("%s:%s@/", dbUser, dbPass)
 
 	db, err := sql.Open("mysql", connection)
 	if err != nil {
@@ -88,7 +98,7 @@ func (s *mysqlAgentServer) DeleteMySQLInstance(ctx context.Context, instance *pb
 		return none, fmt.Errorf("Error while deleting the database : %s", err)
 	}
 
-	_, err = db.Exec("DROP USER '%s'@'%s'", instance.Username, dbHost)
+	_, err = db.Exec(fmt.Sprintf("DROP USER '%s'@'%s'", instance.Username, dbHost))
 	if err != nil {
 		return none, fmt.Errorf("Error while deleting the user : %s", err)
 	}
@@ -96,7 +106,7 @@ func (s *mysqlAgentServer) DeleteMySQLInstance(ctx context.Context, instance *pb
 }
 
 func main() {
-	listner, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", MYSQL_AGENT_PORT))
+	listner, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", MYSQL_AGENT_PORT))
 	if err != nil {
 		fmt.Println("Error while starting listner : %s", err)
 		os.Exit(1)
