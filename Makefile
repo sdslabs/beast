@@ -5,6 +5,7 @@ help:
 	@echo "BEAST: An automated challenge deployment tool for backdoor"
 	@echo ""
 	@echo "* build: Build beast and copy binary to PATH set for go build binaries."
+	@echo "* requirements: Build beast extra artifacts requirements."
 	@echo "* check_format: Check for formatting errors using gofmt"
 	@echo "* format: format the go files using go_fmt in the project directory."
 	@echo "* test: Run tests for beast"
@@ -44,5 +45,8 @@ tools:
 	  gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
 	fi
 
+requirements:
+	@echo ">>> Building beast extras..."
+	@./scripts/build/extras.sh
 
 .PHONY: build format test check_format tools
