@@ -46,3 +46,28 @@ For implementation, since each sidecar will have different functions to perform 
 Each of these agenets are a GRPC servers implemented in a compiled language(Go for instance). Before we begin using these agents we should have the binary ready which can be run inside the containers, so compile your servers using `Makefile` inside extras, it will automatically place agents binarires in required directories.
 
 Once we have agents as binaries we can start deploying sidecars. To deploy a sidecar make an API call to beast sidecar deployment endpoint(this will trigger the deployment). During deployment the agents are copied inside the sidecar and are run along with the sidecar as container entrypoint exposing the specified RPCs.
+
+Communication of the challenge containers with the sidecar container is handled using docker networks. Whenever a sidecar is deployed a new network is created for it, for example mysql have `beast-mysql` network associated with it. Each challenge which then species this sidcar to be used is also associated with this network. Doing so provide complete observability between the two containers.
+
+Using sidecar you have to pick your configuration variables from environment variables. For mysql sidecar example with php:
+
+```php
+<?php 
+
+$dsn = "mysql:host=mysql;dbname=" . getenv("MYSQL_database") . ";charset=utf8mb4";
+$options = [
+  PDO::ATTR_EMULATE_PREPARES   => false, // turn off emulation mode for "real" prepared statements
+  PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, //turn on errors in the form of exceptions
+  PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, //make the default fetch be an associative array
+];
+
+try {
+	$pdo = new PDO($dsn, getenv("MYSQL_username"), getenv("MYSQL_password"), $options);
+} catch (Exception $e) {
+	echo $e->getMessage();
+}
+
+echo "Success: A proper connection to MySQL was made! The my_db database is great." . PHP_EOL;
+
+?>
+```

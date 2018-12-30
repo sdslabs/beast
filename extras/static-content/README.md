@@ -13,7 +13,7 @@ $ docker build . --tag beast-static:latest
 To run the nginx powered static content serving container for beast run
 
 ```bash
-$ docker run -d -p 80:80 -v <beast-staging-directory>:/beast beast-static
+$ docker run -d -p 80:80 -v <beast-staging-directory>:/beast -v <beast-htpasswd-file>:/.static.beast.htpasswd beast-static
 ```
 
 For authentication purposes you should create a htpasswd file using apache2-utils. First install apache2-utils and then create a htpasswd file
