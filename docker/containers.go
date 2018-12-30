@@ -16,12 +16,12 @@ import (
 )
 
 type CreateContainerConfig struct {
-	PortsList      []uint32
-	MountsMap      map[string]string
-	ImageId        string
-	ContainerName  string
-	ContainerEnv   []string
-	ContainerLinks []string
+	PortsList        []uint32
+	MountsMap        map[string]string
+	ImageId          string
+	ContainerName    string
+	ContainerEnv     []string
+	ContainerNetwork string
 }
 
 func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
@@ -111,7 +111,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	hostConfig := &container.HostConfig{
 		PortBindings: portMap,
 		Mounts:       mountBindings,
-		Links:        containerConfig.ContainerLinks,
+		NetworkMode:  container.NetworkMode(containerConfig.ContainerNetwork),
 	}
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, containerName)

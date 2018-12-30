@@ -27,6 +27,25 @@ func RemoveImage(imageId string) error {
 	return err
 }
 
+func CheckIfImageExists(imageId string) (bool, error) {
+	ctx := context.Background()
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		return false, err
+	}
+
+	inspectVal, _, err := cli.ImageInspectWithRaw(ctx, imageId)
+	if err != nil {
+		return false, err
+	}
+
+	if inspectVal.ID != "" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {

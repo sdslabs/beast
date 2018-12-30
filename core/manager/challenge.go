@@ -77,23 +77,22 @@ func DeployChallenge(challengeName string) error {
 		}
 	}
 
+	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+
 	if challenge.ImageId != "" {
-		images, err := docker.SearchImageByFilter(map[string]string{"id": challenge.ImageId})
+		imageExist, err := docker.CheckIfImageExists(challenge.ImageId)
 		if err != nil {
-			log.Error("Error while searching for image with id %s", challenge.ImageId)
+			log.Errorf("Error while searching for image with id %s: %s", challenge.ImageId, err)
 			return errors.New("DOCKER ERROR")
 		}
 
-		if len(images) > 1 {
-			log.Error("Got more than one images, something fishy here. Contact admin to check manually.")
-			return errors.New("DOCKER ERROR")
-		}
-
-		if len(images) == 1 {
+		if imageExist {
 			log.Debugf("Found a commited instance of the challenge with image ID %s", challenge.ImageId)
 			log.Debugf("Challenge is already in commited stage, deploying from existing image.")
 			// Challenge is already in commited stage here, so skip commit and stage step and start
 			// deployment of the challenge.
+			go StartDeployPipeline(challengeStagingDir, true, true)
+			return nil
 		} else {
 			if err = database.Db.Model(&challenge).Update("ImageId", "").Error; err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
@@ -102,7 +101,6 @@ func DeployChallenge(challengeName string) error {
 		}
 	}
 
-	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	// TODO: Later replace this with a manifest file, containing information about the
 	// staged challenge. Currently this staging will only check for non static challenges
 	// so static challenges will be redeployed each time. Later we can improve this by adding this

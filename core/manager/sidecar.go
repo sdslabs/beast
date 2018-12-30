@@ -86,14 +86,14 @@ func getSidecarEnv(config *cfg.BeastChallengeConfig) []string {
 		return env
 	}
 
-	for key, val := range env {
+	for key, val := range cont {
 		env = append(env, fmt.Sprintf("%s_%s=%s", core.SIDECAR_ENV_PREFIX[config.Challenge.Metadata.Sidecar], key, val))
 	}
 
+	log.Debugf("Generated environment variables for container are : %v", env)
 	return env
 }
 
-func getSidecarLink(sidecar string) string {
-	var container string = core.SIDECAR_CONTAINER_MAP[sidecar]
-	return fmt.Sprintf("%s:%s", container, container)
+func getSidecarNetwork(sidecar string) string {
+	return core.SIDECAR_NETWORK_MAP[sidecar]
 }

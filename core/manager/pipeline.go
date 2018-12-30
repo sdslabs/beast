@@ -169,24 +169,23 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	log.Debugf("Static mount config for deploy : %s", staticMount)
 
 	var containerEnv []string
-	var containerLinks []string
+	var containerNetwork string
 	if config.Challenge.Metadata.Sidecar != "" {
 		// We need to configure the sidecar for the challenge container.
 		// Push the environment variables to the container and link to the sidecar.
 		env := getSidecarEnv(&config)
 		containerEnv = append(containerEnv, env...)
 
-		link := getSidecarLink(config.Challenge.Metadata.Sidecar)
-		containerLinks = append(containerLinks, link)
+		containerNetwork = getSidecarNetwork(config.Challenge.Metadata.Sidecar)
 	}
 
 	containerConfig := docker.CreateContainerConfig{
-		PortsList:      config.Challenge.Env.Ports,
-		MountsMap:      staticMount,
-		ImageId:        challenge.ImageId,
-		ContainerName:  config.Challenge.Metadata.Name,
-		ContainerEnv:   containerEnv,
-		ContainerLinks: containerLinks,
+		PortsList:        config.Challenge.Env.Ports,
+		MountsMap:        staticMount,
+		ImageId:          challenge.ImageId,
+		ContainerName:    config.Challenge.Metadata.Name,
+		ContainerEnv:     containerEnv,
+		ContainerNetwork: containerNetwork,
 	}
 	containerId, err := docker.CreateContainerFromImage(&containerConfig)
 	if err != nil {
