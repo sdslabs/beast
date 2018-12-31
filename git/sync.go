@@ -44,6 +44,7 @@ func SyncBeastRemote() error {
 	}
 
 	log.Info("Beast git base synced with remote")
+	go config.UpdateUsedPortList()
 	return nil
 }
 

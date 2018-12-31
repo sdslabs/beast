@@ -151,6 +151,22 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 		return fmt.Errorf("Max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
 	}
 
+	// By default if no port is specified to be default, the first port
+	// from the list is assumed to be default and the service is deployed accordingly.
+	if config.DefaultPort == 0 {
+		config.DefaultPort = config.Ports[0]
+	}
+
+	if !utils.UInt32InList(config.DefaultPort, config.Ports) {
+		return fmt.Errorf("`default_port` must be one of the Ports in the `ports` list")
+	}
+
+	for _, port := range config.Ports {
+		if port < core.ALLOWED_MIN_PORT_VALUE || port > core.ALLOWED_MAX_PORT_VALUE {
+			return fmt.Errorf("Port value must be between %s and %s", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE)
+		}
+	}
+
 	if config.StaticContentDir != "" {
 		if filepath.IsAbs(config.StaticContentDir) {
 			return fmt.Errorf("Static content directory path should be relative to challenge directory root")
@@ -183,12 +199,6 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 		} else if config.WebRoot != "" && filepath.IsAbs(config.WebRoot) {
 			return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
 		}
-	}
-
-	// By default if no port is specified to be default, the first port
-	// from the list is assumed to be default and the service is deployed accordingly.
-	if config.DefaultPort == 0 {
-		config.DefaultPort = config.Ports[0]
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -164,4 +165,25 @@ func CopyDirectory(src, dst string) error {
 		}
 	}
 	return nil
+}
+
+// This is very flexible and will not report any error even though it is not able to
+// access the directory. It will return an empty list in such cases.  The caller must take
+// care of this.
+func GetAllDirectoriesName(dirPath string) []string {
+	var directories []string
+
+	_ = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if info.IsDir() {
+			directories = append(directories, path)
+		}
+
+		return nil
+	})
+
+	return directories
 }
