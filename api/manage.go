@@ -61,9 +61,10 @@ func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
 
+	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
+
 	switch action {
 	case MANAGE_ACTION_UNDEPLOY:
-		log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 		if err := manager.UndeployChallenge(identifier, false); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
@@ -78,7 +79,6 @@ func manageChallengeHandler(c *gin.Context) {
 		return
 
 	case MANAGE_ACTION_PURGE:
-		log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 		if err := manager.UndeployChallenge(identifier, true); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
@@ -92,9 +92,14 @@ func manageChallengeHandler(c *gin.Context) {
 		})
 		return
 
-	case MANAGE_ACTION_DEPLOY:
-		// For deploy, identifier is name
-		log.Infof("Trying to %s challenge with name %s", action, identifier)
+	case MANAGE_ACTION_REDEPLOY:
+		// Redeploying a challenge means to first purge the challenge and then try to deploy it.
+		if err := manager.UndeployChallenge(identifier, true); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
 
 		if err := manager.DeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -102,10 +107,15 @@ func manageChallengeHandler(c *gin.Context) {
 			})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{
-			"message": fmt.Sprintf("Deploy for challenge %s has been triggered, check stats", identifier),
-		})
-		return
+
+	case MANAGE_ACTION_DEPLOY:
+		// For deploy, identifier is name
+		if err := manager.DeployChallenge(identifier); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
 
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{
