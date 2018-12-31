@@ -48,6 +48,68 @@
                 }
             }
         },
+        "/api/info/images/available": {
+            "get": {
+                "description": "Returns all the available base images  which can be used for challenge creation as the base OS for challenge.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Gives all the base images that can be used while creating a beast challenge, this is a constant specified in beast global config",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.AvailableImagesResp"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.AvailableImagesResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/ports/used": {
+            "get": {
+                "description": "Returns the ports in use by beast, which cannot be used in creating a new challenge..",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Returns ports in use by beast by looking in the hack git repository, also returns min and max value of port allowed while specifying in beast challenge config.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.PortsInUseResp"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.PortsInUseResp"
+                        }
+                    }
+                }
+            }
+        },
         "/api/manage/all/": {
             "post": {
                 "description": "Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.",
@@ -262,6 +324,102 @@
                 }
             }
         },
+        "/api/status/all/": {
+            "get": {
+                "description": "This returns the challenges in the status provided, along with their name and last updated time.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Returns challenge deployment status from the beast database for the challenges which matches the stauts according to filter.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Status type to filter with, if none specified then all",
+                        "name": "filter",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ChallengeStatusResp"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/status/challenge/": {
+            "get": {
+                "description": "Returns challenge deployment status from the beast database, for those challenges which are not present a status value NA is returned.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Returns challenge deployment status from the beast database.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the challenge",
+                        "name": "name",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.ChallengeStatusResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/": {
             "get": {
                 "description": "Sends challenge for authorization of user",
@@ -334,6 +492,42 @@
                 }
             }
         },
+        "api.AvailableImagesResp": {
+            "type": "object",
+            "properties": {
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['ubuntu16.04'",
+                        " 'ubuntu18.04']"
+                    ]
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Available Base images."
+                }
+            }
+        },
+        "api.ChallengeStatusResp": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "Web Challenge"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "deployed"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2018-12-31T22:20:08.948096189+05:30"
+                }
+            }
+        },
         "api.HTTPAuthorizeResp": {
             "type": "object",
             "properties": {
@@ -353,6 +547,31 @@
                 "message": {
                     "type": "string",
                     "example": "Messsage in response to your request"
+                }
+            }
+        },
+        "api.PortsInUseResp": {
+            "type": "object",
+            "properties": {
+                "port_max_value": {
+                    "type": "integer",
+                    "example": 20000
+                },
+                "port_min_value": {
+                    "type": "integer",
+                    "example": 10000
+                },
+                "ports_in_use": {
+                    "type": "array",
+                    "items": {
+                        "type": "uint32"
+                    },
+                    "example": [
+                        "[10000",
+                        " 100001",
+                        " 100003",
+                        " 10010]"
+                    ]
                 }
             }
         }

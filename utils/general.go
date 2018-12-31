@@ -52,3 +52,12 @@ func StringInSlice(a string, list []string) bool {
 	}
 	return false
 }
+
+func UInt32InList(a uint32, list []uint32) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}

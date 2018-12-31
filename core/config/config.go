@@ -156,7 +156,29 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 	return config, nil
 }
 
+// Update the USED_PORT_LIST variable in config.
+// Don't do this very often, we do this once during syncing the git repository
+// then whenever you need updated used port list you need to sync the git remote
+// by beast.
+func UpdateUsedPortList() {
+	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
+	challengeDir := filepath.Join(beastRemoteDir, Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+
+	dirs := utils.GetAllDirectoriesName(challengeDir)
+	for _, dir := range dirs {
+		configFilePath := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
+		var config BeastChallengeConfig
+		_, err := toml.DecodeFile(configFilePath, &config)
+		if err == nil {
+			USED_PORTS_LIST = append(USED_PORTS_LIST, config.Challenge.Env.Ports...)
+		}
+	}
+
+	log.Debugf("Used port list updated: %v", USED_PORTS_LIST)
+}
+
 var Cfg BeastConfig = InitConfig()
+var USED_PORTS_LIST []uint32
 
 func InitConfig() BeastConfig {
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)

@@ -38,6 +38,8 @@ const (
 	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
 	DEFAULT_XINETD_CONF_FILE       string = "xinetd.conf"
 	BEAST_STATIC_AUTH_FILE         string = ".static.beast.htpasswd"
+	ALLOWED_MIN_PORT_VALUE         uint32 = 10000
+	ALLOWED_MAX_PORT_VALUE         uint32 = 20000
 )
 
 var DEPLOY_STATUS = map[string]string{

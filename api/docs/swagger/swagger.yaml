@@ -9,6 +9,31 @@ definitions:
         example: Response message
         type: string
     type: object
+  api.AvailableImagesResp:
+    properties:
+      images:
+        example:
+        - '[''ubuntu16.04'''
+        - ' ''ubuntu18.04'']'
+        items:
+          type: string
+        type: array
+      message:
+        example: Available Base images.
+        type: string
+    type: object
+  api.ChallengeStatusResp:
+    properties:
+      name:
+        example: Web Challenge
+        type: string
+      status:
+        example: deployed
+        type: string
+      updated_at:
+        example: "2018-12-31T22:20:08.948096189+05:30"
+        type: string
+    type: object
   api.HTTPAuthorizeResp:
     properties:
       message:
@@ -23,6 +48,24 @@ definitions:
       message:
         example: Messsage in response to your request
         type: string
+    type: object
+  api.PortsInUseResp:
+    properties:
+      port_max_value:
+        example: 20000
+        type: integer
+      port_min_value:
+        example: 10000
+        type: integer
+      ports_in_use:
+        example:
+        - '[10000'
+        - ' 100001'
+        - ' 100003'
+        - ' 10010]'
+        items:
+          type: uint32
+        type: array
     type: object
 host: beast.sdslabs.co
 info:
@@ -58,6 +101,53 @@ paths:
       summary: Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
       tags:
       - config
+  /api/info/images/available:
+    get:
+      consumes:
+      - application/json
+      description: Returns all the available base images  which can be used for challenge
+        creation as the base OS for challenge.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.AvailableImagesResp'
+            type: object
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/api.AvailableImagesResp'
+            type: object
+      summary: Gives all the base images that can be used while creating a beast challenge,
+        this is a constant specified in beast global config
+      tags:
+      - info
+  /api/info/ports/used:
+    get:
+      consumes:
+      - application/json
+      description: Returns the ports in use by beast, which cannot be used in creating
+        a new challenge..
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.PortsInUseResp'
+            type: object
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/api.PortsInUseResp'
+            type: object
+      summary: Returns ports in use by beast by looking in the hack git repository,
+        also returns min and max value of port allowed while specifying in beast challenge
+        config.
+      tags:
+      - info
   /api/manage/all/:
     post:
       consumes:
@@ -210,6 +300,74 @@ paths:
             $ref: '#/definitions/api.HTTPPlainResp'
             type: object
       summary: Syncs beast's local copy of remote git repository for challenges.
+  /api/status/all/:
+    get:
+      consumes:
+      - application/json
+      description: This returns the challenges in the status provided, along with
+        their name and last updated time.
+      parameters:
+      - description: Status type to filter with, if none specified then all
+        in: query
+        name: filter
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ChallengeStatusResp'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Returns challenge deployment status from the beast database for the
+        challenges which matches the stauts according to filter.
+      tags:
+      - status
+  /api/status/challenge/:
+    get:
+      consumes:
+      - application/json
+      description: Returns challenge deployment status from the beast database, for
+        those challenges which are not present a status value NA is returned.
+      parameters:
+      - description: Name of the challenge
+        in: query
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengeStatusResp'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Returns challenge deployment status from the beast database.
+      tags:
+      - status
   /auth/:
     get:
       description: Sends challenge for authorization of user
