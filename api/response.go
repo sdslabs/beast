@@ -1,5 +1,7 @@
 package api
 
+import "time"
+
 type HTTPPlainResp struct {
 	Message string `json:"message" example:"Messsage in response to your request"`
 }
@@ -23,4 +25,10 @@ type PortsInUseResp struct {
 	MinPortValue uint32   `json:"port_min_value" example:"10000"`
 	MaxPortValue uint32   `json:"port_max_value" example:"20000"`
 	PortsInUse   []uint32 `json:"ports_in_use" example:"[10000, 100001, 100003, 10010]"`
+}
+
+type ChallengeStatusResp struct {
+	Name      string    `json:"name" example:"Web Challenge"`
+	Status    string    `json:"status" example:"deployed"`
+	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }

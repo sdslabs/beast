@@ -37,8 +37,9 @@ func initGinRouter() *gin.Engine {
 		// Status route group
 		statusGroup := apiGroup.Group("/status")
 		{
-			statusGroup.GET("/challenge/:id", challengeStatusHandler)
-			statusGroup.GET("/all/", statusHandler)
+			statusGroup.GET("/challenge/:name", challengeStatusHandler)
+			statusGroup.GET("/all", statusHandler)
+			statusGroup.GET("/all/:filter", statusHandler)
 		}
 
 		// Info route group
