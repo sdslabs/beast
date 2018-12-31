@@ -6,7 +6,7 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author
 [challenge.metadata]
 name = "simple"
 flag = "BACKDOOR{SAMPLE_FLAG}"
-type = "service"
+type = "bare"
 
 [challenge.env]
 apt_deps = ["gcc", "socat"]

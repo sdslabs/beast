@@ -12,6 +12,7 @@ import (
 	"github.com/sdslabs/beastv4/database"
 	"github.com/sdslabs/beastv4/docker"
 	"github.com/sdslabs/beastv4/git"
+	"github.com/sdslabs/beastv4/notify"
 	"github.com/sdslabs/beastv4/utils"
 
 	"github.com/BurntSushi/toml"
@@ -42,6 +43,10 @@ func DeployChallengePipeline(challengeDir string) error {
 // and the container is running, then don't do anything. If the challenge does not exist
 // then first check if the challenge is in staged state, if it is then deploy challenge
 // from there on or else start deploy pipeline for the challenge.
+//
+// This will start deploy pipeline if it finds there is no problem in deployment, else it will
+// notify the user via return value if there is an error or if the deployement request cannot
+// be processed.
 func DeployChallenge(challengeName string) error {
 	log.Infof("Processing request to deploy the challenge with ID %s", challengeName)
 
@@ -190,7 +195,13 @@ func DeployAll(sync bool) error {
 // This simply removes the staging directory for the challenge from the staging area.
 func unstageChallenge(challengeName string) error {
 	challengeStagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
-	err := utils.RemoveDirRecursively(challengeStagedDir)
+	err := utils.ValidateDirExists(challengeStagedDir)
+	if err != nil {
+		log.Warnf("Chanllenge staging directory for challenge %s does not exist, continuing...", challengeName)
+		return nil
+	}
+
+	err = utils.RemoveDirRecursively(challengeStagedDir)
 	if err != nil {
 		return fmt.Errorf("Error while removing staged directory : %s", err)
 	}
@@ -203,7 +214,7 @@ func unstageChallenge(challengeName string) error {
 // Do not touch any files in staging, commit phase.
 // This function returns a error if the challenge was not found or if
 // an error happened while removing the challenge instance.
-func UndeployChallenge(challengeName string, purge bool) error {
+func undeployChallenge(challengeName string, purge bool) error {
 	log.Infof("Got request to Undeploy challenge : %s", challengeName)
 
 	challenge, err := database.QueryFirstChallengeEntry("name", challengeName)
@@ -260,8 +271,7 @@ func UndeployChallenge(challengeName string, purge bool) error {
 
 		err = coreUtils.CleanupChallengeIfExist(cfg)
 		if err != nil {
-			log.Errorf("Error while cleaning up the challenge")
-			return err
+			return fmt.Errorf("Error while cleaning up the challenge: %s", err)
 		}
 
 		log.Infof("Purging the challenge : %s", challenge.Name)
@@ -274,4 +284,20 @@ func UndeployChallenge(challengeName string, purge bool) error {
 	}
 
 	return nil
+}
+
+func UndeployChallenge(challengeName string, purge bool) error {
+	err := undeployChallenge(challengeName, purge)
+	if err != nil {
+		msg := fmt.Sprintf("UNDEPLOY ERROR: %s : %s", challengeName, err)
+		log.Error(msg)
+		notify.SendNotificationToSlack(notify.Error, msg)
+	} else {
+		msg := fmt.Sprintf("UNDEPLOY SUCCESSFUL: %s", challengeName)
+		log.Info(msg)
+		notify.SendNotificationToSlack(notify.Success, msg)
+	}
+
+	log.Infof("Notification for the event sent to slack.")
+	return err
 }
