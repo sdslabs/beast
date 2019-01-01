@@ -19,21 +19,7 @@ type Response struct {
 	Token     string `json:"token"`
 }
 
-func GetAuth(keyFile string, host string, username string) {
-	if keyFile == "" {
-		fmt.Printf("File Location not provided")
-		return
-	}
-
-	if host == "" {
-		fmt.Printf("Host not provided")
-		return
-	}
-
-	if username == "" {
-		fmt.Printf("UserName not provided")
-		return
-	}
+func Authorize(keyFile string, host string, username string) {
 
 	err := utils.ValidateFileExists(keyFile)
 	if err != nil {
