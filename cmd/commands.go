@@ -15,6 +15,12 @@ var Verbose bool
 
 var Port string
 
+var KeyFile string
+
+var Username string
+
+var Host string
+
 // Root command `beast` all commands are either a flag to this command
 // or a subcommand for this.
 var rootCmd = &cobra.Command{
@@ -49,8 +55,12 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
 	runCmd.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to run the beast server on.")
+	getAuthCmd.PersistentFlags().StringVarP(&KeyFile, "identity", "i", "", "Private File location")
+	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
+	getAuthCmd.PersistentFlags().StringVarP(&Host, "host", "H", "http://localhost:5005/", "Hostname or IP along with port where beast is hosted")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(getAuthCmd)
 }
