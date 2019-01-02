@@ -11,15 +11,16 @@ import (
 // Flag which defines verbose nature of beast
 // If true beast will run in Verbose mode and will log all logs in debug
 // error level.
-var Verbose bool
-
-var Port string
-
-var KeyFile string
-
-var Username string
-
-var Host string
+var (
+	Verbose       bool
+	Port          string
+	KeyFile       string
+	Username      string
+	Host          string
+	Name          string
+	Email         string
+	PublicKeyPath string
+)
 
 // Root command `beast` all commands are either a flag to this command
 // or a subcommand for this.
@@ -58,9 +59,13 @@ func init() {
 	getAuthCmd.PersistentFlags().StringVarP(&KeyFile, "identity", "i", "", "Private File location")
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
 	getAuthCmd.PersistentFlags().StringVarP(&Host, "host", "H", "http://localhost:5005/", "Hostname or IP along with port where beast is hosted")
+	createAuthorCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new author")
+	createAuthorCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new author")
+	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new author")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(getAuthCmd)
+	rootCmd.AddCommand(createAuthorCmd)
 }
