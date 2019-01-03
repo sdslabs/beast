@@ -315,6 +315,28 @@ func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.B
 	return nil
 }
 
+// This function assumes that the staging directory exist and thus does not check for the same
+// it is the responsibility of the caller to check for that. If stagingDir does not exist
+// then this function will not return error, it will simply skip copying all the files.
+func copyAdditionalContextToStaging(fileCtx map[string]string, stagingDir string) {
+	for key, val := range fileCtx {
+		filePath := filepath.Join(stagingDir, key)
+		err := utils.RemoveFileIfExists(filePath)
+		if err != nil {
+			log.Errorf("%s", err)
+			log.Errorf("Skipping copying file %s", key)
+			continue
+		}
+
+		err = utils.CopyFile(val, filePath)
+		if err != nil {
+			log.Errorf("Error while copying %s SKIPPING : %s", key, err)
+		}
+
+	}
+	log.Debugf("Copied additional context to staging directory")
+}
+
 // TODO: Refactor this.
 func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
 	// Challenge is nil, which means the challenge entry does not exist

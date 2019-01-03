@@ -57,6 +57,10 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 		return fmt.Errorf("Error while adding additional context : %s", err)
 	}
 
+	// Copy those additional contexts to the staging area, so we can provide them for
+	// user to download.
+	copyAdditionalContextToStaging(additionalCtx, stagingDir)
+
 	log.Debug("Copying Content to Static Folder")
 
 	staticContentDir, err := GetStaticContentDir(challengeConfig, contextDir)
