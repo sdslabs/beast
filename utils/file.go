@@ -83,6 +83,20 @@ func CreateIfNotExistDir(dirPath string) error {
 	return nil
 }
 
+func RemoveFileIfExists(filePath string) error {
+	err := ValidateFileExists(filePath)
+	if err != nil {
+		return nil
+	}
+
+	err = os.Remove(filePath)
+	if err != nil {
+		return fmt.Errorf("Error while removing existing file : %s : %s", filePath, err)
+	}
+
+	return nil
+}
+
 func CreateFileIfNotExist(filePath string) error {
 	err := ValidateFileExists(filePath)
 	if err != nil {
