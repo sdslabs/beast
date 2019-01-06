@@ -40,6 +40,8 @@ const (
 	BEAST_STATIC_AUTH_FILE         string = ".static.beast.htpasswd"
 	ALLOWED_MIN_PORT_VALUE         uint32 = 10000
 	ALLOWED_MAX_PORT_VALUE         uint32 = 20000
+	IMAGE_NA                       string = "IMAGE_NA"
+	CONTAINER_NA                   string = "CONTAINER_NA"
 )
 
 var DEPLOY_STATUS = map[string]string{

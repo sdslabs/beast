@@ -1,8 +1,12 @@
 package utils
 
 import (
+	"encoding/base32"
 	"fmt"
 	"io/ioutil"
+	"strings"
+
+	"github.com/sdslabs/beastv4/core"
 )
 
 // From a list of strings generate a list containing only unique strings
@@ -60,4 +64,24 @@ func UInt32InList(a uint32, list []uint32) bool {
 		}
 	}
 	return false
+}
+
+func GetInvalidImageID(a string) string {
+	b := core.IMAGE_NA + "_" + a
+	if len(b) > 30 {
+		return b[:30]
+	}
+	return b
+}
+
+func GetInvalidContainerID(a string) string {
+	b := core.CONTAINER_NA + "_" + a
+	if len(b) > 30 {
+		return b[:30]
+	}
+	return b
+}
+
+func EncodeID(a string) string {
+	return strings.TrimRight(strings.ToLower(base32.StdEncoding.EncodeToString([]byte(a))), "=")
 }
