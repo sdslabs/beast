@@ -11,6 +11,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+
+	"github.com/sdslabs/beastv4/utils"
 )
 
 func RemoveImage(imageId string) error {
@@ -73,7 +75,7 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	defer builderContext.Close()
 
 	buildOptions := types.ImageBuildOptions{
-		Tags:   []string{challengeName},
+		Tags:   []string{utils.EncodeID(challengeName)},
 		Remove: true,
 	}
 
@@ -92,7 +94,7 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(imageBuildResp.Body)
 
-	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", challengeName)})
+	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", utils.EncodeID(challengeName))})
 	if len(images) > 0 {
 		log.Infof("Image ID for the image built is : %s", images[0].ID[7:])
 		return buf, images[0].ID[7:], nil

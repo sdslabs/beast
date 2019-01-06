@@ -375,11 +375,13 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			}
 		}
 
-		challEntry = &database.Challenge{
-			Name:     config.Challenge.Metadata.Name,
-			AuthorID: authorEntry.ID,
-			Format:   config.Challenge.Metadata.Type,
-			Status:   core.DEPLOY_STATUS["unknown"],
+		*challEntry = database.Challenge{
+			Name:        config.Challenge.Metadata.Name,
+			AuthorID:    authorEntry.ID,
+			Format:      config.Challenge.Metadata.Type,
+			Status:      core.DEPLOY_STATUS["unknown"],
+			ContainerId: utils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:     utils.GetTempImageId(config.Challenge.Metadata.Name),
 		}
 
 		err = database.CreateChallengeEntry(challEntry)

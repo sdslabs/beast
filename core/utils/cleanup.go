@@ -6,6 +6,7 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/database"
 	"github.com/sdslabs/beastv4/docker"
+	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -41,16 +42,16 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 }
 
 func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChallengeConfig) error {
-	if chall.ContainerId != "" {
+	if chall.ContainerId != utils.GetTempContainerId(chall.Name) {
 		err := CleanupContainerByFilter("id", chall.ContainerId)
 		if err != nil {
 			return err
 		}
 
-		database.Db.Model(chall).Update("ContainerId", "")
+		database.Db.Model(chall).Update("ContainerId", utils.GetTempContainerId(chall.Name))
 	}
 
-	err := CleanupContainerByFilter("name", config.Challenge.Metadata.Name)
+	err := CleanupContainerByFilter("name", utils.EncodeID(config.Challenge.Metadata.Name))
 	return err
 }
 
@@ -61,7 +62,7 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 		return err
 	}
 
-	database.Db.Model(&chall).Update("ImageId", "")
+	database.Db.Model(&chall).Update("ImageId", utils.GetTempImageId(chall.Name))
 
 	return nil
 }
@@ -83,7 +84,7 @@ func CleanupChallengeIfExist(config cfg.BeastChallengeConfig) error {
 		return err
 	}
 
-	if chall.ImageId == "" {
+	if chall.ImageId == utils.GetTempImageId(chall.Name) {
 		log.Warn("Looks like we don't have the image ID in database for challenge, Nothing to remove")
 		return nil
 	}

@@ -13,6 +13,7 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	tools "github.com/sdslabs/beastv4/templates"
+	"github.com/sdslabs/beastv4/utils"
 )
 
 // The `challenges` table has the following columns
@@ -183,7 +184,7 @@ func updateScript(author *Author) error {
 	mapOfChall := make(map[string]string)
 
 	for _, chall := range challs {
-		if chall.ContainerId != "" {
+		if chall.ContainerId != utils.GetTempImageId(chall.Name) {
 			mapOfChall[chall.Name] = chall.ContainerId
 		}
 	}

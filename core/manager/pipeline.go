@@ -187,7 +187,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		PortsList:        config.Challenge.Env.Ports,
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
-		ContainerName:    config.Challenge.Metadata.Name,
+		ContainerName:    utils.EncodeID(config.Challenge.Metadata.Name),
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
 	}
