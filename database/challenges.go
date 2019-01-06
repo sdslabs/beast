@@ -184,7 +184,7 @@ func updateScript(author *Author) error {
 	mapOfChall := make(map[string]string)
 
 	for _, chall := range challs {
-		if chall.ContainerId != utils.GetInvalidImageID(chall.Name) {
+		if chall.ContainerId != utils.GetTempImageId(chall.Name) {
 			mapOfChall[chall.Name] = chall.ContainerId
 		}
 	}

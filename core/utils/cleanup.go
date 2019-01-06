@@ -42,13 +42,13 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 }
 
 func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChallengeConfig) error {
-	if chall.ContainerId != utils.GetInvalidContainerID(chall.Name) {
+	if chall.ContainerId != utils.GetTempContainerId(chall.Name) {
 		err := CleanupContainerByFilter("id", chall.ContainerId)
 		if err != nil {
 			return err
 		}
 
-		database.Db.Model(chall).Update("ContainerId", utils.GetInvalidContainerID(chall.Name))
+		database.Db.Model(chall).Update("ContainerId", utils.GetTempContainerId(chall.Name))
 	}
 
 	err := CleanupContainerByFilter("name", utils.EncodeID(config.Challenge.Metadata.Name))
@@ -62,7 +62,7 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 		return err
 	}
 
-	database.Db.Model(&chall).Update("ImageId", utils.GetInvalidImageID(chall.Name))
+	database.Db.Model(&chall).Update("ImageId", utils.GetTempImageId(chall.Name))
 
 	return nil
 }
@@ -84,7 +84,7 @@ func CleanupChallengeIfExist(config cfg.BeastChallengeConfig) error {
 		return err
 	}
 
-	if chall.ImageId == utils.GetInvalidImageID(chall.Name) {
+	if chall.ImageId == utils.GetTempImageId(chall.Name) {
 		log.Warn("Looks like we don't have the image ID in database for challenge, Nothing to remove")
 		return nil
 	}

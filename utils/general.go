@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"encoding/base32"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -66,16 +66,16 @@ func UInt32InList(a uint32, list []uint32) bool {
 	return false
 }
 
-func GetInvalidImageID(a string) string {
-	b := core.IMAGE_NA + "_" + a
+func GetTempImageId(a string) string {
+	b := fmt.Sprintf("%s_%s", core.IMAGE_NA, a)
 	if len(b) > 30 {
 		return b[:30]
 	}
 	return b
 }
 
-func GetInvalidContainerID(a string) string {
-	b := core.CONTAINER_NA + "_" + a
+func GetTempContainerId(a string) string {
+	b := fmt.Sprintf("%s_%s", core.CONTAINER_NA, a)
 	if len(b) > 30 {
 		return b[:30]
 	}
@@ -83,5 +83,13 @@ func GetInvalidContainerID(a string) string {
 }
 
 func EncodeID(a string) string {
-	return strings.TrimRight(strings.ToLower(base32.StdEncoding.EncodeToString([]byte(a))), "=")
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(a)))[:30]
+}
+
+func IsImageIdValid(a string) bool {
+	return (!strings.HasPrefix(a, core.IMAGE_NA) && a != "")
+}
+
+func IsContainerIdValid(a string) bool {
+	return ((!strings.HasPrefix(a, core.CONTAINER_NA)) && a != "")
 }
