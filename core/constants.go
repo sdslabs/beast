@@ -101,12 +101,18 @@ var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	},
 	"python": {
 		"2.7": {
+			"flask":   "python:2.7-jessie",
+			"django":  "python:2.7-jessie",
 			"default": "python:2.7-jessie",
 		},
 		"3.5": {
+			"flask":   "python:3.5-jessie",
+			"django":  "python:3.5-jessie",
 			"default": "python:3.5-jessie",
 		},
 		"3.6": {
+			"flask":   "python:3.6-jessie",
+			"django":  "python:3.6-jessie",
 			"default": "python:3.6-jessie",
 		},
 		"default": {

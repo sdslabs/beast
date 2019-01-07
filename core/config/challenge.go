@@ -92,6 +92,10 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 		return fmt.Errorf("Name and Flag required for the challenge"), false
 	}
 
+	if !utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "" {
+		return fmt.Errorf("Sidecar provided is not an available sidecar."), false
+	}
+
 	// Check if the config type is static here and if it is
 	// then return an indication for that, so that caller knows if it need
 	// to check a valid environment or not.
@@ -106,10 +110,6 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 
 			return nil, false
 		}
-	}
-
-	if !utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) {
-		return fmt.Errorf("Sidecar provided is not an available sidecar."), false
 	}
 
 	return fmt.Errorf("Not a valid challenge type : %s", config.Type), false
