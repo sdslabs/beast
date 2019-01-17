@@ -173,7 +173,7 @@ type ScriptFile struct {
 //updates user script
 func updateScript(author *Author) error {
 
-	time.Sleep(time.Second)
+	time.Sleep(3 * time.Second)
 
 	SHA256 := sha256.New()
 	SHA256.Write([]byte(author.Email))
@@ -184,7 +184,7 @@ func updateScript(author *Author) error {
 	mapOfChall := make(map[string]string)
 
 	for _, chall := range challs {
-		if chall.ContainerId != utils.GetTempImageId(chall.Name) {
+		if utils.IsContainerIdValid(chall.ContainerId) {
 			mapOfChall[chall.Name] = chall.ContainerId
 		}
 	}

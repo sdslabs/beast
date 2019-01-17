@@ -21,7 +21,7 @@ case "$SSH_ORIGINAL_COMMAND" in
 
 	{{range $name, $containerId := .Challenges}}
     "{{ $name }}")
-        exec docker-enter {{ $containerId }}
+        exec docker_enter {{ $containerId }}
         ;;
     {{end}}
 

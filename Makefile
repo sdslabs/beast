@@ -37,12 +37,15 @@ tools:
 
 	@if ! test -x "`which docker-enter 2>&1;true`"; then \
 	  echo 'Warn: docker-enter is not installed, building....' >&2 ; \
-	  cp ./scripts/docker-enter "/usr/bin/" ; \
+	  sudo cp ./scripts/docker-enter "/usr/bin/" ; \
+	  sudo cp ./scripts/docker_enter "/usr/bin/"; \
+	  sudo chown root "/usr/bin/docker_enter"; \
+	  sudo chmod u+s "/usr/bin/docker_enter"; \
 	fi
 
 	@if ! test -x "`which importenv 2>&1;true`"; then \
 	  echo 'Warn: importenv is not installed, building....' >&2 ; \
-	  gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
+	  sudo gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
 	fi
 
 requirements:

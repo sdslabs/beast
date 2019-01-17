@@ -18,8 +18,8 @@ Beast is a service that runs on your host(may be a bare metal server or a cloud 
 
 ## Tech Stack
 
-Beast is writtern completely in Golang and comes with a clean REST API interface to trigger actions or interact with underlying functionalities.
-The REST API server is implemented using `gin` go library and uses JWT as an authentication mechanism. Being writtern in go, Beast is compiled into
+Beast is written completely in Golang and comes with a clean REST API interface to trigger actions or interact with underlying functionalities.
+The REST API server is implemented using `gin` go library and uses JWT as an authentication mechanism. Being written in go, Beast is compiled into
 a single binary which can run on any linux distribution.
 
 Beast uses Docker as a container runtimes to run challenges in a sandboxed environment. Note that container does not provide a very strong isolation, but our host is safe as long as there is no 0-day in linux kernel itself. Even though container provide a security layer for the challenges, we follow some practices to harden those security measures.

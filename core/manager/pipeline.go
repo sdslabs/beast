@@ -127,7 +127,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		defer logFile.Close()
 
 		logFile.Write(buff.Bytes())
-		log.Debug("Logs writterned to log file for the challenge")
+		log.Debug("Logs written to log file for the challenge")
 	}
 
 	if buildErr != nil {
@@ -388,7 +388,7 @@ func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) {
 	if err != nil {
 		notify.SendNotificationToSlack(notify.Error, err.Error())
 	} else {
-		msg := fmt.Sprintf("DEPLOY SUCCESS : %s : Challenge deployment pieline successful.", challengeName)
+		msg := fmt.Sprintf("DEPLOY SUCCESS : %s : Challenge deployment pipeline successful.", challengeName)
 		notify.SendNotificationToSlack(notify.Success, msg)
 	}
 

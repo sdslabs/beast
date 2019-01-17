@@ -14,6 +14,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
 )
 
@@ -155,7 +156,7 @@ func generateContentAuthorizedKeyFile(author *Author) ([]byte, error) {
 
 //adds to authorized keys
 func addToAuthorizedKeys(author *Author) error {
-	f, err := os.OpenFile(core.AUTHORIZED_KEYS_FILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(config.Cfg.AuthorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("Error while opening authorized keys file : %s", err)
 	}
@@ -166,6 +167,8 @@ func addToAuthorizedKeys(author *Author) error {
 		return err
 	}
 
+	authBytes = bytes.Replace(authBytes, []byte("&#43;"), []byte("+"), -1)
+
 	if _, err := f.Write(authBytes); err != nil {
 		return fmt.Errorf("Error while appending key to authorized keys file : %s", err)
 	}
@@ -174,7 +177,7 @@ func addToAuthorizedKeys(author *Author) error {
 
 func deleteFromAuthorizedKeys(author *Author) error {
 
-	keys, err := ioutil.ReadFile(core.AUTHORIZED_KEYS_FILE)
+	keys, err := ioutil.ReadFile(config.Cfg.AuthorizedKeysFile)
 	if err != nil {
 		return fmt.Errorf("Error while reading auth file : %s", err)
 	}
@@ -184,7 +187,7 @@ func deleteFromAuthorizedKeys(author *Author) error {
 	re := regexp.MustCompile(regex)
 	newKeys := []byte(re.ReplaceAllString(string(keys), ""))
 
-	err = ioutil.WriteFile(core.AUTHORIZED_KEYS_FILE, newKeys, 0644)
+	err = ioutil.WriteFile(config.Cfg.AuthorizedKeysFile, newKeys, 0644)
 	if err != nil {
 		return fmt.Errorf("Error while writing to auth file : %s", err)
 	}
