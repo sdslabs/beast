@@ -34,6 +34,10 @@ func QueryAuthorEntries(key string, value string) ([]Author, error) {
 	queryKey := fmt.Sprintf("%s = ?", key)
 
 	var authors []Author
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
 	tx := Db.Where(queryKey, value).Find(&authors)
 	if tx.RecordNotFound() {
 		return nil, nil
@@ -65,6 +69,8 @@ func QueryFirstAuthorEntry(key string, value string) (Author, error) {
 // It returns an error if anything wrong happen during the
 // transaction.
 func CreateAuthorEntry(author *Author) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
 	tx := Db.Begin()
 
 	if tx.Error != nil {
@@ -79,9 +85,21 @@ func CreateAuthorEntry(author *Author) error {
 	return tx.Commit().Error
 }
 
+// Update an entry for the author in the Author table
+func UpdateAuthor(author *Author, m map[string]interface{}) error {
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	return Db.Model(author).Update(m).Error
+}
+
 //Get Related Challenges
 func GetRelatedChallenges(author *Author) []Challenge {
 	var challenges []Challenge
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
 
 	Db.Model(author).Related(&challenges)
 

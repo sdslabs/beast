@@ -48,7 +48,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 			return err
 		}
 
-		database.Db.Model(chall).Update("ContainerId", utils.GetTempContainerId(chall.Name))
+		database.UpdateChallenge(chall, map[string]interface{}{"ContainerId": utils.GetTempContainerId(chall.Name)})
 	}
 
 	err := CleanupContainerByFilter("name", utils.EncodeID(config.Challenge.Metadata.Name))
@@ -62,7 +62,7 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 		return err
 	}
 
-	database.Db.Model(&chall).Update("ImageId", utils.GetTempImageId(chall.Name))
+	database.UpdateChallenge(chall, map[string]interface{}{"ImageId": utils.GetTempImageId(chall.Name)})
 
 	return nil
 }

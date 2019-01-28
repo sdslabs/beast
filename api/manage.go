@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/manager"
@@ -26,10 +27,10 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 	switch action {
 	case MANAGE_ACTION_DEPLOY:
 		log.Infof("Starting deploy for all challenges")
-		err := manager.DeployAll(true)
+		msgs := manager.DeployAll(true)
 		var msg string
-		if err != nil {
-			msg = fmt.Sprintf("%s", err)
+		if len(msgs) != 0 {
+			msg = strings.Join(msgs, " ::: ")
 		} else {
 			msg = "Deploy for all challeges started"
 		}
@@ -65,28 +66,28 @@ func manageChallengeHandler(c *gin.Context) {
 
 	switch action {
 	case MANAGE_ACTION_UNDEPLOY:
-		if err := manager.UndeployChallenge(identifier, false); err != nil {
+		if err := manager.UndeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})
 			return
 		}
 
-		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, identifier)
+		respStr := fmt.Sprintf("Your action %s on challenge %s has started", action, identifier)
 		c.JSON(http.StatusOK, gin.H{
 			"message": respStr,
 		})
 		return
 
 	case MANAGE_ACTION_PURGE:
-		if err := manager.UndeployChallenge(identifier, true); err != nil {
+		if err := manager.UndeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})
 			return
 		}
 
-		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, identifier)
+		respStr := fmt.Sprintf("Your action %s on challenge %s has started", action, identifier)
 		c.JSON(http.StatusOK, gin.H{
 			"message": respStr,
 		})
@@ -94,7 +95,7 @@ func manageChallengeHandler(c *gin.Context) {
 
 	case MANAGE_ACTION_REDEPLOY:
 		// Redeploying a challenge means to first purge the challenge and then try to deploy it.
-		if err := manager.UndeployChallenge(identifier, true); err != nil {
+		if err := manager.UndeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})

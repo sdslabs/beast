@@ -19,13 +19,16 @@ type Port struct {
 // transaction. If the entry already exists then it does not
 // do anything and returns.
 func PortEntryGetOrCreate(port Port) (Port, error) {
+	var portEntry Port
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
 	tx := Db.Begin()
 
 	if tx.Error != nil {
 		return Port{}, fmt.Errorf("Error while starting transaction : %s", tx.Error)
 	}
-
-	var portEntry Port
 
 	if tx.Where("port_no = ?", port.PortNo).First(&portEntry).RecordNotFound() {
 		if err := tx.Create(&port).Error; err != nil {
@@ -45,6 +48,10 @@ func PortEntryGetOrCreate(port Port) (Port, error) {
 
 func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 	var ports []Port
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
 	err := Db.Model(&challenge).Related(&ports).Error
 
 	if err != nil {
@@ -55,6 +62,10 @@ func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 }
 
 func DeleteRelatedPorts(portList []Port) error {
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
 	tx := Db.Begin()
 
 	if tx.Error != nil {

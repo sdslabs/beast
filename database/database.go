@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	mutex *sync.Mutex
+	DBMux *sync.Mutex
 	Db    *gorm.DB
 	dberr error
 )
@@ -26,7 +26,7 @@ var (
 // database, which is not closed after creating a connection here and can
 // be used further after this.
 func init() {
-	mutex = &sync.Mutex{}
+	DBMux = &sync.Mutex{}
 
 	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
 	Db, dberr = gorm.Open("sqlite3", beastDb)

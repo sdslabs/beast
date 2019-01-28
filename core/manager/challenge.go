@@ -33,8 +33,17 @@ func DeployChallengePipeline(challengeDir string) error {
 	}
 
 	// Start a goroutine to start a deploy pipeline for the challenge
-	go StartDeployPipeline(challengeDir, false, false)
-
+	challengeName := filepath.Base(challengeDir)
+	info := DeployInfo{
+		ChallDir:   challengeDir,
+		SkipStage:  false,
+		SkipCommit: false,
+	}
+	Q.CheckPush(Work{
+		Action:    core.DEPLOY,
+		ChallName: challengeName,
+		Info:      info,
+	})
 	return nil
 }
 
@@ -75,7 +84,7 @@ func DeployChallenge(challengeName string) error {
 			log.Debugf("Found an already running instance of the challenge with container ID %s", challenge.ContainerId)
 			return fmt.Errorf("Challenge already deployed")
 		} else {
-			if err = database.Db.Model(&challenge).Update("ContainerId", utils.GetTempContainerId(challengeName)).Error; err != nil {
+			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ContainerId": utils.GetTempContainerId(challengeName)}); err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
 				return errors.New("DATABASE ERROR")
 			}
@@ -96,17 +105,25 @@ func DeployChallenge(challengeName string) error {
 			log.Debugf("Challenge is already in commited stage, deploying from existing image.")
 			// Challenge is already in commited stage here, so skip commit and stage step and start
 			// deployment of the challenge.
-			go StartDeployPipeline(challengeStagingDir, true, true)
-			return nil
+			info := DeployInfo{
+				ChallDir:   challengeStagingDir,
+				SkipStage:  true,
+				SkipCommit: true,
+			}
+			return Q.CheckPush(Work{
+				Action:    core.DEPLOY,
+				ChallName: challengeName,
+				Info:      info,
+			})
 		} else {
-			if err = database.Db.Model(&challenge).Update("ImageId", utils.GetTempImageId(challengeName)).Error; err != nil {
+			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ImageId": utils.GetTempImageId(challengeName)}); err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
 				return errors.New("DATABASE ERROR")
 			}
 		}
 	}
 
-	// TODO: Later replace this with a manifest file, containing information about the
+	// TODO: Later replace this with a manifest file, containing Information about the
 	// staged challenge. Currently this staging will only check for non static challenges
 	// so static challenges will be redeployed each time. Later we can improve this by adding this
 	// test to the manifest file.
@@ -126,24 +143,43 @@ func DeployChallenge(challengeName string) error {
 			return errors.New("CHALLENGE VALIDATION ERROR")
 		}
 
-		go StartDeployPipeline(challengeDir, false, false)
+		info := DeployInfo{
+			ChallDir:   challengeDir,
+			SkipStage:  false,
+			SkipCommit: false,
+		}
+		return Q.CheckPush(Work{
+			Action:    core.DEPLOY,
+			ChallName: challengeName,
+			Info:      info,
+		})
 	} else {
 		// Challenge is in staged state, so start the deploy pipeline and skip
 		// the staging state.
 		log.Infof("The requested challenge with Name %s is already staged, starting deploy...", challengeName)
-		go StartDeployPipeline(challengeStagingDir, true, false)
-	}
 
-	return nil
+		info := DeployInfo{
+			ChallDir:   challengeStagingDir,
+			SkipStage:  true,
+			SkipCommit: false,
+		}
+		return Q.CheckPush(Work{
+			Action:    core.DEPLOY,
+			ChallName: challengeName,
+			Info:      info,
+		})
+	}
 }
 
 // Deploy multiple challenges simultaneously.
 // When we have multiple challenges we spawn X goroutines and distribute
 // deployments in those goroutines. The work for these worker goroutines is specified
 // in deployList, which contains the name of the challenges to be deployed.
-func DeployMultipleChallenges(deployList []string) {
+func DeployMultipleChallenges(deployList []string) []string {
 	deployList = utils.GetUniqueStrings(deployList)
 	log.Infof("Starting deploy for the following challenge list : %v", deployList)
+
+	errstrings := []string{}
 
 	for _, chall := range deployList {
 		log.Infof("Starting to push %s challenge to deploy queue", chall)
@@ -151,15 +187,17 @@ func DeployMultipleChallenges(deployList []string) {
 		err := DeployChallenge(chall)
 		if err != nil {
 			log.Errorf("Cannot start deploy for challenge : %s due to : %s", chall, err)
+			errstrings = append(errstrings, err.Error())
 			continue
 		}
 
 		log.Infof("Started deploy for challenge : %s", chall)
 	}
+	return errstrings
 }
 
 // Deploy all challenges.
-func DeployAll(sync bool) error {
+func DeployAll(sync bool) []string {
 	log.Infof("Got request to deploy ALL CHALLENGES")
 	if sync {
 		err := git.SyncBeastRemote()
@@ -168,7 +206,7 @@ func DeployAll(sync bool) error {
 			// is up to date. This ignores this error.
 			if !strings.Contains(err.Error(), "already up-to-date") {
 				log.Warnf("Error while syncing beast for DEPLOY_ALL : %s ...", err)
-				return fmt.Errorf("GIT_REMOTE_SYNC_ERROR")
+				return []string{fmt.Sprintf("GIT_REMOTE_SYNC_ERROR")}
 			}
 		}
 
@@ -179,7 +217,7 @@ func DeployAll(sync bool) error {
 	err, challenges := utils.GetDirsInDir(challengesDirRoot)
 	if err != nil {
 		log.Errorf("DEPLOY_ALL : Error while getting available challenges : %s", err)
-		return fmt.Errorf("DIRECTORY_ACCESS_ERROR")
+		return []string{fmt.Sprintf("DIRECTORY_ACCESS_ERROR")}
 	}
 
 	var challsNameList []string
@@ -187,8 +225,7 @@ func DeployAll(sync bool) error {
 		challsNameList = append(challsNameList, chall)
 	}
 
-	go DeployMultipleChallenges(challsNameList)
-	return nil
+	return DeployMultipleChallenges(challsNameList)
 }
 
 // Unstage a challenge based on the challenge name.
@@ -197,7 +234,7 @@ func unstageChallenge(challengeName string) error {
 	challengeStagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	err := utils.ValidateDirExists(challengeStagedDir)
 	if err != nil {
-		log.Warnf("Chanllenge staging directory for challenge %s does not exist, continuing...", challengeName)
+		log.Warnf("Challenge staging directory for challenge %s does not exist, continuing...", challengeName)
 		return nil
 	}
 
@@ -247,13 +284,13 @@ func undeployChallenge(challengeName string, purge bool) error {
 		}
 	}
 
-	tx := database.Db.Model(&challenge).Updates(map[string]interface{}{
+	tx := database.UpdateChallenge(&challenge, map[string]interface{}{
 		"Status":      core.DEPLOY_STATUS["unknown"],
 		"ContainerId": utils.GetTempContainerId(challengeName),
 	})
 
 	if tx.Error != nil {
-		log.Error(tx.Error.Error())
+		log.Error(tx.Error)
 		return fmt.Errorf("Error while updating the challenge : %s", tx.Error)
 	}
 
@@ -286,7 +323,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 	return nil
 }
 
-func UndeployChallenge(challengeName string, purge bool) error {
+func StartUndeployChallenge(challengeName string, purge bool) error {
 	err := undeployChallenge(challengeName, purge)
 	if err != nil {
 		msg := fmt.Sprintf("UNDEPLOY ERROR: %s : %s", challengeName, err)
@@ -300,4 +337,25 @@ func UndeployChallenge(challengeName string, purge bool) error {
 
 	log.Infof("Notification for the event sent to slack.")
 	return err
+}
+
+func UndeployChallenge(challengeName string) error {
+	return Q.CheckPush(Work{
+		Action:    core.UNDEPLOY,
+		ChallName: challengeName,
+	})
+}
+
+func PurgeChallenge(challengeName string) error {
+	return Q.CheckPush(Work{
+		Action:    core.PURGE,
+		ChallName: challengeName,
+	})
+}
+
+func RedeployChallenge(challengeName string) error {
+	return Q.CheckPush(Work{
+		Action:    core.REDEPLOY,
+		ChallName: challengeName,
+	})
 }
