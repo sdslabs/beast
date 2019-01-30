@@ -9,6 +9,7 @@ import (
 	swaggerFiles "github.com/swaggo/gin-swagger/swaggerFiles"
 
 	_ "github.com/sdslabs/beastv4/api/docs"
+	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/git"
 )
 
@@ -42,6 +43,9 @@ func RunBeastApiServer(port string) {
 	} else {
 		port = DEFAULT_BEAST_PORT
 	}
+
+	manager.InitQueue()
+	manager.StartWorkers()
 
 	runBeastApiBootsteps()
 

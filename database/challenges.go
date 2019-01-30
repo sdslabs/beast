@@ -53,6 +53,10 @@ type Challenge struct {
 // It returns an error if anything wrong happen during the
 // transaction.
 func CreateChallengeEntry(challenge *Challenge) error {
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
 	tx := Db.Begin()
 
 	if tx.Error != nil {
@@ -71,6 +75,9 @@ func CreateChallengeEntry(challenge *Challenge) error {
 func QueryAllChallenges() ([]Challenge, error) {
 	var challenges []Challenge
 
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
 	tx := Db.Find(&challenges)
 	if tx.RecordNotFound() {
 		return nil, nil
@@ -85,6 +92,10 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 	queryKey := fmt.Sprintf("%s = ?", key)
 
 	var challenges []Challenge
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
 	tx := Db.Where(queryKey, value).Find(&challenges)
 	if tx.RecordNotFound() {
 		return nil, nil
@@ -112,14 +123,26 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 	return challenges[0], nil
 }
 
+// Update an entry for the challenge in the Challenge table
+func UpdateChallenge(chall *Challenge, m map[string]interface{}) error {
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	return Db.Model(chall).Update(m).Error
+}
+
 // This function updates a challenge entry in the database, whereMap is the map
 // which contains key value pairs of column and values to filter out the record
 // to update. chall is the Challenge variable with the values to update with.
 // This function returns any error that might occur while updating the challenge
 // entry which includes the error in case the challenge already does not exist in the
 // database.
-func UpdateChallengeEntry(whereMap map[string]interface{}, chall Challenge) error {
+func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) error {
 	var challenge Challenge
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
 
 	tx := Db.Where(whereMap).First(&challenge)
 	if tx.RecordNotFound() {

@@ -79,7 +79,7 @@ func GenerateAuthChallenge(username string) (string, error) {
 	rMessage := make([]byte, 128)
 	rand.Read(rMessage)
 
-	database.Db.Model(&author).Update("AuthChallenge", rMessage)
+	database.UpdateAuthor(&author, map[string]interface{}{"AuthChallenge": rMessage})
 
 	encMessage, err := EncryptMessage(rMessage, author.SshKey)
 	if err != nil {

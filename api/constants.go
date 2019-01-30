@@ -42,9 +42,4 @@ Namespaces with routes:
 `
 
 	WIP_TEXT = "WORK IN PROGRESS"
-
-	MANAGE_ACTION_UNDEPLOY = "undeploy"
-	MANAGE_ACTION_DEPLOY   = "deploy"
-	MANAGE_ACTION_PURGE    = "purge"
-	MANAGE_ACTION_REDEPLOY = "redeploy"
 )

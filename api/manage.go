@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/manager"
 	log "github.com/sirupsen/logrus"
 )
@@ -24,12 +26,12 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 	action := c.Param("action")
 
 	switch action {
-	case MANAGE_ACTION_DEPLOY:
+	case core.MANAGE_ACTION_DEPLOY:
 		log.Infof("Starting deploy for all challenges")
-		err := manager.DeployAll(true)
+		msgs := manager.DeployAll(true)
 		var msg string
-		if err != nil {
-			msg = fmt.Sprintf("%s", err)
+		if len(msgs) != 0 {
+			msg = strings.Join(msgs, " ::: ")
 		} else {
 			msg = "Deploy for all challeges started"
 		}
@@ -64,37 +66,37 @@ func manageChallengeHandler(c *gin.Context) {
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 
 	switch action {
-	case MANAGE_ACTION_UNDEPLOY:
-		if err := manager.UndeployChallenge(identifier, false); err != nil {
+	case core.MANAGE_ACTION_UNDEPLOY:
+		if err := manager.UndeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})
 			return
 		}
 
-		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, identifier)
+		respStr := fmt.Sprintf("Your action %s on challenge %s has started", action, identifier)
 		c.JSON(http.StatusOK, gin.H{
 			"message": respStr,
 		})
 		return
 
-	case MANAGE_ACTION_PURGE:
-		if err := manager.UndeployChallenge(identifier, true); err != nil {
+	case core.MANAGE_ACTION_PURGE:
+		if err := manager.UndeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})
 			return
 		}
 
-		respStr := fmt.Sprintf("Your action %s on challenge %s was successful", action, identifier)
+		respStr := fmt.Sprintf("Your action %s on challenge %s has started", action, identifier)
 		c.JSON(http.StatusOK, gin.H{
 			"message": respStr,
 		})
 		return
 
-	case MANAGE_ACTION_REDEPLOY:
+	case core.MANAGE_ACTION_REDEPLOY:
 		// Redeploying a challenge means to first purge the challenge and then try to deploy it.
-		if err := manager.UndeployChallenge(identifier, true); err != nil {
+		if err := manager.UndeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})
@@ -108,7 +110,7 @@ func manageChallengeHandler(c *gin.Context) {
 			return
 		}
 
-	case MANAGE_ACTION_DEPLOY:
+	case core.MANAGE_ACTION_DEPLOY:
 		// For deploy, identifier is name
 		if err := manager.DeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -179,14 +181,14 @@ func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
 
 	switch action {
-	case MANAGE_ACTION_DEPLOY:
+	case core.MANAGE_ACTION_DEPLOY:
 		go manager.DeployStaticContentContainer()
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Static container deploy started",
 		})
 		return
 
-	case MANAGE_ACTION_UNDEPLOY:
+	case core.MANAGE_ACTION_UNDEPLOY:
 		go manager.UndeployStaticContentContainer()
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Static content container undeploy started",

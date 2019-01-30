@@ -42,6 +42,11 @@ const (
 	ALLOWED_MAX_PORT_VALUE         uint32 = 20000
 	IMAGE_NA                       string = "IMAGE_NA"
 	CONTAINER_NA                   string = "CONTAINER_NA"
+	MANAGE_ACTION_UNDEPLOY         string = "undeploy"
+	MANAGE_ACTION_DEPLOY           string = "deploy"
+	MANAGE_ACTION_PURGE            string = "purge"
+	MANAGE_ACTION_REDEPLOY         string = "redeploy"
+	MAX_QUEUE_SIZE                 uint32 = 100
 )
 
 var DEPLOY_STATUS = map[string]string{

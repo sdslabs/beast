@@ -140,7 +140,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return fmt.Errorf("Error while getting imageId for the commited challenge")
 	}
 
-	if err = database.Db.Model(&challenge).Update("ImageId", imageId).Error; err != nil {
+	if err = database.UpdateChallenge(challenge, map[string]interface{}{"ImageId": imageId}); err != nil {
 		return fmt.Errorf("Error while writing imageId to database : %s", err)
 	}
 
@@ -194,7 +194,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	containerId, err := docker.CreateContainerFromImage(&containerConfig)
 	if err != nil {
 		if containerId != "" {
-			if e := database.Db.Model(&challenge).Update("ContainerId", containerId).Error; e != nil {
+			if e := database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": containerId}); e != nil {
 				return fmt.Errorf("Error while starting container : %s and saving database : %s", err, e)
 			}
 
@@ -205,7 +205,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	challenge.ContainerId = containerId
-	if err = database.Db.Model(&challenge).Update("ContainerId", containerId).Error; err != nil {
+	if err = database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": containerId}); err != nil {
 		return fmt.Errorf("Error while saving containerId to database : %s", err)
 	}
 
@@ -312,7 +312,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	stagedChallengePath := filepath.Join(stagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
 
 	if !skipStage {
-		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["staging"])
+		database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["staging"]})
 
 		err = stageChallenge(challengeDir, &config)
 		if err != nil {
@@ -320,7 +320,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 				"DEPLOY_ERROR": "STAGING :: " + challengeName,
 			}).Errorf("%s", err)
 
-			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
+			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
 			return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, err)
 		}
 	} else {
@@ -340,7 +340,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	}
 
 	if !skipCommit {
-		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["committing"])
+		database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["committing"]})
 
 		err = commitChallenge(&challenge, config, stagedChallengePath)
 		if err != nil {
@@ -348,18 +348,18 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 				"DEPLOY_ERROR": "COMMIT :: " + challengeName,
 			}).Errorf("%s", err)
 
-			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
+			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
 			return fmt.Errorf("COMMIT ERROR: %s : %s", challengeName, err)
 		}
 	} else {
 		if challenge.ImageId == "" {
-			database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
+			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
 			return fmt.Errorf("COMMIT ERROR: Cannot skip commit step, no Image ID found for challenge.")
 		}
 		log.Debugf("Skipping commit phase")
 	}
 
-	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["deploying"])
+	database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["deploying"]})
 
 	err = deployChallenge(&challenge, config)
 	if err != nil {
@@ -367,12 +367,12 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 			"DEPLOY_ERROR": "DEPLOY :: " + challengeName,
 		}).Errorf("%s", err)
 
-		database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["unknown"])
+		database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
 
 		return fmt.Errorf("DEPLOY ERROR: %s : %s", challengeName, err)
 	}
 
-	database.Db.Model(&challenge).Update("Status", core.DEPLOY_STATUS["deployed"])
+	database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["deployed"]})
 
 	log.Infof("CHALLENGE %s DEPLOYED SUCCESSFULLY", challengeName)
 
