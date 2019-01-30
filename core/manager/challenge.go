@@ -40,7 +40,7 @@ func DeployChallengePipeline(challengeDir string) error {
 		SkipCommit: false,
 	}
 	Q.CheckPush(Work{
-		Action:    core.DEPLOY,
+		Action:    core.MANAGE_ACTION_DEPLOY,
 		ChallName: challengeName,
 		Info:      info,
 	})
@@ -111,7 +111,7 @@ func DeployChallenge(challengeName string) error {
 				SkipCommit: true,
 			}
 			return Q.CheckPush(Work{
-				Action:    core.DEPLOY,
+				Action:    core.MANAGE_ACTION_DEPLOY,
 				ChallName: challengeName,
 				Info:      info,
 			})
@@ -149,7 +149,7 @@ func DeployChallenge(challengeName string) error {
 			SkipCommit: false,
 		}
 		return Q.CheckPush(Work{
-			Action:    core.DEPLOY,
+			Action:    core.MANAGE_ACTION_DEPLOY,
 			ChallName: challengeName,
 			Info:      info,
 		})
@@ -164,7 +164,7 @@ func DeployChallenge(challengeName string) error {
 			SkipCommit: false,
 		}
 		return Q.CheckPush(Work{
-			Action:    core.DEPLOY,
+			Action:    core.MANAGE_ACTION_DEPLOY,
 			ChallName: challengeName,
 			Info:      info,
 		})
@@ -341,21 +341,21 @@ func StartUndeployChallenge(challengeName string, purge bool) error {
 
 func UndeployChallenge(challengeName string) error {
 	return Q.CheckPush(Work{
-		Action:    core.UNDEPLOY,
+		Action:    core.MANAGE_ACTION_UNDEPLOY,
 		ChallName: challengeName,
 	})
 }
 
 func PurgeChallenge(challengeName string) error {
 	return Q.CheckPush(Work{
-		Action:    core.PURGE,
+		Action:    core.MANAGE_ACTION_PURGE,
 		ChallName: challengeName,
 	})
 }
 
 func RedeployChallenge(challengeName string) error {
 	return Q.CheckPush(Work{
-		Action:    core.REDEPLOY,
+		Action:    core.MANAGE_ACTION_REDEPLOY,
 		ChallName: challengeName,
 	})
 }
