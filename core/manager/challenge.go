@@ -284,14 +284,14 @@ func undeployChallenge(challengeName string, purge bool) error {
 		}
 	}
 
-	tx := database.UpdateChallenge(&challenge, map[string]interface{}{
+	err = database.UpdateChallenge(&challenge, map[string]interface{}{
 		"Status":      core.DEPLOY_STATUS["unknown"],
 		"ContainerId": utils.GetTempContainerId(challengeName),
 	})
 
-	if tx.Error != nil {
-		log.Error(tx.Error)
-		return fmt.Errorf("Error while updating the challenge : %s", tx.Error)
+	if err != nil {
+		log.Error(err)
+		return fmt.Errorf("Error while updating the challenge : %s", err)
 	}
 
 	log.Infof("Challenge undeploy successful for %s", challenge.Name)
