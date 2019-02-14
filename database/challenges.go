@@ -47,6 +47,7 @@ type Challenge struct {
 	Status      string `gorm:"not null;default:'Unknown'"`
 	AuthorID    uint   `gorm:"not null"`
 	Ports       []Port
+	Tags        []*Tag `gorm:"many2many:tag_challenges;"`
 }
 
 // Create an entry for the challenge in the Challenge table
@@ -157,6 +158,18 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 	tx = Db.Model(&challenge).Updates(chall)
 
 	return tx.Error
+}
+
+//Get Related Tags
+func GetRelatedTags(challenge *Challenge) []Tag {
+	var tags []Tag
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	Db.Model(challenge).Related(&tags, "Tags")
+
+	return tags
 }
 
 //hook after update of challenge

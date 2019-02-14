@@ -79,10 +79,11 @@ func (config *Challenge) ValidateRequiredFields() error {
 // * Name - relative path to the challenge setup scripts
 // * Type - Relative path to the directory which you want
 type ChallengeMetadata struct {
-	Flag    string `toml:"flag"`
-	Name    string `toml:"name"`
-	Type    string `toml:"type"`
-	Sidecar string `toml:"sidecar"`
+	Flag    string   `toml:"flag"`
+	Name    string   `toml:"name"`
+	Type    string   `toml:"type"`
+	Tags    []string `toml:"tags"`
+	Sidecar string   `toml:"sidecar"`
 }
 
 // In this validation returned boolean value represents if the challenge type is

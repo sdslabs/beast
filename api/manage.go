@@ -113,6 +113,45 @@ func manageChallengeHandler(c *gin.Context) {
 	})
 }
 
+// Handles route related to managing a challenges related to tag
+// @Summary Handles challenge management actions related to tag.
+// @Description Handles challenge management routes related to tags.
+// @Tags manage
+// @Accept  json
+// @Produce application/json
+// @Param tag query string true "tag of the challenges to be managed"
+// @Param action query string true "Action for the challenge"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/manage/challenge/ [post]
+func manageChallengeTagHandler(c *gin.Context) {
+
+	action := c.PostForm("action")
+	tag := c.PostForm("tag")
+
+	switch action {
+	case core.MANAGE_ACTION_DEPLOY:
+		log.Infof("Starting deploy for all challenges related to tags")
+		msgs := manager.DeployTagRelatedChallenges(tag)
+		var msg string
+		if len(msgs) != 0 {
+			msg = strings.Join(msgs, " ::: ")
+		} else {
+			msg = "Deploy for all challeges started"
+		}
+
+		c.JSON(http.StatusNotAcceptable, gin.H{
+			"message": msg,
+		})
+		break
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": fmt.Sprintf("Invalid Action : %s", action),
+		})
+	}
+}
+
 // Deploy local challenge
 // @Summary Deploy a local challenge using the path provided in the post parameter
 // @Description Handles deployment of a challenge using the absolute directory path
