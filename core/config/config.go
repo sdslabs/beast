@@ -42,6 +42,7 @@ type BeastConfig struct {
 	GitRemote          GitRemote `toml:"remote"`
 	JWTSecret          string    `toml:"jwt_secret"`
 	SlackWebHookURL    string    `toml:"slack_webhook"`
+	TickerSeconds      int       `toml:"ticker_seconds"`
 }
 
 func (config *BeastConfig) ValidateConfig() error {
@@ -87,6 +88,11 @@ func (config *BeastConfig) ValidateConfig() error {
 	err := config.GitRemote.ValidateGitConfig()
 	if err != nil {
 		return err
+	}
+
+	if config.TickerSeconds <= 0 {
+		log.Error("Time is not provided or is less than equal to zero so default time is taken")
+		config.TickerSeconds = core.DEFAULT_TICKER_SECONDS
 	}
 
 	return nil
