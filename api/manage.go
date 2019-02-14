@@ -74,36 +74,17 @@ func manageChallengeHandler(c *gin.Context) {
 			return
 		}
 
-		respStr := fmt.Sprintf("Your action %s on challenge %s has started", action, identifier)
-		c.JSON(http.StatusOK, gin.H{
-			"message": respStr,
-		})
-		return
-
 	case core.MANAGE_ACTION_PURGE:
-		if err := manager.UndeployChallenge(identifier); err != nil {
+		if err := manager.PurgeChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})
 			return
 		}
-
-		respStr := fmt.Sprintf("Your action %s on challenge %s has started", action, identifier)
-		c.JSON(http.StatusOK, gin.H{
-			"message": respStr,
-		})
-		return
 
 	case core.MANAGE_ACTION_REDEPLOY:
 		// Redeploying a challenge means to first purge the challenge and then try to deploy it.
-		if err := manager.UndeployChallenge(identifier); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": err.Error(),
-			})
-			return
-		}
-
-		if err := manager.DeployChallenge(identifier); err != nil {
+		if err := manager.RedeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
 			})

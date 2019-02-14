@@ -34,6 +34,7 @@ func (q *Queue) CheckPush(w Work) error {
 	q.Mux.Lock()
 	if _, ex := q.Set[w.ChallName]; ex {
 		q.Mux.Unlock()
+		log.Warnf("The challenge : %s is already in queue", w.ChallName)
 		return fmt.Errorf("The challenge : %s is already in queue", w.ChallName)
 	}
 	q.Set[w.ChallName] = true

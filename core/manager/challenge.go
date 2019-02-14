@@ -102,9 +102,10 @@ func DeployChallenge(challengeName string) error {
 
 		if imageExist {
 			log.Debugf("Found a commited instance of the challenge with image ID %s", challenge.ImageId)
-			log.Debugf("Challenge is already in commited stage, deploying from existing image.")
+			log.Debugf("Challenge is already in commited stage.")
 			// Challenge is already in commited stage here, so skip commit and stage step and start
 			// deployment of the challenge.
+			log.Debugf("Checking and pushing the task of deploying commited challenge in the queue.")
 			info := DeployInfo{
 				ChallDir:   challengeStagingDir,
 				SkipStage:  true,
@@ -128,7 +129,7 @@ func DeployChallenge(challengeName string) error {
 	// so static challenges will be redeployed each time. Later we can improve this by adding this
 	// test to the manifest file.
 	stagedFileName := filepath.Join(challengeStagingDir, fmt.Sprintf("%s.tar.gz", challengeName))
-	log.Infof("No challenge exists with the provided challenge name, starting deploy for new instance")
+	log.Infof("No challenge exists with the provided challenge name.")
 
 	// Check if the challenge is in staged state, it it is start the
 	// pipeline from there on, else start deploy pipeline for the challenge
@@ -143,6 +144,8 @@ func DeployChallenge(challengeName string) error {
 			return errors.New("CHALLENGE VALIDATION ERROR")
 		}
 
+		log.Debugf("Checking and pushing the task of deploying unstaged challenge in the queue.")
+
 		info := DeployInfo{
 			ChallDir:   challengeDir,
 			SkipStage:  false,
@@ -156,7 +159,9 @@ func DeployChallenge(challengeName string) error {
 	} else {
 		// Challenge is in staged state, so start the deploy pipeline and skip
 		// the staging state.
-		log.Infof("The requested challenge with Name %s is already staged, starting deploy...", challengeName)
+		log.Infof("The requested challenge with Name %s is already staged.", challengeName)
+
+		log.Debugf("Checking and pushing the task of deploying staged challenge in the queue.")
 
 		info := DeployInfo{
 			ChallDir:   challengeStagingDir,
