@@ -10,6 +10,6 @@ var dockerLogsCmd = &cobra.Command{
 	Short: "Provides live logs of a container",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		utils.ShowLogs(args[0])
+		utils.GetLogs(args[0], true)
 	},
 }

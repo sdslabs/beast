@@ -25,6 +25,11 @@ type CreateContainerConfig struct {
 	ContainerNetwork string
 }
 
+type Log struct {
+	Stderr string
+	Stdout string
+}
+
 func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -134,7 +139,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	return containerId, nil
 }
 
-func GiveDockerLogs(containerID string) ([]string, error) {
+func GetDockerStdLogs(containerID string) (*Log, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		return nil, err
@@ -162,10 +167,10 @@ func GiveDockerLogs(containerID string) ([]string, error) {
 
 	stderrlogs, _ := ioutil.ReadAll(stderr)
 
-	return []string{string(stdoutlogs), string(stderrlogs)}, nil
+	return &Log{Stdout: string(stdoutlogs), Stderr: string(stderrlogs)}, nil
 }
 
-func ShowDockerLogsLive(containerID string) {
+func ShowLiveDockerLogs(containerID string) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		log.Error(err)

@@ -192,18 +192,23 @@ func beastStaticContentHandler(c *gin.Context) {
 // @Produce application/json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/static/:action [post]
+// @Router /api/manage/logs/ [post]
 func challengeLogsHandler(c *gin.Context) {
 	chall := c.PostForm("name")
-	msgs, err := utils.GetLogs(chall)
+	if chall == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Name cannot be empty"),
+		})
+	}
+	logs, err := utils.GetLogs(chall, false)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 	} else {
 		c.JSON(http.StatusOK, gin.H{
-			"stdout": msgs[0],
-			"stderr": msgs[1],
+			"stdout": logs.Stdout,
+			"stderr": logs.Stderr,
 		})
 	}
 }
