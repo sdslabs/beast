@@ -8,10 +8,11 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/notify"
 	log "github.com/sirupsen/logrus"
 )
 
-func HealthTicker(sec int) {
+func ChallengesHealthTicker(sec int) {
 	for {
 		time.Sleep(time.Duration(sec) * time.Second)
 
@@ -29,12 +30,16 @@ func HealthTicker(sec int) {
 				allocatedPorts, err := database.GetAllocatedPorts(chall)
 				if err != nil {
 					log.Errorf("Error while accessing database : %v", err)
+					continue
 				}
 				err = HealthChecker(int(allocatedPorts[0].PortNo))
 				if err != nil {
 					log.WithFields(log.Fields{
 						"ChallName": chall.Name,
 					}).Error(err)
+					msg := fmt.Sprintf("HEALTHCHECK ERROR: %s : %s", chall.Name, err)
+					log.Error(msg)
+					notify.SendNotificationToSlack(notify.Error, msg)
 				}
 			}
 		}
@@ -42,7 +47,7 @@ func HealthTicker(sec int) {
 }
 
 func HealthChecker(port int) error {
-	conn, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port))
+	conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", strconv.Itoa(port)))
 	if err != nil {
 		return fmt.Errorf("May be the container stopped : %v", err)
 	}

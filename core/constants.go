@@ -47,7 +47,7 @@ const (
 	MANAGE_ACTION_PURGE            string = "purge"
 	MANAGE_ACTION_REDEPLOY         string = "redeploy"
 	MAX_QUEUE_SIZE                 uint32 = 100
-	DEFAULT_TICKER_SECONDS         int    = 1500
+	DEFAULT_TICKER_FREQUENCY       int    = 1500
 )
 
 var DEPLOY_STATUS = map[string]string{

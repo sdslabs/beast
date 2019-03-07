@@ -71,7 +71,7 @@ func RunBeastApiServer(port string) {
 		})
 	})
 
-	go utils.HealthTicker(config.Cfg.TickerSeconds)
+	go utils.ChallengesHealthTicker(config.Cfg.TickerFrequency)
 
 	router.Run(port)
 }
