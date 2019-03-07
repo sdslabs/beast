@@ -108,6 +108,26 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 	return challenges, nil
 }
 
+// Queries all the challenges entries where the column matches
+func QueryChallengeEntriesMap(whereMap map[string]interface{}) ([]Challenge, error) {
+
+	var challenges []Challenge
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where(whereMap).Find(&challenges)
+	if tx.RecordNotFound() {
+		return nil, nil
+	}
+
+	if tx.Error != nil {
+		return challenges, tx.Error
+	}
+
+	return challenges, nil
+}
+
 // Using the column value in key and value in value get the first
 // result of the query.
 func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {

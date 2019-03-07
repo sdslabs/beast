@@ -9,7 +9,9 @@ import (
 	swaggerFiles "github.com/swaggo/gin-swagger/swaggerFiles"
 
 	_ "github.com/sdslabs/beastv4/api/docs"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
+	"github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/git"
 )
 
@@ -68,6 +70,8 @@ func RunBeastApiServer(port string) {
 			"message": HELP_TEXT,
 		})
 	})
+
+	go utils.ChallengesHealthTicker(config.Cfg.TickerFrequency)
 
 	router.Run(port)
 }
