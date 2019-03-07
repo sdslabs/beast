@@ -22,7 +22,6 @@ else
 		beast-static
 fi
 
-cd $CWD
 echo -e "\n\nBuilding beast extras sidecar images: MYSQL\n"
 cd "${CWD}/extras/sidecars/mysql"
 
@@ -35,7 +34,7 @@ fi
 if docker network ls | grep -q 'beast-mysql'; then
 	echo "Network for beast-mysql sidecar already exists."
 else
-	docker nework create beast-mysql
+	docker network create beast-mysql
 fi
 
 if docker ps -a | grep -q 'mysql'; then
@@ -45,4 +44,29 @@ else
 		--name mysql --network beast-mysql \
 		--env MYSQL_ROOT_PASSWORD=$(openssl rand -hex 20) \
 		beast-mysql
+fi
+
+echo -e "\n\nBuilding beast extras sidecar images: MONGO\n"
+cd "${CWD}/extras/sidecars/mongo"
+
+if docker images | grep -q 'beast-mongo'; then
+	echo "Image for beast-mongo container already exists."
+else
+	docker build . --tag beast-mongo:latest
+fi
+
+if docker network ls | grep -q 'beast-mongo'; then
+	echo "Network for beast-mongo sidecar already exists."
+else
+	docker network create beast-mongo
+fi
+
+if docker ps -a | grep -q 'mongo'; then
+	echo "Container for mongo sidecar with name mongo already exists."
+else
+	docker run -d -p 127.0.0.1:9501:9501 \
+		--name mongo --network beast-mongo \
+        -e MONGO_INITDB_ROOT_USERNAME=$(openssl rand -hex 20) \
+        -e MONGO_INITDB_ROOT_PASSWORD=$(openssl rand -hex 20) \
+        beast-mongo
 fi
