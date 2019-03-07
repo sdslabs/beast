@@ -120,7 +120,7 @@ func getCommandForWebChall(language, framework, webRoot, port string) string {
 			cmd = "php -S 0.0.0.0:"
 		}
 	case "node":
-		cmd = "node server.js"
+		cmd = "npm install && node server.js "
 	case "python":
 		switch framework {
 		case "django":

@@ -59,17 +59,21 @@ var DEPLOY_STATUS = map[string]string{
 }
 
 const MYSQL_SIDECAR_HOST = "mysql"
+const MONGO_SIDECAR_HOST = "mongo"
 
 var SIDECAR_CONTAINER_MAP = map[string]string{
 	"mysql": "mysql",
+	"mongo": "mongo",
 }
 
 var SIDECAR_NETWORK_MAP = map[string]string{
 	"mysql": "beast-mysql",
+	"mongo": "beast-mongo",
 }
 
 var SIDECAR_ENV_PREFIX = map[string]string{
 	"mysql": "MYSQL",
+	"mongo": "MONGO",
 }
 
 // Available challenge types

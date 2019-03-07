@@ -2,7 +2,7 @@ module github.com/sdslabs/beastv4
 
 require (
 	cloud.google.com/go v0.28.0 // indirect
-	github.com/BurntSushi/toml v0.3.0
+	github.com/BurntSushi/toml v0.3.1
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/PuerkitoBio/purell v1.1.0 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
@@ -35,6 +35,7 @@ require (
 	github.com/jinzhu/now v0.0.0-20180511015916-ed742868f2ae // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20180830205328-81db2a75821e // indirect
+	github.com/kisielk/gotool v1.0.0 // indirect
 	github.com/lib/pq v1.0.0 // indirect
 	github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
@@ -42,6 +43,7 @@ require (
 	github.com/mitchellh/go-homedir v1.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
+	github.com/mongodb/mongo-go-driver v0.3.0 // indirect
 	github.com/onsi/gomega v1.4.2 // indirect
 	github.com/pelletier/go-buffruneio v0.2.0 // indirect
 	github.com/pkg/errors v0.8.0 // indirect
@@ -60,7 +62,7 @@ require (
 	golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b
 	golang.org/x/net v0.0.0-20180906233101-161cd47e91fd
 	google.golang.org/appengine v1.2.0 // indirect
-	google.golang.org/grpc v1.17.0
+	google.golang.org/grpc v1.19.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect
 	gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect

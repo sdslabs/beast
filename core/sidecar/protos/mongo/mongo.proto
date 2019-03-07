@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package protobuf;
+
+
+// Interface for the mongo service.
+service MongoService {
+  // RPC to create a new Mongo instance, an instance is represented by a
+  // user and a database. So this RPC creates a new user along with a database
+  // which the user owns. After creating the database it returns the instance
+  // created.
+  rpc CreateMongoInstance(None) returns (MongoInstance) {}
+
+  // This RPC deletes an existing Mongo instance, it deletes the user and the database
+  // user is associated with. As a return value it results RPCResult depicting if the 
+  // operation was successful or not.
+  rpc DeleteMongoInstance(MongoInstance) returns (None) {}
+}
+
+message None {}
+
+// Message respresenting a Mongo instance
+message MongoInstance {
+  string username = 1;
+  string database = 2;
+  string password = 3;
+}
