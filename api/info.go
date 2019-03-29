@@ -55,7 +55,7 @@ func challengesHandler(c *gin.Context) {
 	challenges,err:=database.QueryAllChallenges()
 	if err!=nil {
 		c.JSON(http.StatusBadRequest,gin.H{
-			"Error":err,
+			"Error":err.Error(),
 		})
 		return
 	}else if challenges==nil {

@@ -290,7 +290,7 @@ func verifyLocalHandler(c *gin.Context){
 	err:=manager.ValidateChallengeConfig(challengeDir)
 	if err!=nil{
 		c.JSON(http.StatusBadRequest,gin.H{
-			"Error":err,
+			"Error":err.Error(),
 		})
 		return
 	}else{
@@ -306,7 +306,7 @@ func verifyHandler(c *gin.Context){
 	err:=manager.ValidateChallengeConfig(challengeStagingDir)
 	if err!=nil{
 		c.JSON(http.StatusBadRequest,gin.H{
-			"Error":err,
+			"Error":err.Error(),
 		})
 		return
 	}else{
