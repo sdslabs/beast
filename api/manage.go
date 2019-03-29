@@ -284,3 +284,35 @@ func commitChallenge(c *gin.Context) {
 		Message: "Commit Done",
 	})
 }
+
+func verifyLocalHandler(c *gin.Context){
+	challengeDir:=c.PostForm("challenge_dir")
+	err:=manager.ValidateChallengeConfig(challengeDir)
+	if err!=nil{
+		c.JSON(http.StatusBadRequest,gin.H{
+			"Error":err,
+		})
+		return
+	}else{
+		c.JSON(http.StatusOK,gin.H{
+			"Message":"This challenge can be deployed",
+		})
+		return
+	}
+}
+func verifyHandler(c *gin.Context){
+	challengeName:=c.PostForm("challName")
+	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	err:=manager.ValidateChallengeConfig(challengeStagingDir)
+	if err!=nil{
+		c.JSON(http.StatusBadRequest,gin.H{
+			"Error":err,
+		})
+		return
+	}else{
+		c.JSON(http.StatusOK,gin.H{
+			"Message":"This challenge can be deployed",
+		})
+		return
+	}
+}

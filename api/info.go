@@ -2,7 +2,7 @@ package api
 
 import (
 	"net/http"
-	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
