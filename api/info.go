@@ -2,7 +2,7 @@ package api
 
 import (
 	"net/http"
-
+	"github.com/sdslabs/beastv4/database"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -49,4 +49,28 @@ func availableImagesHandler(c *gin.Context) {
 		Message: "Available base images are",
 		Images:  cfg.Cfg.AllowedBaseImages,
 	})
+}
+
+func challengesHandler(c *gin.Context) {
+	challenges,err:=database.QueryAllChallenges()
+	if err!=nil {
+		c.JSON(http.StatusBadRequest,gin.H{
+			"Error":err,
+		})
+		return
+	}else if challenges==nil {
+		c.JSON(http.StatusOK,gin.H{
+			"Message":"No challenges currently deployed",
+		})
+		return
+	}else{
+		var Challenge []string
+		for i:=range challenges{
+			Challenge=append(Challenge,challenges[i].Name)
+		}
+		c.JSON(http.StatusOK,ChallengesResp{
+			Message: "All Challenges",
+			Challenges: Challenge,
+		})
+	}
 }
