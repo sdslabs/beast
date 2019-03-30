@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	b64 "encoding/base64"
+	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"

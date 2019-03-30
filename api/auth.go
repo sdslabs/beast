@@ -58,7 +58,6 @@ func getJWT(c *gin.Context) {
 	decrMess := c.PostForm("decrmess")
 
 	jwt, err := auth.GenerateJWT(username, decrMess)
-
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"message": err.Error(),
