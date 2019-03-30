@@ -285,33 +285,34 @@ func commitChallenge(c *gin.Context) {
 	})
 }
 
-func verifyLocalHandler(c *gin.Context){
-	challengeDir:=c.PostForm("challenge_dir")
-	err:=manager.ValidateChallengeConfig(challengeDir)
-	if err!=nil{
-		c.JSON(http.StatusBadRequest,gin.H{
-			"Error":err.Error(),
+func verifyLocalHandler(c *gin.Context) {
+	challengeDir := c.PostForm("challenge_dir")
+	err := manager.ValidateChallengeConfig(challengeDir)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Error": err.Error(),
 		})
 		return
 	}else{
-		c.JSON(http.StatusOK,gin.H{
-			"Message":"This challenge can be deployed",
+		c.JSON(http.StatusOK, gin.H{
+			"Message": "This challenge can be deployed",
 		})
 		return
 	}
 }
-func verifyHandler(c *gin.Context){
-	challengeName:=c.PostForm("challName")
-	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
-	err:=manager.ValidateChallengeConfig(challengeStagingDir)
-	if err!=nil{
-		c.JSON(http.StatusBadRequest,gin.H{
-			"Error":err.Error(),
+
+func verifyHandler(c *gin.Context) {
+	challengeName := c.PostForm("challName")
+	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, BEAST_REMOTE_CHALLENGE_DIR, challengeName)
+	err := manager.ValidateChallengeConfig(challengeStagingDir)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Error": err.Error(),
 		})
 		return
-	}else{
-		c.JSON(http.StatusOK,gin.H{
-			"Message":"This challenge can be deployed",
+	}else {
+		c.JSON(http.StatusOK, gin.H{
+			"Message": "This challenge can be deployed",
 		})
 		return
 	}

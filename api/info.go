@@ -52,23 +52,23 @@ func availableImagesHandler(c *gin.Context) {
 }
 
 func challengesHandler(c *gin.Context) {
-	challenges,err:=database.QueryAllChallenges()
-	if err!=nil {
-		c.JSON(http.StatusBadRequest,gin.H{
-			"Error":err.Error(),
+	challenges,err := database.QueryAllChallenges()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Error": err.Error(),
 		})
 		return
-	}else if challenges==nil {
-		c.JSON(http.StatusOK,gin.H{
-			"Message":"No challenges currently deployed",
+	}else if challenges == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"Message": "No challenges currently deployed",
 		})
 		return
 	}else{
 		var Challenge []string
-		for i:=range challenges{
-			Challenge=append(Challenge,challenges[i].Name)
+		for i := range challenges{
+			Challenge = append(Challenge,challenges[i].Name)
 		}
-		c.JSON(http.StatusOK,ChallengesResp{
+		c.JSON(http.StatusOK, ChallengesResp{
 			Message: "All Challenges",
 			Challenges: Challenge,
 		})
