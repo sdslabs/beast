@@ -5,74 +5,49 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-	b64 "encoding/base64"
-	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/auth"
 	"github.com/sdslabs/beastv4/core/manager"
 	log "github.com/sirupsen/logrus"
 )
 
-// Handles route related to manage all the challenges or the challenges related to a particular tag for current beast remote.
-// @Summary Handles challenge management actions for multiple challenges.
-// @Description Handles challenge management routes for multiple the challenges with actions which includes - DEPLOY, UNDEPLOY.
+// Handles route related to manage all the challenges for current beast remote.
+// @Summary Handles challenge management actions for multiple(all) challenges.
+// @Description Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.
 // @Tags manage
 // @Accept  json
 // @Produce application/json
 // @Param action query string true "Action for the challenge"
-// @Param tag query string false "Tag for a group of challenges"
 // @Success 200 {object} api.HTTPPlainResp
-// @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/multiple/:action [post]
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/manage/all/:action [post]
+
 func manageMultipleChallengeHandler(c *gin.Context) {
 	action := c.Param("action")
-	tag := c.PostForm("tag")
 
-	if tag != "" {
-		switch action {
-		case core.MANAGE_ACTION_DEPLOY:
-			log.Infof("Starting deploy for all challenges related to tags")
-			msgs := manager.DeployTagRelatedChallenges(tag)
-			var msg string
-			if len(msgs) != 0 {
-				msg = strings.Join(msgs, " ::: ")
-			} else {
-				msg = "Deploy for all challeges started"
-			}
+	switch action {
+	case core.MANAGE_ACTION_DEPLOY:
+		log.Infof("Starting deploy for all challenges")
+		msgs := manager.DeployAll(true, auth.GetUser(c.GetHeader("Authorization")))
 
-			c.JSON(http.StatusOK, gin.H{
-				"message": msg,
-			})
-			break
-
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": fmt.Sprintf("Invalid Action : %s", action),
-			})
+		var msg string
+		if len(msgs) != 0 {
+			msg = strings.Join(msgs, " ::: ")
+		} else {
+			msg = "Deploy for all challeges started"
 		}
-	} else {
-		switch action {
-		case core.MANAGE_ACTION_DEPLOY:
-			log.Infof("Starting deploy for all challenges")
-			msgs := manager.DeployAll(true)
-			var msg string
-			if len(msgs) != 0 {
-				msg = strings.Join(msgs, " ::: ")
-			} else {
-				msg = "Deploy for all challeges started"
-			}
 
-			c.JSON(http.StatusOK, gin.H{
-				"message": msg,
-			})
-			break
+		c.JSON(http.StatusNotAcceptable, gin.H{
+			"message": msg,
+		})
+		break
 
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": fmt.Sprintf("Invalid Action : %s", action),
-			})
-		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": fmt.Sprintf("Invalid Action : %s", action),
+		})
 	}
 }
 
@@ -85,16 +60,20 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 // @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
 // @Param action query string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
-// @Failure 400 {object} api.HTTPPlainResp
+// @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/manage/challenge/ [post]
 func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
+	authorization := c.GetHeader("Authorization")
 
-	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
+	if msgs := manager.SaveTransactionFunc(identifier, action, authorization); msgs != nil {
+		log.Info("error while getting details")
+	}
 
 	switch action {
 	case core.MANAGE_ACTION_UNDEPLOY:
+
 		if err := manager.UndeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
@@ -103,6 +82,7 @@ func manageChallengeHandler(c *gin.Context) {
 		}
 
 	case core.MANAGE_ACTION_PURGE:
+
 		if err := manager.PurgeChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
@@ -112,6 +92,7 @@ func manageChallengeHandler(c *gin.Context) {
 
 	case core.MANAGE_ACTION_REDEPLOY:
 		// Redeploying a challenge means to first purge the challenge and then try to deploy it.
+
 		if err := manager.RedeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
@@ -121,6 +102,7 @@ func manageChallengeHandler(c *gin.Context) {
 
 	case core.MANAGE_ACTION_DEPLOY:
 		// For deploy, identifier is name
+
 		if err := manager.DeployChallenge(identifier); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
@@ -150,10 +132,11 @@ func manageChallengeHandler(c *gin.Context) {
 // @Param challenge_dir query string true "Challenge Directory"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Failure 406 {object} api.HTTPPlainResp
 // @Router /api/manage/deploy/local [post]
 func deployLocalChallengeHandler(c *gin.Context) {
+	action := core.MANAGE_ACTION_DEPLOY
 	challDir := c.PostForm("challenge_dir")
+	authorization := c.GetHeader("Authorization")
 	if challDir == "" {
 		c.JSON(http.StatusNotAcceptable, gin.H{
 			"message": "No challenge directory specified",
@@ -163,6 +146,10 @@ func deployLocalChallengeHandler(c *gin.Context) {
 
 	log.Info("In local deploy challenge Handler")
 	err := manager.DeployChallengePipeline(challDir)
+	if msgs := manager.SaveTransactionFunc(strings.Split(challDir, "/")[len(strings.Split(challDir, "/"))-1], action, authorization); msgs != nil {
+		log.Info("error while saving transaction")
+	}
+
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": err.Error(),
@@ -189,10 +176,15 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // @Router /api/manage/static/:action [post]
 func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
-
+	identifier := core.BEAST_STATIC_CONTAINER_NAME
+	authorization := c.GetHeader("Authorization")
+	if msgs := manager.SaveTransactionFunc(identifier, action, authorization); msgs != nil {
+		log.Info("error while getting details")
+	}
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
 		go manager.DeployStaticContentContainer()
+
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Static container deploy started",
 		})
@@ -200,6 +192,7 @@ func beastStaticContentHandler(c *gin.Context) {
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		go manager.UndeployStaticContentContainer()
+
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Static content container undeploy started",
 		})
