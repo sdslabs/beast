@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
+	b64 "encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -67,6 +69,19 @@ func GenerateJWT(username, decrmess string) (string, error) {
 	})
 
 	return token.SignedString([]byte(config.Cfg.JWTSecret))
+}
+
+func DecryptToken(authHeader string) string {
+	values := strings.Split(authHeader, " ")
+	userInfoEncr := strings.Split(values[1], ".")
+	sDec, err1 := b64.StdEncoding.DecodeString(userInfoEncr[1])
+	if err1 != nil {
+		fmt.Printf("Error in decrypting JWT token")
+	}
+	in := []byte(sDec)
+	var raw CustomClaims
+	json.Unmarshal(in, &raw)
+	return raw.User
 }
 
 func GenerateAuthChallenge(username string) (string, error) {
