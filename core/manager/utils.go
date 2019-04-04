@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/auth"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/database"
 	tools "github.com/sdslabs/beastv4/templates"
@@ -350,17 +351,6 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			return fmt.Errorf("Error while querying author with email %s", config.Author.Email)
 		}
 
-		tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
-
-		for i, tag := range config.Challenge.Metadata.Tags {
-			tags[i] = &database.Tag{
-				TagName: tag,
-			}
-			if err = database.QueryOrCreateTagEntry(tags[i]); err != nil {
-				return fmt.Errorf("Error while querying the tags for challenge(%s) : %v", config.Challenge.Metadata.Name, err)
-			}
-		}
-
 		if authorEntry.Email == "" {
 			// Create a new authentication challenge message for the user.
 			rMessage := make([]byte, 128)
@@ -399,8 +389,6 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		if err != nil {
 			return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
 		}
-
-		database.Db.Model(challEntry).Association("Tags").Append(tags)
 	}
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
@@ -471,6 +459,24 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 		relativeStaticContentDir = core.PUBLIC
 	}
 	return filepath.Join(contextDir, relativeStaticContentDir), nil
+}
+
+//Takes and save the data to transaction table
+func SaveTransactionFunc(identifier string, action string, authorization string) error {
+	challengeId, error := database.QueryFirstChallengeEntry("name", identifier)
+	if error != nil {
+		log.Infof("Error while getting challenge ID")
+	}
+
+	TransactionEntry := database.Transaction{
+		Action:      action,
+		UserId:      auth.DecryptToken(authorization),
+		ChallengeID: challengeId.ID,
+	}
+
+	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
+	err := database.SaveTransaction(&TransactionEntry)
+	return err
 }
 
 //Copies the Static content to the staging/static/folder
