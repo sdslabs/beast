@@ -15,7 +15,6 @@ import (
 // @Accept  json
 // @Produce application/json
 // @Success 200 {object} api.PortsInUseResp
-// @Failure 402 {object} api.PortsInUseResp
 // @Router /api/info/ports/used [get]
 func usedPortsInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, PortsInUseResp{
@@ -44,7 +43,6 @@ func availableChallengeInfoHandler(c *gin.Context) {
 // @Accept  json
 // @Produce application/json
 // @Success 200 {object} api.AvailableImagesResp
-// @Failure 402 {object} api.AvailableImagesResp
 // @Router /api/info/images/available [get]
 func availableImagesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, AvailableImagesResp{

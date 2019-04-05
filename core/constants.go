@@ -35,6 +35,7 @@ const (
 	SERVICE_CHALLENGE_TYPE_NAME    string = "service"
 	BARE_CHALLENGE_TYPE_NAME       string = "bare"
 	PUBLIC                         string = "public"
+	HIDDEN                         string = ".hidden"
 	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
 	DEFAULT_XINETD_CONF_FILE       string = "xinetd.conf"
 	BEAST_STATIC_AUTH_FILE         string = ".static.beast.htpasswd"

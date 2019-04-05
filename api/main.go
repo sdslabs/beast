@@ -38,6 +38,11 @@ func runBeastApiBootsteps() error {
 
 // @host beast.sdslabs.co
 // @BasePath /
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+
 func RunBeastApiServer(port string) {
 	log.Info("Bootstrapping Beast API server")
 	if port != "" {

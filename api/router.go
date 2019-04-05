@@ -30,7 +30,7 @@ func initGinRouter() *gin.Engine {
 		{
 			manageGroup.POST("/deploy/local/", deployLocalChallengeHandler)
 			manageGroup.POST("/challenge/", manageChallengeHandler)
-			manageGroup.POST("/all/:action", manageMultipleChallengeHandler)
+			manageGroup.POST("/multiple/:action", manageMultipleChallengeHandler)
 			manageGroup.POST("/static/:action", beastStaticContentHandler)
 		}
 

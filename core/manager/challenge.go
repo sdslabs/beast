@@ -201,6 +201,32 @@ func DeployMultipleChallenges(deployList []string) []string {
 	return errstrings
 }
 
+// Deploy tag related challenges.
+func DeployTagRelatedChallenges(tag string) []string {
+	log.Infof("Trying request to deploy CHALLENGES related to %s", tag)
+
+	tagEntry := &database.Tag{
+		TagName: tag,
+	}
+	err := database.QueryOrCreateTagEntry(tagEntry)
+	if err != nil {
+		return []string{fmt.Sprintf("DATABASE_ERROR")}
+	}
+
+	challs, err := database.QueryRelatedChallenges(tagEntry)
+	if err != nil {
+		return []string{fmt.Sprintf("DATABASE_ERROR")}
+	}
+
+	challNames := make([]string, len(challs))
+
+	for i := range challs {
+		challNames[i] = challs[i].Name
+	}
+
+	return DeployMultipleChallenges(challNames)
+}
+
 // Deploy all challenges.
 func DeployAll(sync bool) []string {
 	log.Infof("Got request to deploy ALL CHALLENGES")

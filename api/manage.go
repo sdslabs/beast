@@ -12,39 +12,65 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Handles route related to manage all the challenges for current beast remote.
-// @Summary Handles challenge management actions for multiple(all) challenges.
-// @Description Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.
+// Handles route related to manage all the challenges or the challenges related to a particular tag for current beast remote.
+// @Summary Handles challenge management actions for multiple challenges.
+// @Description Handles challenge management routes for multiple the challenges with actions which includes - DEPLOY, UNDEPLOY.
 // @Tags manage
 // @Accept  json
 // @Produce application/json
 // @Param action query string true "Action for the challenge"
+// @Param tag query string false "Tag for a group of challenges"
 // @Success 200 {object} api.HTTPPlainResp
-// @Failure 402 {object} api.HTTPPlainResp
-// @Router /api/manage/all/:action [post]
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/manage/multiple/:action [post]
 func manageMultipleChallengeHandler(c *gin.Context) {
 	action := c.Param("action")
+	tag := c.PostForm("tag")
 
-	switch action {
-	case core.MANAGE_ACTION_DEPLOY:
-		log.Infof("Starting deploy for all challenges")
-		msgs := manager.DeployAll(true)
-		var msg string
-		if len(msgs) != 0 {
-			msg = strings.Join(msgs, " ::: ")
-		} else {
-			msg = "Deploy for all challeges started"
+	if tag != "" {
+		switch action {
+		case core.MANAGE_ACTION_DEPLOY:
+			log.Infof("Starting deploy for all challenges related to tags")
+			msgs := manager.DeployTagRelatedChallenges(tag)
+			var msg string
+			if len(msgs) != 0 {
+				msg = strings.Join(msgs, " ::: ")
+			} else {
+				msg = "Deploy for all challeges started"
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"message": msg,
+			})
+			break
+
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Invalid Action : %s", action),
+			})
 		}
+	} else {
+		switch action {
+		case core.MANAGE_ACTION_DEPLOY:
+			log.Infof("Starting deploy for all challenges")
+			msgs := manager.DeployAll(true)
+			var msg string
+			if len(msgs) != 0 {
+				msg = strings.Join(msgs, " ::: ")
+			} else {
+				msg = "Deploy for all challeges started"
+			}
 
-		c.JSON(http.StatusNotAcceptable, gin.H{
-			"message": msg,
-		})
-		break
+			c.JSON(http.StatusOK, gin.H{
+				"message": msg,
+			})
+			break
 
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": fmt.Sprintf("Invalid Action : %s", action),
-		})
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Invalid Action : %s", action),
+			})
+		}
 	}
 }
 
@@ -57,7 +83,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 // @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
 // @Param action query string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
-// @Failure 402 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/challenge/ [post]
 func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
@@ -122,6 +148,7 @@ func manageChallengeHandler(c *gin.Context) {
 // @Param challenge_dir query string true "Challenge Directory"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
+// @Failure 406 {object} api.HTTPPlainResp
 // @Router /api/manage/deploy/local [post]
 func deployLocalChallengeHandler(c *gin.Context) {
 	challDir := c.PostForm("challenge_dir")

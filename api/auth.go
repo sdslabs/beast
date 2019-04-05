@@ -14,7 +14,9 @@ import (
 // @Description Authorizes user by checking if JWT token exists and is valid
 // @Tags auth
 // @Produce application/json
+// @Param application/json
 // @Failure 401 {object} api.HTTPPlainResp
+// @Security ApiKeyAuth
 func authorize(c *gin.Context) {
 
 	authHeader := c.GetHeader("Authorization")

@@ -350,6 +350,17 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			return fmt.Errorf("Error while querying author with email %s", config.Author.Email)
 		}
 
+		tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
+
+		for i, tag := range config.Challenge.Metadata.Tags {
+			tags[i] = &database.Tag{
+				TagName: tag,
+			}
+			if err = database.QueryOrCreateTagEntry(tags[i]); err != nil {
+				return fmt.Errorf("Error while querying the tags for challenge(%s) : %v", config.Challenge.Metadata.Name, err)
+			}
+		}
+
 		if authorEntry.Email == "" {
 			// Create a new authentication challenge message for the user.
 			rMessage := make([]byte, 128)
@@ -388,6 +399,8 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		if err != nil {
 			return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
 		}
+
+		database.Db.Model(challEntry).Association("Tags").Append(tags)
 	}
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
