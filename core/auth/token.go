@@ -71,7 +71,7 @@ func GenerateJWT(username, decrmess string) (string, error) {
 	return token.SignedString([]byte(config.Cfg.JWTSecret))
 }
 
-func DecryptToken(authHeader string) string {
+func GetUser(authHeader string) string {
 	values := strings.Split(authHeader, " ")
 	userInfoEncr := strings.Split(values[1], ".")
 	sDec, err1 := b64.StdEncoding.DecodeString(userInfoEncr[1])

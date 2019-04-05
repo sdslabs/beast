@@ -463,19 +463,19 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 
 //Takes and save the data to transaction table
 func SaveTransactionFunc(identifier string, action string, authorization string) error {
-	challengeId, error := database.QueryFirstChallengeEntry("name", identifier)
-	if error != nil {
+	challengeId, err := database.QueryFirstChallengeEntry("name", identifier)
+	if err != nil {
 		log.Infof("Error while getting challenge ID")
 	}
 
 	TransactionEntry := database.Transaction{
 		Action:      action,
-		UserId:      auth.DecryptToken(authorization),
+		UserId:      auth.GetUser(authorization),
 		ChallengeID: challengeId.ID,
 	}
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
-	err := database.SaveTransaction(&TransactionEntry)
+	err = database.SaveTransaction(&TransactionEntry)
 	return err
 }
 

@@ -30,7 +30,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
 		log.Infof("Starting deploy for all challenges")
-		msgs := manager.DeployAll(true, auth.DecryptToken(c.GetHeader("Authorization")))
+		msgs := manager.DeployAll(true, auth.GetUser(c.GetHeader("Authorization")))
 
 		var msg string
 		if len(msgs) != 0 {
@@ -134,8 +134,7 @@ func manageChallengeHandler(c *gin.Context) {
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/deploy/local [post]
 func deployLocalChallengeHandler(c *gin.Context) {
-	identifier := c.PostForm("name")
-	action := c.PostForm("action")
+	action := core.MANAGE_ACTION_DEPLOY
 	challDir := c.PostForm("challenge_dir")
 	authorization := c.GetHeader("Authorization")
 	if challDir == "" {
@@ -147,8 +146,8 @@ func deployLocalChallengeHandler(c *gin.Context) {
 
 	log.Info("In local deploy challenge Handler")
 	err := manager.DeployChallengePipeline(challDir)
-	if msgs := manager.SaveTransactionFunc(identifier, action, authorization); msgs != nil {
-		log.Info("error while getting details")
+	if msgs := manager.SaveTransactionFunc(strings.Split(challDir, "/")[len(strings.Split(challDir, "/"))-1], action, authorization); msgs != nil {
+		log.Info("error while saving transaction")
 	}
 
 	if err != nil {
@@ -177,7 +176,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // @Router /api/manage/static/:action [post]
 func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
-	identifier := c.Param("name")
+	identifier := core.BEAST_STATIC_CONTAINER_NAME
 	authorization := c.GetHeader("Authorization")
 	if msgs := manager.SaveTransactionFunc(identifier, action, authorization); msgs != nil {
 		log.Info("error while getting details")
