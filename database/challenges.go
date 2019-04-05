@@ -161,15 +161,17 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 }
 
 //Get Related Tags
-func GetRelatedTags(challenge *Challenge) []Tag {
+func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	var tags []Tag
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	Db.Model(challenge).Related(&tags, "Tags")
+	if err := Db.Model(challenge).Related(&tags, "Tags").Error; err != nil {
+		return tags, err
+	}
 
-	return tags
+	return tags, nil
 }
 
 //hook after update of challenge
@@ -215,7 +217,10 @@ func updateScript(author *Author) error {
 	SHA256.Write([]byte(author.Email))
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
 
-	challs := GetRelatedChallenges(author)
+	challs, err := GetRelatedChallenges(author)
+	if err != nil {
+		return fmt.Errorf("Error while getting related challenges : %v", err)
+	}
 
 	mapOfChall := make(map[string]string)
 

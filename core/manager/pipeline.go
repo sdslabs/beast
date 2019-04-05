@@ -74,7 +74,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	}
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
-	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir})
+	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir, filepath.Join(contextDir, core.HIDDEN)})
 
 	if err != nil {
 		return err

@@ -95,15 +95,17 @@ func UpdateAuthor(author *Author, m map[string]interface{}) error {
 }
 
 //Get Related Challenges
-func GetRelatedChallenges(author *Author) []Challenge {
+func GetRelatedChallenges(author *Author) ([]Challenge, error) {
 	var challenges []Challenge
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	Db.Model(author).Related(&challenges)
+	if err := Db.Model(author).Related(&challenges).Error; err != nil {
+		return challenges, err
+	}
 
-	return challenges
+	return challenges, nil
 }
 
 //hook after create

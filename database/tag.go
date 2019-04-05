@@ -33,15 +33,17 @@ func QueryOrCreateTagEntry(tag *Tag) error {
 }
 
 // Query Related Challenges
-func QueryRelatedChallenges(tag *Tag) []*Challenge {
+func QueryRelatedChallenges(tag *Tag) ([]*Challenge, error) {
 	var challenges []*Challenge
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	Db.Model(tag).Related(&challenges, "Challenges")
+	if err := Db.Model(tag).Related(&challenges, "Challenges").Error; err != nil {
+		return challenges, err
+	}
 
-	return challenges
+	return challenges, nil
 }
 
 // Query using map
