@@ -393,6 +393,11 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Status:      core.DEPLOY_STATUS["unknown"],
 			ContainerId: utils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:     utils.GetTempImageId(config.Challenge.Metadata.Name),
+			Flag:        config.Challenge.Metadata.Flag,
+			Type:        config.Challenge.Metadata.Type,
+			Sidecar:     config.Challenge.Metadata.Sidecar,
+			Description: config.Challenge.Metadata.Description,
+			Hint:        config.Challenge.Metadata.Hint,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
