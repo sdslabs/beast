@@ -56,7 +56,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 		log.Infof("Starting %s for all challenges related to tags", action)
 		msgs := manager.HandleTagRelatedChallenges(action, tag, authorName)
 		if len(msgs) != 0 {
-			msg = strings.Join(msgs, " ::: ")
+			msg = fmt.Sprintf("Error while performing %s : %s", action, strings.Join(msgs, " || "))
 		} else {
 			msg = fmt.Sprintf("%s for all challeges started", action)
 		}
@@ -64,7 +64,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 		log.Infof("Starting %s for all challenges", action)
 		msgs := manager.HandleAll(action, authorName)
 		if len(msgs) != 0 {
-			msg = strings.Join(msgs, " ::: ")
+			msg = fmt.Sprintf("Error while performing %s : %s", action, strings.Join(msgs, " || "))
 		} else {
 			msg = "Deploy for all challeges started"
 		}

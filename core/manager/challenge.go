@@ -286,7 +286,7 @@ func handleMultipleChallenges(list []string, action string) []string {
 
 		if err != nil {
 			log.Errorf("Cannot start %s for challenge : %s due to : %s", action, chall, err)
-			errstrings = append(errstrings, err.Error())
+			errstrings = append(errstrings, fmt.Sprintf("%s : %s", chall, err.Error()))
 			continue
 		}
 		log.Infof("Started %s for challenge : %s", action, chall)
