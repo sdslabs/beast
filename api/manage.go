@@ -42,51 +42,36 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 		authorName = core.DEFAULT_USER_NAME
 	}
 
+	_, ok := manager.MapOfFunctions[action]
+	if !ok {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Invalid Action : %s", action),
+		})
+		return
+	}
+
+	var msg string
+
 	if tag != "" {
-		switch action {
-		case core.MANAGE_ACTION_DEPLOY:
-			log.Infof("Starting deploy for all challenges related to tags")
-			msgs := manager.DeployTagRelatedChallenges(tag, authorName)
-			var msg string
-			if len(msgs) != 0 {
-				msg = strings.Join(msgs, " ::: ")
-			} else {
-				msg = "Deploy for all challeges started"
-			}
-
-			c.JSON(http.StatusOK, gin.H{
-				"message": msg,
-			})
-			break
-
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": fmt.Sprintf("Invalid Action : %s", action),
-			})
+		log.Infof("Starting %s for all challenges related to tags", action)
+		msgs := manager.HandleTagRelatedChallenges(action, tag, authorName)
+		if len(msgs) != 0 {
+			msg = strings.Join(msgs, " ::: ")
+		} else {
+			msg = fmt.Sprintf("%s for all challeges started", action)
 		}
 	} else {
-		switch action {
-		case core.MANAGE_ACTION_DEPLOY:
-			log.Infof("Starting deploy for all challenges")
-			msgs := manager.DeployAll(true, authorName)
-			var msg string
-			if len(msgs) != 0 {
-				msg = strings.Join(msgs, " ::: ")
-			} else {
-				msg = "Deploy for all challeges started"
-			}
-
-			c.JSON(http.StatusOK, gin.H{
-				"message": msg,
-			})
-			break
-
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": fmt.Sprintf("Invalid Action : %s", action),
-			})
+		log.Infof("Starting %s for all challenges", action)
+		msgs := manager.HandleAll(action, authorName)
+		if len(msgs) != 0 {
+			msg = strings.Join(msgs, " ::: ")
+		} else {
+			msg = "Deploy for all challeges started"
 		}
 	}
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: msg,
+	})
 }
 
 // Handles route related to managing a challenge
@@ -110,55 +95,28 @@ func manageChallengeHandler(c *gin.Context) {
 		log.Info("error while getting details")
 	}
 
-	switch action {
-	case core.MANAGE_ACTION_UNDEPLOY:
+	f, ok := manager.MapOfFunctions[action]
+	if !ok {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Invalid Action : %s", action),
+		})
+		return
+	}
 
-		if err := manager.UndeployChallenge(identifier); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": err.Error(),
-			})
-			return
-		}
+	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 
-	case core.MANAGE_ACTION_PURGE:
+	err := f(identifier)
 
-		if err := manager.PurgeChallenge(identifier); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": err.Error(),
-			})
-			return
-		}
-
-	case core.MANAGE_ACTION_REDEPLOY:
-		// Redeploying a challenge means to first purge the challenge and then try to deploy it.
-
-		if err := manager.RedeployChallenge(identifier); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": err.Error(),
-			})
-			return
-		}
-
-	case core.MANAGE_ACTION_DEPLOY:
-		// For deploy, identifier is name
-
-		if err := manager.DeployChallenge(identifier); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": err.Error(),
-			})
-			return
-		}
-
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": fmt.Sprintf("Invalid Action : %s", action),
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
 		})
 		return
 	}
 
 	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
-	c.JSON(http.StatusOK, gin.H{
-		"message": respStr,
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: respStr,
 	})
 }
 
@@ -179,8 +137,8 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	authorization := c.GetHeader("Authorization")
 
 	if challDir == "" {
-		c.JSON(http.StatusNotAcceptable, gin.H{
-			"message": "No challenge directory specified",
+		c.JSON(http.StatusNotAcceptable, HTTPPlainResp{
+			Message: "No challenge directory specified",
 		})
 		return
 	}
@@ -192,8 +150,8 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
 		})
 		return
 	}
@@ -201,8 +159,8 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	challengeName := filepath.Base(challDir)
 	respStr := fmt.Sprintf("Deploy for challenge %s has been triggered.\n", challengeName)
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": respStr,
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: respStr,
 	})
 }
 
@@ -227,21 +185,21 @@ func beastStaticContentHandler(c *gin.Context) {
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
 		go manager.DeployStaticContentContainer()
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Static container deploy started",
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Static container deploy started",
 		})
 		return
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		go manager.UndeployStaticContentContainer()
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Static content container undeploy started",
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Static content container undeploy started",
 		})
 		return
 
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": fmt.Sprintf("Invalid Action : %s", action),
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Invalid Action : %s", action),
 		})
 	}
 }

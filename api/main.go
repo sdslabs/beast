@@ -65,14 +65,14 @@ func RunBeastApiServer(port string, healthProbe bool) {
 
 	router.GET("/api/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": WELCOME_TEXT,
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: WELCOME_TEXT,
 		})
 	})
 
 	router.GET("/help", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": HELP_TEXT,
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: HELP_TEXT,
 		})
 	})
 

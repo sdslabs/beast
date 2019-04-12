@@ -12,7 +12,7 @@ type HTTPAuthorizeResp struct {
 }
 
 type AuthorizationChallengeResp struct {
-	Challenge string `json:"challenge" example:"Challenge String"`
+	Challenge []byte `json:"challenge" example:"Challenge String"`
 	Message   string `json:"message" example:"Response message"`
 }
 

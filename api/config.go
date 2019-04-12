@@ -21,13 +21,13 @@ func reloadBeastConfig(c *gin.Context) {
 	err := config.ReloadBeastConfig()
 	if err != nil {
 		log.Errorf("%s", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "CONFIG RELOAD SUCCESSFUL",
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "CONFIG RELOAD SUCCESSFUL",
 	})
 }
