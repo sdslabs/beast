@@ -3,11 +3,11 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/auth"
+	"github.com/sdslabs/beastv4/core/config"
 )
 
 // Acts as a middleware to authorize user
@@ -17,7 +17,7 @@ import (
 // @Produce application/json
 // @Failure 401 {object} api.HTTPPlainResp
 func authorize(c *gin.Context) {
-	if os.Getenv("NOAUTH") == "1" {
+	if config.SkipAuthorization {
 		return
 	}
 

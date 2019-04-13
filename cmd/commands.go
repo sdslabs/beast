@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/sdslabs/beastv4/cmd/debug"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/spf13/cobra"
 )
 
@@ -37,9 +38,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		if SkipAuthorization {
-			os.Setenv("NOAUTH", "1")
+			config.SkipAuthorization = true
 		} else {
-			os.Setenv("NOAUTH", "")
+			config.SkipAuthorization = false
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
