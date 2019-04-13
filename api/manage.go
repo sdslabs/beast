@@ -239,3 +239,28 @@ func challengeLogsHandler(c *gin.Context) {
 		})
 	}
 }
+
+// Commit a challenge container
+// @Summary Commits the challenge container so that later the challenge image can be used deployment
+// @Description Commits the challenge container for later use
+// @Tags manage
+// @Accept  json
+// @Produce application/json
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /api/manage/commit/ [post]
+func commitChallenge(c *gin.Context) {
+	challenge := c.PostForm("chall")
+
+	err := manager.CommitChallengeContainer(challenge)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: fmt.Sprintf("Error : %s", err.Error()),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Commit Done",
+	})
+}

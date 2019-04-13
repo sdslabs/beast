@@ -19,6 +19,34 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Function which commits the deployed challenge provided
+func CommitChallengeContainer(challName string) error {
+	log.Debug("Starting to commit the chall : %s", challName)
+	chall, err := database.QueryFirstChallengeEntry("name", challName)
+	if err != nil {
+		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		return err
+	}
+
+	if chall.Status != core.DEPLOY_STATUS["deployed"] || !utils.IsContainerIdValid(chall.ContainerId) {
+		log.Errorf("Challenge : %s not deployed", err.Error())
+		return fmt.Errorf("Challenge is not deployed")
+	}
+
+	imageId, err := docker.CommitContainer(chall.ContainerId)
+	if err != nil {
+		log.Errorf("Error while commiting the container : %s", err.Error())
+		return err
+	}
+	imageId = strings.TrimPrefix(imageId, "sha256:")
+
+	if e := database.UpdateChallenge(&chall, map[string]interface{}{"ImageId": imageId}); e != nil {
+		log.Errorf("Error while updating imageid : %s", e.Error())
+		return e
+	}
+	return nil
+}
+
 // Main function which starts the deploy of a challenge provided
 // directory inside the hack git database. We validate the challenge
 // config first and return early starting a goroutine to start out
