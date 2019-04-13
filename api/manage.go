@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/auth"
 	"github.com/sdslabs/beastv4/core/manager"
 	log "github.com/sirupsen/logrus"
 )
@@ -31,52 +30,51 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 
 	if tag != "" {
 		switch action {
-			case core.MANAGE_ACTION_DEPLOY:
-				log.Infof("Starting deploy for all challenges related to tags")
-				msgs := manager.DeployTagRelatedChallenges(tag)
-				var msg string
-				if len(msgs) != 0 {
-					msg = strings.Join(msgs, " ::: ")
-				} else {
-					msg = "Deploy for all challeges started"
-				}
-
-				c.JSON(http.StatusOK, gin.H{
-					"message": msg,
-				})
-				break
-
-			default:
-				c.JSON(http.StatusBadRequest, gin.H{
-					"message": fmt.Sprintf("Invalid Action : %s", action),
-				})
+		case core.MANAGE_ACTION_DEPLOY:
+			log.Infof("Starting deploy for all challenges related to tags")
+			msgs := manager.DeployTagRelatedChallenges(tag)
+			var msg string
+			if len(msgs) != 0 {
+				msg = strings.Join(msgs, " ::: ")
+			} else {
+				msg = "Deploy for all challeges started"
 			}
-		} else {
-			switch action {
-			case core.MANAGE_ACTION_DEPLOY:
-				log.Infof("Starting deploy for all challenges")
-				msgs := manager.DeployAll(true)
-				var msg string
-				if len(msgs) != 0 {
-					msg = strings.Join(msgs, " ::: ")
-				} else {
-					msg = "Deploy for all challeges started"
-				}
-	
-				c.JSON(http.StatusOK, gin.H{
-					"message": msg,
-				})
-				break
-	
-			default:
-				c.JSON(http.StatusBadRequest, gin.H{
-					"message": fmt.Sprintf("Invalid Action : %s", action),
-				})
+
+			c.JSON(http.StatusOK, gin.H{
+				"message": msg,
+			})
+			break
+
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Invalid Action : %s", action),
+			})
+		}
+	} else {
+		switch action {
+		case core.MANAGE_ACTION_DEPLOY:
+			log.Infof("Starting deploy for all challenges")
+			msgs := manager.DeployAll(true)
+			var msg string
+			if len(msgs) != 0 {
+				msg = strings.Join(msgs, " ::: ")
+			} else {
+				msg = "Deploy for all challeges started"
 			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"message": msg,
+			})
+			break
+
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": fmt.Sprintf("Invalid Action : %s", action),
+			})
 		}
 	}
 }
-	
+
 // Handles route related to managing a challenge
 // @Summary Handles challenge management actions.
 // @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.
@@ -212,7 +210,6 @@ func beastStaticContentHandler(c *gin.Context) {
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
 		go manager.DeployStaticContentContainer()
-
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Static container deploy started",
 		})
@@ -220,7 +217,6 @@ func beastStaticContentHandler(c *gin.Context) {
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		go manager.UndeployStaticContentContainer()
-
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Static content container undeploy started",
 		})

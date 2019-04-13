@@ -217,7 +217,7 @@ func DeployMultipleChallenges(deployList []string, userId string) []string {
 }
 
 // Deploy tag related challenges.
-func DeployTagRelatedChallenges(tag string) []string {
+func DeployTagRelatedChallenges(tag string, userId string) []string {
 	log.Infof("Trying request to deploy CHALLENGES related to %s", tag)
 
 	tagEntry := &database.Tag{
@@ -239,7 +239,7 @@ func DeployTagRelatedChallenges(tag string) []string {
 		challNames[i] = challs[i].Name
 	}
 
-	return DeployMultipleChallenges(challNames)
+	return DeployMultipleChallenges(challNames, userId)
 }
 
 // Deploy all challenges.

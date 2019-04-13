@@ -350,7 +350,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		if err != nil {
 			return fmt.Errorf("Error while querying author with email %s", config.Author.Email)
 		}
-		
+
 		tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
 
 		for i, tag := range config.Challenge.Metadata.Tags {
@@ -400,6 +400,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		if err != nil {
 			return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
 		}
+
 		database.Db.Model(challEntry).Association("Tags").Append(tags)
 	}
 
