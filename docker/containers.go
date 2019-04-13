@@ -2,6 +2,7 @@ package docker
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strconv"
 
 	"github.com/docker/docker/api/types"
@@ -22,6 +23,11 @@ type CreateContainerConfig struct {
 	ContainerName    string
 	ContainerEnv     []string
 	ContainerNetwork string
+}
+
+type Log struct {
+	Stderr string
+	Stdout string
 }
 
 func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
@@ -131,4 +137,55 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	return containerId, nil
+}
+
+func GetDockerStdLogs(containerID string) (*Log, error) {
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		return nil, err
+	}
+
+	stdout, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		Details:    true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer stdout.Close()
+
+	stdoutlogs, _ := ioutil.ReadAll(stdout)
+
+	stderr, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+		ShowStderr: true,
+		Details:    true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer stderr.Close()
+
+	stderrlogs, _ := ioutil.ReadAll(stderr)
+
+	return &Log{Stdout: string(stdoutlogs), Stderr: string(stderrlogs)}, nil
+}
+
+func ShowLiveDockerLogs(containerID string) {
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		log.Error(err)
+	}
+
+	stream, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Details:    true,
+	})
+	if err != nil {
+		log.Error(err)
+	}
+	defer stream.Close()
+
+	logs, _ := ioutil.ReadAll(stream)
+	fmt.Println(string(logs))
 }

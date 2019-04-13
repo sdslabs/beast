@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/manager"
+	"github.com/sdslabs/beastv4/core/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -206,6 +207,35 @@ func beastStaticContentHandler(c *gin.Context) {
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": fmt.Sprintf("Invalid Action : %s", action),
+		})
+	}
+}
+
+// Handles route related to logs handling
+// @Summary Handles route related to logs handling of container
+// @Description Container logs
+// @Tags manage
+// @Accept  json
+// @Produce application/json
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/manage/logs/ [get]
+func challengeLogsHandler(c *gin.Context) {
+	chall := c.Param("name")
+	if chall == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Name cannot be empty"),
+		})
+	}
+	logs, err := utils.GetLogs(chall, false)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"stdout": logs.Stdout,
+			"stderr": logs.Stderr,
 		})
 	}
 }
