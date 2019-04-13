@@ -13,44 +13,70 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Handles route related to manage all the challenges for current beast remote.
-// @Summary Handles challenge management actions for multiple(all) challenges.
-// @Description Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.
+// Handles route related to manage all the challenges or the challenges related to a particular tag for current beast remote.
+// @Summary Handles challenge management actions for multiple challenges.
+// @Description Handles challenge management routes for multiple the challenges with actions which includes - DEPLOY, UNDEPLOY.
 // @Tags manage
 // @Accept  json
 // @Produce application/json
 // @Param action query string true "Action for the challenge"
+// @Param tag query string false "Tag for a group of challenges"
 // @Success 200 {object} api.HTTPPlainResp
-// @Failure 402 {object} api.HTTPPlainResp
-// @Router /api/manage/all/:action [post]
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/manage/multiple/:action [post]
 
 func manageMultipleChallengeHandler(c *gin.Context) {
 	action := c.Param("action")
+	tag := c.PostForm("tag")
 
-	switch action {
-	case core.MANAGE_ACTION_DEPLOY:
-		log.Infof("Starting deploy for all challenges")
-		msgs := manager.DeployAll(true, auth.GetUser(c.GetHeader("Authorization")))
+	if tag != "" {
+		switch action {
+			case core.MANAGE_ACTION_DEPLOY:
+				log.Infof("Starting deploy for all challenges related to tags")
+				msgs := manager.DeployTagRelatedChallenges(tag)
+				var msg string
+				if len(msgs) != 0 {
+					msg = strings.Join(msgs, " ::: ")
+				} else {
+					msg = "Deploy for all challeges started"
+				}
 
-		var msg string
-		if len(msgs) != 0 {
-			msg = strings.Join(msgs, " ::: ")
+				c.JSON(http.StatusOK, gin.H{
+					"message": msg,
+				})
+				break
+
+			default:
+				c.JSON(http.StatusBadRequest, gin.H{
+					"message": fmt.Sprintf("Invalid Action : %s", action),
+				})
+			}
 		} else {
-			msg = "Deploy for all challeges started"
+			switch action {
+			case core.MANAGE_ACTION_DEPLOY:
+				log.Infof("Starting deploy for all challenges")
+				msgs := manager.DeployAll(true)
+				var msg string
+				if len(msgs) != 0 {
+					msg = strings.Join(msgs, " ::: ")
+				} else {
+					msg = "Deploy for all challeges started"
+				}
+	
+				c.JSON(http.StatusOK, gin.H{
+					"message": msg,
+				})
+				break
+	
+			default:
+				c.JSON(http.StatusBadRequest, gin.H{
+					"message": fmt.Sprintf("Invalid Action : %s", action),
+				})
+			}
 		}
-
-		c.JSON(http.StatusNotAcceptable, gin.H{
-			"message": msg,
-		})
-		break
-
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": fmt.Sprintf("Invalid Action : %s", action),
-		})
 	}
 }
-
+	
 // Handles route related to managing a challenge
 // @Summary Handles challenge management actions.
 // @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.
