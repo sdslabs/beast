@@ -42,7 +42,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 		authorName = core.DEFAULT_USER_NAME
 	}
 
-	_, ok := manager.MapOfFunctions[action]
+	_, ok := manager.ChallengeActionHandlers[action]
 	if !ok {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: fmt.Sprintf("Invalid Action : %s", action),
@@ -95,7 +95,7 @@ func manageChallengeHandler(c *gin.Context) {
 		log.Info("error while getting details")
 	}
 
-	f, ok := manager.MapOfFunctions[action]
+	challAction, ok := manager.ChallengeActionHandlers[action]
 	if !ok {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: fmt.Sprintf("Invalid Action : %s", action),
@@ -105,7 +105,7 @@ func manageChallengeHandler(c *gin.Context) {
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 
-	err := f(identifier)
+	err := challAction(identifier)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{

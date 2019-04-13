@@ -33,7 +33,7 @@ var Q *wpool.Queue
 type Worker struct {
 }
 
-var MapOfFunctions = map[string]func(string) error{
+var ChallengeActionHandlers = map[string]func(string) error{
 	core.MANAGE_ACTION_DEPLOY:   DeployChallenge,
 	core.MANAGE_ACTION_UNDEPLOY: UndeployChallenge,
 	core.MANAGE_ACTION_REDEPLOY: RedeployChallenge,
@@ -273,7 +273,8 @@ func handleMultipleChallenges(list []string, action string) []string {
 
 	errstrings := []string{}
 
-	f, ok := MapOfFunctions[action]
+	challAction, ok := ChallengeActionHandlers[action]
+
 	if !ok {
 		return []string{"ACTION NOT IN LIST"}
 	}
@@ -282,7 +283,7 @@ func handleMultipleChallenges(list []string, action string) []string {
 
 		log.Infof("Starting to push %s challenge to queue", chall)
 
-		err := f(chall)
+		err := challAction(chall)
 
 		if err != nil {
 			log.Errorf("Cannot start %s for challenge : %s due to : %s", action, chall, err)
