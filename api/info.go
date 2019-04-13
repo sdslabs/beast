@@ -51,26 +51,35 @@ func availableImagesHandler(c *gin.Context) {
 	})
 }
 
+// Returns available challenges.
+// @Summary Gives all challenges available in the in the database
+// @Description Returns all challenges available in the in the database
+// @Tags info
+// @Accept json
+// @Produce application/json
+// @Success 200 {object} api.ChallengesResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/info/images/available [get]
 func challengesHandler(c *gin.Context) {
-	challenges,err := database.QueryAllChallenges()
+	challenges, err := database.QueryAllChallenges()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"Error": err.Error(),
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
 		})
 		return
-	}else if challenges == nil {
-		c.JSON(http.StatusOK, gin.H{
-			"Message": "No challenges currently deployed",
+	} else if challenges == nil {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "No challenges currently in the database",
 		})
 		return
-	}else{
-		var Challenge []string
-		for i := range challenges{
-			Challenge = append(Challenge,challenges[i].Name)
+	} else {
+		var challs []string
+		for i := range challenges {
+			challs = append(challs, challenges[i].Name)
 		}
 		c.JSON(http.StatusOK, ChallengesResp{
-			Message: "All Challenges",
-			Challenges: Challenge,
+			Message:    "All Challenges",
+			Challenges: challs,
 		})
 	}
 }
