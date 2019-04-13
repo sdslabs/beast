@@ -86,13 +86,14 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 // @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
 // @Param action query string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
-// @Failure 402 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/challenge/ [post]
 func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
 	authorization := c.GetHeader("Authorization")
 
+	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 	if msgs := manager.SaveTransactionFunc(identifier, action, authorization); msgs != nil {
 		log.Info("error while getting details")
 	}
@@ -158,6 +159,7 @@ func manageChallengeHandler(c *gin.Context) {
 // @Param challenge_dir query string true "Challenge Directory"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
+// @Failure 406 {object} api.HTTPPlainResp
 // @Router /api/manage/deploy/local [post]
 func deployLocalChallengeHandler(c *gin.Context) {
 	action := core.MANAGE_ACTION_DEPLOY
