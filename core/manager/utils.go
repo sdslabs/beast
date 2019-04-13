@@ -400,6 +400,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		if err != nil {
 			return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
 		}
+		database.Db.Model(challEntry).Association("Tags").Append(tags)
 	}
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
