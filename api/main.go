@@ -51,7 +51,7 @@ func RunBeastApiServer(port string, healthProbe bool) {
 		port = DEFAULT_BEAST_PORT
 	}
 
-	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE)
+	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
 	manager.Q.StartWorkers(&manager.Worker{})
 
 	runBeastApiBootsteps()

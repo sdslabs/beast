@@ -271,6 +271,10 @@ func handleMultipleChallenges(list []string, action string) []string {
 	list = utils.GetUniqueStrings(list)
 	log.Infof("Starting %s for the following challenge list : %v", action, list)
 
+	if len(list) == 0 {
+		return []string{"EMPTY LIST"}
+	}
+
 	errstrings := []string{}
 
 	challAction, ok := ChallengeActionHandlers[action]

@@ -23,6 +23,8 @@ var (
 	Email             string
 	PublicKeyPath     string
 	SkipAuthorization bool
+	AllChalls         bool
+	Tag               string
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -73,6 +75,8 @@ func init() {
 	createAuthorCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new author")
 	createAuthorCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new author")
 	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new author")
+	challengeCmd.PersistentFlags().BoolVarP(&AllChalls, "all", "a", false, "Performs action to all challs")
+	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
@@ -82,4 +86,5 @@ func init() {
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(healthProbeCmd)
 	rootCmd.AddCommand(verifyCmd)
+	rootCmd.AddCommand(challengeCmd)
 }
