@@ -5,8 +5,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var dockerLogsCmd = &cobra.Command{
-	Use:   "docker-logs CHALLNAME",
+var logsCmd = &cobra.Command{
+	Use:   "logs CHALLNAME",
 	Short: "Provides live logs of a container",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

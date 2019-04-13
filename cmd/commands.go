@@ -68,5 +68,5 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(getAuthCmd)
 	rootCmd.AddCommand(createAuthorCmd)
-	rootCmd.AddCommand(dockerLogsCmd)
+	rootCmd.AddCommand(logsCmd)
 }
