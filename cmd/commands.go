@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/sdslabs/beastv4/cmd/debug"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/spf13/cobra"
 )
 
@@ -12,14 +13,15 @@ import (
 // If true beast will run in Verbose mode and will log all logs in debug
 // error level.
 var (
-	Verbose       bool
-	Port          string
-	KeyFile       string
-	Username      string
-	Host          string
-	Name          string
-	Email         string
-	PublicKeyPath string
+	Verbose           bool
+	Port              string
+	KeyFile           string
+	Username          string
+	Host              string
+	Name              string
+	Email             string
+	PublicKeyPath     string
+	SkipAuthorization bool
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -33,6 +35,12 @@ var rootCmd = &cobra.Command{
 			debug.Enable()
 		} else {
 			debug.Disable()
+		}
+
+		if SkipAuthorization {
+			config.SkipAuthorization = true
+		} else {
+			config.SkipAuthorization = false
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -55,6 +63,7 @@ func Execute() {
 // * runCmd: Run beast API server.
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
+	rootCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
 	runCmd.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to run the beast server on.")
 	getAuthCmd.PersistentFlags().StringVarP(&KeyFile, "identity", "i", "", "Private File location")
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")

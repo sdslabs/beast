@@ -184,6 +184,7 @@ func UpdateUsedPortList() {
 }
 
 var Cfg BeastConfig = InitConfig()
+var SkipAuthorization bool
 var USED_PORTS_LIST []uint32
 
 func InitConfig() BeastConfig {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/auth"
+	"github.com/sdslabs/beastv4/core/config"
 )
 
 // Acts as a middleware to authorize user
@@ -18,6 +19,9 @@ import (
 // @Failure 401 {object} api.HTTPPlainResp
 // @Security ApiKeyAuth
 func authorize(c *gin.Context) {
+	if config.SkipAuthorization {
+		return
+	}
 
 	authHeader := c.GetHeader("Authorization")
 
