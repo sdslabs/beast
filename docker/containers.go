@@ -189,3 +189,18 @@ func ShowLiveDockerLogs(containerID string) {
 	logs, _ := ioutil.ReadAll(stream)
 	fmt.Println(string(logs))
 }
+
+func CommitContainer(containerId string) (string, error) {
+	ctx := context.Background()
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		return "", err
+	}
+
+	commitResp, err := cli.ContainerCommit(ctx, containerId, types.ContainerCommitOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return commitResp.ID, nil
+}
