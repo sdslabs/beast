@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/auth"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/database"
 	tools "github.com/sdslabs/beastv4/templates"
@@ -476,6 +477,24 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 		relativeStaticContentDir = core.PUBLIC
 	}
 	return filepath.Join(contextDir, relativeStaticContentDir), nil
+}
+
+//Takes and save the data to transaction table
+func SaveTransactionFunc(identifier string, action string, authorization string) error {
+	challengeId, err := database.QueryFirstChallengeEntry("name", identifier)
+	if err != nil {
+		log.Infof("Error while getting challenge ID")
+	}
+
+	TransactionEntry := database.Transaction{
+		Action:      action,
+		UserId:      auth.GetUser(authorization),
+		ChallengeID: challengeId.ID,
+	}
+
+	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
+	err = database.SaveTransaction(&TransactionEntry)
+	return err
 }
 
 //Copies the Static content to the staging/static/folder

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BurntSushi/toml"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
@@ -14,8 +16,6 @@ import (
 	"github.com/sdslabs/beastv4/git"
 	"github.com/sdslabs/beastv4/notify"
 	"github.com/sdslabs/beastv4/utils"
-
-	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -180,7 +180,7 @@ func DeployChallenge(challengeName string) error {
 // When we have multiple challenges we spawn X goroutines and distribute
 // deployments in those goroutines. The work for these worker goroutines is specified
 // in deployList, which contains the name of the challenges to be deployed.
-func DeployMultipleChallenges(deployList []string) []string {
+func DeployMultipleChallenges(deployList []string, userId string) []string {
 	deployList = utils.GetUniqueStrings(deployList)
 	log.Infof("Starting deploy for the following challenge list : %v", deployList)
 
@@ -189,9 +189,24 @@ func DeployMultipleChallenges(deployList []string) []string {
 	for _, chall := range deployList {
 		log.Infof("Starting to push %s challenge to deploy queue", chall)
 		// TODO: Discuss if to make this challenge force redeploy or not.
+		challEntry, error := database.QueryFirstChallengeEntry("name", chall)
+		if error != nil {
+			log.Infof("Error while getting challenge ID")
+		}
+		TransactionEntry := database.Transaction{
+			Action:      core.MANAGE_ACTION_DEPLOY,
+			UserId:      userId,
+			ChallengeID: challEntry.ID,
+		}
+
+		tran := database.SaveTransaction(&TransactionEntry)
+		if tran != nil {
+			log.Infof("Error while saving transaction : %s ", tran)
+		}
 		err := DeployChallenge(chall)
 		if err != nil {
 			log.Errorf("Cannot start deploy for challenge : %s due to : %s", chall, err)
+
 			errstrings = append(errstrings, err.Error())
 			continue
 		}
@@ -202,7 +217,7 @@ func DeployMultipleChallenges(deployList []string) []string {
 }
 
 // Deploy tag related challenges.
-func DeployTagRelatedChallenges(tag string) []string {
+func DeployTagRelatedChallenges(tag string, userId string) []string {
 	log.Infof("Trying request to deploy CHALLENGES related to %s", tag)
 
 	tagEntry := &database.Tag{
@@ -224,11 +239,12 @@ func DeployTagRelatedChallenges(tag string) []string {
 		challNames[i] = challs[i].Name
 	}
 
-	return DeployMultipleChallenges(challNames)
+	return DeployMultipleChallenges(challNames, userId)
 }
 
 // Deploy all challenges.
-func DeployAll(sync bool) []string {
+func DeployAll(sync bool, userId string) []string {
+
 	log.Infof("Got request to deploy ALL CHALLENGES")
 	if sync {
 		err := git.SyncBeastRemote()
@@ -256,7 +272,7 @@ func DeployAll(sync bool) []string {
 		challsNameList = append(challsNameList, chall)
 	}
 
-	return DeployMultipleChallenges(challsNameList)
+	return DeployMultipleChallenges(challsNameList, userId)
 }
 
 // Unstage a challenge based on the challenge name.
