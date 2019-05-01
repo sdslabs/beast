@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/auth"
 	"github.com/sdslabs/beastv4/core/manager"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,7 +33,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 		switch action {
 		case core.MANAGE_ACTION_DEPLOY:
 			log.Infof("Starting deploy for all challenges related to tags")
-			msgs := manager.DeployTagRelatedChallenges(tag)
+			msgs := manager.DeployTagRelatedChallenges(tag, auth.GetUser(c.GetHeader("Authorization")))
 			var msg string
 			if len(msgs) != 0 {
 				msg = strings.Join(msgs, " ::: ")
@@ -54,7 +55,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 		switch action {
 		case core.MANAGE_ACTION_DEPLOY:
 			log.Infof("Starting deploy for all challenges")
-			msgs := manager.DeployAll(true)
+			msgs := manager.DeployAll(true, auth.GetUser(c.GetHeader("Authorization")))
 			var msg string
 			if len(msgs) != 0 {
 				msg = strings.Join(msgs, " ::: ")
