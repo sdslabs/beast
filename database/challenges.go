@@ -53,6 +53,7 @@ type Challenge struct {
 	AuthorID    uint   `gorm:"not null"`
 	Ports       []Port
 	Tags        []*Tag `gorm:"many2many:tag_challenges;"`
+	Score       int
 }
 
 // Create an entry for the challenge in the Challenge table
