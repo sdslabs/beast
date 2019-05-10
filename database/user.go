@@ -7,10 +7,11 @@ import (
 )
 
 type UserDetail struct {
-	UserID    string `gorm:"not null"`
-	UserEmail string `gorm:"not null"`
-	Password  string
-	sum       (Score)
+	UserID     string `gorm:"not null"`
+	UserEmail  string `gorm:"not null"`
+	Password   string
+	sum        (Score)
+	Challenges []Challenge `gorm:"many2many:Score"`
 }
 
 func AddUser(userDetail *UserDetail) error {
