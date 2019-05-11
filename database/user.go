@@ -10,7 +10,7 @@ type UserDetail struct {
 	UserID     string `gorm:"not null"`
 	UserEmail  string `gorm:"not null"`
 	Password   string
-	sum        (Score)
+	TotalScore int
 	Challenges []Challenge `gorm:"many2many:Score"`
 }
 
