@@ -13,7 +13,7 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/core/database"
 )
 
 type CustomClaims struct {

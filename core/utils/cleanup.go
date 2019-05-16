@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	cfg "github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
 
 	log "github.com/sirupsen/logrus"

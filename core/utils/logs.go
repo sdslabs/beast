@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
 )
 

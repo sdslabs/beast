@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"io/ioutil"
 
-	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 )

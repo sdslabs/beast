@@ -12,7 +12,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/auth"
 	cfg "github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/core/database"
 	tools "github.com/sdslabs/beastv4/templates"
 	"github.com/sdslabs/beastv4/utils"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
