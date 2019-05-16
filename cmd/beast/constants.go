@@ -1,4 +1,4 @@
-package cmd
+package main
 
 const (
 	LONG_DESCRIPTION_BEAST = `

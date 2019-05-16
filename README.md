@@ -62,18 +62,15 @@ To run the API server for beast use command `beast run -v`
 	* Core functionalities of beast
 	* It includes package managing challenges.
 	* Inside package `manager` lives the code relating to all the core functionality that beast provides.
-
-* **database**
-	* Database wrapper using gorm for beast.
-
-* **docker**
-	* Docker wrapper for beast container API provider
+	* It also contains database wrapper using gorm for beast.
 
 * **git**
 	* Git functions wrapper provider for beast functions.
 
-* **notify**
-	* Package implementing notification functionality for beast, this includes slack notifications.
+* **pkg**
+	* Contains library code which can be used by external applications also.
+	* **cr** : Container Runtime wrapper for beast container API provider
+	* **notify** : Package implementing notification functionality for beast, this includes slack notifications.
 
 * **templates**
 	* Tempaltes used by beast.
