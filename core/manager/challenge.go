@@ -28,7 +28,7 @@ func CommitChallengeContainer(challName string) error {
 		return err
 	}
 
-	if chall.Status != core.DEPLOY_STATUS["deployed"] || !utils.IsContainerIdValid(chall.ContainerId) {
+	if chall.Status != core.DEPLOY_STATUS["deployed"] || !coreUtils.IsContainerIdValid(chall.ContainerId) {
 		log.Errorf("Challenge : %s not deployed", err.Error())
 		return fmt.Errorf("Challenge is not deployed")
 	}
@@ -96,7 +96,7 @@ func DeployChallenge(challengeName string) error {
 	// Check if a container for the challenge is already deployed.
 	// If the challange is already deployed, return an error.
 	// If not then start the deploy pipeline for the challenge.
-	if utils.IsContainerIdValid(challenge.ContainerId) {
+	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
 		containers, err := docker.SearchContainerByFilter(map[string]string{"id": challenge.ContainerId})
 		if err != nil {
 			log.Error("Error while searching for container with id %s", challenge.ContainerId)
@@ -112,7 +112,7 @@ func DeployChallenge(challengeName string) error {
 			log.Debugf("Found an already running instance of the challenge with container ID %s", challenge.ContainerId)
 			return fmt.Errorf("Challenge already deployed")
 		} else {
-			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ContainerId": utils.GetTempContainerId(challengeName)}); err != nil {
+			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ContainerId": coreUtils.GetTempContainerId(challengeName)}); err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
 				return errors.New("DATABASE ERROR")
 			}
@@ -121,7 +121,7 @@ func DeployChallenge(challengeName string) error {
 
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 
-	if utils.IsImageIdValid(challenge.ImageId) {
+	if coreUtils.IsImageIdValid(challenge.ImageId) {
 		imageExist, err := docker.CheckIfImageExists(challenge.ImageId)
 		if err != nil {
 			log.Errorf("Error while searching for image with id %s: %s", challenge.ImageId, err)
@@ -145,7 +145,7 @@ func DeployChallenge(challengeName string) error {
 				Info:      info,
 			})
 		} else {
-			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ImageId": utils.GetTempImageId(challengeName)}); err != nil {
+			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ImageId": coreUtils.GetTempImageId(challengeName)}); err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
 				return errors.New("DATABASE ERROR")
 			}
@@ -345,7 +345,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 	// was in staging state(and deployed is cancled) then we can neither deploy new
 	// version nor we can undeploy the existing version(since it does not exist)
 	// So this....
-	if challenge.ContainerId == utils.GetTempContainerId(challengeName) {
+	if challenge.ContainerId == coreUtils.GetTempContainerId(challengeName) {
 		log.Warnf("No instance of challenge(%s) deployed", challengeName)
 	} else {
 		log.Debug("Removing challenge instance for ", challengeName)
@@ -361,7 +361,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 
 	err = database.UpdateChallenge(&challenge, map[string]interface{}{
 		"Status":      core.DEPLOY_STATUS["unknown"],
-		"ContainerId": utils.GetTempContainerId(challengeName),
+		"ContainerId": coreUtils.GetTempContainerId(challengeName),
 	})
 
 	if err != nil {

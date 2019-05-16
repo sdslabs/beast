@@ -111,7 +111,8 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return err
 	}
 
-	buff, imageId, buildErr := docker.BuildImageFromTarContext(challengeName, stagedPath)
+	challengeTag := coreUtils.EncodeID(challengeName)
+	buff, imageId, buildErr := docker.BuildImageFromTarContext(challengeName, challengeTag, stagedPath)
 
 	// Create logs directory for the challenge in staging directory.
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
@@ -187,7 +188,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		PortsList:        config.Challenge.Env.Ports,
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
-		ContainerName:    utils.EncodeID(config.Challenge.Metadata.Name),
+		ContainerName:    coreUtils.EncodeID(config.Challenge.Metadata.Name),
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
 	}
