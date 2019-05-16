@@ -12,9 +12,10 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/auth"
 	cfg "github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/database"
+	"github.com/sdslabs/beastv4/core/database"
 	tools "github.com/sdslabs/beastv4/templates"
 	"github.com/sdslabs/beastv4/utils"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 
 	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
@@ -392,8 +393,8 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			AuthorID:    authorEntry.ID,
 			Format:      config.Challenge.Metadata.Type,
 			Status:      core.DEPLOY_STATUS["unknown"],
-			ContainerId: utils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:     utils.GetTempImageId(config.Challenge.Metadata.Name),
+			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
 			Flag:        config.Challenge.Metadata.Flag,
 			Type:        config.Challenge.Metadata.Type,
 			Sidecar:     config.Challenge.Metadata.Sidecar,

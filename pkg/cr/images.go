@@ -1,4 +1,4 @@
-package docker
+package cr
 
 import (
 	"bytes"
@@ -11,8 +11,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-
-	"github.com/sdslabs/beastv4/utils"
 )
 
 func RemoveImage(imageId string) error {
@@ -67,7 +65,7 @@ func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, err
 	return images, err
 }
 
-func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buffer, string, error) {
+func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath string) (*bytes.Buffer, string, error) {
 	builderContext, err := os.Open(tarContextPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("Error while opening staged file :: %s", tarContextPath)
@@ -75,7 +73,7 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	defer builderContext.Close()
 
 	buildOptions := types.ImageBuildOptions{
-		Tags:   []string{utils.EncodeID(challengeName)},
+		Tags:   []string{challengeTag},
 		Remove: true,
 	}
 
@@ -94,7 +92,7 @@ func BuildImageFromTarContext(challengeName, tarContextPath string) (*bytes.Buff
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(imageBuildResp.Body)
 
-	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", utils.EncodeID(challengeName))})
+	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", challengeTag)})
 	if len(images) > 0 {
 		log.Infof("Image ID for the image built is : %s", images[0].ID[7:])
 		return buf, images[0].ID[7:], nil

@@ -9,9 +9,9 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
-	"github.com/sdslabs/beastv4/database"
-	"github.com/sdslabs/beastv4/docker"
-	"github.com/sdslabs/beastv4/notify"
+	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/cr"
+	"github.com/sdslabs/beastv4/pkg/notify"
 	"github.com/sdslabs/beastv4/utils"
 
 	"github.com/BurntSushi/toml"
@@ -111,7 +111,8 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return err
 	}
 
-	buff, imageId, buildErr := docker.BuildImageFromTarContext(challengeName, stagedPath)
+	challengeTag := coreUtils.EncodeID(challengeName)
+	buff, imageId, buildErr := cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath)
 
 	// Create logs directory for the challenge in staging directory.
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
@@ -183,15 +184,15 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		containerNetwork = getSidecarNetwork(config.Challenge.Metadata.Sidecar)
 	}
 
-	containerConfig := docker.CreateContainerConfig{
+	containerConfig := cr.CreateContainerConfig{
 		PortsList:        config.Challenge.Env.Ports,
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
-		ContainerName:    utils.EncodeID(config.Challenge.Metadata.Name),
+		ContainerName:    coreUtils.EncodeID(config.Challenge.Metadata.Name),
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
 	}
-	containerId, err := docker.CreateContainerFromImage(&containerConfig)
+	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {
 		if containerId != "" {
 			if e := database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": containerId}); e != nil {

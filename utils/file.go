@@ -201,3 +201,25 @@ func GetAllDirectoriesName(dirPath string) []string {
 
 	return directories
 }
+
+// Returns a list of directory present in the provided directory
+func GetDirsInDir(dirPath string) (error, []string) {
+	var dirs []string
+	err := ValidateDirExists(dirPath)
+	if err != nil {
+		return err, dirs
+	}
+
+	files, err := ioutil.ReadDir(dirPath)
+	if err != nil {
+		return fmt.Errorf("Error while reading directory with path %s : %s", dirPath, err), dirs
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			dirs = append(dirs, file.Name())
+		}
+	}
+
+	return nil, dirs
+}

@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/database"
-	"github.com/sdslabs/beastv4/docker"
-	tools "github.com/sdslabs/beastv4/utils"
+	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/cr"
 )
 
-func GetLogs(challname string, live bool) (*docker.Log, error) {
+func GetLogs(challname string, live bool) (*cr.Log, error) {
 	chall, err := database.QueryFirstChallengeEntry("name", challname)
 	if err != nil {
 		return nil, fmt.Errorf("Error while database access : %s", err)
@@ -18,10 +17,10 @@ func GetLogs(challname string, live bool) (*docker.Log, error) {
 	if chall.Format == core.STATIC_CHALLENGE_TYPE_NAME {
 		return nil, fmt.Errorf("The challenge is a static challenge")
 	}
-	if !tools.IsContainerIdValid(chall.ContainerId) {
+	if !IsContainerIdValid(chall.ContainerId) {
 		return nil, fmt.Errorf("The container id is not valid")
 	}
-	containers, err := docker.SearchContainerByFilter(map[string]string{"id": chall.ContainerId})
+	containers, err := cr.SearchContainerByFilter(map[string]string{"id": chall.ContainerId})
 	if err != nil {
 		return nil, fmt.Errorf("Error while searching for container with id %s", chall.ContainerId)
 	}
@@ -35,9 +34,9 @@ func GetLogs(challname string, live bool) (*docker.Log, error) {
 	}
 
 	if live {
-		docker.ShowLiveDockerLogs(chall.ContainerId)
+		cr.ShowLiveContainerLogs(chall.ContainerId)
 		return nil, nil
 	}
 
-	return docker.GetDockerStdLogs(chall.ContainerId)
+	return cr.GetContainerStdLogs(chall.ContainerId)
 }

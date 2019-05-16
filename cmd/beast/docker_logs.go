@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"github.com/sdslabs/beastv4/core/utils"

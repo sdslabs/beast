@@ -9,7 +9,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	coreutils "github.com/sdslabs/beastv4/core/utils"
-	"github.com/sdslabs/beastv4/docker"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -38,7 +38,7 @@ func DeployStaticContentContainer() error {
 		return errors.New("CLEANUP_ERROR")
 	}
 
-	images, err := docker.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.BEAST_STATIC_CONTAINER_NAME)})
+	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.BEAST_STATIC_CONTAINER_NAME)})
 	if len(images) == 0 {
 		log.Debugf("Static content image does not exist, build image manually")
 		return errors.New("IMAGE_NOT_FOUND_ERROR")
@@ -66,13 +66,13 @@ func DeployStaticContentContainer() error {
 	staticMount[beastStaticAuthFile] = filepath.Join("/", core.BEAST_STATIC_AUTH_FILE)
 	port := []uint32{core.BEAST_CHALLENGES_STATIC_PORT}
 
-	containerConfig := docker.CreateContainerConfig{
+	containerConfig := cr.CreateContainerConfig{
 		PortsList:     port,
 		MountsMap:     staticMount,
 		ImageId:       imageId,
 		ContainerName: core.BEAST_STATIC_CONTAINER_NAME,
 	}
-	containerId, err := docker.CreateContainerFromImage(&containerConfig)
+	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {
 		if containerId != "" {
 			log.Errorf("Error while starting the container : %s", err)

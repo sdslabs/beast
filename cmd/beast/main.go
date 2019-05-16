@@ -5,9 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sdslabs/beastv4/cmd"
 	"github.com/sdslabs/beastv4/core"
-	_ "github.com/sdslabs/beastv4/database"
+	_ "github.com/sdslabs/beastv4/core/database"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -44,5 +43,5 @@ func init() {
 }
 
 func main() {
-	cmd.Execute()
+	Execute()
 }
