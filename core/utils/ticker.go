@@ -8,7 +8,7 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/database"
-	"github.com/sdslabs/beastv4/notify"
+	"github.com/sdslabs/beastv4/pkg/notify"
 	log "github.com/sirupsen/logrus"
 )
 

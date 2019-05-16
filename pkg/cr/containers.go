@@ -1,4 +1,4 @@
-package docker
+package cr
 
 import (
 	"fmt"
@@ -139,7 +139,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	return containerId, nil
 }
 
-func GetDockerStdLogs(containerID string) (*Log, error) {
+func GetContainerStdLogs(containerID string) (*Log, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func GetDockerStdLogs(containerID string) (*Log, error) {
 	return &Log{Stdout: string(stdoutlogs), Stderr: string(stderrlogs)}, nil
 }
 
-func ShowLiveDockerLogs(containerID string) {
+func ShowLiveContainerLogs(containerID string) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		log.Error(err)

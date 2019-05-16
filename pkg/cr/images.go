@@ -1,4 +1,4 @@
-package docker
+package cr
 
 import (
 	"bytes"
