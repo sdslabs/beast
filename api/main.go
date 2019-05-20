@@ -9,10 +9,12 @@ import (
 	swaggerFiles "github.com/swaggo/gin-swagger/swaggerFiles"
 
 	_ "github.com/sdslabs/beastv4/api/docs"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/git"
+	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 )
 
 const (
@@ -51,8 +53,8 @@ func RunBeastApiServer(port string) {
 		port = DEFAULT_BEAST_PORT
 	}
 
-	manager.InitQueue()
-	manager.StartWorkers()
+	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE)
+	manager.Q.StartWorkers(manager.QueueAction)
 
 	runBeastApiBootsteps()
 

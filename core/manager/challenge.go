@@ -10,14 +10,25 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
-	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/core/database"
-	"github.com/sdslabs/beastv4/pkg/cr"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/git"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/notify"
+	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 )
+
+type ActionInfo struct {
+	Action     string
+	ChallDir   string
+	SkipStage  bool
+	SkipCommit bool
+	Purge      bool
+}
+
+var Q *wpool.Queue
 
 // Function which commits the deployed challenge provided
 func CommitChallengeContainer(challName string) error {
@@ -47,6 +58,44 @@ func CommitChallengeContainer(challName string) error {
 	return nil
 }
 
+func QueueAction(w wpool.Work) *wpool.Work {
+	info := w.Info.(ActionInfo)
+	switch info.Action {
+	case core.MANAGE_ACTION_DEPLOY:
+		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit)
+
+	case core.MANAGE_ACTION_UNDEPLOY:
+		err := StartUndeployChallenge(w.ID, false)
+		if err != nil {
+			log.Errorf("Error while undeplying challenge(%s): %s", w.ID, err.Error())
+		}
+
+	case core.MANAGE_ACTION_REDEPLOY:
+		err := StartUndeployChallenge(w.ID, true)
+		if err != nil {
+			log.Errorf("Error while redeplying challenge(%s): %s", w.ID, err.Error())
+			return nil
+		}
+		work, err := GetDeployWork(w.ID)
+		if err != nil {
+			log.Error(err)
+			return nil
+		}
+		return work
+
+	case core.MANAGE_ACTION_PURGE:
+		err := StartUndeployChallenge(w.ID, true)
+		if err != nil {
+			log.Errorf("Error while purging challenge(%s): %s", w.ID, err.Error())
+		}
+
+	default:
+		log.Errorf("The action(%s) specified for challenge : %s does not exist", info.Action, w.ID)
+	}
+
+	return nil
+}
+
 // Main function which starts the deploy of a challenge provided
 // directory inside the hack git database. We validate the challenge
 // config first and return early starting a goroutine to start out
@@ -62,17 +111,16 @@ func DeployChallengePipeline(challengeDir string) error {
 
 	// Start a goroutine to start a deploy pipeline for the challenge
 	challengeName := filepath.Base(challengeDir)
-	info := DeployInfo{
+	info := ActionInfo{
+		Action:     core.MANAGE_ACTION_DEPLOY,
 		ChallDir:   challengeDir,
 		SkipStage:  false,
 		SkipCommit: false,
 	}
-	Q.CheckPush(Work{
-		Action:    core.MANAGE_ACTION_DEPLOY,
-		ChallName: challengeName,
-		Info:      info,
+	return Q.CheckPush(wpool.Work{
+		ID:   challengeName,
+		Info: info,
 	})
-	return nil
 }
 
 // Start deploying a challenge using the challenge Name(we are not using ID here),
@@ -84,13 +132,13 @@ func DeployChallengePipeline(challengeDir string) error {
 // This will start deploy pipeline if it finds there is no problem in deployment, else it will
 // notify the user via return value if there is an error or if the deployement request cannot
 // be processed.
-func DeployChallenge(challengeName string) error {
+func GetDeployWork(challengeName string) (*wpool.Work, error) {
 	log.Infof("Processing request to deploy the challenge with ID %s", challengeName)
 
 	challenge, err := database.QueryFirstChallengeEntry("name", challengeName)
 	if err != nil {
 		log.Errorf("Got an error while querying database for challenge : %s : %s", challengeName, err)
-		return errors.New("DATABASE SERVER ERROR")
+		return nil, errors.New("DATABASE SERVER ERROR")
 	}
 
 	// Check if a container for the challenge is already deployed.
@@ -100,21 +148,21 @@ func DeployChallenge(challengeName string) error {
 		containers, err := cr.SearchContainerByFilter(map[string]string{"id": challenge.ContainerId})
 		if err != nil {
 			log.Error("Error while searching for container with id %s", challenge.ContainerId)
-			return errors.New("CONTAINER RUNTIME ERROR")
+			return nil, errors.New("CONTAINER RUNTIME ERROR")
 		}
 
 		if len(containers) > 1 {
 			log.Error("Got more than one containers, something fishy here. Contact admin to check manually.")
-			return errors.New("CONTAINER RUNTIME ERROR")
+			return nil, errors.New("CONTAINER RUNTIME ERROR")
 		}
 
 		if len(containers) == 1 {
 			log.Debugf("Found an already running instance of the challenge with container ID %s", challenge.ContainerId)
-			return fmt.Errorf("Challenge already deployed")
+			return nil, fmt.Errorf("Challenge already deployed")
 		} else {
 			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ContainerId": coreUtils.GetTempContainerId(challengeName)}); err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
-				return errors.New("DATABASE ERROR")
+				return nil, errors.New("DATABASE ERROR")
 			}
 		}
 	}
@@ -125,7 +173,7 @@ func DeployChallenge(challengeName string) error {
 		imageExist, err := cr.CheckIfImageExists(challenge.ImageId)
 		if err != nil {
 			log.Errorf("Error while searching for image with id %s: %s", challenge.ImageId, err)
-			return errors.New("CONTAINER RUNTIME ERROR")
+			return nil, errors.New("CONTAINER RUNTIME ERROR")
 		}
 
 		if imageExist {
@@ -134,20 +182,20 @@ func DeployChallenge(challengeName string) error {
 			// Challenge is already in commited stage here, so skip commit and stage step and start
 			// deployment of the challenge.
 			log.Debugf("Checking and pushing the task of deploying commited challenge in the queue.")
-			info := DeployInfo{
+			info := ActionInfo{
+				Action:     core.MANAGE_ACTION_DEPLOY,
 				ChallDir:   challengeStagingDir,
 				SkipStage:  true,
 				SkipCommit: true,
 			}
-			return Q.CheckPush(Work{
-				Action:    core.MANAGE_ACTION_DEPLOY,
-				ChallName: challengeName,
-				Info:      info,
-			})
+			return &wpool.Work{
+				ID:   challengeName,
+				Info: info,
+			}, nil
 		} else {
 			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ImageId": coreUtils.GetTempImageId(challengeName)}); err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
-				return errors.New("DATABASE ERROR")
+				return nil, errors.New("DATABASE ERROR")
 			}
 		}
 	}
@@ -169,21 +217,21 @@ func DeployChallenge(challengeName string) error {
 
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
-			return errors.New("CHALLENGE VALIDATION ERROR")
+			return nil, errors.New("CHALLENGE VALIDATION ERROR")
 		}
 
 		log.Debugf("Checking and pushing the task of deploying unstaged challenge in the queue.")
 
-		info := DeployInfo{
+		info := ActionInfo{
+			Action:     core.MANAGE_ACTION_DEPLOY,
 			ChallDir:   challengeDir,
 			SkipStage:  false,
 			SkipCommit: false,
 		}
-		return Q.CheckPush(Work{
-			Action:    core.MANAGE_ACTION_DEPLOY,
-			ChallName: challengeName,
-			Info:      info,
-		})
+		return &wpool.Work{
+			ID:   challengeName,
+			Info: info,
+		}, nil
 	} else {
 		// Challenge is in staged state, so start the deploy pipeline and skip
 		// the staging state.
@@ -191,22 +239,22 @@ func DeployChallenge(challengeName string) error {
 
 		log.Debugf("Checking and pushing the task of deploying staged challenge in the queue.")
 
-		info := DeployInfo{
+		info := ActionInfo{
+			Action:     core.MANAGE_ACTION_DEPLOY,
 			ChallDir:   challengeStagingDir,
 			SkipStage:  true,
 			SkipCommit: false,
 		}
-		return Q.CheckPush(Work{
-			Action:    core.MANAGE_ACTION_DEPLOY,
-			ChallName: challengeName,
-			Info:      info,
-		})
+		return &wpool.Work{
+			ID:   challengeName,
+			Info: info,
+		}, nil
 	}
 }
 
 // Deploy multiple challenges simultaneously.
 // When we have multiple challenges we spawn X goroutines and distribute
-// deployments in those goroutines. The work for these worker goroutines is specified
+// deployments in those goroutines. The wpool.work for these wpool.worker goroutines is specified
 // in deployList, which contains the name of the challenges to be deployed.
 func DeployMultipleChallenges(deployList []string, userId string) []string {
 	deployList = utils.GetUniqueStrings(deployList)
@@ -418,23 +466,31 @@ func StartUndeployChallenge(challengeName string, purge bool) error {
 	return err
 }
 
+func DeployChallenge(challengeName string) error {
+	w, err := GetDeployWork(challengeName)
+	if err != nil {
+		return err
+	}
+	return Q.CheckPush(*w)
+}
+
 func UndeployChallenge(challengeName string) error {
-	return Q.CheckPush(Work{
-		Action:    core.MANAGE_ACTION_UNDEPLOY,
-		ChallName: challengeName,
+	return Q.CheckPush(wpool.Work{
+		Info: ActionInfo{Action: core.MANAGE_ACTION_UNDEPLOY},
+		ID:   challengeName,
 	})
 }
 
 func PurgeChallenge(challengeName string) error {
-	return Q.CheckPush(Work{
-		Action:    core.MANAGE_ACTION_PURGE,
-		ChallName: challengeName,
+	return Q.CheckPush(wpool.Work{
+		Info: ActionInfo{Action: core.MANAGE_ACTION_PURGE},
+		ID:   challengeName,
 	})
 }
 
 func RedeployChallenge(challengeName string) error {
-	return Q.CheckPush(Work{
-		Action:    core.MANAGE_ACTION_REDEPLOY,
-		ChallName: challengeName,
+	return Q.CheckPush(wpool.Work{
+		Info: ActionInfo{Action: core.MANAGE_ACTION_REDEPLOY},
+		ID:   challengeName,
 	})
 }
