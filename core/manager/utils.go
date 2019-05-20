@@ -515,3 +515,19 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 	err = utils.CopyDirectory(staticContentDir, dirPath)
 	return err
 }
+
+func GetAllChalls() ([]string, error) {	
+
+	challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, cfg.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+	err, challenges := utils.GetDirsInDir(challengesDirRoot)
+	if err != nil {
+		log.Errorf("DEPLOY_ALL : Error while getting available challenges : %s", err)
+		return nil, err
+	}
+
+	var challsNameList []string
+	for _, chall := range challenges {
+		challsNameList = append(challsNameList, chall)
+	}
+	return challsNameList, nil
+}

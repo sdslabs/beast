@@ -2,9 +2,9 @@ package api
 
 import (
 	"net/http"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/manager"
 	cfg "github.com/sdslabs/beastv4/core/config"
 )
 
@@ -61,7 +61,8 @@ func availableImagesHandler(c *gin.Context) {
 // @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/info/images/available [get]
 func challengesHandler(c *gin.Context) {
-	challenges, err := database.QueryAllChallenges()
+
+	challenges, err := manager.GetAllChalls()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: err.Error(),
@@ -73,13 +74,9 @@ func challengesHandler(c *gin.Context) {
 		})
 		return
 	} else {
-		var challs []string
-		for i := range challenges {
-			challs = append(challs, challenges[i].Name)
-		}
 		c.JSON(http.StatusOK, ChallengesResp{
 			Message:    "All Challenges",
-			Challenges: challs,
+			Challenges: challenges,
 		})
 	}
 }

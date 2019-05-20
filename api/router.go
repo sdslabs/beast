@@ -34,7 +34,6 @@ func initGinRouter() *gin.Engine {
 			manageGroup.POST("/static/:action", beastStaticContentHandler)
 			manageGroup.POST("/commit/", commitChallenge)
 			manageGroup.GET("/logs/", challengeLogsHandler)
-			manageGroup.POST("/challenge/verify/local",verifyLocalHandler)
 			manageGroup.POST("/challenge/verify",verifyHandler)
 		}
 
@@ -53,7 +52,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/available", availableChallengeInfoHandler)
 			infoGroup.GET("/images/available", availableImagesHandler)
 			infoGroup.GET("/ports/used", usedPortsInfoHandler)
-			infoGroup.GET("/challenges",challengesHandler)
+			infoGroup.GET("/challenge/all", challengesHandler)
 		}
 
 		remoteGroup := apiGroup.Group("/remote")
