@@ -43,7 +43,7 @@ func runBeastApiBootsteps() error {
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port string) {
+func RunBeastApiServer(port string, tickerneeded bool) {
 	log.Info("Bootstrapping Beast API server")
 	if port != "" {
 		port = ":" + port
@@ -76,7 +76,9 @@ func RunBeastApiServer(port string) {
 		})
 	})
 
-	go utils.ChallengesHealthTicker(config.Cfg.TickerFrequency)
+	if tickerneeded {
+		go utils.ChallengesHealthTicker(config.Cfg.TickerFrequency)
+	}
 
 	router.Run(port)
 }

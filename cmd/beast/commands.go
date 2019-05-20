@@ -14,6 +14,7 @@ import (
 // error level.
 var (
 	Verbose           bool
+	StopTicker        bool
 	Port              string
 	KeyFile           string
 	Username          string
@@ -65,6 +66,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
 	rootCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
 	runCmd.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to run the beast server on.")
+	runCmd.PersistentFlags().BoolVarP(&StopTicker, "no-tick", "k", false, "Health Ticker is not run")
 	getAuthCmd.PersistentFlags().StringVarP(&KeyFile, "identity", "i", "", "Private File location")
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
 	getAuthCmd.PersistentFlags().StringVarP(&Host, "host", "H", "http://localhost:5005/", "Hostname or IP along with port where beast is hosted")
