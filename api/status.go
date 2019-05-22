@@ -125,27 +125,6 @@ func challengeDescriptionHandler(c *gin.Context) {
 		return
 	}
 
-	var challDescription string
-	if len(challenge) > 0 {
-		challDescription = challenge[0].Description
-	} else {
-		challDescription = "Not Available"
-	}
-	c.JSON(http.StatusOK, ChallengeDescriptionResp{
-		Name:        name,
-		Description: challDescription,
-	})
-}
-
-func challengePortUsedHandler(c *gin.Context) {
-	name := c.Param("name")
-	if name == "" {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Name of the challenge is a required parameter to process request.",
-		})
-		return
-	}
-
 	chall, err := database.QueryFirstChallengeEntry("name", name)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
@@ -162,14 +141,25 @@ func challengePortUsedHandler(c *gin.Context) {
 		return
 	}
 
+	var challDescription string
 	var challPortUsed uint32
+	var challScore int
+	if len(challenge) > 0 {
+		challDescription = challenge[0].Description
+		challScore = challenge[0].Score
+	} else {
+		challDescription = "Not Available"
+		challScore = 0
+	}
 	if len(port) > 0 {
 		challPortUsed = port[0].PortNo
 	} else {
 		challPortUsed = 0
 	}
-	c.JSON(http.StatusOK, PortUsedByChallResp{
-		Name:     name,
-		PortUsed: challPortUsed,
+	c.JSON(http.StatusOK, ChallengeDescriptionResp{
+		Name:        name,
+		Description: challDescription,
+		PortUsed:    challPortUsed,
+		Score:       challScore,
 	})
 }
