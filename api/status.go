@@ -107,3 +107,32 @@ func statusHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 	}
 }
+
+func challengeDescriptionHandler(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Name of the challenge is a required parameter to process request.",
+		})
+		return
+	}
+
+	challenge, err := database.QueryChallengeEntries("name", name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	var challDescription string
+	if len(challenge) > 0 {
+		challDescription = challenge[0].Description
+	} else {
+		challDescription = "Not Available"
+	}
+	c.JSON(http.StatusOK, challengeDescriptionResp{
+		Name:        name,
+		Description: challDescription,
+	})
+}

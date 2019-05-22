@@ -32,3 +32,13 @@ type ChallengeStatusResp struct {
 	Status    string    `json:"status" example:"deployed"`
 	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }
+
+type PortUsedByChallResp struct {
+	Name     string `json:"name" example:"Web Challenge"`
+	PortUsed uint32 `json:"port_used_by_chall" example:"10000"`
+}
+
+type challengeDescriptionResp struct {
+	Name        string `json:"name" example:"Web Challenge"`
+	Description string `json:"description" example:"Challenge Description"`
+}
