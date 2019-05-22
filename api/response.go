@@ -38,7 +38,7 @@ type PortUsedByChallResp struct {
 	PortUsed uint32 `json:"port_used_by_chall" example:"10000"`
 }
 
-type challengeDescriptionResp struct {
+type ChallengeDescriptionResp struct {
 	Name        string `json:"name" example:"Web Challenge"`
 	Description string `json:"description" example:"Challenge Description"`
 }

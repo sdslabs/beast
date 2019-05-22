@@ -43,6 +43,7 @@ func initGinRouter() *gin.Engine {
 			statusGroup.GET("/all", statusHandler)
 			statusGroup.GET("/all/:filter", statusHandler)
 			statusGroup.GET("/challenge/description", challengeDescriptionHandler)
+			statusGroup.GET("challenges/portused", challengePortUsedHandler)
 		}
 
 		// Info route group
