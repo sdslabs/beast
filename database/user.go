@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -17,6 +18,7 @@ type UserDetail struct {
 	Challenges []Challenge `gorm:"many2many:Score"`
 }
 
+//Adds user info
 func AddUser(userDetail *UserDetail) error {
 
 	DBMux.Lock()
@@ -35,6 +37,7 @@ func AddUser(userDetail *UserDetail) error {
 	return tx.Commit().Error
 }
 
+//Update user score
 func UpdateUser(userDetail *UserDetail, chall *Challenge) error {
 
 	DBMux.Lock()
@@ -51,4 +54,36 @@ func UpdateUser(userDetail *UserDetail, chall *Challenge) error {
 	}
 
 	return tx.Commit().Error
+}
+
+// Query user table to get all the entries in the table
+func QueryAllUsers() ([]UserDetail, error) {
+	var user []UserDetail
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Find(&user)
+	if tx.RecordNotFound() {
+		return nil, nil
+	}
+
+	return user, tx.Error
+}
+
+// Query user table by score in decreasing order to get all the entries in the table
+func QueryAllUsersByScore() ([]UserDetail, error) {
+	var user []UserDetail
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Find(&user)
+	if tx.RecordNotFound() {
+		return nil, nil
+	}
+	sort.SliceStable(user, func(i, j int) bool {
+		return user[i].TotalScore > user[j].TotalScore
+	})
+	return user, tx.Error
 }
