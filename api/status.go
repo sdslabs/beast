@@ -163,3 +163,21 @@ func challengeDescriptionHandler(c *gin.Context) {
 		Score:       challScore,
 	})
 }
+
+func leaderboardHandler(c *gin.Context) {
+	users, err := database.QueryAllUsersByScore()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	numberOfUsers := len(users)
+	for i := 0; i < numberOfUsers; i++ {
+		c.JSON(http.StatusInternalServerError, LeaderboardResp{
+			UserName:   users[i].UserName,
+			TotalScore: users[i].TotalScore,
+		})
+	}
+}

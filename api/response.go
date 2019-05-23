@@ -39,3 +39,8 @@ type ChallengeDescriptionResp struct {
 	PortUsed    uint32 `json:"port_used_by_chall" example:"10000"`
 	Score       int    `json:"challenge_score" example:"100"`
 }
+
+type LeaderboardResp struct {
+	UserName   string `json:"name" example:"Username"`
+	TotalScore int    `json:"total_score" example:"100"`
+}
