@@ -71,6 +71,34 @@ func GenerateJWT(username, decrmess string) (string, error) {
 	return token.SignedString([]byte(config.Cfg.JWTSecret))
 }
 
+type UserCustomClaims struct {
+	User            string `json:"usr"`
+	ExpiresAt       int64  `json:"exp"`
+	Issuer          string `json:"iss"`
+	CompetitionCode int64  `json:"code"`
+}
+
+func (c UserCustomClaims) Valid() error {
+	if c.ExpiresAt < time.Now().Unix() {
+		return fmt.Errorf("Token Expired")
+	}
+	return nil
+}
+
+func GenerateUserJWT(username, decrmess string) (string, error) {
+
+	t := time.Now().Unix()
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, UserCustomClaims{
+		User:            username,
+		ExpiresAt:       t + 6*60*60,
+		Issuer:          "beast-sds",
+		CompetitionCode: 0,
+	})
+
+	return token.SignedString([]byte(config.Cfg.JWTSecret))
+}
+
 func GetUser(authHeader string) string {
 	values := strings.Split(authHeader, " ")
 	userInfoEncr := strings.Split(values[1], ".")
