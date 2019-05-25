@@ -65,6 +65,12 @@ func initGinRouter() *gin.Engine {
 		{
 			configGroup.PATCH("/reload", reloadBeastConfig)
 		}
+
+		registerGroup := apiGroup.Group("/register")
+		{
+			registerGroup.POST("/signup", signUpHandler)
+			registerGroup.POST("/signin", signInHandler)
+		}
 	}
 
 	return router
