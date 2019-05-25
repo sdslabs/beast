@@ -48,7 +48,7 @@ func signInHandler(c *gin.Context) {
 		return
 	}
 	if userdetail[0].Password == encryptedPass {
-		jwt, err := auth.GenerateJWT(username, decrMess)
+		jwt, err := auth.GenerateUserJWT(username, decrMess)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"message": err.Error(),
