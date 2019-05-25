@@ -13,7 +13,7 @@ type UserDetail struct {
 
 	UserName   string `gorm:"not null";unique`
 	UserEmail  string `gorm:"not null"`
-	Password   string
+	Password   [32]byte
 	TotalScore int
 	Challenges []Challenge `gorm:"many2many:Score"`
 }
@@ -86,4 +86,25 @@ func QueryAllUsersByScore() ([]UserDetail, error) {
 		return user[i].TotalScore > user[j].TotalScore
 	})
 	return user, tx.Error
+}
+
+// Query user details by using their informations
+func QueryUserEntry(key string, value string) ([]UserDetail, error) {
+	queryKey := fmt.Sprintf("%s = ?", key)
+
+	var userDetail []UserDetail
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where(queryKey, value).Find(&userDetail)
+	if tx.RecordNotFound() {
+		return nil, nil
+	}
+
+	if tx.Error != nil {
+		return userDetail, tx.Error
+	}
+
+	return userDetail, nil
 }
