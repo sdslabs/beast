@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/utils"
-
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/src-d/go-git.v4"
@@ -18,10 +15,6 @@ import (
 // The paramter sshKeyFile is the path to the file containing the private
 // key to be used during the transport.
 func getSSHAuth(sshKeyFile string) (*gitssh.PublicKeys, error) {
-	err := utils.ValidateFileExists(sshKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("The file %s does not exist", sshKeyFile)
-	}
 
 	pem, err := ioutil.ReadFile(sshKeyFile)
 	if err != nil {
@@ -43,7 +36,7 @@ func getSSHAuth(sshKeyFile string) (*gitssh.PublicKeys, error) {
 
 // Pull the git directory specified by gitDir using the provided sshKeyFile secret
 // and branch.
-func pull(gitDir string, sshKeyFile string, branch string) error {
+func Pull(gitDir string, sshKeyFile string, branch string, remote string) error {
 	auth, err := getSSHAuth(sshKeyFile)
 	if err != nil {
 		return fmt.Errorf("Error while generating auth for git : %s", err)
@@ -61,7 +54,7 @@ func pull(gitDir string, sshKeyFile string, branch string) error {
 
 	refName := plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", branch))
 	err = w.Pull(&git.PullOptions{
-		RemoteName:    core.GIT_DEFAULT_REMOTE,
+		RemoteName:    remote,
 		ReferenceName: refName,
 		SingleBranch:  true,
 		Auth:          auth,
@@ -78,18 +71,18 @@ func pull(gitDir string, sshKeyFile string, branch string) error {
 // provided remote repo name.
 // This function assumes that the arguments provided have been checked or
 // validated earlier, for example gitDir is an empty directory or does not exist.
-func clone(gitDir, sshKeyFile, repoUrl, branch string) error {
+func Clone(gitDir string, sshKeyFile string, repoUrl string, branch string, remote string) error {
 	auth, err := getSSHAuth(sshKeyFile)
 	if err != nil {
 		return fmt.Errorf("Error while generating auth for git : %s", err)
 	}
 
 	refName := plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", branch))
-	log.Debugf("Performing clone for remote : %s & branch : %s", core.GIT_DEFAULT_REMOTE, refName)
+	log.Debugf("Performing clone for remote : %s & branch : %s", remote, refName)
 	_, err = git.PlainClone(gitDir, false, &git.CloneOptions{
 		URL:           repoUrl,
 		Auth:          auth,
-		RemoteName:    core.GIT_DEFAULT_REMOTE,
+		RemoteName:    remote,
 		ReferenceName: refName,
 		SingleBranch:  true,
 	})

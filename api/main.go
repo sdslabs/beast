@@ -13,7 +13,6 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
-	"github.com/sdslabs/beastv4/git"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 )
 
@@ -22,7 +21,7 @@ const (
 )
 
 func runBeastApiBootsteps() error {
-	git.RunBeastBootsetps()
+	manager.RunBeastBootsetps()
 
 	return nil
 }

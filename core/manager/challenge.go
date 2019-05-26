@@ -12,7 +12,6 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
-	"github.com/sdslabs/beastv4/git"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/notify"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
@@ -323,7 +322,7 @@ func DeployAll(sync bool, userId string) []string {
 
 	log.Infof("Got request to deploy ALL CHALLENGES")
 	if sync {
-		err := git.SyncBeastRemote()
+		err := SyncBeastRemote()
 		if err != nil {
 			// A hack for go-git which returns error when the git repo
 			// is up to date. This ignores this error.
