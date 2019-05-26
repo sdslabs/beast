@@ -64,7 +64,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 	}
 
 	log.Debugf("Parsed config file is : %s", config)
-	err = config.ValidateRequiredFields()
+	err = config.ValidateRequiredFields(challengeDir)
 	if err != nil {
 		return err
 	}
