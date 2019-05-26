@@ -1,4 +1,4 @@
-package workerpool
+package Taskerpool
 
 import (
 	"fmt"
@@ -9,64 +9,72 @@ import (
 )
 
 type Queue struct {
-	WorkQueue chan Work
+	TaskQueue chan Task
 	Mux       sync.RWMutex
-	Set       map[string]bool
+	InQueue   map[string]bool // A map which stores if the task related to some id is already in the queue
 }
 
-type Work struct {
+type Task struct {
 	ID   string
 	Info interface{}
 }
 
-func (q *Queue) CheckPush(w Work) error {
+type Worker interface {
+	PerformTask(Task) *Task
+}
+
+func (q *Queue) Push(w Task) error {
 	q.Mux.Lock()
-	if _, ex := q.Set[w.ID]; ex {
+	if _, ex := q.InQueue[w.ID]; ex {
 		q.Mux.Unlock()
-		log.Warnf("The Work ID : %s is already in queue", w.ID)
-		return fmt.Errorf("The Work ID : %s is already in queue", w.ID)
+		log.Warnf("The Task ID : %s is already in queue", w.ID)
+		return fmt.Errorf("The Task ID : %s is already in queue", w.ID)
 	}
-	q.Set[w.ID] = true
+	q.InQueue[w.ID] = true
 	q.Mux.Unlock()
-	q.WorkQueue <- w
+	select {
+	case q.TaskQueue <- w:
+	default:
+		return fmt.Errorf("Queue is full")
+	}
 	// TODO : get size of the queue
 	return nil
 }
 
-func (q *Queue) Remove(ID string) {
+func (q *Queue) Pop(ID string) {
 	q.Mux.Lock()
-	delete(q.Set, ID)
+	delete(q.InQueue, ID)
 	q.Mux.Unlock()
 }
 
-func (q *Queue) startConcurrentWorker(i int, action func(Work) *Work) {
-	var newWork *Work
+func (q *Queue) startConcurrentWorker(i int, worker Worker) {
+	var newTask *Task
 	for {
-		w := <-q.WorkQueue
-		newWork = action(w)
+		w := <-q.TaskQueue
+		newTask = worker.PerformTask(w)
 
-		q.Remove(w.ID)
+		q.Pop(w.ID)
 
-		if newWork != nil {
-			q.CheckPush(*newWork)
+		if newTask != nil {
+			q.Push(*newTask)
 		}
 	}
 }
 
-func (q *Queue) StartWorkers(action func(Work) *Work) {
+func (q *Queue) StartWorkers(worker Worker) {
 	numCPUs := runtime.NumCPU()
-	log.Info("Total workers: ", numCPUs)
+	log.Info("Total Workers: ", numCPUs)
 	for i := 0; i < numCPUs; i++ {
-		go q.startConcurrentWorker(i, action)
+		go q.startConcurrentWorker(i, worker)
 	}
 }
 
 func InitQueue(maxQueueSize uint32) *Queue {
 	var Q *Queue
 	Q = &Queue{
-		WorkQueue: make(chan Work, maxQueueSize),
+		TaskQueue: make(chan Task, maxQueueSize),
 		Mux:       sync.RWMutex{},
-		Set:       map[string]bool{},
+		InQueue:   map[string]bool{},
 	}
 	return Q
 }

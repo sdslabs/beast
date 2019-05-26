@@ -19,7 +19,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type ActionInfo struct {
+type TaskInfo struct {
 	Action     string
 	ChallDir   string
 	SkipStage  bool
@@ -28,6 +28,10 @@ type ActionInfo struct {
 }
 
 var Q *wpool.Queue
+
+// a struct which implements the wpool.Worker interface for performing tasks
+type Worker struct {
+}
 
 // Function which commits the deployed challenge provided
 func CommitChallengeContainer(challName string) error {
@@ -57,8 +61,9 @@ func CommitChallengeContainer(challName string) error {
 	return nil
 }
 
-func QueueAction(w wpool.Work) *wpool.Work {
-	info := w.Info.(ActionInfo)
+// This function is used by the worker nodes or goroutines to perform the task which is pushed in the queue by the beast manager
+func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
+	info := w.Info.(TaskInfo)
 	switch info.Action {
 	case core.MANAGE_ACTION_DEPLOY:
 		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit)
@@ -110,13 +115,13 @@ func DeployChallengePipeline(challengeDir string) error {
 
 	// Start a goroutine to start a deploy pipeline for the challenge
 	challengeName := filepath.Base(challengeDir)
-	info := ActionInfo{
+	info := TaskInfo{
 		Action:     core.MANAGE_ACTION_DEPLOY,
 		ChallDir:   challengeDir,
 		SkipStage:  false,
 		SkipCommit: false,
 	}
-	return Q.CheckPush(wpool.Work{
+	return Q.Push(wpool.Task{
 		ID:   challengeName,
 		Info: info,
 	})
@@ -131,7 +136,7 @@ func DeployChallengePipeline(challengeDir string) error {
 // This will start deploy pipeline if it finds there is no problem in deployment, else it will
 // notify the user via return value if there is an error or if the deployement request cannot
 // be processed.
-func GetDeployWork(challengeName string) (*wpool.Work, error) {
+func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	log.Infof("Processing request to deploy the challenge with ID %s", challengeName)
 
 	challenge, err := database.QueryFirstChallengeEntry("name", challengeName)
@@ -181,13 +186,13 @@ func GetDeployWork(challengeName string) (*wpool.Work, error) {
 			// Challenge is already in commited stage here, so skip commit and stage step and start
 			// deployment of the challenge.
 			log.Debugf("Checking and pushing the task of deploying commited challenge in the queue.")
-			info := ActionInfo{
+			info := TaskInfo{
 				Action:     core.MANAGE_ACTION_DEPLOY,
 				ChallDir:   challengeStagingDir,
 				SkipStage:  true,
 				SkipCommit: true,
 			}
-			return &wpool.Work{
+			return &wpool.Task{
 				ID:   challengeName,
 				Info: info,
 			}, nil
@@ -221,13 +226,13 @@ func GetDeployWork(challengeName string) (*wpool.Work, error) {
 
 		log.Debugf("Checking and pushing the task of deploying unstaged challenge in the queue.")
 
-		info := ActionInfo{
+		info := TaskInfo{
 			Action:     core.MANAGE_ACTION_DEPLOY,
 			ChallDir:   challengeDir,
 			SkipStage:  false,
 			SkipCommit: false,
 		}
-		return &wpool.Work{
+		return &wpool.Task{
 			ID:   challengeName,
 			Info: info,
 		}, nil
@@ -238,13 +243,13 @@ func GetDeployWork(challengeName string) (*wpool.Work, error) {
 
 		log.Debugf("Checking and pushing the task of deploying staged challenge in the queue.")
 
-		info := ActionInfo{
+		info := TaskInfo{
 			Action:     core.MANAGE_ACTION_DEPLOY,
 			ChallDir:   challengeStagingDir,
 			SkipStage:  true,
 			SkipCommit: false,
 		}
-		return &wpool.Work{
+		return &wpool.Task{
 			ID:   challengeName,
 			Info: info,
 		}, nil
@@ -253,7 +258,7 @@ func GetDeployWork(challengeName string) (*wpool.Work, error) {
 
 // Deploy multiple challenges simultaneously.
 // When we have multiple challenges we spawn X goroutines and distribute
-// deployments in those goroutines. The wpool.work for these wpool.worker goroutines is specified
+// deployments in those goroutines. The wpool.Task for these wpool.Worker goroutines is specified
 // in deployList, which contains the name of the challenges to be deployed.
 func DeployMultipleChallenges(deployList []string, userId string) []string {
 	deployList = utils.GetUniqueStrings(deployList)
@@ -470,26 +475,26 @@ func DeployChallenge(challengeName string) error {
 	if err != nil {
 		return err
 	}
-	return Q.CheckPush(*w)
+	return Q.Push(*w)
 }
 
 func UndeployChallenge(challengeName string) error {
-	return Q.CheckPush(wpool.Work{
-		Info: ActionInfo{Action: core.MANAGE_ACTION_UNDEPLOY},
+	return Q.Push(wpool.Task{
+		Info: TaskInfo{Action: core.MANAGE_ACTION_UNDEPLOY},
 		ID:   challengeName,
 	})
 }
 
 func PurgeChallenge(challengeName string) error {
-	return Q.CheckPush(wpool.Work{
-		Info: ActionInfo{Action: core.MANAGE_ACTION_PURGE},
+	return Q.Push(wpool.Task{
+		Info: TaskInfo{Action: core.MANAGE_ACTION_PURGE},
 		ID:   challengeName,
 	})
 }
 
 func RedeployChallenge(challengeName string) error {
-	return Q.CheckPush(wpool.Work{
-		Info: ActionInfo{Action: core.MANAGE_ACTION_REDEPLOY},
+	return Q.Push(wpool.Task{
+		Info: TaskInfo{Action: core.MANAGE_ACTION_REDEPLOY},
 		ID:   challengeName,
 	})
 }

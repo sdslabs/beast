@@ -53,7 +53,7 @@ func RunBeastApiServer(port string) {
 	}
 
 	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE)
-	manager.Q.StartWorkers(manager.QueueAction)
+	manager.Q.StartWorkers(&manager.Worker{})
 
 	runBeastApiBootsteps()
 
