@@ -10,8 +10,8 @@ import (
 type Transaction struct {
 	gorm.Model
 	Action      string
-	UserId      string
-	ChallengeID uint `gorm:"not null"`
+	UserId      string `gorm:"not null"`
+	ChallengeID uint
 }
 
 func SaveTransaction(transaction *Transaction) error {
