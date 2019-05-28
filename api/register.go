@@ -13,11 +13,11 @@ func signUpHandler(c *gin.Context) {
 	username := c.Param("username")
 	useremail := c.Param("useremail")
 	password := c.Param("password")
-	encryptedPass := sha256.Sum256([]byte(password))
+	hashedPass := sha256.Sum256([]byte(password))
 	NewUserEntry := database.UserDetail{
 		UserName:   username,
 		UserEmail:  useremail,
-		Password:   encryptedPass,
+		Password:   hashedPass,
 		TotalScore: 0,
 	}
 	err := database.AddUser(&NewUserEntry)
@@ -33,10 +33,10 @@ func signInHandler(c *gin.Context) {
 	username := c.Param("username")
 	password := c.Param("password")
 	decrMess := c.PostForm("decrmess")
-	encryptedPass := sha256.Sum256([]byte(password))
+	hashedPass := sha256.Sum256([]byte(password))
 	if username == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Name of the challenge is a required parameter to process request.",
+			Message: "UserName is a required parameter to process request.",
 		})
 		return
 	}
@@ -47,7 +47,7 @@ func signInHandler(c *gin.Context) {
 		})
 		return
 	}
-	if userdetail[0].Password == encryptedPass {
+	if userdetail[0].Password == hashedPass {
 		jwt, err := auth.GenerateUserJWT(username, decrMess)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -64,7 +64,7 @@ func signInHandler(c *gin.Context) {
 
 	} else {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Name of the challenge is a required parameter to process request.",
+			Message: "Incorrect username or password",
 		})
 		return
 	}
