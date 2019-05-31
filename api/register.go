@@ -30,8 +30,8 @@ func signUpHandler(c *gin.Context) {
 }
 
 func signInHandler(c *gin.Context) {
-	username := c.Param("username")
-	password := c.Param("password")
+	username := c.PostForm("username")
+	password := c.PostForm("password")
 	decrMess := c.PostForm("decrmess")
 	hashedPass := sha256.Sum256([]byte(password))
 	if username == "" {
@@ -40,14 +40,14 @@ func signInHandler(c *gin.Context) {
 		})
 		return
 	}
-	userdetail, err := database.QueryUserEntry("username", username)
+	userdetail, err := database.QueryUserEntryByUsernameHashedPass(username, hashedPass)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
-	if userdetail[0].Password == hashedPass {
+	if len(userdetail) > 0 {
 		jwt, err := auth.GenerateUserJWT(username, decrMess)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
