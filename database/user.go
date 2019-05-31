@@ -108,3 +108,22 @@ func QueryUserEntry(key string, value string) ([]UserDetail, error) {
 
 	return userDetail, nil
 }
+
+// Query user details by using their username and hashed password
+func QueryUserEntryByUsernameHashedPass(username string, hashedPass [32]byte) ([]UserDetail, error) {
+	var userDetail []UserDetail
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("username = ? AND Password = ?", username, hashedPass).Find(&userDetail)
+	if tx.RecordNotFound() {
+		return nil, nil
+	}
+
+	if tx.Error != nil {
+		return userDetail, tx.Error
+	}
+
+	return userDetail, nil
+}

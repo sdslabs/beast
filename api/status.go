@@ -125,15 +125,7 @@ func challengeDescriptionHandler(c *gin.Context) {
 		return
 	}
 
-	chall, err := database.QueryFirstChallengeEntry("name", name)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-
-	port, err := database.GetAllocatedPorts(chall)
+	port, err := database.GetAllocatedPorts(challenge[0])
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "DATABASE ERROR while processing the request.",
