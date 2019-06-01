@@ -32,7 +32,6 @@ func signUpHandler(c *gin.Context) {
 func signInHandler(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
-	decrMess := c.PostForm("decrmess")
 	hashedPass := sha256.Sum256([]byte(password))
 	if username == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
@@ -48,7 +47,7 @@ func signInHandler(c *gin.Context) {
 		return
 	}
 	if len(userdetail) > 0 {
-		jwt, err := auth.GenerateUserJWT(username, decrMess)
+		jwt, err := auth.GenerateUserJWT(username)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"message": err.Error(),
