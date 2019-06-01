@@ -59,10 +59,10 @@ func availableImagesHandler(c *gin.Context) {
 // @Produce application/json
 // @Success 200 {object} api.ChallengesResp
 // @Failure 402 {object} api.HTTPPlainResp
-// @Router /api/info/images/available [get]
+// @Router /api/info/challenges/available [get]
 func challengesHandler(c *gin.Context) {
 
-	challenges, err := manager.GetAllChalls()
+	challenges, err := manager.GetAvailableChallenges()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: err.Error(),
