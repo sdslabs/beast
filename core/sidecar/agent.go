@@ -3,8 +3,8 @@ package sidecar
 import (
 	"fmt"
 
-	"github.com/sdslabs/beastv4/core/sidecar/mysql"
 	"github.com/sdslabs/beastv4/core/sidecar/mongo"
+	"github.com/sdslabs/beastv4/core/sidecar/mysql"
 )
 
 type SidecarAgent interface {

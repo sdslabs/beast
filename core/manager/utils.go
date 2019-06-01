@@ -13,9 +13,9 @@ import (
 	"github.com/sdslabs/beastv4/core/auth"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	tools "github.com/sdslabs/beastv4/templates"
 	"github.com/sdslabs/beastv4/utils"
-	coreUtils "github.com/sdslabs/beastv4/core/utils"
 
 	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
@@ -64,7 +64,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 	}
 
 	log.Debugf("Parsed config file is : %s", config)
-	err = config.ValidateRequiredFields()
+	err = config.ValidateRequiredFields(challengeDir)
 	if err != nil {
 		return err
 	}

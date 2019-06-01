@@ -1,11 +1,13 @@
-package git
+package manager
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/pkg/git"
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -23,7 +25,7 @@ func SyncBeastRemote() error {
 		log.Warnf("Directory for the remote(%s) does not exist", remote)
 		log.Infof("Performing initial repository clone, this may take a while...")
 
-		err = clone(remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Url, config.Cfg.GitRemote.Branch)
+		err = git.Clone(remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Url, config.Cfg.GitRemote.Branch, core.GIT_DEFAULT_REMOTE)
 		if err != nil {
 			log.Errorf("Error while cloning repository : %s", err)
 			return err
@@ -33,7 +35,13 @@ func SyncBeastRemote() error {
 	}
 
 	log.Debugf("Pulling latest changes from the remote.")
-	err = pull(remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Branch)
+
+	err = utils.ValidateFileExists(config.Cfg.GitRemote.Secret)
+	if err != nil {
+		return fmt.Errorf("Error while validating file location : %s : %v", config.Cfg.GitRemote.Secret, err)
+	}
+
+	err = git.Pull(remote, config.Cfg.GitRemote.Secret, config.Cfg.GitRemote.Branch, core.GIT_DEFAULT_REMOTE)
 	if err != nil {
 		if !strings.Contains(err.Error(), "already up-to-date") {
 			log.Errorf("Error while syncing beast with git remote : %s ...", err)

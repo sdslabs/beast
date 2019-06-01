@@ -9,10 +9,11 @@ import (
 	swaggerFiles "github.com/swaggo/gin-swagger/swaggerFiles"
 
 	_ "github.com/sdslabs/beastv4/api/docs"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
-	"github.com/sdslabs/beastv4/git"
+	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 )
 
 const (
@@ -20,7 +21,7 @@ const (
 )
 
 func runBeastApiBootsteps() error {
-	git.RunBeastBootsetps()
+	manager.RunBeastBootsetps()
 
 	return nil
 }
@@ -43,7 +44,7 @@ func runBeastApiBootsteps() error {
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port string) {
+func RunBeastApiServer(port string, healthProbe bool) {
 	log.Info("Bootstrapping Beast API server")
 	if port != "" {
 		port = ":" + port
@@ -51,8 +52,8 @@ func RunBeastApiServer(port string) {
 		port = DEFAULT_BEAST_PORT
 	}
 
-	manager.InitQueue()
-	manager.StartWorkers()
+	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE)
+	manager.Q.StartWorkers(&manager.Worker{})
 
 	runBeastApiBootsteps()
 
@@ -76,7 +77,9 @@ func RunBeastApiServer(port string) {
 		})
 	})
 
-	go utils.ChallengesHealthTicker(config.Cfg.TickerFrequency)
+	if healthProbe {
+		go utils.ChallengesHealthTicker(config.Cfg.TickerFrequency)
+	}
 
 	router.Run(port)
 }

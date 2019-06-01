@@ -26,9 +26,9 @@ type BeastChallengeConfig struct {
 	Author    Author    `toml:"author"`
 }
 
-func (config *BeastChallengeConfig) ValidateRequiredFields() error {
+func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) error {
 	log.Debugf("Validating BeastChallengeConfig required fields")
-	err := config.Challenge.ValidateRequiredFields()
+	err := config.Challenge.ValidateRequiredFields(challdir)
 	if err != nil {
 		log.Debugf("Error while validating `Challenge` required fields : %s", err.Error())
 		return err
@@ -54,7 +54,7 @@ type Challenge struct {
 	Env      ChallengeEnv      `toml:"env"`
 }
 
-func (config *Challenge) ValidateRequiredFields() error {
+func (config *Challenge) ValidateRequiredFields(challdir string) error {
 	err, staticChall := config.Metadata.ValidateRequiredFields()
 	if err != nil {
 		log.Debugf("Error while validating `ChallengeMetadata`'s required fields : %s", err.Error())
@@ -64,7 +64,7 @@ func (config *Challenge) ValidateRequiredFields() error {
 		return nil
 	}
 
-	err = config.Env.ValidateRequiredFields(config.Metadata.Type)
+	err = config.Env.ValidateRequiredFields(config.Metadata.Type, challdir)
 	if err != nil {
 		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
 		return err
@@ -145,7 +145,7 @@ type ChallengeEnv struct {
 	ServicePath      string   `toml:"service_path"`
 }
 
-func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
+func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir string) error {
 	if len(config.Ports) == 0 {
 		return errors.New("Are you sure you have specified the ports used by challenge")
 	}
@@ -174,6 +174,9 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 		if filepath.IsAbs(config.StaticContentDir) {
 			return fmt.Errorf("Static content directory path should be relative to challenge directory root")
 		}
+		if err := utils.ValidateDirExists(filepath.Join(challdir, config.StaticContentDir)); err != nil {
+			return err
+		}
 	}
 
 	// Run command is only a required value in case of bare challenge types.
@@ -191,16 +194,32 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string) error {
 
 	if challType == core.SERVICE_CHALLENGE_TYPE_NAME {
 		// Challenge type is service.
-		// ServicePath must be realtive.
-		if config.ServicePath != "" && filepath.IsAbs(config.ServicePath) {
-			return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
+		// ServicePath must be relative.
+		if config.ServicePath != "" {
+			if filepath.IsAbs(config.ServicePath) {
+				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
+			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
+				return fmt.Errorf("File %s does not exist", config.ServicePath);
+			}
 		}
 	} else if strings.HasPrefix(challType, "web") {
 		// Challenge type is web.
 		if config.WebRoot == "" {
 			return errors.New("Web root can not be empty for web challenges")
-		} else if config.WebRoot != "" && filepath.IsAbs(config.WebRoot) {
-			return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
+		} else if config.WebRoot != "" {
+			if filepath.IsAbs(config.WebRoot) {
+				return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
+			} else if err := utils.ValidateDirExists(filepath.Join(challdir, config.WebRoot)); err != nil {
+				return fmt.Errorf("Web Root directory does not exist")
+			}
+		}
+	}
+
+	for _, script := range config.SetupScripts {
+		if filepath.IsAbs(script) {
+			return fmt.Errorf("script path is absolute : %s", script)
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, script)); err != nil {
+			return fmt.Errorf("File %s does not exist", script)
 		}
 	}
 

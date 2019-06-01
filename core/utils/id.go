@@ -1,9 +1,9 @@
 package utils
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
-	"crypto/sha256"
 
 	"github.com/sdslabs/beastv4/core"
 )
