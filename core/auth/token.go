@@ -85,7 +85,7 @@ func (c UserCustomClaims) Valid() error {
 	return nil
 }
 
-func GenerateUserJWT(username, decrmess string) (string, error) {
+func GenerateUserJWT(username string) (string, error) {
 
 	t := time.Now().Unix()
 
