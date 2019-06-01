@@ -78,5 +78,6 @@ func init() {
 	rootCmd.AddCommand(getAuthCmd)
 	rootCmd.AddCommand(createAuthorCmd)
 	rootCmd.AddCommand(logsCmd)
+	rootCmd.AddCommand(healthProbeCmd)
 	rootCmd.AddCommand(verifyCmd)
 }
