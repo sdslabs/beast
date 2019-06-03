@@ -61,7 +61,6 @@ func availableImagesHandler(c *gin.Context) {
 // @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/info/challenges/available [get]
 func challengesHandler(c *gin.Context) {
-
 	challenges, err := manager.GetAvailableChallenges()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{

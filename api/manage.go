@@ -287,7 +287,7 @@ func commitChallenge(c *gin.Context) {
 }
 
 func verifyHandler(c *gin.Context) {
-	challengeName := c.PostForm("challName")
+	challengeName := c.PostForm("challenge")
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
 	err := manager.ValidateChallengeConfig(challengeStagingDir)
 	if err != nil {
