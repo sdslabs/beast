@@ -2,9 +2,9 @@ package api
 
 import (
 	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/manager"
 	cfg "github.com/sdslabs/beastv4/core/config"
 )
 
@@ -49,4 +49,33 @@ func availableImagesHandler(c *gin.Context) {
 		Message: "Available base images are",
 		Images:  cfg.Cfg.AllowedBaseImages,
 	})
+}
+
+// Returns available challenges.
+// @Summary Gives all challenges available in the in the database
+// @Description Returns all challenges available in the in the database
+// @Tags info
+// @Accept json
+// @Produce application/json
+// @Success 200 {object} api.ChallengesResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/info/challenges/available [get]
+func challengesHandler(c *gin.Context) {
+	challenges, err := manager.GetAvailableChallenges()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
+		})
+		return
+	} else if challenges == nil {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "No challenges currently in the database",
+		})
+		return
+	} else {
+		c.JSON(http.StatusOK, ChallengesResp{
+			Message:    "All Challenges",
+			Challenges: challenges,
+		})
+	}
 }

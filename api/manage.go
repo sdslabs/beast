@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/auth"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	log "github.com/sirupsen/logrus"
@@ -283,4 +284,21 @@ func commitChallenge(c *gin.Context) {
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "Commit Done",
 	})
+}
+
+func verifyHandler(c *gin.Context) {
+	challengeName := c.PostForm("challenge")
+	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
+	err := manager.ValidateChallengeConfig(challengeStagingDir)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Error": err.Error(),
+		})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"Message": "This challenge can be deployed",
+		})
+		return
+	}
 }

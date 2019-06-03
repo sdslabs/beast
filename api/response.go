@@ -32,3 +32,7 @@ type ChallengeStatusResp struct {
 	Status    string    `json:"status" example:"deployed"`
 	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }
+type ChallengesResp struct {
+	Message    string
+	Challenges []string
+}
