@@ -40,6 +40,11 @@ func configureSidecar(config *cfg.BeastChallengeConfig) error {
 }
 
 func cleanSidecar(config *cfg.BeastChallengeConfig) error {
+
+	if config.Challenge.Metadata.Sidecar == "" {
+		return nil
+	}
+
 	log.Infof("Destroying the sidecar configuration for challenge: %s", config.Challenge.Metadata.Name)
 
 	sidecarAgent, err := sidecar.GetSidecarAgent(config.Challenge.Metadata.Sidecar)
