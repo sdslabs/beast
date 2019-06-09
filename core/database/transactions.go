@@ -9,13 +9,13 @@ import (
 
 type Transaction struct {
 	gorm.Model
+
 	Action      string
-	UserId      string `gorm:"not null"`
-	ChallengeID uint
+	AuthorID    uint `gorm:"not null"`
+	ChallengeID uint `gorm:"not null"`
 }
 
 func SaveTransaction(transaction *Transaction) error {
-
 	DBMux.Lock()
 	defer DBMux.Unlock()
 

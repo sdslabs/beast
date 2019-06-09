@@ -63,7 +63,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return fmt.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
 	}
 
-	log.Debugf("Parsed config file is : %s", config)
+	// log.Debugf("Parsed config file is : %s", config)
 	err = config.ValidateRequiredFields(challengeDir)
 	if err != nil {
 		return err
@@ -481,16 +481,32 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 }
 
 //Takes and save the data to transaction table
-func SaveTransactionFunc(identifier string, action string, authorization string) error {
-	challengeId, err := database.QueryFirstChallengeEntry("name", identifier)
+func LogTransaction(identifier string, action string, authorization string) error {
+	log.Debugf("Logging transaction for %s on %s", action, identifier)
+
+	challenge, err := database.QueryFirstChallengeEntry("name", identifier)
 	if err != nil {
-		log.Infof("Error while getting challenge ID")
+		return fmt.Errorf("Error while querying challenge: %s", identifier)
+	}
+
+	// We are trying to get the username for the request from JWT claims here
+	// Since upto this point the request is already authorized, we use a default
+	// username if any error occurs while getting the username.
+	userName, err := auth.GetUser(authorization)
+	if err != nil {
+		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
+		userName = core.DEFAULT_USER_NAME
+	}
+
+	author, err := database.QueryFirstAuthorEntry("name", userName)
+	if err != nil {
+		return fmt.Errorf("Error while querying user corresponding to request: %s", err)
 	}
 
 	TransactionEntry := database.Transaction{
 		Action:      action,
-		UserId:      auth.GetUser(authorization),
-		ChallengeID: challengeId.ID,
+		AuthorID:    author.ID,
+		ChallengeID: challenge.ID,
 	}
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
@@ -516,7 +532,7 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 	return err
 }
 
-func GetAvailableChallenges() ([]string, error) {	
+func GetAvailableChallenges() ([]string, error) {
 	challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, cfg.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
 	err, challenges := utils.GetDirsInDir(challengesDirRoot)
 	if err != nil {

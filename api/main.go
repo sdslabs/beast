@@ -12,7 +12,6 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
-	"github.com/sdslabs/beastv4/core/utils"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 )
 
@@ -78,7 +77,7 @@ func RunBeastApiServer(port string, healthProbe bool) {
 	})
 
 	if healthProbe {
-		go utils.ChallengesHealthTicker(config.Cfg.TickerFrequency)
+		go manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
 	}
 
 	router.Run(port)

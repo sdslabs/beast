@@ -260,9 +260,15 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 // When we have multiple challenges we spawn X goroutines and distribute
 // deployments in those goroutines. The wpool.Task for these wpool.Worker goroutines is specified
 // in deployList, which contains the name of the challenges to be deployed.
-func DeployMultipleChallenges(deployList []string, userId string) []string {
+func DeployMultipleChallenges(deployList []string, user string) []string {
 	deployList = utils.GetUniqueStrings(deployList)
 	log.Infof("Starting deploy for the following challenge list : %v", deployList)
+
+	author, err := database.QueryFirstAuthorEntry("name", user)
+	if err != nil {
+		log.Errorf("Error while querying user corresponding to request: %s", err)
+		return []string{"DATABASE ERROR."}
+	}
 
 	errstrings := []string{}
 
@@ -273,9 +279,10 @@ func DeployMultipleChallenges(deployList []string, userId string) []string {
 		if error != nil {
 			log.Infof("Error while getting challenge ID")
 		}
+
 		TransactionEntry := database.Transaction{
 			Action:      core.MANAGE_ACTION_DEPLOY,
-			UserId:      userId,
+			AuthorID:    author.ID,
 			ChallengeID: challEntry.ID,
 		}
 
@@ -297,12 +304,15 @@ func DeployMultipleChallenges(deployList []string, userId string) []string {
 }
 
 // Deploy tag related challenges.
-func DeployTagRelatedChallenges(tag string, userId string) []string {
+func DeployTagRelatedChallenges(tag string, user string) []string {
 	log.Infof("Trying request to deploy CHALLENGES related to %s", tag)
 
 	tagEntry := &database.Tag{
 		TagName: tag,
 	}
+
+	// TODO: Why are we creating tag entry here, if there does not
+	// exist the provided tag, simply skip doing anything.
 	err := database.QueryOrCreateTagEntry(tagEntry)
 	if err != nil {
 		return []string{fmt.Sprintf("DATABASE_ERROR")}
@@ -319,11 +329,11 @@ func DeployTagRelatedChallenges(tag string, userId string) []string {
 		challNames[i] = challs[i].Name
 	}
 
-	return DeployMultipleChallenges(challNames, userId)
+	return DeployMultipleChallenges(challNames, user)
 }
 
 // Deploy all challenges.
-func DeployAll(sync bool, userId string) []string {
+func DeployAll(sync bool, user string) []string {
 
 	log.Infof("Got request to deploy ALL CHALLENGES")
 	if sync {
@@ -352,7 +362,7 @@ func DeployAll(sync bool, userId string) []string {
 		challsNameList = append(challsNameList, chall)
 	}
 
-	return DeployMultipleChallenges(challsNameList, userId)
+	return DeployMultipleChallenges(challsNameList, user)
 }
 
 // Unstage a challenge based on the challenge name.

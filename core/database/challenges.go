@@ -50,6 +50,7 @@ type Challenge struct {
 	ImageId     string `gorm:"size:64;unique"`
 	Status      string `gorm:"not null;default:'Unknown'"`
 	AuthorID    uint   `gorm:"not null"`
+	HealthCheck uint   `gorm:"not null;default:1"`
 	Ports       []Port
 	Tags        []*Tag `gorm:"many2many:tag_challenges;"`
 }

@@ -34,7 +34,7 @@ func initGinRouter() *gin.Engine {
 			manageGroup.POST("/static/:action", beastStaticContentHandler)
 			manageGroup.POST("/commit/", commitChallenge)
 			manageGroup.GET("/logs/", challengeLogsHandler)
-			manageGroup.POST("/challenge/verify",verifyHandler)
+			manageGroup.POST("/challenge/verify", verifyHandler)
 		}
 
 		// Status route group
