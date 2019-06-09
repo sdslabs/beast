@@ -7,6 +7,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/sdslabs/beastv4/core"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,4 +39,12 @@ func init() {
 	}
 
 	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &Author{}, &Tag{})
+	err := CreateAuthorEntry(&Author{
+		Name:  core.DEFAULT_USER_NAME,
+		Email: core.DEFAULT_USER_EMAIL,
+	})
+	if err != nil {
+		log.Errorf("Error while creating dummy author entry.")
+		os.Exit(1)
+	}
 }
