@@ -292,7 +292,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		if !skipStage {
 			// Deploy pipeline for static challenge will follow.
 			log.Infof("Deploy static challenge request.")
-			DeployStaticChallenge(&config)
+			DeployStaticChallenge(&config, &challenge)
 		}
 		return nil
 	}
