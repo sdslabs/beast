@@ -18,6 +18,7 @@ import (
 
 type CustomClaims struct {
 	User      string `json:"usr"`
+	Email     string `json:"email"`
 	ExpiresAt int64  `json:"exp"`
 	IssuedAt  int64  `json:"iat"`
 	Issuer    string `json:"iss"`
@@ -49,6 +50,7 @@ func Authorize(jwtTokenString string) error {
 	return token.Claims.Valid()
 }
 
+// TODO: change this from username to email.
 func GenerateJWT(username, decrmess string) (string, error) {
 	author, err := database.QueryFirstAuthorEntry("name", username)
 	if err != nil {
@@ -63,6 +65,7 @@ func GenerateJWT(username, decrmess string) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, CustomClaims{
 		User:      username,
+		Email:     author.Email,
 		ExpiresAt: t + 6*60*60,
 		IssuedAt:  t,
 		Issuer:    "beast-sds",
@@ -71,17 +74,32 @@ func GenerateJWT(username, decrmess string) (string, error) {
 	return token.SignedString([]byte(config.Cfg.JWTSecret))
 }
 
-func GetUser(authHeader string) string {
-	values := strings.Split(authHeader, " ")
-	userInfoEncr := strings.Split(values[1], ".")
-	sDec, err1 := b64.StdEncoding.DecodeString(userInfoEncr[1])
-	if err1 != nil {
-		fmt.Printf("Error in decrypting JWT token")
+func GetUser(authHeader string) (string, error) {
+	if authHeader == "" {
+		return "", fmt.Errorf("No authorization header.")
 	}
+	values := strings.Split(authHeader, " ")
+
+	if len(values) < 2 {
+		return "", fmt.Errorf("Not a valid authorization header")
+	}
+
+	jwtToken := values[1]
+	userInfoEncr := strings.Split(jwtToken, ".")
+	if len(userInfoEncr) != 3 {
+		return "", fmt.Errorf("Not a valid JWT token in authorization header: %s", jwtToken)
+	}
+
+	sDec, err := b64.StdEncoding.DecodeString(userInfoEncr[1])
+	if err != nil {
+		return "", fmt.Errorf("Error in decrypting JWT token: %s", err)
+	}
+
 	in := []byte(sDec)
 	var raw CustomClaims
 	json.Unmarshal(in, &raw)
-	return raw.User
+
+	return raw.User, nil
 }
 
 func GenerateAuthChallenge(username string) (string, error) {
