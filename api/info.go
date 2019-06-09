@@ -1,11 +1,11 @@
 package api
 
 import (
-	"net/http"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/manager"
 	cfg "github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/manager"
+	"net/http"
 )
 
 // Returns port in use by beast.

@@ -28,14 +28,25 @@ import (
 // @Router /api/manage/multiple/:action [post]
 
 func manageMultipleChallengeHandler(c *gin.Context) {
+	// If no tags are provided we by default we apply the action to all
+	// the challenges.
 	action := c.Param("action")
 	tag := c.PostForm("tag")
+
+	// We are trying to get the username for the request from JWT claims here
+	// Since upto this point the request is already authorized, we use a default
+	// username if any error occurs while getting the username.
+	authorName, err := auth.GetUser(c.GetHeader("Authorization"))
+	if err == nil {
+		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
+		authorName = core.DEFAULT_USER_NAME
+	}
 
 	if tag != "" {
 		switch action {
 		case core.MANAGE_ACTION_DEPLOY:
 			log.Infof("Starting deploy for all challenges related to tags")
-			msgs := manager.DeployTagRelatedChallenges(tag, auth.GetUser(c.GetHeader("Authorization")))
+			msgs := manager.DeployTagRelatedChallenges(tag, authorName)
 			var msg string
 			if len(msgs) != 0 {
 				msg = strings.Join(msgs, " ::: ")
@@ -57,7 +68,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 		switch action {
 		case core.MANAGE_ACTION_DEPLOY:
 			log.Infof("Starting deploy for all challenges")
-			msgs := manager.DeployAll(true, auth.GetUser(c.GetHeader("Authorization")))
+			msgs := manager.DeployAll(true, authorName)
 			var msg string
 			if len(msgs) != 0 {
 				msg = strings.Join(msgs, " ::: ")
@@ -95,7 +106,7 @@ func manageChallengeHandler(c *gin.Context) {
 	authorization := c.GetHeader("Authorization")
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
-	if msgs := manager.SaveTransactionFunc(identifier, action, authorization); msgs != nil {
+	if msgs := manager.LogTransaction(identifier, action, authorization); msgs != nil {
 		log.Info("error while getting details")
 	}
 
@@ -166,6 +177,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	action := core.MANAGE_ACTION_DEPLOY
 	challDir := c.PostForm("challenge_dir")
 	authorization := c.GetHeader("Authorization")
+
 	if challDir == "" {
 		c.JSON(http.StatusNotAcceptable, gin.H{
 			"message": "No challenge directory specified",
@@ -175,7 +187,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 
 	log.Info("In local deploy challenge Handler")
 	err := manager.DeployChallengePipeline(challDir)
-	if msgs := manager.SaveTransactionFunc(strings.Split(challDir, "/")[len(strings.Split(challDir, "/"))-1], action, authorization); msgs != nil {
+	if msgs := manager.LogTransaction(strings.Split(challDir, "/")[len(strings.Split(challDir, "/"))-1], action, authorization); msgs != nil {
 		log.Info("error while saving transaction")
 	}
 
@@ -207,9 +219,11 @@ func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
 	identifier := core.BEAST_STATIC_CONTAINER_NAME
 	authorization := c.GetHeader("Authorization")
-	if msgs := manager.SaveTransactionFunc(identifier, action, authorization); msgs != nil {
-		log.Info("error while getting details")
+
+	if msgs := manager.LogTransaction(identifier, action, authorization); msgs != nil {
+		log.Error("error while getting details")
 	}
+
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
 		go manager.DeployStaticContentContainer()
