@@ -199,7 +199,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			if filepath.IsAbs(config.ServicePath) {
 				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
 			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
-				return fmt.Errorf("File %s does not exist", config.ServicePath);
+				return fmt.Errorf("File %s does not exist", config.ServicePath)
 			}
 		}
 	} else if strings.HasPrefix(challType, "web") {

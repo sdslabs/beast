@@ -91,7 +91,7 @@ func (config *BeastConfig) ValidateConfig() error {
 	}
 
 	if config.TickerFrequency <= 0 {
-		log.Error("Time is not provided or is less than equal to zero so default time is taken")
+		log.Info("Time is not provided or is less than equal to zero so default time is taken")
 		config.TickerFrequency = core.DEFAULT_TICKER_FREQUENCY
 	}
 
