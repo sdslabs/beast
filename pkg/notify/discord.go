@@ -81,7 +81,7 @@ func SendNotificationToDiscord(nType NotificationType, msg string) error {
 		AuthorName: "Beast Notifier",
 		AuthorLink: "https://backdoor.sdslabs.co",
 		Footer:     "Beast Discord API",
-		FooterIcon: "https://platform.discord-edge.com/img/default_application_icon.png",
+		FooterIcon: "https://discordapp.com/assets/e05ead6e6ebc08df9291738d0aa6986d.png",
 		Timestamp:  time.Now().Unix(),
 		Text:       msg,
 	}
