@@ -186,6 +186,7 @@ func UpdateUsedPortList() {
 var Cfg BeastConfig = InitConfig()
 var SkipAuthorization bool
 var USED_PORTS_LIST []uint32
+var Channels chan int
 
 func InitConfig() BeastConfig {
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)

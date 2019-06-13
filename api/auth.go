@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -28,8 +27,8 @@ func authorize(c *gin.Context) {
 	values := strings.Split(authHeader, " ")
 
 	if len(values) < 2 || values[0] != "Bearer" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"message": fmt.Errorf("No Token Provided"),
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: "No Token Provided",
 		})
 		c.Abort()
 		return
@@ -38,8 +37,8 @@ func authorize(c *gin.Context) {
 	err := auth.Authorize(values[1])
 
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"message": err.Error(),
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: err.Error(),
 		})
 		c.Abort()
 		return
@@ -64,15 +63,15 @@ func getJWT(c *gin.Context) {
 	jwt, err := auth.GenerateJWT(username, decrMess)
 
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"message": err.Error(),
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token":   jwt,
-		"message": "Expires in 6 hours\nTo access APIs send the token in header as \"Authorization: Bearer <token>\"",
+	c.JSON(http.StatusOK, HTTPAuthorizeResp{
+		Token:   jwt,
+		Message: "Expires in 6 hours\nTo access APIs send the token in header as \"Authorization: Bearer <token>\"",
 	})
 	return
 }
@@ -91,15 +90,15 @@ func getAuthChallenge(c *gin.Context) {
 	challenge, err := auth.GenerateAuthChallenge(username)
 
 	if err != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{
-			"message": err.Error(),
+		c.JSON(http.StatusNotAcceptable, HTTPPlainResp{
+			Message: err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"challenge": []byte(challenge),
-		"message":   "Solve the above challenge and POST to this route to get AUTHORIZATION KEY",
+	c.JSON(http.StatusOK, AuthorizationChallengeResp{
+		Challenge: []byte(challenge),
+		Message:   "Solve the above challenge and POST to this route to get AUTHORIZATION KEY",
 	})
 	return
 }

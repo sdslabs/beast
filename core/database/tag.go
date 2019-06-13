@@ -33,8 +33,8 @@ func QueryOrCreateTagEntry(tag *Tag) error {
 }
 
 // Query Related Challenges
-func QueryRelatedChallenges(tag *Tag) ([]*Challenge, error) {
-	var challenges []*Challenge
+func QueryRelatedChallenges(tag *Tag) ([]Challenge, error) {
+	var challenges []Challenge
 
 	DBMux.Lock()
 	defer DBMux.Unlock()

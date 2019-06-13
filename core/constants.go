@@ -11,6 +11,7 @@ var (
 )
 
 const (
+	BEAST_LOCAL_SERVER             string = "BEAST_LOCAL_SERVER"
 	CHALLENGE_CONFIG_FILE_NAME     string = "beast.toml"
 	BEAST_CONFIG_FILE_NAME         string = "config.toml"
 	DEFAULT_CHALLENGE_NAME         string = "Backdoor-Challenge"

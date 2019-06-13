@@ -9,9 +9,10 @@ import (
 )
 
 type Queue struct {
-	TaskQueue chan Task
-	Mux       sync.RWMutex
-	InQueue   map[string]bool // A map which stores if the task related to some id is already in the queue
+	TaskQueue         chan Task
+	Mux               sync.RWMutex
+	InQueue           map[string]bool // A map which stores if the task related to some id is already in the queue
+	CompletionChannel chan bool
 }
 
 type Task struct {
@@ -44,6 +45,9 @@ func (q *Queue) Push(w Task) error {
 func (q *Queue) Pop(ID string) {
 	q.Mux.Lock()
 	delete(q.InQueue, ID)
+	if q.CompletionChannel != nil && len(q.InQueue) == 0 {
+		q.CompletionChannel <- true
+	}
 	q.Mux.Unlock()
 }
 
@@ -69,12 +73,13 @@ func (q *Queue) StartWorkers(worker Worker) {
 	}
 }
 
-func InitQueue(maxQueueSize uint32) *Queue {
+func InitQueue(maxQueueSize uint32, completionChannel chan bool) *Queue {
 	var Q *Queue
 	Q = &Queue{
-		TaskQueue: make(chan Task, maxQueueSize),
-		Mux:       sync.RWMutex{},
-		InQueue:   map[string]bool{},
+		TaskQueue:         make(chan Task, maxQueueSize),
+		Mux:               sync.RWMutex{},
+		InQueue:           map[string]bool{},
+		CompletionChannel: completionChannel,
 	}
 	return Q
 }

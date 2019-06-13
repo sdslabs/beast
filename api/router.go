@@ -7,8 +7,8 @@ import (
 )
 
 func dummyHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": WIP_TEXT,
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: WIP_TEXT,
 	})
 }
 
