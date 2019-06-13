@@ -16,7 +16,7 @@ import (
 // @Description Returns challenge deployment status from the beast database, for those challenges which are not present a status value NA is returned.
 // @Tags status
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Param name query string true "Name of the challenge"
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 500 {object} api.HTTPPlainResp
@@ -60,7 +60,7 @@ func challengeStatusHandler(c *gin.Context) {
 // @Description This returns the challenges in the status provided, along with their name and last updated time.
 // @Tags status
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Param filter query string true "Status type to filter with, if none specified then all"
 // @Failure 500 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp

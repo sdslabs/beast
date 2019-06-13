@@ -48,6 +48,37 @@
                 }
             }
         },
+        "/api/info/challenges/available": {
+            "get": {
+                "description": "Returns all challenges available in the in the database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Gives all challenges available in the in the database",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.ChallengesResp"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
         "/api/info/images/available": {
             "get": {
                 "description": "Returns all the available base images  which can be used for challenge creation as the base OS for challenge.",
@@ -64,13 +95,6 @@
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "$ref": "#/definitions/api.AvailableImagesResp"
-                        }
-                    },
-                    "402": {
-                        "description": "Payment Required",
                         "schema": {
                             "type": "object",
                             "$ref": "#/definitions/api.AvailableImagesResp"
@@ -98,53 +122,6 @@
                         "schema": {
                             "type": "object",
                             "$ref": "#/definitions/api.PortsInUseResp"
-                        }
-                    },
-                    "402": {
-                        "description": "Payment Required",
-                        "schema": {
-                            "type": "object",
-                            "$ref": "#/definitions/api.PortsInUseResp"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/manage/all/": {
-            "post": {
-                "description": "Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "manage"
-                ],
-                "summary": "Handles challenge management actions for multiple(all) challenges.",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Action for the challenge",
-                        "name": "action",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "$ref": "#/definitions/api.HTTPPlainResp"
-                        }
-                    },
-                    "402": {
-                        "description": "Payment Required",
-                        "schema": {
-                            "type": "object",
-                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -187,8 +164,39 @@
                             "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     },
-                    "402": {
-                        "description": "Payment Required",
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/commit/": {
+            "post": {
+                "description": "Commits the challenge container for later use",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Commits the challenge container so that later the challenge image can be used deployment",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "$ref": "#/definitions/api.HTTPPlainResp"
@@ -219,6 +227,44 @@
                         "required": true
                     }
                 ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "406": {
+                        "description": "Not Acceptable",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/logs/": {
+            "get": {
+                "description": "Container logs",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Handles route related to logs handling of container",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -483,8 +529,13 @@
             "type": "object",
             "properties": {
                 "challenge": {
-                    "type": "string",
-                    "example": "Challenge String"
+                    "type": "array",
+                    "items": {
+                        "type": "byte"
+                    },
+                    "example": [
+                        "Challenge String"
+                    ]
                 },
                 "message": {
                     "type": "string",
@@ -525,6 +576,20 @@
                 "updated_at": {
                     "type": "string",
                     "example": "2018-12-31T22:20:08.948096189+05:30"
+                }
+            }
+        },
+        "api.ChallengesResp": {
+            "type": "object",
+            "properties": {
+                "challenges": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "message": {
+                    "type": "string"
                 }
             }
         },
@@ -574,6 +639,13 @@
                     ]
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }
