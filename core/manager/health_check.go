@@ -24,7 +24,7 @@ func ChallengesHealthProber(waitTime int) {
 		}
 
 		challs, err := database.QueryChallengeEntriesMap(map[string]interface{}{
-			"Status":      core.DEPLOY_STATUS["deployed"],
+			"Status":       core.DEPLOY_STATUS["deployed"],
 			"health_check": 1,
 		})
 
