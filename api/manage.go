@@ -20,7 +20,7 @@ import (
 // @Description Handles challenge management routes for multiple the challenges with actions which includes - DEPLOY, UNDEPLOY.
 // @Tags manage
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Param action query string true "Action for the challenge"
 // @Param tag query string false "Tag for a group of challenges"
 // @Success 200 {object} api.HTTPPlainResp
@@ -79,7 +79,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 // @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.
 // @Tags manage
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
 // @Param action query string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
@@ -125,7 +125,7 @@ func manageChallengeHandler(c *gin.Context) {
 // @Description Handles deployment of a challenge using the absolute directory path
 // @Tags manage
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Param challenge_dir query string true "Challenge Directory"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
@@ -169,7 +169,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // @Description Handles beast static content serving container routes.
 // @Tags manage
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/static/:action [post]
@@ -209,7 +209,7 @@ func beastStaticContentHandler(c *gin.Context) {
 // @Description Container logs
 // @Tags manage
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/logs/ [get]
@@ -238,7 +238,7 @@ func challengeLogsHandler(c *gin.Context) {
 // @Description Commits the challenge container for later use
 // @Tags manage
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
 // @Router /api/manage/commit/ [post]

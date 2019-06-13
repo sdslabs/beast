@@ -13,8 +13,8 @@ import (
 // @Summary Handles authorization of user
 // @Description Authorizes user by checking if JWT token exists and is valid
 // @Tags auth
-// @Produce application/json
-// @Param application/json
+// @Accept json
+// @Produce json
 // @Failure 401 {object} api.HTTPPlainResp
 // @Security ApiKeyAuth
 func authorize(c *gin.Context) {
@@ -52,7 +52,7 @@ func authorize(c *gin.Context) {
 // @Description JWT can be received by sending back correct answer to challenge
 // @Tags auth
 // @Accept json
-// @Produce application/json
+// @Produce json
 // @Success 200 {object} api.HTTPAuthorizeResp
 // @Failure 401 {object} api.HTTPPlainResp
 // @Router /auth/:username [post]
@@ -80,7 +80,7 @@ func getJWT(c *gin.Context) {
 // @Summary Handles challenge generation
 // @Description Sends challenge for authorization of user
 // @Tags auth
-// @Produce application/json
+// @Produce json
 // @Success 200 {object} api.AuthorizationChallengeResp
 // @Failure 406 {object} api.HTTPPlainResp
 // @Router /auth/:username [get]

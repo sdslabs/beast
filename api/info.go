@@ -13,7 +13,7 @@ import (
 // @Description Returns the ports in use by beast, which cannot be used in creating a new challenge..
 // @Tags info
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Success 200 {object} api.PortsInUseResp
 // @Router /api/info/ports/used [get]
 func usedPortsInfoHandler(c *gin.Context) {
@@ -41,7 +41,7 @@ func availableChallengeInfoHandler(c *gin.Context) {
 // @Description Returns all the available base images  which can be used for challenge creation as the base OS for challenge.
 // @Tags info
 // @Accept  json
-// @Produce application/json
+// @Produce json
 // @Success 200 {object} api.AvailableImagesResp
 // @Router /api/info/images/available [get]
 func availableImagesHandler(c *gin.Context) {
@@ -56,7 +56,7 @@ func availableImagesHandler(c *gin.Context) {
 // @Description Returns all challenges available in the in the database
 // @Tags info
 // @Accept json
-// @Produce application/json
+// @Produce json
 // @Success 200 {object} api.ChallengesResp
 // @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/info/challenges/available [get]

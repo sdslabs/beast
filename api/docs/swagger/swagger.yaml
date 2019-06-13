@@ -3,8 +3,11 @@ definitions:
   api.AuthorizationChallengeResp:
     properties:
       challenge:
-        example: Challenge String
-        type: string
+        example:
+        - Challenge String
+        items:
+          type: byte
+        type: array
       message:
         example: Response message
         type: string
@@ -32,6 +35,15 @@ definitions:
         type: string
       updated_at:
         example: "2018-12-31T22:20:08.948096189+05:30"
+        type: string
+    type: object
+  api.ChallengesResp:
+    properties:
+      challenges:
+        items:
+          type: string
+        type: array
+      message:
         type: string
     type: object
   api.HTTPAuthorizeResp:
@@ -101,6 +113,27 @@ paths:
       summary: Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
       tags:
       - config
+  /api/info/challenges/available:
+    get:
+      consumes:
+      - application/json
+      description: Returns all challenges available in the in the database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengesResp'
+            type: object
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Gives all challenges available in the in the database
+      tags:
+      - info
   /api/info/images/available:
     get:
       consumes:
@@ -112,11 +145,6 @@ paths:
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/api.AvailableImagesResp'
-            type: object
-        "402":
-          description: Payment Required
           schema:
             $ref: '#/definitions/api.AvailableImagesResp'
             type: object
@@ -138,44 +166,11 @@ paths:
           schema:
             $ref: '#/definitions/api.PortsInUseResp'
             type: object
-        "402":
-          description: Payment Required
-          schema:
-            $ref: '#/definitions/api.PortsInUseResp'
-            type: object
       summary: Returns ports in use by beast by looking in the hack git repository,
         also returns min and max value of port allowed while specifying in beast challenge
         config.
       tags:
       - info
-  /api/manage/all/:
-    post:
-      consumes:
-      - application/json
-      description: Handles challenge management routes for all the challenges with
-        actions which includes - DEPLOY, UNDEPLOY.
-      parameters:
-      - description: Action for the challenge
-        in: query
-        name: action
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
-        "402":
-          description: Payment Required
-          schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
-      summary: Handles challenge management actions for multiple(all) challenges.
-      tags:
-      - manage
   /api/manage/challenge/:
     post:
       consumes:
@@ -202,12 +197,34 @@ paths:
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
             type: object
-        "402":
-          description: Payment Required
+        "400":
+          description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
             type: object
       summary: Handles challenge management actions.
+      tags:
+      - manage
+  /api/manage/commit/:
+    post:
+      consumes:
+      - application/json
+      description: Commits the challenge container for later use
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Commits the challenge container so that later the challenge image can
+        be used deployment
       tags:
       - manage
   /api/manage/deploy/local:
@@ -235,7 +252,33 @@ paths:
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
             type: object
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Deploy a local challenge using the path provided in the post parameter
+      tags:
+      - manage
+  /api/manage/logs/:
+    get:
+      consumes:
+      - application/json
+      description: Container logs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Handles route related to logs handling of container
       tags:
       - manage
   /api/manage/static/:
@@ -407,4 +450,9 @@ paths:
       summary: Handles solution check and token production
       tags:
       - auth
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
