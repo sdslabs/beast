@@ -8,10 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func NewDiscordNotifier(webhookUrl string) *Notifier {
-	return &Notifier{
-		WebHookURL: webhookUrl + "/slack",
-	}
+type DiscordNotificationProvider struct {
+	DiscordWebHookURL string
 }
 
 func SendNotificationToDiscord(nType NotificationType, msg string) error {
@@ -20,7 +18,7 @@ func SendNotificationToDiscord(nType NotificationType, msg string) error {
 		return fmt.Errorf("No webhook URL in beast config.")
 	}
 
-	discordNotifier := NewDiscordNotifier(config.Cfg.DiscordWebHookURL)
+	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL)
 	discordNotifier.PostPayload = PostPayload{
 		Username: "Beast",
 		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
@@ -31,7 +29,7 @@ func SendNotificationToDiscord(nType NotificationType, msg string) error {
 		AuthorName: "Beast Notifier",
 		AuthorLink: "https://backdoor.sdslabs.co",
 		Footer:     "Beast Discord API",
-		FooterIcon: "https://platform.discord-edge.com/img/default_application_icon.png",
+		FooterIcon: "https://discordapp.com/assets/e05ead6e6ebc08df9291738d0aa6986d.png",
 		Timestamp:  time.Now().Unix(),
 		Text:       msg,
 	}
