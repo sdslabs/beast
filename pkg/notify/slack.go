@@ -8,10 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func NewSlackNotifier(webhookUrl string) *Notifier {
-	return &Notifier{
-		WebHookURL: webhookUrl,
-	}
+type SlackNotificationProvider struct {
+	SlackWebHookURL string
 }
 
 func SendNotificationToSlack(nType NotificationType, msg string) error {
@@ -20,7 +18,7 @@ func SendNotificationToSlack(nType NotificationType, msg string) error {
 		return fmt.Errorf("No webhook URL in beast config.")
 	}
 
-	slackNotifier := NewSlackNotifier(config.Cfg.SlackWebHookURL)
+	slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL)
 	slackNotifier.PostPayload = PostPayload{
 		Username: "Beast",
 		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
