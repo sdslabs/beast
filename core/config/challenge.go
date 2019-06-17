@@ -225,12 +225,10 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	for _, env := range config.EnvironmentVars {
-		if env.IsRelativePath {
-			if filepath.IsAbs(env.Value) {
-				return fmt.Errorf("Environment Variable contains contains absolute path : %s", env.Value)
-			} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
-				return fmt.Errorf("File %s does not exist", env.Value)
-			}
+		if filepath.IsAbs(env.Value) {
+			return fmt.Errorf("Environment Variable contains contains absolute path : %s", env.Value)
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
+			return fmt.Errorf("File %s does not exist", env.Value)
 		}
 	}
 
@@ -262,7 +260,6 @@ func (config *Author) ValidateRequiredFields() error {
 }
 
 type EnvironmentVar struct {
-	IsRelativePath bool   `toml:"is_relative_path"`
-	Key            string `toml:"key"`
-	Value          string `toml:"value"`
+	Key   string `toml:"key"`
+	Value string `toml:"value"`
 }

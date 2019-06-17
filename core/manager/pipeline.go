@@ -185,10 +185,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	for _, env := range config.Challenge.Env.EnvironmentVars {
-		if env.IsRelativePath {
-			env.Value = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)
-		}
-		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, env.Value))
+		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)))
 	}
 
 	containerConfig := cr.CreateContainerConfig{
