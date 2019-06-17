@@ -133,16 +133,17 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // * WebRoot: relative path to web challenge directory
 // * DefaultPort: default port for application
 type ChallengeEnv struct {
-	AptDeps          []string `toml:"apt_deps"`
-	Ports            []uint32 `toml:"ports"`
-	SetupScripts     []string `toml:"setup_scripts"`
-	StaticContentDir string   `toml:"static_dir"`
-	RunCmd           string   `toml:"run_cmd"`
-	Base             string   `toml:"base"`
-	BaseImage        string   `toml:"base_image"`
-	WebRoot          string   `toml:"web_root"`
-	DefaultPort      uint32   `toml:"default_port"`
-	ServicePath      string   `toml:"service_path"`
+	AptDeps          []string         `toml:"apt_deps"`
+	Ports            []uint32         `toml:"ports"`
+	SetupScripts     []string         `toml:"setup_scripts"`
+	StaticContentDir string           `toml:"static_dir"`
+	RunCmd           string           `toml:"run_cmd"`
+	Base             string           `toml:"base"`
+	BaseImage        string           `toml:"base_image"`
+	WebRoot          string           `toml:"web_root"`
+	DefaultPort      uint32           `toml:"default_port"`
+	ServicePath      string           `toml:"service_path"`
+	EnvironmentVars  []EnvironmentVar `toml:"var"`
 }
 
 func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir string) error {
@@ -223,6 +224,14 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		}
 	}
 
+	for _, env := range config.EnvironmentVars {
+		if filepath.IsAbs(env.Value) {
+			return fmt.Errorf("Environment Variable contains contains absolute path : %s", env.Value)
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
+			return fmt.Errorf("File %s does not exist", env.Value)
+		}
+	}
+
 	return nil
 }
 
@@ -248,4 +257,9 @@ func (config *Author) ValidateRequiredFields() error {
 	}
 
 	return nil
+}
+
+type EnvironmentVar struct {
+	Key   string `toml:"key"`
+	Value string `toml:"value"`
 }
