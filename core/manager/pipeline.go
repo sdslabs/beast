@@ -184,6 +184,13 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		containerNetwork = getSidecarNetwork(config.Challenge.Metadata.Sidecar)
 	}
 
+	for _, env := range config.Challenge.Env.EnvironmentVars {
+		if env.IsRelativePath {
+			env.Value = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)
+		}
+		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, env.Value))
+	}
+
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        config.Challenge.Env.Ports,
 		MountsMap:        staticMount,
