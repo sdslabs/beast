@@ -53,6 +53,9 @@ const (
 	DEFAULT_PROBE_TIMEOUT          int    = 10
 	DEFAULT_USER_NAME              string = "ghost"
 	DEFAULT_USER_EMAIL             string = "ghost@ghost.com"
+	DEFAULT_CPU_SHARE              int64  = 1024
+	DEFAULT_MEMORY_LIMIT           int64  = (1 << 30)
+	DEFAULT_PIDS_LIMIT             int64  = 100
 )
 
 var DEPLOY_STATUS = map[string]string{

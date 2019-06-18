@@ -195,6 +195,9 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		ContainerName:    coreUtils.EncodeID(config.Challenge.Metadata.Name),
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
+		CPUShares:        config.Resources.CPUShares,
+		Memory:           config.Resources.Memory,
+		PidsLimit:        config.Resources.PidsLimit,
 	}
 	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {
