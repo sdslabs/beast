@@ -165,6 +165,9 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 // This function first collects the environment variables and
 // container config including ports, networks, resource limitations needed to spawn the container,
 // then it creates the container and finally the challenge is deployed
+//
+// This function assumes that you have validated the configuration beforehand, so it won't be
+// validated here.
 func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
@@ -191,6 +194,11 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	for _, env := range config.Challenge.Env.EnvironmentVars {
 		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)))
 	}
+
+	log.Debugf("Container config for challenge %s are: CPU(%d), Memory(%d), PidsLimit(%d)",
+		config.Challenge.Metadata.Name,
+		config.Resources.CPUShares,
+		config.Resources.PidsLimit)
 
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        config.Challenge.Env.Ports,
@@ -266,20 +274,18 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		return fmt.Errorf("CONFIG ERROR: %s : %s", challengeName, err)
 	}
 
-	// We do not validate challenge config here, make sure you have validated the config
-	// beforehand
-	//
-	// err = config.ValidateRequiredFields()
-	// if err != nil {
-	// 	log.Errorf("An error occured while validating the config file : %s", err)
-	//	return
-	//}
+	err = config.ValidateRequiredFields(challengeDir)
+	if err != nil {
+		return fmt.Errorf("An error occured while validating the config file : %s, cannot continue with pipeline.", err)
+	}
 
 	// Validate challenge directory name with the name of the challenge
 	// provided in the config file for the beast. THere should be no
 	// conflict in the name.
 	if challengeName != config.Challenge.Metadata.Name {
-		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
+		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)",
+			challengeName,
+			config.Challenge.Metadata.Name)
 		return fmt.Errorf("CONFIG ERROR: %s : Inconsistent configuration name and challengeName", challengeName)
 	}
 

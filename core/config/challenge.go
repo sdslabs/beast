@@ -203,7 +203,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			if filepath.IsAbs(config.ServicePath) {
 				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
 			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
-				return fmt.Errorf("File %s does not exist", config.ServicePath)
+				// Skip this, we might create service later too.
+				log.Warnf("Service path file %s does not exist", config.ServicePath)
 			}
 		}
 	} else if strings.HasPrefix(challType, "web") {
@@ -280,20 +281,18 @@ type Resources struct {
 }
 
 func (config *Resources) ValidateRequiredFields() {
-
 	if config.CPUShares <= 0 {
-		log.Warn("CPU shares not provided")
+		log.Warn("CPU shares not provided in configuration, using default.")
 		config.CPUShares = Cfg.CPUShares
 	}
 
 	if config.Memory <= 0 {
-		log.Warn("Memory Limit not provided")
+		log.Warn("Memory Limit not provided in configuration, using default.")
 		config.Memory = Cfg.Memory
 	}
 
 	if config.PidsLimit <= 0 {
-		log.Warn("Pids Limit not provided")
+		log.Warn("Pids Limit not provided in configuration, using default.")
 		config.PidsLimit = Cfg.PidsLimit
 	}
-
 }
