@@ -44,7 +44,7 @@ func ValidateDirExists(dirPath string) error {
 	// Check if the path provided points to a directory
 	if !dirPathInfo.IsDir() {
 		log.Warnf("%s is not a directory", dirPath)
-		return errors.New("Not a directory")
+		return fmt.Errorf("Not a directory : %s", dirPath)
 	}
 
 	return nil

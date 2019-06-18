@@ -226,6 +226,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
 		challengeDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
 
+		/// TODO : remove multiple validation while deploying challenge
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
 			return nil, errors.New("CHALLENGE VALIDATION ERROR")
