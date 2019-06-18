@@ -1,7 +1,10 @@
 package notify
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/sdslabs/beastv4/core/config"
@@ -10,6 +13,38 @@ import (
 
 type DiscordNotificationProvider struct {
 	DiscordWebHookURL string
+	PostPayload       PostPayload
+}
+
+func (d *DiscordNotificationProvider) SendNotification() error {
+	if d.DiscordWebHookURL == "" {
+		return fmt.Errorf("Need a WebHookURL to send notification.")
+	}
+
+	if d.PostPayload.Channel == "" || d.PostPayload.Username == "" {
+		return fmt.Errorf("Username and Channel required to send the notification.")
+	}
+
+	payload, err := json.Marshal(d.PostPayload)
+	if err != nil {
+		return fmt.Errorf("Error while converting payload to JSON : %s", err)
+	}
+
+	payloadReader := bytes.NewReader(payload)
+	req, err := http.NewRequest("POST", d.DiscordWebHookURL, payloadReader)
+	if err != nil {
+		return fmt.Errorf("Error while connecting to webhook url host : %s", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	client := http.Client{}
+	_, err = client.Do(req)
+
+	if err != nil {
+		return fmt.Errorf("Error while posting payload for notification : %s", err)
+	}
+
+	return nil
 }
 
 func SendNotificationToDiscord(nType NotificationType, msg string) error {
@@ -18,7 +53,7 @@ func SendNotificationToDiscord(nType NotificationType, msg string) error {
 		return fmt.Errorf("No webhook URL in beast config.")
 	}
 
-	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL)
+	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, "discord")
 	discordNotifier.PostPayload = PostPayload{
 		Username: "Beast",
 		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",

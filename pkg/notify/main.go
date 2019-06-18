@@ -1,12 +1,5 @@
 package notify
 
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-)
-
 type Attachment struct {
 	Fallback     string            `json:"fallback,omitempty"`
 	Color        NotificationColor `json:"color,omitempty"`
@@ -37,87 +30,25 @@ type PostPayload struct {
 	Markdown    bool         `json:"mrkdwn,omitempty"`
 }
 
-type ProviderType struct {
-	Slack   SlackNotificationProvider
-	Discord DiscordNotificationProvider
-}
-
 type Notifier interface {
 	SendNotification() error
-	PostPayload
 }
 
-func NewNotifier(providerType ProviderType) Notifier {
-	if providerType == ProviderType.Slack {
+const (
+	discord = "discord"
+	slack   = "slack"
+)
+
+func NewNotifier(URL, ProviderType string) Notifier {
+	switch ProviderType {
+	case slack:
 		return &SlackNotificationProvider{
-			SlackWebHookURL: SlackWebHookURL,
+			SlackWebHookURL: URL,
 		}
-	} else if providerType == ProviderType.Discord {
+	case discord:
 		return &DiscordNotificationProvider{
-			DiscordWebHookURL: SlackWebHookURL + "/slack",
+			DiscordWebHookURL: URL + "/slack",
 		}
 	}
-	return nil
-}
-
-func (s *SlackNotificationProvider) SendNotification() error {
-	if notifier.WebHookURL == "" {
-		return fmt.Errorf("Need a WebHookURL to send notification.")
-	}
-
-	if notifier.PostPayload.Channel == "" || notifier.PostPayload.Username == "" {
-		return fmt.Errorf("Username and Channel required to send the notification.")
-	}
-
-	payload, err := json.Marshal(notifier.PostPayload)
-	if err != nil {
-		return fmt.Errorf("Error while converting payload to JSON : %s", err)
-	}
-
-	payloadReader := bytes.NewReader(payload)
-	req, err := http.NewRequest("POST", notifier.WebHookURL, payloadReader)
-	if err != nil {
-		return fmt.Errorf("Error while connecting to webhook url host : %s", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	client := http.Client{}
-	_, err = client.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("Error while posting payload for notification : %s", err)
-	}
-
-	return nil
-}
-
-func (d *DiscordNotificationProvider) SendNotification() error {
-	if notifier.WebHookURL == "" {
-		return fmt.Errorf("Need a WebHookURL to send notification.")
-	}
-
-	if notifier.PostPayload.Channel == "" || notifier.PostPayload.Username == "" {
-		return fmt.Errorf("Username and Channel required to send the notification.")
-	}
-
-	payload, err := json.Marshal(notifier.PostPayload)
-	if err != nil {
-		return fmt.Errorf("Error while converting payload to JSON : %s", err)
-	}
-
-	payloadReader := bytes.NewReader(payload)
-	req, err := http.NewRequest("POST", notifier.WebHookURL, payloadReader)
-	if err != nil {
-		return fmt.Errorf("Error while connecting to webhook url host : %s", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	client := http.Client{}
-	_, err = client.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("Error while posting payload for notification : %s", err)
-	}
-
 	return nil
 }
