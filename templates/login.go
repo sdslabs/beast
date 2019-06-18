@@ -32,3 +32,16 @@ case "$SSH_ORIGINAL_COMMAND" in
 
 esac
 `
+
+// This script will be run for each login, when the ssh is disabled for the
+// author while logging in through ssh.
+var SSH_RESTRICT_LOGIN_SCRIPT_TEMPLATE string = `
+#!/bin/bash
+#
+# This is an automatically generated shell script, don't edit this
+# this disables the author to enter the docker container through ssh.
+# This script is generate for user : {{.Author}}
+
+echo "SSH access has been disabled for all the current authors. Contact the admin."
+exit 1
+`

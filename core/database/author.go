@@ -50,6 +50,21 @@ func QueryAuthorEntries(key string, value string) ([]Author, error) {
 	return authors, nil
 }
 
+// Query all the entries in the Author table
+func QueryAllAuthors() ([]Author, error) {
+	var authors []Author
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Find(&authors)
+	if tx.RecordNotFound() {
+		return nil, nil
+	}
+
+	return authors, tx.Error
+}
+
 // Using the column value in key and value in value get the first
 // result of the query.
 func QueryFirstAuthorEntry(key string, value string) (Author, error) {

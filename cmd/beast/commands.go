@@ -87,4 +87,5 @@ func init() {
 	rootCmd.AddCommand(healthProbeCmd)
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(challengeCmd)
+	rootCmd.AddCommand(disableAuthorSSH)
 }
