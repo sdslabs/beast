@@ -161,6 +161,10 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	return nil
 }
 
+// Deploy the challenge as a docker container from the image built
+// This function first collects the environment variables and
+// container config including ports, networks, resource limitations needed to spawn the container,
+// then it creates the container and finally the challenge is deployed
 func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
