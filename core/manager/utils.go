@@ -30,7 +30,7 @@ type BeastBareDockerfile struct {
 	RunCmd          string
 	RunScript       string
 	MountVolume     string
-	RunAsRoot       bool
+	XinetdService   bool
 	Entrypoint      string
 }
 
@@ -184,17 +184,16 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
 	entrypoint := config.Challenge.Env.Entrypoint
-	runScript := config.Challenge.Env.RunScript
 	setupScripts := config.Challenge.Env.SetupScripts
 	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
-	var runAsRoot bool = false
+	var xinetdService bool = false
 	var executables []string
 
 	// The challenge type we are looking at is service. This should be deployed
 	// using xinetd. The Dockerfile is different for this. Change the runCmd and the
 	// apt dependencies to add xinetd.
 	if challengeType == core.SERVICE_CHALLENGE_TYPE_NAME {
-		runAsRoot = true
+		xinetdService = true
 		runCmd = cfg.SERVICE_CHALL_RUN_CMD
 		aptDeps = fmt.Sprintf("%s %s", cfg.SERVICE_CONTAINER_DEPS, aptDeps)
 		serviceExecutable := filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath)
@@ -216,14 +215,10 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		baseImage = core.DEFAULT_BASE_IMAGE
 	}
 
-	log.Debugf("Command type inside root[true/false] %s", runAsRoot)
+	log.Debugf("Command type inside root[true/false] %s", xinetdService)
 
 	if entrypoint != "" {
 		entrypoint = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, entrypoint)
-	}
-
-	if runScript != "" {
-		runScript = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, runScript)
 	}
 
 	data := BeastBareDockerfile{
@@ -232,9 +227,8 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		AptDeps:         aptDeps,
 		SetupScripts:    setupScripts,
 		RunCmd:          runCmd,
-		RunScript:       runScript,
 		MountVolume:     filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
-		RunAsRoot:       runAsRoot,
+		XinetdService:   xinetdService,
 		Executables:     executables,
 		Entrypoint:      entrypoint,
 	}

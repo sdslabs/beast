@@ -43,10 +43,6 @@ RUN cd /challenge {{ range $index, $elem := .SetupScripts}} && \
 	chmod u+x {{$elem}} {{end}} {{ range $index, $elem := .SetupScripts}} && \
     ./{{$elem}} {{end}}
 
-{{if .RunScript}}
-RUN chmod +x {{.RunScript}}
-{{end}}
-
 WORKDIR /challenge
 {{if not .Entrypoint}}
 RUN touch /entrypoint.sh && \
@@ -56,7 +52,7 @@ RUN touch /entrypoint.sh && \
     echo "    chmod u+x /challenge/post-build.sh && /challenge/post-build.sh" >> /entrypoint.sh && \
     echo "fi" >> /entrypoint.sh && \
     echo "cd /challenge" >> /entrypoint.sh && \
-    echo {{if .RunScript}}"exec {{.RunScript}}"{{else}}{{if .RunAsRoot}} "mv xinetd.conf /etc/xinetd.d/pwn_service && exec {{.RunCmd}}" {{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}}{{end}} >> /entrypoint.sh && \
+    echo {{if .XinetdService}} "mv xinetd.conf /etc/xinetd.d/pwn_service && exec {{.RunCmd}}" {{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
     chmod u+x /entrypoint.sh
 {{end}}
 WORKDIR /challenge
