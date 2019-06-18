@@ -43,6 +43,9 @@ type BeastConfig struct {
 	JWTSecret          string    `toml:"jwt_secret"`
 	SlackWebHookURL    string    `toml:"slack_webhook"`
 	TickerFrequency    int       `toml:"ticker_frequency"`
+	CPUShares          int64     `toml:"default_cpu_shares"`
+	Memory             int64     `toml:"default_memory_limit"`
+	PidsLimit          int64     `toml:"default_pids_limit"`
 }
 
 func (config *BeastConfig) ValidateConfig() error {
@@ -93,6 +96,21 @@ func (config *BeastConfig) ValidateConfig() error {
 	if config.TickerFrequency <= 0 {
 		log.Info("Time is not provided or is less than equal to zero so default time is taken")
 		config.TickerFrequency = core.DEFAULT_TICKER_FREQUENCY
+	}
+
+	if config.CPUShares <= 0 {
+		log.Warn("CPU shares not provided")
+		config.CPUShares = core.DEFAULT_CPU_SHARE
+	}
+
+	if config.Memory <= 0 {
+		log.Warn("Memory Limit not provided")
+		config.Memory = core.DEFAULT_MEMORY_LIMIT
+	}
+
+	if config.PidsLimit <= 0 {
+		log.Warn("Pids Limit not provided")
+		config.PidsLimit = core.DEFAULT_PIDS_LIMIT
 	}
 
 	return nil
