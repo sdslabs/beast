@@ -143,6 +143,8 @@ type ChallengeEnv struct {
 	WebRoot          string           `toml:"web_root"`
 	DefaultPort      uint32           `toml:"default_port"`
 	ServicePath      string           `toml:"service_path"`
+	Entrypoint       string           `toml:"entrypoint"`
+	RunScript        string           `toml:"run_script"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
 }
 
@@ -178,6 +180,14 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if err := utils.ValidateDirExists(filepath.Join(challdir, config.StaticContentDir)); err != nil {
 			return err
 		}
+	}
+
+	if config.RunCmd != "" && config.RunScript != "" {
+		return fmt.Errorf("run_cmd and run_script cannot be non empty simultaneously")
+	}
+
+	if config.Entrypoint != "" && (config.RunScript != "" || config.RunCmd != "") {
+		return fmt.Errorf("run_cmd and run_script cannot be non empty when entrypoint is provided")
 	}
 
 	// Run command is only a required value in case of bare challenge types.
@@ -226,9 +236,25 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 	for _, env := range config.EnvironmentVars {
 		if filepath.IsAbs(env.Value) {
-			return fmt.Errorf("Environment Variable contains contains absolute path : %s", env.Value)
+			return fmt.Errorf("Environment Variable contains absolute path : %s", env.Value)
 		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
 			return fmt.Errorf("File %s does not exist", env.Value)
+		}
+	}
+
+	if config.Entrypoint != "" {
+		if filepath.IsAbs(config.Entrypoint) {
+			return fmt.Errorf("Entrypoint contains absolute path : %s", config.Entrypoint)
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.Entrypoint)); err != nil {
+			return fmt.Errorf("File %s does not exist", config.Entrypoint)
+		}
+	}
+
+	if config.RunScript != "" {
+		if filepath.IsAbs(config.RunScript) {
+			return fmt.Errorf("run_script contains absolute path : %s", config.RunScript)
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.RunScript)); err != nil {
+			return fmt.Errorf("File %s does not exist", config.RunScript)
 		}
 	}
 

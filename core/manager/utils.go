@@ -28,8 +28,10 @@ type BeastBareDockerfile struct {
 	SetupScripts    []string
 	Executables     []string
 	RunCmd          string
+	RunScript       string
 	MountVolume     string
 	RunAsRoot       bool
+	Entrypoint      string
 }
 
 type BeastXinetdConf struct {
@@ -181,6 +183,9 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	baseImage := config.Challenge.Env.BaseImage
 	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
+	entrypoint := config.Challenge.Env.Entrypoint
+	runScript := config.Challenge.Env.RunScript
+	setupScripts := config.Challenge.Env.SetupScripts
 	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
 	var runAsRoot bool = false
 	var executables []string
@@ -213,15 +218,25 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 
 	log.Debugf("Command type inside root[true/false] %s", runAsRoot)
 
+	if entrypoint != "" {
+		entrypoint = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, entrypoint)
+	}
+
+	if runScript != "" {
+		runScript = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, runScript)
+	}
+
 	data := BeastBareDockerfile{
 		DockerBaseImage: baseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
 		AptDeps:         aptDeps,
-		SetupScripts:    config.Challenge.Env.SetupScripts,
+		SetupScripts:    setupScripts,
 		RunCmd:          runCmd,
-		MountVolume:     filepath.Join("/challenge", relativeStaticContentDir),
+		RunScript:       runScript,
+		MountVolume:     filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
 		RunAsRoot:       runAsRoot,
 		Executables:     executables,
+		Entrypoint:      entrypoint,
 	}
 
 	var dockerfile bytes.Buffer
