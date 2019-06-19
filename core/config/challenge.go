@@ -186,7 +186,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	// Run command is only a required value in case of bare challenge types.
-	if config.RunCmd == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
+	if config.RunCmd == "" && config.Entrypoint == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
 	}
 

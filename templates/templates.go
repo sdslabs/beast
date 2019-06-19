@@ -54,6 +54,8 @@ RUN touch /entrypoint.sh && \
     echo "cd /challenge" >> /entrypoint.sh && \
     echo {{if .XinetdService}} "mv xinetd.conf /etc/xinetd.d/pwn_service && exec {{.RunCmd}}" {{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
     chmod u+x /entrypoint.sh
+{{else}}
+RUN chmod u+x {{.Entrypoint}}
 {{end}}
 WORKDIR /challenge
 RUN chmod 600 /challenge/beast.toml {{ range $index, $elem := .Executables}} && \
