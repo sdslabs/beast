@@ -21,6 +21,12 @@ func (d *DiscordNotificationProvider) SendNotification() error {
 		return fmt.Errorf("Need a WebHookURL to send notification.")
 	}
 
+	d.PostPayload = PostPayload{
+		Username: "Beast",
+		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
+		Channel:  "#beast",
+	}
+
 	if d.PostPayload.Channel == "" || d.PostPayload.Username == "" {
 		return fmt.Errorf("Username and Channel required to send the notification.")
 	}
@@ -53,12 +59,7 @@ func SendNotificationToDiscord(nType NotificationType, msg string) error {
 		return fmt.Errorf("No webhook URL in beast config.")
 	}
 
-	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, "discord")
-	discordNotifier.PostPayload = PostPayload{
-		Username: "Beast",
-		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
-		Channel:  "#beast",
-	}
+	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, discord)
 
 	nAttachment := Attachment{
 		AuthorName: "Beast Notifier",

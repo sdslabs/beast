@@ -34,12 +34,18 @@ type Notifier interface {
 	SendNotification() error
 }
 
+type ProviderTypeEnum int
+
 const (
-	discord = "discord"
-	slack   = "slack"
+	discord ProviderTypeEnum = 1 + iota
+	slack
 )
 
-func NewNotifier(URL, ProviderType string) Notifier {
+//func (p ProviderTypeEnum) String() string {
+//	return [...]string{"Discord", "Slack"}[p]
+//}
+
+func NewNotifier(URL string, ProviderType ProviderTypeEnum) Notifier {
 	switch ProviderType {
 	case slack:
 		return &SlackNotificationProvider{
