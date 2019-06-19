@@ -83,7 +83,7 @@ func CleanupChallengeIfExist(config cfg.BeastChallengeConfig) error {
 		return fmt.Errorf("Error while cleaning up the container : %v", err)
 	}
 
-	if !IsImageIdValid(chall.Name) {
+	if !IsImageIdValid(chall.ImageId) {
 		log.Warn("Looks like we don't have the image ID in database for challenge, Nothing to remove")
 		return nil
 	}

@@ -25,6 +25,8 @@ var (
 	SkipAuthorization bool
 	AllChalls         bool
 	Tag               string
+	LocalDirectory    string
+	DeleteEntry    bool
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -77,6 +79,8 @@ func init() {
 	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new author")
 	challengeCmd.PersistentFlags().BoolVarP(&AllChalls, "all", "a", false, "Performs action to all challs")
 	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")
+	challengeCmd.PersistentFlags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Deploys challenge from local directory")
+	challengeCmd.PersistentFlags().BoolVarP(&DeleteEntry, "delete-entry", "d", false, "Deletes db entry related to this challenge")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)

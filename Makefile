@@ -52,4 +52,7 @@ requirements:
 	@echo ">>> Building beast extras..."
 	@./scripts/build/extras.sh
 
+run_test:
+	@./scripts/test/test_example_challs.sh
+
 .PHONY: build format test check_format tools
