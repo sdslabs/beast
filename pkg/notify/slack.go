@@ -21,6 +21,12 @@ func (s *SlackNotificationProvider) SendNotification() error {
 		return fmt.Errorf("Need a WebHookURL to send notification.")
 	}
 
+	s.PostPayload = PostPayload{
+		Username: "Beast",
+		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
+		Channel:  "#beast",
+	}
+
 	if s.PostPayload.Channel == "" || s.PostPayload.Username == "" {
 		return fmt.Errorf("Username and Channel required to send the notification.")
 	}
@@ -53,12 +59,7 @@ func SendNotificationToSlack(nType NotificationType, msg string) error {
 		return fmt.Errorf("No webhook URL in beast config.")
 	}
 
-	slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL, "slack")
-	slackNotifier.PostPayload = PostPayload{
-		Username: "Beast",
-		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
-		Channel:  "#beast",
-	}
+	slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL, slack)
 
 	nAttachment := Attachment{
 		AuthorName: "Beast Notifier",
