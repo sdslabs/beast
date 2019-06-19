@@ -75,7 +75,6 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
 	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir, filepath.Join(contextDir, core.HIDDEN)})
-
 	if err != nil {
 		return err
 	}
@@ -118,12 +117,13 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
 	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
 	if err != nil || buff == nil {
-		log.Errorf("Could not validate challenge logs directory : %s : %s", challengeStagingLogsDir, err)
+		log.Errorf("Could not create challenge logs directory : %s : %s", challengeStagingLogsDir, err)
 	} else {
 		logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
 		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 		if err != nil {
 			log.Errorf("Error while writing logs to file : %s", logFilePath)
+			return fmt.Errorf("Error logs generated on image build failure could not be written to the logfile")
 		}
 		defer logFile.Close()
 
@@ -137,7 +137,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	if imageId == "" {
-		log.Error("Could not figure out the ImageID for the commited challenge")
+		log.Error("Error while creating image logs written to the logfile")
 		return fmt.Errorf("Error while getting imageId for the commited challenge")
 	}
 
@@ -321,7 +321,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		challenge.Status != core.DEPLOY_STATUS["deployed"] &&
 		challenge.Status != "" {
 		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
-		return fmt.Errorf("PIPELINE START ERROR: %s : Deploy already in progress.", challengeName)
+		return fmt.Errorf("PIPELINE START ERROR: %s : Deploy already in progress. Current Status : %s", challengeName, challenge.Status)
 	}
 
 	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)

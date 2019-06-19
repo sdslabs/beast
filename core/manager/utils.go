@@ -377,14 +377,14 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 			err = database.CreateAuthorEntry(&authorEntry)
 			if err != nil {
-				return fmt.Errorf("Error while creating author entry : %s", err)
+				return fmt.Errorf("Error while creating author entry(%s) : %s", config.Author.Name, err)
 			}
 
 		} else {
 			if authorEntry.Email != config.Author.Email &&
 				authorEntry.SshKey != config.Author.SSHKey &&
 				authorEntry.Name != config.Author.Name {
-				return fmt.Errorf("ERROR, author details did not match with the ones in database")
+				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", authorEntry.Name)
 			}
 		}
 
@@ -471,7 +471,7 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 	var config cfg.BeastChallengeConfig
 	_, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Error while decoding file : %s", configFile)
 	}
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
@@ -519,7 +519,7 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
 	err := utils.CreateIfNotExistDir(dirPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error while copying static content : %v", err)
 	}
 
 	err = utils.ValidateDirExists(staticContentDir)
