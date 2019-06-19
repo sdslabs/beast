@@ -28,8 +28,10 @@ type BeastBareDockerfile struct {
 	SetupScripts    []string
 	Executables     []string
 	RunCmd          string
+	RunScript       string
 	MountVolume     string
-	RunAsRoot       bool
+	XinetdService   bool
+	Entrypoint      string
 }
 
 type BeastXinetdConf struct {
@@ -181,15 +183,17 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	baseImage := config.Challenge.Env.BaseImage
 	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
+	entrypoint := config.Challenge.Env.Entrypoint
+	setupScripts := config.Challenge.Env.SetupScripts
 	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
-	var runAsRoot bool = false
+	var xinetdService bool = false
 	var executables []string
 
 	// The challenge type we are looking at is service. This should be deployed
 	// using xinetd. The Dockerfile is different for this. Change the runCmd and the
 	// apt dependencies to add xinetd.
 	if challengeType == core.SERVICE_CHALLENGE_TYPE_NAME {
-		runAsRoot = true
+		xinetdService = true
 		runCmd = cfg.SERVICE_CHALL_RUN_CMD
 		aptDeps = fmt.Sprintf("%s %s", cfg.SERVICE_CONTAINER_DEPS, aptDeps)
 		serviceExecutable := filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath)
@@ -211,17 +215,22 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		baseImage = core.DEFAULT_BASE_IMAGE
 	}
 
-	log.Debugf("Command type inside root[true/false] %s", runAsRoot)
+	log.Debugf("Command type inside root[true/false] %s", xinetdService)
+
+	if entrypoint != "" {
+		entrypoint = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, entrypoint)
+	}
 
 	data := BeastBareDockerfile{
 		DockerBaseImage: baseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
 		AptDeps:         aptDeps,
-		SetupScripts:    config.Challenge.Env.SetupScripts,
+		SetupScripts:    setupScripts,
 		RunCmd:          runCmd,
-		MountVolume:     filepath.Join("/challenge", relativeStaticContentDir),
-		RunAsRoot:       runAsRoot,
+		MountVolume:     filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
+		XinetdService:   xinetdService,
 		Executables:     executables,
+		Entrypoint:      entrypoint,
 	}
 
 	var dockerfile bytes.Buffer

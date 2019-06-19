@@ -146,6 +146,7 @@ type ChallengeEnv struct {
 	WebRoot          string           `toml:"web_root"`
 	DefaultPort      uint32           `toml:"default_port"`
 	ServicePath      string           `toml:"service_path"`
+	Entrypoint       string           `toml:"entrypoint"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
 }
 
@@ -183,8 +184,12 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		}
 	}
 
+	if config.Entrypoint != "" && config.RunCmd != "" {
+		return fmt.Errorf("run_cmd cannot be non empty when entrypoint is provided")
+	}
+
 	// Run command is only a required value in case of bare challenge types.
-	if config.RunCmd == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
+	if config.RunCmd == "" && config.Entrypoint == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
 	}
 
@@ -230,9 +235,17 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 	for _, env := range config.EnvironmentVars {
 		if filepath.IsAbs(env.Value) {
-			return fmt.Errorf("Environment Variable contains contains absolute path : %s", env.Value)
+			return fmt.Errorf("Environment Variable contains absolute path : %s", env.Value)
 		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
 			return fmt.Errorf("File %s does not exist", env.Value)
+		}
+	}
+
+	if config.Entrypoint != "" {
+		if filepath.IsAbs(config.Entrypoint) {
+			return fmt.Errorf("Entrypoint contains absolute path : %s", config.Entrypoint)
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.Entrypoint)); err != nil {
+			return fmt.Errorf("File %s does not exist", config.Entrypoint)
 		}
 	}
 

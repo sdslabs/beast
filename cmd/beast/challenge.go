@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 	log "github.com/sirupsen/logrus"
@@ -58,6 +57,6 @@ var challengeCmd = &cobra.Command{
 				log.Info("The action will be performed")
 			}
 		}
-		_ = <-config.Channels
+		_ = <-completionChannel
 	},
 }
