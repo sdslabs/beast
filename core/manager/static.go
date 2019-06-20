@@ -101,9 +101,8 @@ func UndeployStaticContentContainer() {
 }
 
 // Deploy a static challenge
-func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *database.Challenge) {
+func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *database.Challenge, challengeDir string) {
 	log.Infof("Starting static challenge deploy pipeline")
-	challengeDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, cfg.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challConf.Challenge.Metadata.Name)
 	challengeStagingRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challConf.Challenge.Metadata.Name)
 	challengeStagingDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
 

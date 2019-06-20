@@ -23,6 +23,8 @@ check_format:
 
 # Add more tests later on for this
 test: check_format
+	@echo "[*] Running tests for example challenges"
+	@./scripts/test/test_examples.sh
 
 # Format code using gofmt
 format:

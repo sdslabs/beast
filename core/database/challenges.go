@@ -199,6 +199,24 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	return tags, nil
 }
 
+func DeleteChallengeEntry(challenge *Challenge) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+
+	if tx.Error != nil {
+		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
+	}
+
+	if err := tx.Unscoped().Delete(challenge).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}
+
 //hook after update of challenge
 func (challenge *Challenge) AfterUpdate(scope *gorm.Scope) error {
 	iFace, _ := scope.InstanceGet("gorm:update_attrs")

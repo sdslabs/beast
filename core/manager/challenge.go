@@ -491,7 +491,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 	// If purge is true then first cleanup the challenge image and container
 	// and then remove the challenge from the staging directory.
 	if purge {
-		configFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName, core.CHALLENGE_CONFIG_FILE_NAME)
+		configFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.CHALLENGE_CONFIG_FILE_NAME)
 		var cfg config.BeastChallengeConfig
 		_, err = toml.DecodeFile(configFile, &cfg)
 		if err != nil {

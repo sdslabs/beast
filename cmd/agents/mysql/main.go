@@ -11,9 +11,10 @@ import (
 
 	"google.golang.org/grpc"
 
+	"log"
+
 	_ "github.com/go-sql-driver/mysql"
 	pb "github.com/sdslabs/beastv4/core/sidecar/protos/mysql"
-	"log"
 )
 
 const MYSQL_AGENT_PORT uint32 = 9500
@@ -93,7 +94,7 @@ func (s *mysqlAgentServer) DeleteMySQLInstance(ctx context.Context, instance *pb
 	}
 	defer db.Close()
 
-	_, err = db.Exec("DELETE DATABASE " + instance.Database)
+	_, err = db.Exec("DROP DATABASE " + instance.Database)
 	if err != nil {
 		return none, fmt.Errorf("Error while deleting the database : %s", err)
 	}
