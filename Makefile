@@ -23,6 +23,8 @@ check_format:
 
 # Add more tests later on for this
 test: check_format
+	@echo "[*] Running tests for example challenges"
+	@./scripts/test/test_example_challs.sh
 
 # Format code using gofmt
 format:
@@ -51,8 +53,5 @@ tools:
 requirements:
 	@echo ">>> Building beast extras..."
 	@./scripts/build/extras.sh
-
-run_test:
-	@./scripts/test/test_example_challs.sh
 
 .PHONY: build format test check_format tools

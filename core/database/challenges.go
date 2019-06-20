@@ -199,7 +199,7 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	return tags, nil
 }
 
-func DeleteEntry(challenge *Challenge) error {
+func DeleteChallengeEntry(challenge *Challenge) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 

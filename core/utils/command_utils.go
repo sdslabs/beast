@@ -54,7 +54,7 @@ func DeleteChallengeEntryWithPorts(challname string) error {
 	if err = database.DeleteRelatedPorts(ports); err != nil {
 		return fmt.Errorf("Error while deleting ports from database : %v", err)
 	}
-	if err = database.DeleteEntry(&chall); err != nil {
+	if err = database.DeleteChallengeEntry(&chall); err != nil {
 		return fmt.Errorf("Error while deleting challentry from database : %v", err)
 	}
 	return nil

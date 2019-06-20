@@ -26,7 +26,7 @@ var (
 	AllChalls         bool
 	Tag               string
 	LocalDirectory    string
-	DeleteEntry    bool
+	DeleteEntry       bool
 )
 
 // Root command `beast` all commands are either a flag to this command
