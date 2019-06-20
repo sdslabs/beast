@@ -12,22 +12,36 @@ import (
 )
 
 type SlackNotificationProvider struct {
-	SlackWebHookURL string
-	PostPayload     PostPayload
+	Request
 }
 
-func (s *SlackNotificationProvider) SendNotification() error {
-	if s.SlackWebHookURL == "" {
+func (s *SlackNotificationProvider) SendNotification(nType NotificationType, msg string) error {
+	if s.Request.WebHookURL == "" {
 		return fmt.Errorf("Need a WebHookURL to send notification.")
 	}
 
-	s.PostPayload = PostPayload{
-		Username: "Beast",
-		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
-		Channel:  "#beast",
+	nAttachment := Attachment{
+		AuthorName: "Beast Notifier",
+		AuthorLink: "https://backdoor.sdslabs.co",
+		Footer:     "Beast Slack API",
+		FooterIcon: "https://platform.slack-edge.com/img/default_application_icon.png",
+		Timestamp:  time.Now().Unix(),
+		Text:       msg,
 	}
 
-	if s.PostPayload.Channel == "" || s.PostPayload.Username == "" {
+	switch nType {
+	case Success:
+		nAttachment.Color = SuccessColor
+		nAttachment.Title = "Beast Deployment Success"
+		break
+	case Error:
+		nAttachment.Color = ErrorColor
+		nAttachment.Title = "Beast Deployment Error"
+		break
+	}
+	s.Request.PostPayload.Attachments = []Attachment{nAttachment}
+
+	if s.Request.PostPayload.Channel == "" || s.Request.PostPayload.Username == "" {
 		return fmt.Errorf("Username and Channel required to send the notification.")
 	}
 
@@ -37,7 +51,7 @@ func (s *SlackNotificationProvider) SendNotification() error {
 	}
 
 	payloadReader := bytes.NewReader(payload)
-	req, err := http.NewRequest("POST", s.SlackWebHookURL, payloadReader)
+	req, err := http.NewRequest("POST", s.Request.WebHookURL, payloadReader)
 	if err != nil {
 		return fmt.Errorf("Error while connecting to webhook url host : %s", err)
 	}
@@ -61,28 +75,7 @@ func SendNotificationToSlack(nType NotificationType, msg string) error {
 
 	slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL, slack)
 
-	nAttachment := Attachment{
-		AuthorName: "Beast Notifier",
-		AuthorLink: "https://backdoor.sdslabs.co",
-		Footer:     "Beast Slack API",
-		FooterIcon: "https://platform.slack-edge.com/img/default_application_icon.png",
-		Timestamp:  time.Now().Unix(),
-		Text:       msg,
-	}
-
-	switch nType {
-	case Success:
-		nAttachment.Color = SuccessColor
-		nAttachment.Title = "Beast Deployment Success"
-		break
-	case Error:
-		nAttachment.Color = ErrorColor
-		nAttachment.Title = "Beast Deployment Error"
-		break
-	}
-
-	slackNotifier.PostPayload.Attachments = []Attachment{nAttachment}
-	err := slackNotifier.SendNotification()
+	err := slackNotifier.SendNotification(nType, msg)
 	if err != nil {
 		log.Errorf("Error while sending notification to slack : %s", err)
 		return fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)

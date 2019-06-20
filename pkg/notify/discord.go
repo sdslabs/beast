@@ -12,22 +12,37 @@ import (
 )
 
 type DiscordNotificationProvider struct {
-	DiscordWebHookURL string
-	PostPayload       PostPayload
+	Request
 }
 
-func (d *DiscordNotificationProvider) SendNotification() error {
-	if d.DiscordWebHookURL == "" {
+func (d *DiscordNotificationProvider) SendNotification(nType NotificationType, msg string) error {
+	if d.Request.WebHookURL == "" {
 		return fmt.Errorf("Need a WebHookURL to send notification.")
 	}
 
-	d.PostPayload = PostPayload{
-		Username: "Beast",
-		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
-		Channel:  "#beast",
+	nAttachment := Attachment{
+		AuthorName: "Beast Notifier",
+		AuthorLink: "https://backdoor.sdslabs.co",
+		Footer:     "Beast Discord API",
+		FooterIcon: "https://discordapp.com/assets/e05ead6e6ebc08df9291738d0aa6986d.png",
+		Timestamp:  time.Now().Unix(),
+		Text:       msg,
 	}
 
-	if d.PostPayload.Channel == "" || d.PostPayload.Username == "" {
+	switch nType {
+	case Success:
+		nAttachment.Color = SuccessColor
+		nAttachment.Title = "Beast Deployment Success"
+		break
+	case Error:
+		nAttachment.Color = ErrorColor
+		nAttachment.Title = "Beast Deployment Error"
+		break
+	}
+
+	d.Request.PostPayload.Attachments = []Attachment{nAttachment}
+
+	if d.Request.PostPayload.Channel == "" || d.Request.PostPayload.Username == "" {
 		return fmt.Errorf("Username and Channel required to send the notification.")
 	}
 
@@ -37,7 +52,7 @@ func (d *DiscordNotificationProvider) SendNotification() error {
 	}
 
 	payloadReader := bytes.NewReader(payload)
-	req, err := http.NewRequest("POST", d.DiscordWebHookURL, payloadReader)
+	req, err := http.NewRequest("POST", d.Request.WebHookURL, payloadReader)
 	if err != nil {
 		return fmt.Errorf("Error while connecting to webhook url host : %s", err)
 	}
@@ -61,28 +76,7 @@ func SendNotificationToDiscord(nType NotificationType, msg string) error {
 
 	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, discord)
 
-	nAttachment := Attachment{
-		AuthorName: "Beast Notifier",
-		AuthorLink: "https://backdoor.sdslabs.co",
-		Footer:     "Beast Discord API",
-		FooterIcon: "https://discordapp.com/assets/e05ead6e6ebc08df9291738d0aa6986d.png",
-		Timestamp:  time.Now().Unix(),
-		Text:       msg,
-	}
-
-	switch nType {
-	case Success:
-		nAttachment.Color = SuccessColor
-		nAttachment.Title = "Beast Deployment Success"
-		break
-	case Error:
-		nAttachment.Color = ErrorColor
-		nAttachment.Title = "Beast Deployment Error"
-		break
-	}
-
-	discordNotifier.PostPayload.Attachments = []Attachment{nAttachment}
-	err := discordNotifier.SendNotification()
+	err := discordNotifier.SendNotification(nType, msg)
 	if err != nil {
 		log.Errorf("Error while sending notification to discord : %s", err)
 		return fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)

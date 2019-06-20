@@ -31,7 +31,12 @@ type PostPayload struct {
 }
 
 type Notifier interface {
-	SendNotification() error
+	SendNotification(nType NotificationType, msg string) error
+}
+
+type Request struct {
+	WebHookURL string
+	PostPayload
 }
 
 type ProviderTypeEnum int
@@ -49,12 +54,25 @@ func NewNotifier(URL string, ProviderType ProviderTypeEnum) Notifier {
 	switch ProviderType {
 	case slack:
 		return &SlackNotificationProvider{
-			SlackWebHookURL: URL,
+			Request{
+				WebHookURL: URL,
+			},
 		}
 	case discord:
 		return &DiscordNotificationProvider{
-			DiscordWebHookURL: URL + "/slack",
+			Request{
+				WebHookURL: URL + "/slack",
+			},
 		}
+	}
+	return nil
+}
+
+func (req *Request) Post() error {
+	req.PostPayload = PostPayload{
+		Username: "Beast",
+		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
+		Channel:  "#beast",
 	}
 	return nil
 }
