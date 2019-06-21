@@ -1,6 +1,10 @@
 trigger:
 - master
 
+pr:
+- master
+- releases/*
+
 pool:
   vmImage: 'ubuntu-latest'
 
@@ -20,7 +24,11 @@ steps:
     mv !(gopath) '$(modulePath)'
     echo '##vso[task.prependpath]$(GOBIN)'
     echo '##vso[task.prependpath]$(GOROOT)/bin'
-  displayName: 'Set up the Go workspace'
+    sudo apt update
+    sudo apt install docker-ce
+    sudo apt install docker.io
+    sudo usermod -a -G docker $USER
+  displayName: 'Set up the Go and Docker workspace'
 
 - script: |
     make build
