@@ -37,7 +37,7 @@ steps:
     echo -e "jwt_secret = \"beast\"" >> ~/.beast/config.toml
     echo -e "allowed_base_images = [\"ubuntu:16.04\", \"php:7.1-cli\"]" >> ~/.beast/config.toml
     echo -e "[remote]" >> ~/.beast/config.toml
-    echo -e "ssh_key = \"~/.beast/secret.key\"" >> ~/.beast/config.toml
+    echo -e "ssh_key = \"/home/$USER/.beast/secret.key\"" >> ~/.beast/config.toml
     echo -e "url = \"git@github.com:sdslabs/nonexistent.git\"" >> ~/.beast/config.toml
     echo -e "name = \"nonexistent\"" >> ~/.beast/config.toml
     echo -e "branch = \"nonexistent\"" >> ~/.beast/config.toml
