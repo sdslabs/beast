@@ -34,6 +34,7 @@ steps:
     touch ~/.beast/config.toml
     touch ~/.beast/secret.key
     echo -e "available_sidecars = [\"mysql\"]" >> ~/.beast/config.toml
+    echo -e "jwt_secret = \"beast\"" >> ~/.beast/config.toml
     echo -e "allowed_base_images = [\"ubuntu:16.04\", \"php:7.1-cli\"]" >> ~/.beast/config.toml
     echo -e "[remote]" >> ~/.beast/config.toml
     echo -e "ssh_key = \"~/.beast/secret.key\"" >> ~/.beast/config.toml
