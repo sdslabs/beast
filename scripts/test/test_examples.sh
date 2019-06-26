@@ -78,7 +78,7 @@ fi
 deployChallenge $CHALLENGE $PWD/_examples/$CHALLENGE
 ## Test deployment
 echo -e "$INFO : $CHALLENGE : Test deployment"
-response_code=$(doHTTPProbe "http://static.beast.sdslabs.co/static/$CHALLENGE/index.html")
+response_code=$(doHTTPProbe "http://localhost/static/$CHALLENGE/index.html")
 if [[ $response_code -eq 200 ]]; then
 	echo -e "$SUCCESS : $CHALLENGE : Deployed successfully"
 else
