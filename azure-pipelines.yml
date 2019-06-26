@@ -33,9 +33,14 @@ steps:
     mkdir ~/.beast
     touch ~/.beast/config.toml
     touch ~/.beast/secret.key
+    touch ~/.beast/authorized_keys
+    touch ~/.beast/staging
+    touch ~/.beast/remote
+    touch ~/.beast/scripts
     echo -e "available_sidecars = [\"mysql\"]" >> ~/.beast/config.toml
     echo -e "jwt_secret = \"beast\"" >> ~/.beast/config.toml
     echo -e "allowed_base_images = [\"ubuntu:16.04\", \"php:7.1-cli\"]" >> ~/.beast/config.toml
+    echo -e "authorized_keys_file = /home/$USER/.beast/authorized_keys" >> ~/.beast/config.toml
     echo -e "[remote]" >> ~/.beast/config.toml
     echo -e "ssh_key = \"/home/$USER/.beast/secret.key\"" >> ~/.beast/config.toml
     echo -e "url = \"git@github.com:sdslabs/nonexistent.git\"" >> ~/.beast/config.toml
@@ -49,10 +54,10 @@ steps:
   workingDirectory: '$(modulePath)'
   displayName: 'Build Beast'
 
-- script: |
-    make requirements
-  workingDirectory: '$(modulePath)'
-  displayName: 'Build Requirements'
+# - script: |
+#     make requirements
+#   workingDirectory: '$(modulePath)'
+#   displayName: 'Build Requirements'
 
 - script: |
     make test
