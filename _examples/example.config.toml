@@ -1,4 +1,4 @@
-# [fristonio] $ ~/.beast 
+# $ ~/.beast 
 # ❮❮ tree
 # .
 # ├── auth_file
@@ -17,14 +17,14 @@
 # Make sure you provide a valid existing authorized_keys_file
 # Make sure key.pub is added to the deployed keys of the beast remote repo
 
-authorized_keys_file = "/home/fristonio/.beast/auth_file"
-scripts_dir = "/home/fristonio/.beast/scripts"
-allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
+# scripts_dir = "/home/vsts/.beast/scripts"
+# slack_webhook = ""
+available_sidecars = ["mysql"]
 jwt_secret = "beast"
-slack_webhook = ""
-
+allowed_base_images = ["ubuntu:16.04", "php:7.1-cli"]
+authorized_keys_file = "/home/vsts/.beast/authorized_keys"
 [remote]
-url = "git@github.com:sdslabs/hack-test.git"
-name = "hack-test"
-branch = "master"
-ssh_key = "/home/fristonio/.beast/secrets/key.priv"
+ssh_key = "/home/vsts/.beast/secret.key"
+url = "git@github.com:sdslabs/nonexistent.git"
+name = "nonexistent"
+branch = "nonexistent"
