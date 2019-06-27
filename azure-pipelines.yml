@@ -54,10 +54,10 @@ steps:
   workingDirectory: '$(modulePath)'
   displayName: 'Build Beast'
 
-# - script: |
-#     make requirements
-#   workingDirectory: '$(modulePath)'
-#   displayName: 'Build Requirements'
+- script: |
+    make requirements
+  workingDirectory: '$(modulePath)'
+  displayName: 'Build Requirements'
 
 - script: |
     make test
