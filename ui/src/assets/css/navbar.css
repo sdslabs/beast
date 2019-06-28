@@ -16,6 +16,19 @@
     color: #000000;
 }
 
+.navbar {
+    color: #8D8787;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+}
+
+:hover {
+    color: #000000;
+}
+
 .navbar-0 {
     position: absolute;
     width: 2.8125rem;
@@ -23,15 +36,9 @@
     margin-left: 23.0625rem;
     top: 0rem;
     text-decoration: none;
-    font-family: Montserrat;
-    font-style: normal;
-    font-weight: 500;
-    font-size: 0.875rem;
-    line-height: 1.0625rem;
     display: flex;
     align-items: center;
     text-align: center;
-    color: #8D8787;
 }
 
 .navbar-1 {
@@ -41,15 +48,9 @@
     margin-left: 30.25rem;
     top: 0rem;
     text-decoration: none;
-    font-family: Montserrat;
-    font-style: normal;
-    font-weight: normal;
-    font-size: 0.875rem;
-    line-height: 1.0625rem;
     display: flex;
     align-items: center;
     text-align: center;
-    color: #8D8787;
 }
 
 .navbar-2 {
@@ -59,15 +60,9 @@
     margin-left: 40.3125rem;
     top: 0rem;
     text-decoration: none;
-    font-family: Montserrat;
-    font-style: normal;
-    font-weight: normal;
-    font-size: 0.875rem;
-    line-height: 1.0625rem;
     display: flex;
     align-items: center;
     text-align: center;
-    color: #8D8787;
 }
 
 .navbar-3 {
@@ -77,15 +72,9 @@
     margin-left: 47.3125rem;
     top: 0rem;
     text-decoration: none;
-    font-family: Montserrat;
-    font-style: normal;
-    font-weight: normal;
-    font-size: 0.875rem;
-    line-height: 1.0625rem;
     display: flex;
     align-items: center;
     text-align: center;
-    color: #8D8787;
 }
 
 .navbar-4 {
@@ -95,15 +84,9 @@
     margin-left: 56.6875rem;
     top: 0rem;
     text-decoration: none;
-    font-family: Montserrat;
-    font-style: normal;
-    font-weight: normal;
-    font-size: 0.875rem;
-    line-height: 1.0625rem;
     display: flex;
     align-items: center;
     text-align: center;
-    color: #8D8787;
 }
 
 .navbar-5 {
@@ -113,15 +96,9 @@
     margin-left: 72.8125rem;
     top: 0rem;
     text-decoration: none;
-    font-family: Montserrat;
-    font-style: normal;
-    font-weight: normal;
-    font-size: 0.875rem;
-    line-height: 1.0625rem;
     display: flex;
     align-items: center;
     text-align: center;
-    color: #8D8787;
 }
 
 .navbar-6 {
@@ -131,15 +108,9 @@
     margin-left: 80.375rem;
     top: 0rem;
     text-decoration: none;
-    font-family: Montserrat;
-    font-style: normal;
-    font-weight: normal;
-    font-size: 0.875rem;
-    line-height: 1.0625rem;
     display: flex;
     align-items: center;
     text-align: center;
-    color: #8D8787;
 }
 
 .navbar-hr {

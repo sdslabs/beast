@@ -3,22 +3,26 @@
     <div class="beast">
       <p>BEAST</p>
     </div>
-    <nav v-if="isUser">
-      <router-link class="navbar" v-for="routes in links"
-      v-bind:key="routes.id"
-      :to="`${routes.page}`">{{routes.text}}</router-link>
-    </nav>
-    <nav v-if="isAdmin">
-      <router-link class="navbar" v-for="routes in links"
-      v-bind:key="routes.id"
-      :to="`${routes.admin_page}`">{{routes.text}}</router-link>
-    </nav>
-    <nav>
-      <router-link v-for="routes in links.slice(0,5)"
-      v-bind:key="routes.id"
-      :class="'navbar-' + (routes.id)"
-      :to="`${routes.page}`">{{routes.text}}</router-link>
-    </nav>
+    <div class="navbar">
+      <nav v-if="isUser">
+        <router-link v-for="routes in links"
+        v-bind:key="routes.id"
+        :class="'navbar-' + (routes.id)"
+        :to="`${routes.page}`">{{routes.text}}</router-link>
+      </nav>
+      <nav v-if="isAdmin">
+        <router-link v-for="routes in links"
+        v-bind:key="routes.id"
+        :class="'navbar-' + (routes.id)"
+        :to="`${routes.admin_page}`">{{routes.text}}</router-link>
+      </nav>
+      <nav>
+        <router-link v-for="routes in links.slice(0,5)"
+        v-bind:key="routes.id"
+        :class="'navbar-' + (routes.id)"
+        :to="`${routes.page}`">{{routes.text}}</router-link>
+      </nav>
+    </div>
     <hr class="navbar-hr">
   </div>
 </template>
