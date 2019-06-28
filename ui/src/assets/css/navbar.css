@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css?family=Montserrat&display=swap');
+
+.beast {
+    position: absolute;
+    width: 7.3125rem;
+    height: 1.0625rem;
+    margin-left: 6.4375rem;
+    top: 2.125rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 1.5rem;
+    line-height: 1.8125rem;
+    display: flex;
+    align-items: center;
+    color: #000000;
+}
+
+.navbar-0 {
+    position: absolute;
+    width: 2.8125rem;
+    height: 5.75rem;
+    margin-left: 23.0625rem;
+    top: 0rem;
+    text-decoration: none;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #8D8787;
+}
+
+.navbar-1 {
+    position: absolute;
+    width: 5.6875rem;
+    height: 5.75rem;
+    margin-left: 30.25rem;
+    top: 0rem;
+    text-decoration: none;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #8D8787;
+}
+
+.navbar-2 {
+    position: absolute;
+    width: 2.625rem;
+    height: 5.75rem;
+    margin-left: 40.3125rem;
+    top: 0rem;
+    text-decoration: none;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #8D8787;
+}
+
+.navbar-3 {
+    position: absolute;
+    width: 5rem;
+    height: 5.75rem;
+    margin-left: 47.3125rem;
+    top: 0rem;
+    text-decoration: none;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #8D8787;
+}
+
+.navbar-4 {
+    position: absolute;
+    width: 5.625rem;
+    height: 5.75rem;
+    margin-left: 56.6875rem;
+    top: 0rem;
+    text-decoration: none;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #8D8787;
+}
+
+.navbar-5 {
+    position: absolute;
+    width: 3.8125rem;
+    height: 5.75rem;
+    margin-left: 72.8125rem;
+    top: 0rem;
+    text-decoration: none;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #8D8787;
+}
+
+.navbar-6 {
+    position: absolute;
+    width: 3.1875rem;
+    height: 5.75rem;
+    margin-left: 80.375rem;
+    top: 0rem;
+    text-decoration: none;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #8D8787;
+}
+
+.navbar-hr {
+    margin-top: 5.8125rem;
+}
