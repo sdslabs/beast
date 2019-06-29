@@ -117,64 +117,14 @@
     margin-top: 5.8125rem;
 }
 
-@media only screen and (min-width: 1080px) {
-    .beast {
-        width: 10.26309rem;
-        height: 1.49121875rem;
-        margin-left: 9.03503125rem;
-        top: 2.9824375rem;
-        font-size: 2.10525rem;
-        line-height: 2.54384375rem;
+@media only  screen and (max-width:1920px) {
+    html {
+        font-size: 22.45px;
     }
-    
-    .navbar {
-        font-size: 1.2280625rem;
-        line-height: 1.49121875rem;
-    }
-    
-    .navbar-0 {
-        width: 3.94734375rem;
-        height: 8.070125rem;
-        margin-left: 32.36821875rem;
-    }
-    
-    .navbar-1 {
-        width: 7.98240625rem;
-        height: 8.070125rem;
-        margin-left: 42.455875rem;
-    }
-    
-    .navbar-2 {
-        width: 3.6841875rem;
-        height: 8.070125rem;
-        margin-left: 56.57859375rem;
-    }
-    
-    .navbar-3 {
-        width: 7.0175rem;
-        height: 8.070125rem;
-        margin-left: 66.40309375rem;
-    }
-    
-    .navbar-4 {
-        width: 7.8946875rem;
-        height: 8.070125rem;
-        margin-left: 79.56090625rem;
-    }
-    
-    .navbar-5 {
-        width: 5.35084375rem;
-        height: 8.070125rem;
-        margin-left: 102.19234375rem;
-    }
-    
-    .navbar-6 {
-        width: 4.47365625rem;
-        height: 8.070125rem;
-        margin-left: 112.8063125rem;
-    }
-    
-    .navbar-hr {
-        margin-top: 8.15784375rem;
+}
+
+@media only  screen and (max-width:1369px) {
+    html {
+        font-size: 16px;
     }
 }
