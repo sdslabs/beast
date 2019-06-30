@@ -59,9 +59,9 @@ export default {
         },
         {
           id: 4,
-          text: 'Notification',
-          page: '/Notification',
-          admin_page: '/admin/Notification'
+          text: 'Notifications',
+          page: '/Notifications',
+          admin_page: '/admin/Notifications'
         },
         {
           id: 5,

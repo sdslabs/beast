@@ -115,6 +115,8 @@
 
 .navbar-hr {
     margin-top: 5.8125rem;
+    margin-left: -0.5rem;
+    width: 125rem;
 }
 
 @media only  screen and (max-width:1920px) {

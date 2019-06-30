@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css?family=Montserrat&display=swap');
+
+html,body {
+    width: 100%;
+}
+
+.notification_div {
+    position: relative;
+    width: 44.5625rem;
+    left: 20.4375rem;
+    top: 4.0625rem;
+}
+
+.notification_box {    
+    position: relative;
+    width: 44.5625rem;
+    height: 6.5rem;
+    margin-bottom: 0.875rem;
+    background: #ECECEC;
+}
+
+.notification_title {
+    position: absolute;
+    width: 18.3125rem;
+    height: 3rem;
+    left: 1.9375rem;
+    top: 0.4375rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 1rem;
+    line-height: 1.25rem;
+    display: flex;
+    align-items: center;
+    color: #000000;
+}
+
+.notification_timing {
+    position: absolute;
+    width: 40.625rem;
+    height: 1rem;
+    left: 2rem;
+    top: 2.5625rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: 300;
+    font-size: 0.75rem;
+    line-height: 0.9375rem;
+    display: flex;
+    align-items: center;
+    color: #000000;
+}
+
+.notification_desc {
+    position: absolute;
+    width: 40.625rem;
+    height: 1rem;
+    left: 1.9375rem;
+    top: 3.875rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: 300;
+    font-size: 0.875rem;
+    line-height: 1.0625rem;
+    display: flex;
+    align-items: center;
+    color: #000000;
+}
+
+.notification_status_new {
+position: absolute;
+width: 2.9925rem;
+height: 1.125rem;
+font-family: Montserrat;
+font-style: normal;
+font-weight: 300;
+font-size: 0.75rem;
+line-height: 1.125rem;
+text-align: center;
+color: #000000;
+}
+
+.notification_status {
+position: relative;
+width: 2.9925rem;
+height: 1.125rem;
+left: 39.618125rem;
+top: 1.4375rem;
+background: #C4C4C4;
+border-radius: 0.1875rem;
+}
+
+@media only  screen and (max-width:1920px) {
+    html {
+        font-size: 22.45px;
+    }
+}
+
+@media only  screen and (max-width:1369px) {
+    html {
+        font-size: 16px;
+    }
+}
