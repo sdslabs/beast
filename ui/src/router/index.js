@@ -15,6 +15,7 @@ import Admin_Home from '@/components/admin/Home'
 import Admin_Logout from '@/components/admin/Logout'
 import Admin_Notifications from '@/components/admin/Notifications'
 import Admin_Settings from '@/components/admin/Settings'
+import Login from '@/components/Login'
 
 Vue.use(Router)
 
@@ -89,6 +90,11 @@ export default new Router({
       path: '/admin/settings',
       name: 'Settings',
       component: Admin_Settings
+    },
+    {
+      path: '/login',
+      name: 'Login',
+      component: Login
     },
   ]
 })

@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css?family=Montserrat&display=swap');
+@import url('https://fonts.googleapis.com/css?family=Raleway&display=swap');
 
-html,body {
-    width: 100%;
+body {
+    overflow-x:hidden;
 }
 
 .notification_div {
@@ -16,7 +17,9 @@ html,body {
     width: 44.5625rem;
     height: 6.5rem;
     margin-bottom: 0.875rem;
-    background: #ECECEC;
+    background: #FFFFFF;
+    box-shadow: 0px 5px 10px rgba(102, 151, 232, 0.25);
+    border-radius: 5px;
 }
 
 .notification_title {
@@ -27,12 +30,12 @@ html,body {
     top: 0.4375rem;
     font-family: Montserrat;
     font-style: normal;
-    font-weight: normal;
+    font-weight: 600;
     font-size: 1rem;
     line-height: 1.25rem;
     display: flex;
     align-items: center;
-    color: #000000;
+    color: #363333;
 }
 
 .notification_timing {
@@ -48,7 +51,7 @@ html,body {
     line-height: 0.9375rem;
     display: flex;
     align-items: center;
-    color: #000000;
+    color: rgba(0, 161, 228, 0.75);
 }
 
 .notification_desc {
@@ -57,37 +60,38 @@ html,body {
     height: 1rem;
     left: 1.9375rem;
     top: 3.875rem;
-    font-family: Montserrat;
+    font-family: Raleway;
     font-style: normal;
     font-weight: 300;
     font-size: 0.875rem;
     line-height: 1.0625rem;
     display: flex;
     align-items: center;
-    color: #000000;
+    color: #515151;
 }
 
 .notification_status_new {
-position: absolute;
-width: 2.9925rem;
-height: 1.125rem;
-font-family: Montserrat;
-font-style: normal;
-font-weight: 300;
-font-size: 0.75rem;
-line-height: 1.125rem;
-text-align: center;
-color: #000000;
+    position: absolute;
+    width: 2.9925rem;
+    height: 1.125rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: 300;
+    font-size: 0.75rem;
+    line-height: 1.125rem;
+    text-align: center;
+    color: #FFFFFF;
+    border-radius: 3px;
 }
 
 .notification_status {
-position: relative;
-width: 2.9925rem;
-height: 1.125rem;
-left: 39.618125rem;
-top: 1.4375rem;
-background: #C4C4C4;
-border-radius: 0.1875rem;
+    position: relative;
+    width: 2.9925rem;
+    height: 1.125rem;
+    left: 39.618125rem;
+    top: 1.4375rem;
+    background: #00A1E4;
+    border-radius: 0.1875rem;
 }
 
 @media only  screen and (max-width:1920px) {

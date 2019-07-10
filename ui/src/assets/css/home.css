@@ -1,0 +1,184 @@
+@import url('https://fonts.googleapis.com/css?family=Montserrat&display=swap');
+@import url('https://fonts.googleapis.com/css?family=Raleway&display=swap');
+
+body {
+    overflow-x:hidden;
+}
+
+.home_div {
+    position: relative;
+}
+
+.competition_details_div {
+    position: relative;
+    left:20.4375rem;
+    top:1.75rem;
+}
+
+.competition_name {
+    position: absolute;
+    width: 44.5625rem;
+    height: 6rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1.8125rem;
+    display: flex;
+    align-items: center;
+    color: #363333;
+}
+
+.competition_desc {
+    position: absolute;
+    width: 44.5625rem;
+    height: 7.9375rem;
+    top: 4.75rem;
+    font-family: Raleway;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.75rem;
+    color: #515151;
+    text-align:left;
+}
+
+.competition_date {
+    position: absolute;
+    width: 22.5rem;
+    height: 3.1875rem;
+    top: 12.6875rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: 300;
+    font-size: 1.25rem;
+    line-height: 1.5rem;
+    display: flex;
+    align-items: center;
+    color: #000000;
+}
+
+.competition_time {
+    position: absolute;
+    width: 22.5rem;
+    height: 3.1875rem;
+    top: 15.0625rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: 300;
+    font-size: 1.25rem;
+    line-height: 1.5rem;
+    display: flex;
+    align-items: center;
+    color: #000000;
+}
+
+.see_challenge_button_div {
+    position: relative;
+    width: 10.125rem;
+    height: 2.25rem;
+    left: 20.4375rem;
+    top: 21.375rem;
+}
+
+.challenge_button {
+    position: absolute;
+    width: 10.125rem;
+    height: 2.25rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    text-align:center;
+    line-height: 1.0625rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: transparent;
+    color: #FFFFFF;
+    background: #00A1E4;
+    opacity: 0.8;
+    box-shadow: 0rem 0.3125rem 0.625rem rgba(0, 161, 228, 0.25);
+    border-radius: 0.3125rem;
+}
+
+.remaining_time_to_start {
+    position: absolute;
+    width: 12.9375rem;
+    height: 2.25rem;
+    left: 11.25rem;
+    top: 19.625rem;
+    font-family: Raleway;
+    font-style: normal;
+    font-weight: 300;
+    font-size: 0.875rem;
+    line-height: 1rem;
+    display: flex;
+    align-items: center;
+    color: #515151;
+}
+
+.rules_and_regulations {
+    position: relative;
+    left: 20.4375rem;
+    top: 21.9375rem;
+}
+
+.heading {
+    position: absolute;
+    width: 56.5rem;
+    height: 6rem;
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 1.5rem;
+    line-height: 1.8125rem;
+    display: flex;
+    align-items: center;
+    color: #000000;
+}
+
+.main_rules {
+    position: absolute;
+    width: 44.8125rem;
+    height: 7.9375rem;
+    top: 4.75rem;
+    text-align: left;
+    font-family: Raleway;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.75rem;
+    color: #515151;
+}
+
+.rules_list {
+    position: absolute;
+    width: 37.3125rem;
+    height: 10.4375rem;
+    left: 1.4375rem;
+    top: 14.125rem;
+    text-align: left;
+    font-family: Raleway;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: #515151;
+}
+
+ul li::before {
+    color: #C4C4C4;
+}
+
+@media only  screen and (max-width:1920px) {
+    html {
+        font-size: 22.45px;
+    }
+}
+
+@media only  screen and (max-width:1369px) {
+    html {
+        font-size: 16px;
+    }
+}
