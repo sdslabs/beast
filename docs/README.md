@@ -5,8 +5,10 @@ This directory contains documentation related to beast and will guide you throug
 ## Index
 
 * [Usage](/Usage)
+* [Getting Started](GettingStarted)
 * [Architecture](Architecture)
 * [Authentication Flow](Auth)
+* [Challenge Configuration](ChallConfig)
 
 ## Intro
 

@@ -71,3 +71,8 @@ echo "Success: A proper connection to MySQL was made! The my_db database is grea
 
 ?>
 ```
+
+### Available Sidecars
+
+* MySQL
+* MongoDB
