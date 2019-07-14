@@ -124,6 +124,38 @@ $ htpasswd -C 10 -c -B .static.beast.htpasswd <username>
 New Password: <Type the password>
 ```
 
+### Configuration Directory Structure
+
+The configuration directory structure of beast(`$HOME/.beast`) look something as below:
+
+```
+.beast/                                                                                         
+├── authorized_keys_file                                                                                           
+├── beast.db                                                                                
+├── config.toml                                                                                 
+├── hack-secrets                                                                                
+│   ├── id_rsa                                                                            
+│   └── id_rsa.pub                                                                               
+├── remote                                                                           
+│   └── hack-test                                          
+│       └── challenges                                     
+│           └── MIGHTY-PHP                                 
+│               ├── beast.toml
+│               └── challenge                              
+│                   └── flag.php
+├── scripts
+│   └── 043a6aa3658c08c85d64321d986afbf69cb7ad345f16fe8aa0368ee6478f6e24
+├
+└── staging
+    └── MIGHTY-PHP
+        ├── beast.toml
+        ├── Dockerfile
+        ├── logs
+        │   └── MIGHTY-PHP.20190609173618.log
+        ├── MIGHTY-PHP.tar.gz
+        └── static
+```
+
 ## Run
 
 Once the setup and configuration is done run the beast web server using the below command
