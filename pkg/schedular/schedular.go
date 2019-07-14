@@ -1,66 +1,116 @@
-package schedular
+package Schedular
 
 import (
 	"reflect"
 	"fmt"
-
-    log "github.com/sirupsen/logrus"    
+	"time"
 )
 
-type Function interface{}
-
-type TaskFunction struct {
-	Function Function
-	Name string
-	ParamTypes map[string]reflect.Type
-}
-
-type TaskFunctionRegister struct {
-	Functions map[string]TaskFunction
-}
-
-func (tfr *TaskFunctionRegister) NewTaskFunctionRegister() *TaskFunctionRegister {
-	return &TaskFunctionRegister{
-		Functions: make(map[string]TaskFunction)
-	}
-}
-
-func (tfr *TaskFunctionRegister) AddFunc(function Function) error {
-	funcValue := reflect.ValueOf(function)
-	if funcValue.Kind() != reflect.Func {
-		return fmt.Errorf("Provide function as an argument.")
-	}
-
-	funcType := reflect.TypeOf(function)
-	paramTypes, err := resolveParamTypes(function)
-	if err != nil {
-		return fmt.Errorf("Error occured while resolving parameter types.")
-	}
-
-	trf.Functions[funcType.Name()] = TaskFunction{
-		Function: function,
-		Name: funcType.Name()
-		ParamTypes: paramTypes,
-	}
-}
-
 type Schedular struct {
-    Register TaskFunctionRegister
+	Tasks TaskMap
+	FuncRegister TaskFunctionRegister
+	
+	stopChan     chan bool
+	ticker *time.Ticker
 }
 
-func resolveParamTypes(function Function) (map[string]reflect.Type, error) {
-	funcType := reflect.TypeOf(function)
-	if funcValue.Kind() != reflect.Func {
-		return nil, fmt.Errorf("Provide function as an argument.")
+func NewSchedular() Scheduler {
+	register := NewTaskFunctionRegister()
+	return Scheduler{
+		Tasks: 			NewTaskMap(),
+		FuncRegister: NewTaskFunctionRegister(),
+
+		stopChan:     make(chan bool),
+		ticker: time.NewTicker(1 * time.Second)
+	}
+}
+
+func (scheduler *Scheduler) Start() error {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		for {
+			select {
+			case <-schedular.ticker.C:
+				scheduler.runPending()
+			case <-sigChan:
+				scheduler.stopChan <- true
+			case <-scheduler.stopChan:
+				schedular.ticker.Stop()
+				close(scheduler.stopChan)
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (scheduler *Scheduler) Stop() {
+	scheduler.stopChan <- true
+}
+
+func (scheduler *Scheduler) Wait() {
+	<-scheduler.stopChan
+}
+
+func (scheduler *Scheduler) ScheduleAt(time time.Time, function Function, params ...FuncParam) error {
+	funcID, err := schedular.FuncRegister.AddFunction(function, params...)
+	if err != nil {
+		return err
 	}
 
-	paramTypes := make(map[string]reflect.Type)
-
-	for i := 0; i < funcType.NumIn(); i++ {
-		typ := funcType.In(i)
-		paramTypes[in.Name()] = typ
+	schedule := Schedule{
+		IsRecurring: false,
+		NextRun: time,
+		LastRun: time.Unix(0, 0)
+	}
+	err = scheduler.Tasks.AddTask(schedule, funcID)
+	if err != nil {
+		return err
 	}
 
-	return paramTypes, nil
+	return nil
+}
+
+func (scheduler *Scheduler) ScheduleAfter(duration time.Duration, function Function, params ...FuncParam) error {
+	return scheduler.ScheduleAt(time.Now().Add(duration), function, params...)
+}
+
+func (scheduler *Scheduler) ScheduleEvery(duration time.Duration, function Function, params ...FuncParam) error {
+	funcID, err := schedular.FuncRegister.AddFunction(function, params...)
+	if err != nil {
+		return err
+	}
+
+	schedule := Schedule{
+		IsRecurring: true,
+		NextRun: time,
+		LastRun: time.Unix(0, 0)
+		Duration: duration
+	}
+	err = scheduler.Tasks.AddTask(schedule, funcID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (schedular *Schedular) runPending() {
+	for id, task := range schedular.Tasks {
+		task.IsDue() {
+			if function, ok := schedular.FuncRegister[task.FunctionID]; ok {
+				go function.Run()
+			}
+
+			if !task.Schedule.IsRecurring {
+				delete(scheduler.Tasks, id)
+			} else {
+				task.Schedule.LastRun = time.Now()
+				task.Schedule.NextRun = task.Schedule.NextRun.Add(task.Schedule.Duration)
+			}
+		}
+	}
 }
 
