@@ -1,0 +1,3 @@
+[submodule "Documentation/themes/docsy"]
+	path = Documentation/themes/docsy
+	url = https://github.com/google/docsy
