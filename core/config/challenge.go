@@ -141,7 +141,6 @@ type ChallengeEnv struct {
 	SetupScripts     []string         `toml:"setup_scripts"`
 	StaticContentDir string           `toml:"static_dir"`
 	RunCmd           string           `toml:"run_cmd"`
-	Base             string           `toml:"base"`
 	BaseImage        string           `toml:"base_image"`
 	WebRoot          string           `toml:"web_root"`
 	DefaultPort      uint32           `toml:"default_port"`

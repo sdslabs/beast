@@ -4,9 +4,16 @@ This directory contains documentation related to beast and will guide you throug
 
 ## Index
 
-* [Usage](/Usage)
+* [Usage](Usage)
+* [Setup](Setup)
+* [Getting Started](GettingStarted)
+* [Features](Features)
 * [Architecture](Architecture)
-* [Authentication Flow](Auth)
+* [Authentication Flow](APIAuth)
+* [Challenge Configuration](ChallConfig)
+* [Deployment](Deployment)
+* [Sidecars](Sidecars)
+
 
 ## Intro
 
