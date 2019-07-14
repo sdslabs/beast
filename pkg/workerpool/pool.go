@@ -9,9 +9,10 @@ import (
 )
 
 type Queue struct {
-	TaskQueue         chan Task
-	Mux               sync.RWMutex
-	InQueue           map[string]bool // A map which stores if the task related to some id is already in the queue
+	TaskQueue chan Task
+	Mux       sync.RWMutex
+	InQueue   map[string]bool // A map which stores if the task related to some id is already in the queue
+
 	CompletionChannel chan bool
 }
 

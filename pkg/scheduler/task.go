@@ -1,12 +1,11 @@
-package schedular
+package scheduler
 
 import (
-	"reflect"
-	"fmt"
-	"time"
 	"crypto/sha1"
-
-    log "github.com/sirupsen/logrus"    
+	"fmt"
+	"io"
+	"reflect"
+	"time"
 )
 
 type Function interface{}
@@ -19,14 +18,21 @@ type TaskFunction struct {
 	Name string
 
 	Function Function
-	Params []FuncParam
+	Params   []FuncParam
 }
 
 func (tf *TaskFunction) Run() {
-	tf.Function(tf.Params...)
+	function := reflect.ValueOf(tf.Function)
+
+	var params []reflect.Value
+	for _, param := range tf.Params {
+		params = append(params, reflect.ValueOf(param))
+	}
+
+	function.Call(params)
 }
 
-func (tf *TaskFunc) GetFunctionID() FunctionID {
+func (tf *TaskFunction) GetFunctionID() FunctionID {
 	hash := sha1.New()
 
 	_, _ = io.WriteString(hash, tf.Name)
@@ -39,9 +45,9 @@ type TaskFunctionRegister struct {
 	Functions map[FunctionID]TaskFunction
 }
 
-func (tfr *TaskFunctionRegister) NewTaskFunctionRegister() *TaskFunctionRegister {
-	return &TaskFunctionRegister{
-		Functions: make(map[FunctionID]TaskFunction)
+func NewTaskFunctionRegister() TaskFunctionRegister {
+	return TaskFunctionRegister{
+		Functions: make(map[FunctionID]TaskFunction),
 	}
 }
 
@@ -54,19 +60,19 @@ func (tfr *TaskFunctionRegister) AddFunction(function Function, params ...FuncPa
 	}
 
 	funcType := reflect.TypeOf(function)
-	err := validateParamTypes(function, ...params)
+	err := validateParamTypes(function, params...)
 	if err != nil {
 		return funcID, err
 	}
 
 	tf := TaskFunction{
 		Function: function,
-		Name: funcType.Name()
-		Params: params,
+		Name:     funcType.Name(),
+		Params:   params,
 	}
 
 	funcID = tf.GetFunctionID()
-	trf.Functions[funcID] = tf
+	tfr.Functions[funcID] = tf
 
 	return funcID, nil
 }
@@ -82,14 +88,14 @@ type Task struct {
 	Schedule Schedule
 
 	FunctionID FunctionID
-	id TaskID
+	id         TaskID
 }
 
 func NewTask(schedule Schedule, funcID FunctionID) *Task {
 	return &Task{
-		Schedule schedule,
+		Schedule: schedule,
 
-		FunctionID funcID,
+		FunctionID: funcID,
 	}
 }
 
@@ -97,11 +103,10 @@ func (task *Task) getTaskID() TaskID {
 	hash := sha1.New()
 
 	_, _ = io.WriteString(hash, string(task.FunctionID))
-	_, _ = io.WriteString(hash, fmt.Sprintf("%+v", tf.Schedule))
+	_, _ = io.WriteString(hash, fmt.Sprintf("%+v", task.Schedule))
 
 	return TaskID(fmt.Sprintf("%x", hash.Sum(nil)))
 }
-
 
 func (task *Task) GetTaskID() TaskID {
 	if string(task.id) == "" {
@@ -121,7 +126,7 @@ func NewTaskMap() TaskMap {
 	return make(TaskMap)
 }
 
-func (tMap *TaskMap) AddTask(schedule Schedule, funcID FunctionID) {
+func (tMap TaskMap) AddTask(schedule Schedule, funcID FunctionID) {
 	task := NewTask(schedule, funcID)
 
 	tMap[task.GetTaskID()] = task
@@ -140,7 +145,7 @@ func validateParamTypes(function Function, params ...FuncParam) error {
 	for i, param := range params {
 		typ := funcType.In(i)
 		if typ != reflect.TypeOf(param) {
-			return fmt.Errorf("Parameter type for param %s is not valid", in.Name())
+			return fmt.Errorf("Parameter type for param %s is not valid", typ.Name())
 		}
 	}
 
