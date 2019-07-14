@@ -2,6 +2,8 @@
 
 > Beast is an automatic deployment and management tool for CTF challenges hosted on backdoor.sdslabs.co
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/bea0e0b4-30e1-4830-ba98-e484b51e4036/deploy-status)](https://app.netlify.com/sites/beast-docs-sdslabs/deploys)
+
 ## Development
 
 Beast go version is under development, follow the below instructions to get started.
@@ -128,7 +130,7 @@ The documentation for the project lies in [/docs](/docs). We use `mkdocs` to aut
 ```bash
 $ virtualenv venv && source venv/bin/activate
 
-$ pip install -r requirements-dev.txt
+$ pip install -r requirements.txt
 
 $ mkdocs serve
 

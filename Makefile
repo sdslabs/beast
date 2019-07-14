@@ -54,4 +54,8 @@ requirements:
 	@echo ">>> Building beast extras..."
 	@./scripts/build/extras.sh
 
-.PHONY: build format test check_format tools
+docs:
+	@echo ">>> Building Documentation"
+	@mkdocs build
+
+.PHONY: build format test check_format tools docs
