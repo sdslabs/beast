@@ -20,6 +20,6 @@ var runCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		api.RunBeastApiServer(Port, HealthProbe)
+		api.RunBeastApiServer(Port, HealthProbe, PeriodicSync)
 	},
 }

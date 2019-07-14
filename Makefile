@@ -31,6 +31,11 @@ format:
 	@echo "[*] Formatting code"
 	@$(GO) fmt $(pkgs)
 
+# Vet code using go vet
+govet:
+	@echo "[*] Vetting code, checking for mistakes"
+	@$(GO) vet $(pkgs)
+
 # Ensure that the required tools are installed for beast to work
 tools:
 	@if ! test -x "`which nsenter 2>&1;true`"; then \
