@@ -331,7 +331,6 @@ func HandleTagRelatedChallenges(action string, tag string, user string) []string
 }
 
 func appendAndSaveTransaction(challs *[]database.Challenge, challsNameList *[]string, action string, user string) error {
-
 	author, err := database.QueryFirstAuthorEntry("name", user)
 	if err != nil {
 		return err

@@ -55,10 +55,25 @@ definitions:
         example: YOUR_AUTHENTICATION_TOKEN
         type: string
     type: object
+  api.HTTPErrorResp:
+    properties:
+      error:
+        example: Error occured while veifying the challenge.
+        type: string
+    type: object
   api.HTTPPlainResp:
     properties:
       message:
         example: Messsage in response to your request
+        type: string
+    type: object
+  api.LogsInfoResp:
+    properties:
+      stderr:
+        example: '[ERROR] Challenge deployment failed.'
+        type: string
+      stdout:
+        example: '[INFO] Challenge is starting to deploy'
         type: string
     type: object
   api.PortsInUseResp:
@@ -152,6 +167,33 @@ paths:
         this is a constant specified in beast global config
       tags:
       - info
+  /api/info/logs/:
+    get:
+      consumes:
+      - application/json
+      description: Gives container logs for a particular challenge, useful for debugging
+        purposes.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LogsInfoResp'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Handles route related to logs handling of container
+      tags:
+      - info
   /api/info/ports/used:
     get:
       consumes:
@@ -209,22 +251,24 @@ paths:
     post:
       consumes:
       - application/json
-      description: Commits the challenge container for later use
+      description: Validates challenge configuration for deployment.
+      parameters:
+      - description: Name of the challenge to verify the deployment configuration
+          for.
+        in: query
+        name: challenge
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
+            $ref: '#/definitions/api.HTTPErrorResp'
             type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
-      summary: Commits the challenge container so that later the challenge image can
-        be used deployment
+      summary: Validates the configuration of the challenge and tells if challenge
+        can be deployed or not.
       tags:
       - manage
   /api/manage/deploy/local:
@@ -260,11 +304,22 @@ paths:
       summary: Deploy a local challenge using the path provided in the post parameter
       tags:
       - manage
-  /api/manage/logs/:
-    get:
+  /api/manage/multiple/:
+    post:
       consumes:
       - application/json
-      description: Container logs
+      description: Handles challenge management routes for multiple the challenges
+        with actions which includes - DEPLOY, UNDEPLOY.
+      parameters:
+      - description: Action for the challenge
+        in: query
+        name: action
+        required: true
+        type: string
+      - description: Tag for a group of challenges
+        in: query
+        name: tag
+        type: string
       produces:
       - application/json
       responses:
@@ -278,7 +333,54 @@ paths:
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
             type: object
-      summary: Handles route related to logs handling of container
+      summary: Handles challenge management actions for multiple challenges.
+      tags:
+      - manage
+  /api/manage/schedule/:
+    post:
+      consumes:
+      - application/json
+      description: Handles scheduleing of challenge action to executed at some later
+        point of time
+      parameters:
+      - description: Action for the underlying challenge in context
+        in: query
+        name: action
+        required: true
+        type: string
+      - description: The name of the challenge to schedule the action for.
+        in: query
+        name: challenge
+        type: string
+      - description: Tag corresponding to challenges in context, optional if challenge
+          name is provided
+        in: query
+        name: tags
+        type: string
+      - description: Timestamp at which the challenge should be scheduled should be
+          a unix timestamp string.
+        in: query
+        name: at
+        type: string
+      - description: Time after which the action on the selector should be executed
+          should be of duration format as in '1m20s' etc.
+        in: query
+        name: after
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Schedule an action(deploy, undeploy, purge etc.) on a particular challenge
       tags:
       - manage
   /api/manage/static/:
@@ -286,6 +388,12 @@ paths:
       consumes:
       - application/json
       description: Handles beast static content serving container routes.
+      parameters:
+      - description: Action to apply on the beast static content provider
+        in: query
+        name: action
+        required: true
+        type: string
       produces:
       - application/json
       responses:

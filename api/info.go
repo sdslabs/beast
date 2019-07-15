@@ -1,11 +1,14 @@
 package api
 
 import (
+	"net/http"
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
-	"net/http"
+	"github.com/sdslabs/beastv4/core/utils"
 )
 
 // Returns port in use by beast.
@@ -76,6 +79,38 @@ func challengesHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, ChallengesResp{
 			Message:    "All Challenges",
 			Challenges: challenges,
+		})
+	}
+}
+
+// Handles route related to logs handling
+// @Summary Handles route related to logs handling of container
+// @Description Gives container logs for a particular challenge, useful for debugging purposes.
+// @Tags info
+// @Accept  json
+// @Produce json
+// @Success 200 {object} api.LogsInfoResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /api/info/logs/ [get]
+func challengeLogsHandler(c *gin.Context) {
+	chall := c.Param("challenge")
+	if chall == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Challenge name cannot be empty"),
+		})
+		return
+	}
+
+	logs, err := utils.GetLogs(chall, false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: err.Error(),
+		})
+	} else {
+		c.JSON(http.StatusOK, LogsInfoResp{
+			Stdout: logs.Stdout,
+			Stderr: logs.Stderr,
 		})
 	}
 }

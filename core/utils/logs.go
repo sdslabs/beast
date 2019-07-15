@@ -14,12 +14,15 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Error while database access : %s", err)
 	}
+
 	if chall.Format == core.STATIC_CHALLENGE_TYPE_NAME {
-		return nil, fmt.Errorf("The challenge is a static challenge")
+		return nil, fmt.Errorf("The challenge is a static challenge, no log present")
 	}
+
 	if !IsContainerIdValid(chall.ContainerId) {
-		return nil, fmt.Errorf("The container id is not valid")
+		return nil, fmt.Errorf("Underlying challenge configuration present is not valid.")
 	}
+
 	containers, err := cr.SearchContainerByFilter(map[string]string{"id": chall.ContainerId})
 	if err != nil {
 		return nil, fmt.Errorf("Error while searching for container with id %s", chall.ContainerId)
@@ -30,7 +33,7 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 	}
 
 	if len(containers) == 0 {
-		return nil, fmt.Errorf("The container does not exist")
+		return nil, fmt.Errorf("Underlying container for getting log is not present.")
 	}
 
 	if live {

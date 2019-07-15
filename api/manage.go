@@ -5,13 +5,15 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/auth"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
-	"github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/utils"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,7 +28,6 @@ import (
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/multiple/:action [post]
-
 func manageMultipleChallengeHandler(c *gin.Context) {
 	// If no tags are provided we by default we apply the action to all
 	// the challenges.
@@ -55,6 +56,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 	if tag != "" {
 		log.Infof("Starting %s for all challenges related to tags", action)
 		msgs := manager.HandleTagRelatedChallenges(action, tag, authorName)
+
 		if len(msgs) != 0 {
 			msg = fmt.Sprintf("Error while performing %s : %s", action, strings.Join(msgs, " || "))
 		} else {
@@ -63,6 +65,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 	} else {
 		log.Infof("Starting %s for all challenges", action)
 		msgs := manager.HandleAll(action, authorName)
+
 		if len(msgs) != 0 {
 			msg = fmt.Sprintf("Error while performing %s : %s", action, strings.Join(msgs, " || "))
 		} else {
@@ -146,7 +149,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 	log.Info("In local deploy challenge Handler")
 	err := manager.DeployChallengePipeline(challDir)
 	if msgs := manager.LogTransaction(strings.Split(challDir, "/")[len(strings.Split(challDir, "/"))-1], action, authorization); msgs != nil {
-		log.Info("error while saving transaction")
+		log.Warn("Error while saving transaction")
 	}
 
 	if err != nil {
@@ -170,6 +173,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // @Tags manage
 // @Accept  json
 // @Produce json
+// @Param action query string true "Action to apply on the beast static content provider"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/static/:action [post]
@@ -182,6 +186,8 @@ func beastStaticContentHandler(c *gin.Context) {
 		log.Error("error while getting details")
 	}
 
+	// Static content provider for beast only supports two actions
+	// Deploy and Undeploy
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
 		go manager.DeployStaticContentContainer()
@@ -204,46 +210,18 @@ func beastStaticContentHandler(c *gin.Context) {
 	}
 }
 
-// Handles route related to logs handling
-// @Summary Handles route related to logs handling of container
-// @Description Container logs
-// @Tags manage
-// @Accept  json
-// @Produce json
-// @Success 200 {object} api.HTTPPlainResp
-// @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/logs/ [get]
-func challengeLogsHandler(c *gin.Context) {
-	chall := c.Param("name")
-	if chall == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf("Name cannot be empty"),
-		})
-	}
-	logs, err := utils.GetLogs(chall, false)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-	} else {
-		c.JSON(http.StatusOK, gin.H{
-			"stdout": logs.Stdout,
-			"stderr": logs.Stderr,
-		})
-	}
-}
-
 // Commit a challenge container
 // @Summary Commits the challenge container so that later the challenge image can be used deployment
 // @Description Commits the challenge container for later use
 // @Tags manage
 // @Accept  json
 // @Produce json
+// @Param challenge query string true "Name of the challenge to commit"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
 // @Router /api/manage/commit/ [post]
 func commitChallenge(c *gin.Context) {
-	challenge := c.PostForm("chall")
+	challenge := c.PostForm("challenge")
 
 	err := manager.CommitChallengeContainer(challenge)
 
@@ -258,19 +236,116 @@ func commitChallenge(c *gin.Context) {
 	})
 }
 
+// Verify a challenge for configuration.
+// @Summary Validates the configuration of the challenge and tells if challenge can be deployed or not.
+// @Description Validates challenge configuration for deployment.
+// @Tags manage
+// @Accept  json
+// @Produce json
+// @Param challenge query string true "Name of the challenge to verify the deployment configuration for."
+// @Success 200 {object} api.HTTPPlainResp
+// @Success 200 {object} api.HTTPErrorResp
+// @Router /api/manage/commit/ [post]
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
+	
 	err := manager.ValidateChallengeConfig(challengeStagingDir)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"Error": err.Error(),
+		c.JSON(http.StatusOK, HTTPErrorResp{
+			Error: err.Error(),
 		})
-		return
 	} else {
-		c.JSON(http.StatusOK, gin.H{
-			"Message": "This challenge can be deployed",
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "This challenge can be deployed",
+		})
+	}
+}
+
+// Execute a scheduled action on a challenge.
+// @Summary Schedule an action(deploy, undeploy, purge etc.) on a particular challenge
+// @Description Handles scheduleing of challenge action to executed at some later point of time
+// @Tags manage
+// @Accept  json
+// @Produce json
+// @Param action query string true "Action for the underlying challenge in context"
+// @Param challenge query string false "The name of the challenge to schedule the action for."
+// @Param tags query string false "Tag corresponding to challenges in context, optional if challenge name is provided"
+// @Param at query string false "Timestamp at which the challenge should be scheduled should be a unix timestamp string."
+// @Param after query string false "Time after which the action on the selector should be executed should be of duration format as in '1m20s' etc."
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/manage/schedule/:action [post]
+func manageScheduledAction(c *gin.Context) {
+	action := c.Param("action")
+	challenge := c.PostForm("challenge")
+	tag := c.PostForm("tag")
+	
+	authorization := c.GetHeader("Authorization")
+	authorName, err := auth.GetUser(authorization)
+	if err == nil {
+		log.Warn("Error while getting user from authorization header, using default user(since already authorized)")
+		authorName = core.DEFAULT_USER_NAME
+	}
+
+	if action == "" || (challenge == "" && tag == "") {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Action and a challenge selector like name or tag is required but not provided",
 		})
 		return
 	}
+
+	at := c.PostForm("at")
+	after := c.PostForm("after")
+	if at == "" && after == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "A time correspondence should be associated with a schedule, no parameter at or after",
+		})
+		return
+	}
+
+	var duration time.Duration
+	if at != "" {
+		duration, err = utils.GetDurationFromTimestamp(at)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Invalid timestamp provided: %s: %s", at, err),
+			})
+			return
+		}
+	} else {
+		duration, err = time.ParseDuration(after)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Invalid after duration provided: %s: %s", after, err),
+			})
+			return
+		}
+	}
+
+	actionHandler, ok := manager.ChallengeActionHandlers[action]
+	if !ok {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Invalid Action : %s", action),
+		})
+		return
+	}
+
+	// If a tag is provided we deploy using the tag, else we deploy the challenge
+	// name we are provided
+	if tag != "" {
+		manager.LogTransaction(fmt.Sprintf("TAG:%s", tag), "SCHEDULE::" + action, authorization)
+		
+		BeastScheduler.ScheduleAfter(duration, manager.HandleTagRelatedChallenges, action, tag, authorName)
+		log.Infof("Scheduled %s for challenges with tag %s", action, tag)
+	} else {
+		manager.LogTransaction(challenge, "SCHEDULE::" + action, authorization)
+		
+		BeastScheduler.ScheduleAfter(duration, actionHandler, challenge)
+		log.Infof("Scheduled %s for challenge %s", action, challenge)
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: fmt.Sprintf("Challenge with the provided selector has been scheduled for %s", action),
+	})
 }
