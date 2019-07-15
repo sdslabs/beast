@@ -6,6 +6,10 @@ type HTTPPlainResp struct {
 	Message string `json:"message" example:"Messsage in response to your request"`
 }
 
+type HTTPErrorResp struct {
+	Error string `json:"error" example:"Error occured while veifying the challenge."`
+}
+
 type HTTPAuthorizeResp struct {
 	Token   string `json:"token" example:"YOUR_AUTHENTICATION_TOKEN"`
 	Message string `json:"message" example:"Response message"`
@@ -35,4 +39,9 @@ type ChallengeStatusResp struct {
 type ChallengesResp struct {
 	Message    string
 	Challenges []string
+}
+
+type LogsInfoResp struct {
+	Stdout string `json:"stdout" example:"[INFO] Challenge is starting to deploy"`
+	Stderr string `json:"stderr" example:"[ERROR] Challenge deployment failed."`
 }
