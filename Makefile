@@ -60,7 +60,9 @@ requirements:
 	@./scripts/build/extras.sh
 
 docs:
+	@rm -rf site/
 	@echo ">>> Building Documentation"
 	@mkdocs build
+	@python scripts/tools/swagger-docs.py
 
 .PHONY: build format test check_format tools docs

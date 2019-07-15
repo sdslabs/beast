@@ -5,5 +5,6 @@ nav:
   - Usage: Usage.md
   - Setup: Setup.md
   - Documentation: Documentation.md
+  - APIDocs: /apidocs.html
 
 theme: cosmo

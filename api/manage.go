@@ -249,7 +249,7 @@ func commitChallenge(c *gin.Context) {
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
-	
+
 	err := manager.ValidateChallengeConfig(challengeStagingDir)
 	if err != nil {
 		c.JSON(http.StatusOK, HTTPErrorResp{
@@ -280,7 +280,7 @@ func manageScheduledAction(c *gin.Context) {
 	action := c.Param("action")
 	challenge := c.PostForm("challenge")
 	tag := c.PostForm("tag")
-	
+
 	authorization := c.GetHeader("Authorization")
 	authorName, err := auth.GetUser(authorization)
 	if err == nil {
@@ -334,13 +334,13 @@ func manageScheduledAction(c *gin.Context) {
 	// If a tag is provided we deploy using the tag, else we deploy the challenge
 	// name we are provided
 	if tag != "" {
-		manager.LogTransaction(fmt.Sprintf("TAG:%s", tag), "SCHEDULE::" + action, authorization)
-		
+		manager.LogTransaction(fmt.Sprintf("TAG:%s", tag), "SCHEDULE::"+action, authorization)
+
 		BeastScheduler.ScheduleAfter(duration, manager.HandleTagRelatedChallenges, action, tag, authorName)
 		log.Infof("Scheduled %s for challenges with tag %s", action, tag)
 	} else {
-		manager.LogTransaction(challenge, "SCHEDULE::" + action, authorization)
-		
+		manager.LogTransaction(challenge, "SCHEDULE::"+action, authorization)
+
 		BeastScheduler.ScheduleAfter(duration, actionHandler, challenge)
 		log.Infof("Scheduled %s for challenge %s", action, challenge)
 	}

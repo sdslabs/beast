@@ -1,8 +1,8 @@
 package api
 
 import (
-	"net/http"
 	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
