@@ -32,7 +32,7 @@ func challengeInfoHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Challenge names cannot be empty"),
+			Message: fmt.Sprintf("Challenge name cannot be empty"),
 		})
 		return
 	}
