@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 )
@@ -29,9 +30,37 @@ func usedPortsInfoHandler(c *gin.Context) {
 }
 
 func challengeInfoHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, HTTPPlainResp{
-		Message: WIP_TEXT,
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Challenge names cannot be empty"),
+		})
+		return
+	}
+
+	challenge, err := database.QueryChallengeEntries("name", name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	var challDescription string
+	var challAuthorID uint
+	if len(challenge) > 0 {
+		challDescription = challenge[0].Description
+		challAuthorID = challenge[0].AuthorID
+	} else {
+		challDescription = "Not Available"
+		challAuthorID = 0
+	}
+	c.JSON(http.StatusOK, ChallengeDescriptionResp{
+		Name:     name,
+		AuthorID: challAuthorID,
+		Desc:     challDescription,
 	})
+	return
 }
 
 func availableChallengeInfoHandler(c *gin.Context) {
