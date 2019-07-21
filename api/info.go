@@ -34,9 +34,35 @@ func challengeInfoHandler(c *gin.Context) {
 }
 
 func availableChallengeInfoHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, HTTPPlainResp{
-		Message: WIP_TEXT,
+	challenges, err := database.QueryAllChallenges()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	var challDescription string
+	var challAuthorID uint
+	var challStatus string
+
+	if len(challenges) > 0 {
+		challDescription = challenges[0].Description
+		challAuthorID = challenges[0].AuthorID
+		challStatus = challenges[0].Status
+
+	} else {
+		challDescription = "Not Available"
+		challAuthorID = 0
+		challStatus = core.DEPLOY_STATUS["unknown"]
+	}
+	c.JSON(http.StatusOK, AvailableChallengesDescriptionResp{
+		Name:     name,
+		AuthorID: challAuthorID,
+		Desc:     challDescription,
+		Status:	  challStatus
 	})
+	return
 }
 
 // Returns available base images.
