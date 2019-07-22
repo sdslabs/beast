@@ -39,18 +39,18 @@ import (
 type Challenge struct {
 	gorm.Model
 
-	Name        string `gorm:"not null;type:varchar(64);unique"`
-	Flag        string `gorm:"not null;type:varchar(64)"`
-	Type        string `gorm:"type:varchar(64)"`
-	Sidecar     string `gorm:"type:varchar(64)"`
-	Hint        string `gorm:"type:varchar(64)"`
-	Description string `gorm:"type:varchar(250)"`
-	Format      string `gorm:"not null"`
-	ContainerId string `gorm:"size:64;unique"`
-	ImageId     string `gorm:"size:64;unique"`
-	Status      string `gorm:"not null;default:'Unknown'"`
-	AuthorID    uint   `gorm:"not null"`
-	HealthCheck uint   `gorm:"not null;default:1"`
+	Name        string   `gorm:"not null;type:varchar(64);unique"`
+	Flag        string   `gorm:"not null;type:varchar(64)"`
+	Type        string   `gorm:"type:varchar(64)"`
+	Sidecar     string   `gorm:"type:varchar(64)"`
+	Hints       []string `gorm:"type:varchar(64)[]"`
+	Description string   `gorm:"type:varchar(250)"`
+	Format      string   `gorm:"not null"`
+	ContainerId string   `gorm:"size:64;unique"`
+	ImageId     string   `gorm:"size:64;unique"`
+	Status      string   `gorm:"not null;default:'Unknown'"`
+	AuthorID    uint     `gorm:"not null"`
+	HealthCheck uint     `gorm:"not null;default:1"`
 	Ports       []Port
 	Tags        []*Tag `gorm:"many2many:tag_challenges;"`
 }
