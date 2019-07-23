@@ -408,7 +408,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Type:        config.Challenge.Metadata.Type,
 			Sidecar:     config.Challenge.Metadata.Sidecar,
 			Description: config.Challenge.Metadata.Description,
-			Hints:       config.Challenge.Metadata.Hints,
+			Hints:       strings.Join(config.Challenge.Metadata.Hints, "::::"),
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
