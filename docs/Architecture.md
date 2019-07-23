@@ -43,3 +43,7 @@ the next. Consider them as the threadpool for beast.
 ## Challenge Flow
 
 ![Challenge Deployment Flow](res/challenge-flow.png)
+
+## Deployment Pipeline
+
+![Challenge Deployment Pipeline](res/deployment-pipeline.png)
