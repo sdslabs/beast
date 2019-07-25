@@ -8,6 +8,7 @@ name = "web-php-mysql"
 flag = "BACKDOOR{WEB_CHALLENGE_FLAG}"
 type = "web:php:7.1:cli"
 sidecar = "mysql"
+hints = ["web-php-mysql_hint_1", "web-php-mysql_hint_2"]
 
 [challenge.env]
 apt_deps = ["gcc", "php*-mysql"]

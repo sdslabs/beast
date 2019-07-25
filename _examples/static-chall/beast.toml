@@ -7,3 +7,4 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author
 name = "static-chall"
 flag = "BACKDOOR{SAMPLE_FLAG}"
 type = "static"
+hints = ["static_hint_1", "static_hint_2"]
