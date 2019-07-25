@@ -17,10 +17,10 @@ challenges, Wargames websites, CTF competitions etc.
 
 ## Flow
 
-
+![Challenge Deployment Flow](res/deployment-pipeline.png)
 
 ## Note
 
 There are a lot of features which we can have when using a git repository as the source of truth for the application.
-Beast still does not make use of all of them. There are still a few features which are still in pipline in the same context
+Beast still does not make use of all of them. There are a few features which are still in pipeline, in the same context
 you can hope to see them in future releases of beast.
