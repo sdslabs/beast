@@ -155,3 +155,34 @@ func challengeLogsHandler(c *gin.Context) {
 		})
 	}
 }
+
+func challengeInfoByFilterHandler(c *gin.Context) {
+	filter := c.Param("filter")
+	value := c.Param("value")
+	if value == "" || filter == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Filter or Value cannot be empty"),
+		})
+		return
+	}
+
+	var challenges []database.Challenge
+	var err error
+	challenges, err = database.QueryChallengeEntries(filter, value)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+	} else {
+		var resp []ChallengesByFilterResp
+		for _, challenge := range challenges {
+			r := ChallengesByFilterResp{
+				Message:    "Challenges with " + filter + " = " + value,
+				Challenges: challenge.Name,
+			}
+			resp = append(resp, r)
+		}
+
+		c.JSON(http.StatusOK, resp)
+	}
+}

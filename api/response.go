@@ -37,6 +37,11 @@ type ChallengesResp struct {
 	Challenges []string
 }
 
+type ChallengesByFilterResp struct {
+	Message    string
+	Challenges string
+}
+
 type LogsInfoResp struct {
 	Stdout string `json:"stdout" example:"[INFO] Challenge is starting to deploy"`
 	Stderr string `json:"stderr" example:"[ERROR] Challenge deployment failed."`
