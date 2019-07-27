@@ -92,36 +92,6 @@ func availableImagesHandler(c *gin.Context) {
 	})
 }
 
-// Returns available challenges.
-// @Summary Gives all challenges available in the in the database
-// @Description Returns all challenges available in the in the database
-// @Tags info
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.ChallengesResp
-// @Failure 402 {object} api.HTTPPlainResp
-// @Router /api/info/challenges/available [get]
-func challengesHandler(c *gin.Context) {
-	challenges, err := manager.GetAvailableChallenges()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: err.Error(),
-		})
-		return
-	} else if challenges == nil {
-		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "No challenges currently in the database",
-		})
-		return
-	} else {
-		c.JSON(http.StatusOK, ChallengesResp{
-			Message:    "All Challenges",
-			Challenges: challenges,
-		})
-	}
-}
-
 // Handles route related to logs handling
 // @Summary Handles route related to logs handling of container
 // @Description Gives container logs for a particular challenge, useful for debugging purposes.
@@ -156,14 +126,42 @@ func challengeLogsHandler(c *gin.Context) {
 	}
 }
 
+// Returns available challenges by filter
+// @Summary Gives all challenges available in the in the database that has a particular parameter same
+// @Description Returns all challenges available in the in the database that has a particular parameter same
+// @Tags info
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.ChallengesResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/info/challenges [get]
 func challengeInfoByFilterHandler(c *gin.Context) {
-	filter := c.Param("filter")
-	value := c.Param("value")
-	if value == "" || filter == "" {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Filter or Value cannot be empty"),
-		})
+	filter, ok := c.GetQuery("filter")
+	value, ok := c.GetQuery("value")
+
+	if !ok {
+		fmt.Println("Url Param 'key' is missing")
 		return
+	}
+
+	if value == "" || filter == "" {
+		challenges, err := manager.GetAvailableChallenges()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: err.Error(),
+			})
+			return
+		} else if challenges == nil {
+			c.JSON(http.StatusOK, HTTPPlainResp{
+				Message: "No challenges currently in the database",
+			})
+			return
+		} else {
+			c.JSON(http.StatusOK, ChallengesResp{
+				Message:    "All Challenges",
+				Challenges: challenges,
+			})
+		}
 	}
 
 	var challenges []database.Challenge
