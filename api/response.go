@@ -44,6 +44,6 @@ type LogsInfoResp struct {
 
 type ChallengeDescriptionResp struct {
 	Name   string `json:"name" example:"Web Challenge"`
-	Author string `json:"authorID" example:"2"`
+	Author string `json:"author" example:"Fristonio"`
 	Desc   string `json:"desc" example:"Challenge Description"`
 }
