@@ -172,15 +172,13 @@ func challengeInfoByFilterHandler(c *gin.Context) {
 			Message: "DATABASE ERROR while processing the request.",
 		})
 	} else {
-		var resp []ChallengesByFilterResp
+		var s []string
 		for _, challenge := range challenges {
-			r := ChallengesByFilterResp{
-				Message:    "Challenges with " + filter + " = " + value,
-				Challenges: challenge.Name,
-			}
-			resp = append(resp, r)
+			s = append(s, challenge.Name)
 		}
-
-		c.JSON(http.StatusOK, resp)
+		c.JSON(http.StatusOK, ChallengesResp{
+			Message:    "Challenges with " + filter + " = " + value,
+			Challenges: s,
+		})
 	}
 }
