@@ -68,7 +68,7 @@ func QueryAllUsers() ([]User, error) {
 }
 
 func QueryAuthorById(authorID uint) (Author, error) {
-	var author []Author
+	var author Author
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
@@ -78,7 +78,7 @@ func QueryAuthorById(authorID uint) (Author, error) {
 		return Author{}, nil
 	}
 
-	return author[0], tx.Error
+	return author, tx.Error
 }
 
 // Using the column value in key and value in value get the first
