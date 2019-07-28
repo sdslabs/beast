@@ -19,10 +19,11 @@ $ cd beastv4 && make build
 >>> Building Beast
 ```
 
-This should build beast from source in `$GOPATH/bin/beast`, you can then use this binary to run beast API server.
+This should build beast from source in `$GOPATH/bin/beast`, you can then use this binary to run beast API server. The `-n`
+flag tells beast to not use the authorization middleware.
 
 ```bash
-$ beast run -v
+$ beast run -v -n
 ```
 
 To interact with beast API server you can look at the swagger API documentation hosted on beast itself. Navigate to http://localhost:5005/api/docs/index.html to get a detail of available endpoints.
