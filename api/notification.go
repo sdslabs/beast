@@ -6,6 +6,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Adds notifications
+// @Summary Adds notifications
+// @Description Adds notifications
+// @Tags notification
+// @Accept  json
+// @Produce json
+// @Param title query string true "Title of notification to be added"
+// @Param desc query string true "Description for the notification to be added"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/notification/add [post]
 func addNotification(c *gin.Context) {
 	title := c.PostForm("title")
 	desc := c.PostForm("desc")
@@ -20,6 +31,17 @@ func addNotification(c *gin.Context) {
 	}
 }
 
+// Removes notifications
+// @Summary Removes notifications
+// @Description Removes notifications
+// @Tags notification
+// @Accept  json
+// @Produce json
+// @Param title query string true "Title of notification to be added"
+// @Param desc query string true "Description for the notification to be added"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/notification/delete [post]
 func removeNotification(c *gin.Context) {
 	title := c.PostForm("title")
 	desc := c.PostForm("desc")
@@ -34,7 +56,18 @@ func removeNotification(c *gin.Context) {
 	}
 }
 
-func updateChallenge(c *gin.Context) {
+// Updates notifications
+// @Summary Updates notifications
+// @Description Updates any changes in the notification notifications
+// @Tags notification
+// @Accept  json
+// @Produce json
+// @Param title query string true "Title of notification to be added"
+// @Param desc query string true "Description for the notification to be added"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/notification/update [post]
+func updateNotifications(c *gin.Context) {
 	title := c.PostForm("title")
 	desc := c.PostForm("desc")
 	changedTitle := c.PostForm("changedTitle")

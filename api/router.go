@@ -57,6 +57,14 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/challenges/available", availableChallengeHandler)
 		}
 
+		// Notification route group
+		notificationGroup := apiGroup.Group("/notification")
+		{
+			notificationGroup.POST("/notification/add", addNotification)
+			notificationGroup.POST("/notification/delete", removeNotification)
+			notificationGroup.POST("/notification/update", updateNotifications)
+		}
+
 		remoteGroup := apiGroup.Group("/remote", adminAuthorize)
 		{
 			remoteGroup.POST("/sync", syncBeastGitRemote)
