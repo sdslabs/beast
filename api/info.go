@@ -178,7 +178,7 @@ func challengeInfoByFilterHandler(c *gin.Context) {
 	} else {
 		var challNameString []string
 		for _, challenge := range challenges {
-			s = append(s, challenge.Name)
+			challNameString = append(challNameString, challenge.Name)
 		}
 		c.JSON(http.StatusOK, ChallengesResp{
 			Message:    "Challenges with " + filter + " = " + value,
