@@ -43,7 +43,7 @@ Once the public key is registered in the database, the user can get a JWT token 
 * You will get a response like this : 
 ``` JSON
 {
-    "token"		:	"YOUR_AUTHENTICATION_TOKEN",
+    "token"	:	"YOUR_AUTHENTICATION_TOKEN",
     "message"	:	"<Usage message>"
 }
 
