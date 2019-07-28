@@ -43,30 +43,20 @@ func availableChallengeInfoHandler(c *gin.Context) {
 		return
 	}
 
-	var challName string
-	var challDescription string
-	var challAuthorID uint
-	var challStatus string
+	var resp []AvailableChallengesDescriptionResp
 
-	if len(challenges) > 0 {
-		challName = challenges[0].Name
-		challDescription = challenges[0].Description
-		challAuthorID = challenges[0].AuthorID
-		challStatus = challenges[0].Status
-
-	} else {
-
-		challName = "Not Available"
-		challDescription = "Not Available"
-		challAuthorID = 0
-		challStatus = core.DEPLOY_STATUS["unknown"]
+	for _, challenge := range challenges {
+		r := AvailableChallengesDescriptionResp{
+			Name:     challenge.Name,
+			AuthorID: challenge.AuthorID,
+			Desc:     challenge.Description,
+			Status:	  challenge.Status,
+		}
+		resp = append(resp, r)
 	}
-	c.JSON(http.StatusOK, AvailableChallengesDescriptionResp{
-		Name:     challName,
-		AuthorID: challAuthorID,
-		Desc:     challDescription,
-		Status:	  challStatus,
-	})
+
+	c.JSON(http.StatusOK, resp)
+
 	return
 }
 
