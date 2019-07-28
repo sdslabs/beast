@@ -57,6 +57,7 @@ const (
 	DEFAULT_CPU_SHARE              int64  = (1 << 9)
 	DEFAULT_MEMORY_LIMIT           int64  = (1 << 29)
 	DEFAULT_PIDS_LIMIT             int64  = 100
+	DELIMITER                      string = "::::"
 )
 
 var (

@@ -7,6 +7,7 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author
 name = "xinetd-service"
 flag = "BACKDOOR{SERVICE_CHALLENGE_FLAG}"
 type = "service"
+hints = ["xinetd_hint_1", "xinetd_hint_2"]
 
 [challenge.env]
 apt_deps = ["gcc", "socat"]

@@ -40,11 +40,11 @@ type Challenge struct {
 	gorm.Model
 
 	Name        string `gorm:"not null;type:varchar(64);unique"`
-	Flag        string `gorm:"not null;type:varchar(64)"`
+	Flag        string `gorm:"not null;type:text"`
 	Type        string `gorm:"type:varchar(64)"`
 	Sidecar     string `gorm:"type:varchar(64)"`
-	Hint        string `gorm:"type:varchar(64)"`
-	Description string `gorm:"type:varchar(250)"`
+	Hints       string `gorm:"type:text"`
+	Description string `gorm:"type:text"`
 	Format      string `gorm:"not null"`
 	ContainerId string `gorm:"size:64;unique"`
 	ImageId     string `gorm:"size:64;unique"`
