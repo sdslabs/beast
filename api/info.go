@@ -137,10 +137,14 @@ func challengeLogsHandler(c *gin.Context) {
 // @Router /api/info/challenges [get]
 func challengeInfoByFilterHandler(c *gin.Context) {
 	filter, ok := c.GetQuery("filter")
-	value, ok := c.GetQuery("value")
+	value, okay := c.GetQuery("value")
 
 	if !ok {
-		fmt.Println("Url Param 'key' is missing")
+		fmt.Println("Url Param 'filter' is missing")
+		return
+	}
+	if !okay {
+		fmt.Println("Url Param 'value' is missing")
 		return
 	}
 
@@ -172,13 +176,13 @@ func challengeInfoByFilterHandler(c *gin.Context) {
 			Message: "DATABASE ERROR while processing the request.",
 		})
 	} else {
-		var s []string
+		var challNameString []string
 		for _, challenge := range challenges {
 			s = append(s, challenge.Name)
 		}
 		c.JSON(http.StatusOK, ChallengesResp{
 			Message:    "Challenges with " + filter + " = " + value,
-			Challenges: s,
+			Challenges: challNameString,
 		})
 	}
 }
