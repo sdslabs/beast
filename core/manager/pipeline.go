@@ -280,7 +280,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	}
 
 	// Validate challenge directory name with the name of the challenge
-	// provided in the config file for the beast. THere should be no
+	// provided in the config file for the beast. There should be no
 	// conflict in the name.
 	if challengeName != config.Challenge.Metadata.Name {
 		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)",

@@ -8,6 +8,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
 )
 
@@ -42,25 +43,29 @@ func availableChallengeInfoHandler(c *gin.Context) {
 		return
 	}
 
+	var challName string
 	var challDescription string
 	var challAuthorID uint
 	var challStatus string
 
 	if len(challenges) > 0 {
+		challName = challenges[0].Name
 		challDescription = challenges[0].Description
 		challAuthorID = challenges[0].AuthorID
 		challStatus = challenges[0].Status
 
 	} else {
+
+		challName = "Not Available"
 		challDescription = "Not Available"
 		challAuthorID = 0
 		challStatus = core.DEPLOY_STATUS["unknown"]
 	}
 	c.JSON(http.StatusOK, AvailableChallengesDescriptionResp{
-		Name:     name,
+		Name:     challName,
 		AuthorID: challAuthorID,
 		Desc:     challDescription,
-		Status:	  challStatus
+		Status:	  challStatus,
 	})
 	return
 }
