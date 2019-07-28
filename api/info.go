@@ -55,10 +55,17 @@ func challengeInfoHandler(c *gin.Context) {
 		challDescription = "Not Available"
 		challAuthorID = 0
 	}
+	challAuthor, err := database.QueryAuthorById(challAuthorID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while fetching author info.",
+		})
+		return
+	}
 	c.JSON(http.StatusOK, ChallengeDescriptionResp{
-		Name:     name,
-		AuthorID: challAuthorID,
-		Desc:     challDescription,
+		Name:   name,
+		Author: challAuthor.Name,
+		Desc:   challDescription,
 	})
 	return
 }

@@ -67,6 +67,20 @@ func QueryAllUsers() ([]User, error) {
 	return users, tx.Error
 }
 
+func QueryAuthorById(authorID uint) (Author, error) {
+	var author []Author
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.First(&author, authorID)
+	if tx.RecordNotFound() {
+		return Author{}, nil
+	}
+
+	return author[0], tx.Error
+}
+
 // Using the column value in key and value in value get the first
 // result of the query.
 func QueryFirstUserEntry(key string, value string) (User, error) {
