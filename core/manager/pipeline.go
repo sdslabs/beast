@@ -274,9 +274,11 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		return fmt.Errorf("CONFIG ERROR: %s : %s", challengeName, err)
 	}
 
-	err = config.ValidateRequiredFields(challengeDir)
-	if err != nil {
-		return fmt.Errorf("An error occured while validating the config file : %s, cannot continue with pipeline.", err)
+	if !skipStage {
+		err = config.ValidateRequiredFields(challengeDir)
+		if err != nil {
+			return fmt.Errorf("An error occured while validating the config file : %s, cannot continue with pipeline.", err)
+		}
 	}
 
 	// Validate challenge directory name with the name of the challenge
