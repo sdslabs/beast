@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 )
@@ -35,29 +34,9 @@ func challengeInfoHandler(c *gin.Context) {
 }
 
 func availableChallengeInfoHandler(c *gin.Context) {
-	challenges, err := database.QueryAllChallenges()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-
-	var resp []AvailableChallengesDescriptionResp
-
-	for _, challenge := range challenges {
-		r := AvailableChallengesDescriptionResp{
-			Name:     challenge.Name,
-			AuthorID: challenge.AuthorID,
-			Desc:     challenge.Description,
-			Status:   challenge.Status,
-		}
-		resp = append(resp, r)
-	}
-
-	c.JSON(http.StatusOK, resp)
-
-	return
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: WIP_TEXT,
+	})
 }
 
 // Returns available base images.
