@@ -7,8 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 )
 
@@ -50,7 +50,7 @@ func availableChallengeInfoHandler(c *gin.Context) {
 			Name:     challenge.Name,
 			AuthorID: challenge.AuthorID,
 			Desc:     challenge.Description,
-			Status:	  challenge.Status,
+			Status:   challenge.Status,
 		}
 		resp = append(resp, r)
 	}
