@@ -71,7 +71,7 @@ func getJWT(c *gin.Context) {
 
 	c.JSON(http.StatusOK, HTTPAuthorizeResp{
 		Token:   jwt,
-		Message: "Expires in 6 hours\nTo access APIs send the token in header as \"Authorization: Bearer <token>\"",
+		Message: "Expires in 6 hours. To access APIs send the token in header as \"Authorization: Bearer <token>\"",
 	})
 	return
 }
@@ -98,7 +98,7 @@ func getAuthChallenge(c *gin.Context) {
 
 	c.JSON(http.StatusOK, AuthorizationChallengeResp{
 		Challenge: []byte(challenge),
-		Message:   "Solve the above challenge and POST to this route to get AUTHORIZATION KEY",
+		Message:   "Solve the above challenge and POST to same route to get AUTHORIZATION KEY",
 	})
 	return
 }
