@@ -274,13 +274,15 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		return fmt.Errorf("CONFIG ERROR: %s : %s", challengeName, err)
 	}
 
-	err = config.ValidateRequiredFields(challengeDir)
-	if err != nil {
-		return fmt.Errorf("An error occured while validating the config file : %s, cannot continue with pipeline.", err)
+	if !skipStage {
+		err = config.ValidateRequiredFields(challengeDir)
+		if err != nil {
+			return fmt.Errorf("An error occured while validating the config file : %s, cannot continue with pipeline.", err)
+		}
 	}
 
 	// Validate challenge directory name with the name of the challenge
-	// provided in the config file for the beast. THere should be no
+	// provided in the config file for the beast. There should be no
 	// conflict in the name.
 	if challengeName != config.Challenge.Metadata.Name {
 		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)",
