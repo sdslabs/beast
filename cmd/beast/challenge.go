@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
@@ -16,7 +18,7 @@ import (
 var challengeCmd = &cobra.Command{
 	Use:   "challenge action [challname] [-atld]",
 	Short: "Performs action to the challs",
-	Long:  "Performs actions like : deploy, undeploy, redeploy, purge, show to the challs",
+	Long:  "Performs actions like : deploy, undeploy, redeploy, purge, to the challs",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 
@@ -30,37 +32,37 @@ var challengeCmd = &cobra.Command{
 					log.Errorf("The action was not performed due to error : %s", err.Error())
 					os.Exit(1)
 				} else {
-					log.Info("Name\t")
-					log.Info("ContainerId\t")
-					log.Info("ImageId\t")
-					log.Info("Status\n")
+					w := new(tabwriter.Writer)
+
+					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
+					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
+					fmt.Fprintln(w)
 
 					for _, challenge := range challenges {
-						log.Info("%s\t", challenge.Name)
-						log.Info("%s\t", challenge.ContainerId)
-						log.Info("%s\t", challenge.ImageId)
-						log.Info("%s\n", challenge.Status)
+						s := []string{challenge.Name, challenge.ContainerId, challenge.ImageId, challenge.Status}
+						fmt.Fprintln(w, strings.Join(s, "\t"))
 					}
+
+					w.Flush()
 				}
 			} else if Tag != "" {
-				// challenges, err := database.QueryRelatedChallenges(Tag)
-				// if err != nil {
-				// 	log.Errorf("The action was not performed due to error : %s", err.Error())
-				// 	os.Exit(1)
-				// } else {
-				// log.Info("Name\t")
-				// log.Info("ContainerId\t")
-				// log.Info("ImageId\t")
-				// log.Info("Status\n")
+				//t := newTag(Tag) (how to create new tag??)
+				//challenges, err := database.QueryRelatedChallenges(t)
+				if err != nil {
+					log.Errorf("The action was not performed due to error : %s", err.Error())
+					os.Exit(1)
+				} else {
+					w := new(tabwriter.Writer)
 
-				// for _, challenge := range challenges {
-				// log.Info("%s\t", challenge.Name)
-				// log.Info("%s\t", challenge.ContainerId)
-				// log.Info("%s\t", challenge.ImageId)
-				// log.Info("%s\n", challenge.Status)
-				// }
-				// }
-				log.Info("Tag query")
+					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
+					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
+					fmt.Fprintln(w)
+
+					for _, challenge := range challenges {
+						s := []string{challenge.Name, challenge.ContainerId, challenge.ImageId, challenge.Status}
+						fmt.Fprintln(w, strings.Join(s, "\t"))
+					}
+				}
 			} else {
 				if len(args) == 1 {
 					log.Errorf("Provide chall name")
@@ -73,21 +75,14 @@ var challengeCmd = &cobra.Command{
 					os.Exit(1)
 				}
 
-				var challName string
-				var challContainerId string
-				var challImageId string
-				var challStatus string
-
 				if len(challenge) > 0 {
-					challName = args[1]
-					challContainerId = challenge[0].ContainerId
-					challImageId = challenge[0].ImageId
-					challStatus = challenge[0].Status
+					w := new(tabwriter.Writer)
+					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
+					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
 
-					log.Info("Name       :%s", challName)
-					log.Info("ContainerId:%s", challContainerId)
-					log.Info("ImageId    :%s", challImageId)
-					log.Info("Status     :%s", challStatus)
+					s := []string{args[1], challenge[0].ContainerId, challenge[0].ImageId, challenge[0].Status}
+					fmt.Fprintln(w, strings.Join(s, "\t"))
+					w.Flush()
 
 				} else {
 					log.Errorf("Provide valid chall name")
