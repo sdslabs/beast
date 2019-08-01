@@ -71,6 +71,7 @@ var DEPLOY_STATUS = map[string]string{
 	"deploying":  "Deploying",
 	"deployed":   "Deployed",
 	"building":   "Building",
+	"queued":     "Queued",
 }
 
 const MYSQL_SIDECAR_HOST = "mysql"
