@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
@@ -15,7 +16,7 @@ import (
 var challengeCmd = &cobra.Command{
 	Use:   "challenge action [challname] [-atld]",
 	Short: "Performs action to the challs",
-	Long:  "Performs actions like : deploy, undeploy, redeploy, purge to the challs",
+	Long:  "Performs actions like : deploy, undeploy, redeploy, purge, show to the challs",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 
@@ -24,11 +25,78 @@ var challengeCmd = &cobra.Command{
 		if action == core.MANAGE_ACTION_SHOW {
 
 			if AllChalls {
-				
-			}
-		}
+				challenges, err := database.QueryAllChallenges()
+				if err != nil {
+					log.Errorf("The action was not performed due to error : %s", err.Error())
+					os.Exit(1)
+				} else {
+					log.Info("Name\t")
+					log.Info("AuthorID\t")
+					log.Info("Description\t")
+					log.Info("Status\n")
 
-		else {
+					for _, challenge := range challenges {
+						log.Info("%s\t", challenge.Name)
+						log.Info("%s\t", challenge.AuthorID)
+						log.Info("%s\t", challenge.Description)
+						log.Info("%s\n", challenge.Status)
+					}
+				}
+			} else if Tag != "" {
+				// challenges, err := database.QueryRelatedChallenges(Tag)
+				// if err != nil {
+				// 	log.Errorf("The action was not performed due to error : %s", err.Error())
+				// 	os.Exit(1)
+				// } else {
+				// 	log.Info("Name\t")
+				// 	log.Info("AuthorID\t")
+				// 	log.Info("Description\t")
+				// 	log.Info("Status\n")
+
+				// 	for _, challenge := range challenges {
+				// 		log.Info("%s\t", challenge.Name)
+				// 		log.Info("%s\t", challenge.AuthorID)
+				// 		log.Info("%s\t", challenge.Description)
+				// 		log.Info("%s\n", challenge.Status)
+				// 	}
+				// }
+				log.Info("Tag query")
+			} else {
+				if len(args) == 1 {
+					log.Errorf("Provide chall name")
+					os.Exit(1)
+				}
+
+				challenge, err := database.QueryChallengeEntries("name", args[1])
+				if err != nil {
+					log.Errorf("The action was not performed due to error : %s", err.Error())
+					os.Exit(1)
+				}
+
+				var challName string
+				var challAuthorID uint
+				var challDescription string
+				var challStatus string
+
+				if len(challenge) > 0 {
+					challName = args[1]
+					challDescription = challenge[0].Description
+					challAuthorID = challenge[0].AuthorID
+					challStatus = challenge[0].Status
+
+					log.Info("Name       :%s", challName)
+					log.Info("AuthorID   :%s", challAuthorID)
+					log.Info("Description:%s", challDescription)
+					log.Info("Status     :%s", challStatus)
+
+				} else {
+					log.Errorf("Provide valid chall name")
+					os.Exit(1)
+				}
+
+			}
+
+		} else {
 
 			challAction, ok := manager.ChallengeActionHandlers[action]
 			if !ok {
