@@ -31,14 +31,14 @@ var challengeCmd = &cobra.Command{
 					os.Exit(1)
 				} else {
 					log.Info("Name\t")
-					log.Info("AuthorID\t")
-					log.Info("Description\t")
+					log.Info("ContainerId\t")
+					log.Info("ImageId\t")
 					log.Info("Status\n")
 
 					for _, challenge := range challenges {
 						log.Info("%s\t", challenge.Name)
-						log.Info("%s\t", challenge.AuthorID)
-						log.Info("%s\t", challenge.Description)
+						log.Info("%s\t", challenge.ContainerId)
+						log.Info("%s\t", challenge.ImageId)
 						log.Info("%s\n", challenge.Status)
 					}
 				}
@@ -48,17 +48,17 @@ var challengeCmd = &cobra.Command{
 				// 	log.Errorf("The action was not performed due to error : %s", err.Error())
 				// 	os.Exit(1)
 				// } else {
-				// 	log.Info("Name\t")
-				// 	log.Info("AuthorID\t")
-				// 	log.Info("Description\t")
-				// 	log.Info("Status\n")
+				// log.Info("Name\t")
+				// log.Info("ContainerId\t")
+				// log.Info("ImageId\t")
+				// log.Info("Status\n")
 
-				// 	for _, challenge := range challenges {
-				// 		log.Info("%s\t", challenge.Name)
-				// 		log.Info("%s\t", challenge.AuthorID)
-				// 		log.Info("%s\t", challenge.Description)
-				// 		log.Info("%s\n", challenge.Status)
-				// 	}
+				// for _, challenge := range challenges {
+				// log.Info("%s\t", challenge.Name)
+				// log.Info("%s\t", challenge.ContainerId)
+				// log.Info("%s\t", challenge.ImageId)
+				// log.Info("%s\n", challenge.Status)
+				// }
 				// }
 				log.Info("Tag query")
 			} else {
@@ -74,19 +74,19 @@ var challengeCmd = &cobra.Command{
 				}
 
 				var challName string
-				var challAuthorID uint
-				var challDescription string
+				var challContainerId string
+				var challImageId string
 				var challStatus string
 
 				if len(challenge) > 0 {
 					challName = args[1]
-					challDescription = challenge[0].Description
-					challAuthorID = challenge[0].AuthorID
+					challContainerId = challenge[0].ContainerId
+					challImageId = challenge[0].ImageId
 					challStatus = challenge[0].Status
 
 					log.Info("Name       :%s", challName)
-					log.Info("AuthorID   :%s", challAuthorID)
-					log.Info("Description:%s", challDescription)
+					log.Info("ContainerId:%s", challContainerId)
+					log.Info("ImageId    :%s", challImageId)
 					log.Info("Status     :%s", challStatus)
 
 				} else {
