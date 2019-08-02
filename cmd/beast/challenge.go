@@ -33,10 +33,11 @@ var challengeCmd = &cobra.Command{
 					os.Exit(1)
 				} else {
 					w := new(tabwriter.Writer)
-
+					line := strings.Repeat("-", 180)
 					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
 					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
-					fmt.Fprintln(w)
+					w.Flush()
+					fmt.Println(line)
 
 					for _, challenge := range challenges {
 						s := []string{challenge.Name, challenge.ContainerId, challenge.ImageId, challenge.Status}
@@ -46,8 +47,10 @@ var challengeCmd = &cobra.Command{
 					w.Flush()
 				}
 			} else if Tag != "" {
-				//t := newTag(Tag) (how to create new tag??)
-				//challenges, err := database.QueryRelatedChallenges(t)
+				tagEntry := &database.Tag{
+					TagName: Tag,
+				}
+				challenges, err := database.QueryRelatedChallenges(tagEntry)
 				if err != nil {
 					log.Errorf("The action was not performed due to error : %s", err.Error())
 					os.Exit(1)
@@ -55,13 +58,17 @@ var challengeCmd = &cobra.Command{
 					w := new(tabwriter.Writer)
 
 					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
+					line := strings.Repeat("-", 180)
 					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
-					fmt.Fprintln(w)
+					w.Flush()
+					fmt.Println(line)
 
 					for _, challenge := range challenges {
 						s := []string{challenge.Name, challenge.ContainerId, challenge.ImageId, challenge.Status}
 						fmt.Fprintln(w, strings.Join(s, "\t"))
 					}
+
+					w.Flush()
 				}
 			} else {
 				if len(args) == 1 {
@@ -78,7 +85,10 @@ var challengeCmd = &cobra.Command{
 				if len(challenge) > 0 {
 					w := new(tabwriter.Writer)
 					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
+					line := strings.Repeat("-", 180)
 					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
+					w.Flush()
+					fmt.Println(line)
 
 					s := []string{args[1], challenge[0].ContainerId, challenge[0].ImageId, challenge[0].Status}
 					fmt.Fprintln(w, strings.Join(s, "\t"))
