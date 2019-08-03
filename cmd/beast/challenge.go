@@ -35,13 +35,25 @@ var challengeCmd = &cobra.Command{
 					w := new(tabwriter.Writer)
 					line := strings.Repeat("-", 180)
 					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
+					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
 					w.Flush()
 					fmt.Println(line)
 
 					for _, challenge := range challenges {
-						s := []string{challenge.Name, challenge.ContainerId, challenge.ImageId, challenge.Status}
-						fmt.Fprintln(w, strings.Join(s, "\t"))
+
+						s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
+						fmt.Fprint(w, strings.Join(s, "\t"))
+						fmt.Fprint(w, "\t")
+						ports, err := database.GetAllocatedPorts(challenge)
+						if err != nil {
+							log.Errorf("The action was not performed due to error : %s", err.Error())
+							os.Exit(1)
+						}
+
+						for _, port := range ports {
+							fmt.Fprint(w, " ", port.PortNo)
+						}
+						fmt.Fprintln(w)
 					}
 
 					w.Flush()
@@ -59,13 +71,24 @@ var challengeCmd = &cobra.Command{
 
 					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
 					line := strings.Repeat("-", 180)
-					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
+					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
 					w.Flush()
 					fmt.Println(line)
 
 					for _, challenge := range challenges {
-						s := []string{challenge.Name, challenge.ContainerId, challenge.ImageId, challenge.Status}
-						fmt.Fprintln(w, strings.Join(s, "\t"))
+						s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
+						fmt.Fprint(w, strings.Join(s, "\t"))
+						fmt.Fprint(w, "\t")
+						ports, err := database.GetAllocatedPorts(challenge)
+						if err != nil {
+							log.Errorf("The action was not performed due to error : %s", err.Error())
+							os.Exit(1)
+						}
+
+						for _, port := range ports {
+							fmt.Fprint(w, " ", port.PortNo)
+						}
+						fmt.Fprintln(w)
 					}
 
 					w.Flush()
@@ -86,12 +109,23 @@ var challengeCmd = &cobra.Command{
 					w := new(tabwriter.Writer)
 					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
 					line := strings.Repeat("-", 180)
-					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus")
+					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
 					w.Flush()
 					fmt.Println(line)
 
-					s := []string{args[1], challenge[0].ContainerId, challenge[0].ImageId, challenge[0].Status}
-					fmt.Fprintln(w, strings.Join(s, "\t"))
+					s := []string{args[1], challenge[0].ContainerId[0:7], challenge[0].ImageId[0:7], challenge[0].Status}
+					fmt.Fprint(w, strings.Join(s, "\t"))
+					fmt.Fprint(w, "\t")
+					ports, err := database.GetAllocatedPorts(challenge[0])
+					if err != nil {
+						log.Errorf("The action was not performed due to error : %s", err.Error())
+						os.Exit(1)
+					}
+
+					for _, port := range ports {
+						fmt.Fprint(w, " ", port.PortNo)
+					}
+					fmt.Fprintln(w)
 					w.Flush()
 
 				} else {
