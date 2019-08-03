@@ -2,6 +2,8 @@
 
 > Beast is an automatic deployment and management tool for CTF challenges hosted on backdoor.sdslabs.co
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/bea0e0b4-30e1-4830-ba98-e484b51e4036/deploy-status)](https://app.netlify.com/sites/beast-docs-sdslabs/deploys)    [![Build Status](https://dev.azure.com/deepshpathak/deepshpathak/_apis/build/status/sdslabs.beastv4?branchName=master)](https://dev.azure.com/deepshpathak/deepshpathak/_build/latest?definitionId=1&branchName=master)    [![Apache License](https://img.shields.io/badge/license-Apache-blue.svg)](https://github.com/sdslabs/beastv4/blob/master/LICENSE.md)
+
 ## Development
 
 Beast go version is under development, follow the below instructions to get started.
@@ -64,13 +66,14 @@ To run the API server for beast use command `beast run -v`
 	* Inside package `manager` lives the code relating to all the core functionality that beast provides.
 	* It also contains database wrapper using gorm for beast.
 
-* **git**
-	* Git functions wrapper provider for beast functions.
-
 * **pkg**
 	* Contains library code which can be used by external applications also.
-	* **cr** : Container Runtime wrapper for beast container API provider
-	* **notify** : Package implementing notification functionality for beast, this includes slack notifications.
+	* **cr**
+	* **notify**
+	* **git**
+	* **scheduler**
+	* **probes**
+	* **workerpool**
 
 * **templates**
 	* Tempaltes used by beast.
@@ -128,7 +131,7 @@ The documentation for the project lies in [/docs](/docs). We use `mkdocs` to aut
 ```bash
 $ virtualenv venv && source venv/bin/activate
 
-$ pip install -r requirements-dev.txt
+$ pip install -r requirements.txt
 
 $ mkdocs serve
 

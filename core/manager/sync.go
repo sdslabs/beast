@@ -15,6 +15,7 @@ import (
 
 // Sync the beast remote directory with the actual git repository.
 func SyncBeastRemote() error {
+	log.Info("Syncing local challenge repository with remote.")
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
 	remote := filepath.Join(beastRemoteDir, config.Cfg.GitRemote.RemoteName)
 

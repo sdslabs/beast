@@ -1,13 +1,20 @@
 package auth
 
 import (
+	"bytes"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"html/template"
 	"io/ioutil"
+	"path/filepath"
 
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/templates"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -65,4 +72,39 @@ func ParsePrivateKey(keyFile string) (*rsa.PrivateKey, error) {
 	}
 
 	return key, nil
+}
+
+// This function disables the SSH based container access to all the current users
+func DisableAuthorSSH() {
+	authors, err := database.QueryAllAuthors()
+	if err != nil {
+		log.Errorf("DB ERROR : %v", err)
+		return
+	}
+	for _, author := range authors {
+		SHA256 := sha256.New()
+		SHA256.Write([]byte(author.Email))
+		scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
+
+		data := database.ScriptFile{
+			Author: author.Name,
+		}
+
+		var script bytes.Buffer
+		scriptTemplate, err := template.New("script").Parse(templates.SSH_RESTRICT_LOGIN_SCRIPT_TEMPLATE)
+		if err != nil {
+			log.Errorf("Error while parsing script template :: %v", err)
+			continue
+		}
+
+		if err = scriptTemplate.Execute(&script, data); err != nil {
+			log.Errorf("Error while executing script template :: %v", err)
+			continue
+		}
+
+		if err = ioutil.WriteFile(scriptPath, script.Bytes(), 0755); err != nil {
+			log.Errorf("Error while writing to the script file :: %v", err)
+			continue
+		}
+	}
 }

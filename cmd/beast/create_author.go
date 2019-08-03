@@ -28,6 +28,7 @@ var createAuthorCmd = &cobra.Command{
 			os.Exit(1)
 		}
 	},
+
 	Run: func(cmd *cobra.Command, args []string) {
 		utils.CreateAuthor(Name, Email, PublicKeyPath)
 	},

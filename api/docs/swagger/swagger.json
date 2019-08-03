@@ -48,6 +48,37 @@
                 }
             }
         },
+        "/api/info/challenges/available": {
+            "get": {
+                "description": "Returns all challenges available in the in the database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Gives all challenges available in the in the database",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.ChallengesResp"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
         "/api/info/images/available": {
             "get": {
                 "description": "Returns all the available base images  which can be used for challenge creation as the base OS for challenge.",
@@ -68,12 +99,43 @@
                             "type": "object",
                             "$ref": "#/definitions/api.AvailableImagesResp"
                         }
-                    },
-                    "402": {
-                        "description": "Payment Required",
+                    }
+                }
+            }
+        },
+        "/api/info/logs/": {
+            "get": {
+                "description": "Gives container logs for a particular challenge, useful for debugging purposes.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Handles route related to logs handling of container",
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "type": "object",
-                            "$ref": "#/definitions/api.AvailableImagesResp"
+                            "$ref": "#/definitions/api.LogsInfoResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -98,53 +160,6 @@
                         "schema": {
                             "type": "object",
                             "$ref": "#/definitions/api.PortsInUseResp"
-                        }
-                    },
-                    "402": {
-                        "description": "Payment Required",
-                        "schema": {
-                            "type": "object",
-                            "$ref": "#/definitions/api.PortsInUseResp"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/manage/all/": {
-            "post": {
-                "description": "Handles challenge management routes for all the challenges with actions which includes - DEPLOY, UNDEPLOY.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "manage"
-                ],
-                "summary": "Handles challenge management actions for multiple(all) challenges.",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Action for the challenge",
-                        "name": "action",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "$ref": "#/definitions/api.HTTPPlainResp"
-                        }
-                    },
-                    "402": {
-                        "description": "Payment Required",
-                        "schema": {
-                            "type": "object",
-                            "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     }
                 }
@@ -187,11 +202,44 @@
                             "$ref": "#/definitions/api.HTTPPlainResp"
                         }
                     },
-                    "402": {
-                        "description": "Payment Required",
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "type": "object",
                             "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/commit/": {
+            "post": {
+                "description": "Validates challenge configuration for deployment.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Validates the configuration of the challenge and tells if challenge can be deployed or not.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the challenge to verify the deployment configuration for.",
+                        "name": "challenge",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPErrorResp"
                         }
                     }
                 }
@@ -233,6 +281,123 @@
                             "type": "object",
                             "$ref": "#/definitions/api.HTTPPlainResp"
                         }
+                    },
+                    "406": {
+                        "description": "Not Acceptable",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/multiple/": {
+            "post": {
+                "description": "Handles challenge management routes for multiple the challenges with actions which includes - DEPLOY, UNDEPLOY.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Handles challenge management actions for multiple challenges.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Action for the challenge",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tag for a group of challenges",
+                        "name": "tag",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/schedule/": {
+            "post": {
+                "description": "Handles scheduleing of challenge action to executed at some later point of time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Schedule an action(deploy, undeploy, purge etc.) on a particular challenge",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Action for the underlying challenge in context",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "The name of the challenge to schedule the action for.",
+                        "name": "challenge",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tag corresponding to challenges in context, optional if challenge name is provided",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Timestamp at which the challenge should be scheduled should be a unix timestamp string.",
+                        "name": "at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Time after which the action on the selector should be executed should be of duration format as in '1m20s' etc.",
+                        "name": "after",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
                     }
                 }
             }
@@ -250,6 +415,15 @@
                     "manage"
                 ],
                 "summary": "Handles route related to beast static content serving container, takes action as route parameter and perform that action",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Action to apply on the beast static content provider",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -483,8 +657,13 @@
             "type": "object",
             "properties": {
                 "challenge": {
-                    "type": "string",
-                    "example": "Challenge String"
+                    "type": "array",
+                    "items": {
+                        "type": "byte"
+                    },
+                    "example": [
+                        "Challenge String"
+                    ]
                 },
                 "message": {
                     "type": "string",
@@ -528,6 +707,20 @@
                 }
             }
         },
+        "api.ChallengesResp": {
+            "type": "object",
+            "properties": {
+                "challenges": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "api.HTTPAuthorizeResp": {
             "type": "object",
             "properties": {
@@ -541,12 +734,34 @@
                 }
             }
         },
+        "api.HTTPErrorResp": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Error occured while veifying the challenge."
+                }
+            }
+        },
         "api.HTTPPlainResp": {
             "type": "object",
             "properties": {
                 "message": {
                     "type": "string",
                     "example": "Messsage in response to your request"
+                }
+            }
+        },
+        "api.LogsInfoResp": {
+            "type": "object",
+            "properties": {
+                "stderr": {
+                    "type": "string",
+                    "example": "[ERROR] Challenge deployment failed."
+                },
+                "stdout": {
+                    "type": "string",
+                    "example": "[INFO] Challenge is starting to deploy"
                 }
             }
         },
@@ -574,6 +789,13 @@
                     ]
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }

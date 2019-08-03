@@ -12,13 +12,15 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
-	"github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/pkg/scheduler"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 )
 
 const (
 	DEFAULT_BEAST_PORT = ":5005"
 )
+
+var BeastScheduler scheduler.Scheduler = scheduler.NewScheduler()
 
 func runBeastApiBootsteps() error {
 	manager.RunBeastBootsetps()
@@ -44,7 +46,7 @@ func runBeastApiBootsteps() error {
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port string, healthProbe bool) {
+func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
 	log.Info("Bootstrapping Beast API server")
 	if port != "" {
 		port = ":" + port
@@ -52,7 +54,7 @@ func RunBeastApiServer(port string, healthProbe bool) {
 		port = DEFAULT_BEAST_PORT
 	}
 
-	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE)
+	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
 	manager.Q.StartWorkers(&manager.Worker{})
 
 	runBeastApiBootsteps()
@@ -66,19 +68,27 @@ func RunBeastApiServer(port string, healthProbe bool) {
 
 	router.GET("/api/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": WELCOME_TEXT,
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: WELCOME_TEXT,
 		})
 	})
 
 	router.GET("/help", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": HELP_TEXT,
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: HELP_TEXT,
 		})
 	})
 
+	log.Info("Starting beast scheduler")
+	BeastScheduler.Start()
+
+	if periodicSync {
+		log.Infof("Scheduling periodic remote sync for beast with period: %v", config.Cfg.RemoteSyncPeriod)
+		BeastScheduler.ScheduleEvery(config.Cfg.RemoteSyncPeriod, manager.SyncBeastRemote)
+	}
+
 	if healthProbe {
-		go utils.ChallengesHealthTicker(config.Cfg.TickerFrequency)
+		go manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
 	}
 
 	router.Run(port)

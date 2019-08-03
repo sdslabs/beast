@@ -3,6 +3,7 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var (
@@ -11,6 +12,7 @@ var (
 )
 
 const (
+	BEAST_LOCAL_SERVER             string = "BEAST_LOCAL_SERVER"
 	CHALLENGE_CONFIG_FILE_NAME     string = "beast.toml"
 	BEAST_CONFIG_FILE_NAME         string = "config.toml"
 	DEFAULT_CHALLENGE_NAME         string = "Backdoor-Challenge"
@@ -49,6 +51,17 @@ const (
 	MANAGE_ACTION_REDEPLOY         string = "redeploy"
 	MAX_QUEUE_SIZE                 uint32 = 100
 	DEFAULT_TICKER_FREQUENCY       int    = 1500
+	DEFAULT_PROBE_TIMEOUT          int    = 10
+	DEFAULT_USER_NAME              string = "ghost"
+	DEFAULT_USER_EMAIL             string = "ghost@ghost.com"
+	DEFAULT_CPU_SHARE              int64  = (1 << 9)
+	DEFAULT_MEMORY_LIMIT           int64  = (1 << 29)
+	DEFAULT_PIDS_LIMIT             int64  = 100
+	DELIMITER                      string = "::::"
+)
+
+var (
+	DEFAULT_REMOTE_PERIODIC_SYNC_TIME = time.Second * 120
 )
 
 var DEPLOY_STATUS = map[string]string{

@@ -40,16 +40,17 @@ type Challenge struct {
 	gorm.Model
 
 	Name        string `gorm:"not null;type:varchar(64);unique"`
-	Flag        string `gorm:"not null;type:varchar(64)"`
+	Flag        string `gorm:"not null;type:text"`
 	Type        string `gorm:"type:varchar(64)"`
 	Sidecar     string `gorm:"type:varchar(64)"`
-	Hint        string `gorm:"type:varchar(64)"`
-	Description string `gorm:"type:varchar(250)"`
+	Hints       string `gorm:"type:text"`
+	Description string `gorm:"type:text"`
 	Format      string `gorm:"not null"`
 	ContainerId string `gorm:"size:64;unique"`
 	ImageId     string `gorm:"size:64;unique"`
 	Status      string `gorm:"not null;default:'Unknown'"`
 	AuthorID    uint   `gorm:"not null"`
+	HealthCheck uint   `gorm:"not null;default:1"`
 	Ports       []Port
 	Tags        []*Tag `gorm:"many2many:tag_challenges;"`
 }
@@ -196,6 +197,24 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	}
 
 	return tags, nil
+}
+
+func DeleteChallengeEntry(challenge *Challenge) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+
+	if tx.Error != nil {
+		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
+	}
+
+	if err := tx.Unscoped().Delete(challenge).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
 }
 
 //hook after update of challenge

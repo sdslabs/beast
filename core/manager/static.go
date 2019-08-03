@@ -8,6 +8,7 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	coreutils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/utils"
@@ -100,9 +101,8 @@ func UndeployStaticContentContainer() {
 }
 
 // Deploy a static challenge
-func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig) {
+func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *database.Challenge, challengeDir string) {
 	log.Infof("Starting static challenge deploy pipeline")
-	challengeDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, cfg.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challConf.Challenge.Metadata.Name)
 	challengeStagingRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challConf.Challenge.Metadata.Name)
 	challengeStagingDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
 
@@ -119,9 +119,11 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig) {
 
 	err = utils.CopyDirectory(challengeDir, challengeStagingDir)
 	if err != nil {
-		log.Errorf("Error while copying the staging directory: %s", err)
+		log.Errorf("Error while copying to the staging directory: %s", err)
 	} else {
 		log.Infof("Challenge %s has been deployed as a static challenge", challConf.Challenge.Metadata.Name)
+
+		database.UpdateChallenge(challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["deployed"]})
 
 		configFile := filepath.Join(challengeStagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
 		err = os.Rename(configFile, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))

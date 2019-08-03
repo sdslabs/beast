@@ -33,6 +33,13 @@ var Q *wpool.Queue
 type Worker struct {
 }
 
+var ChallengeActionHandlers = map[string]func(string) error{
+	core.MANAGE_ACTION_DEPLOY:   DeployChallenge,
+	core.MANAGE_ACTION_UNDEPLOY: UndeployChallenge,
+	core.MANAGE_ACTION_REDEPLOY: RedeployChallenge,
+	core.MANAGE_ACTION_PURGE:    PurgeChallenge,
+}
+
 // Function which commits the deployed challenge provided
 func CommitChallengeContainer(challName string) error {
 	log.Debug("Starting to commit the chall : %s", challName)
@@ -219,6 +226,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
 		challengeDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
 
+		/// TODO : remove multiple validation while deploying challenge
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
 			return nil, errors.New("CHALLENGE VALIDATION ERROR")
@@ -256,53 +264,52 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	}
 }
 
-// Deploy multiple challenges simultaneously.
+// Handle multiple challenges simultaneously.
 // When we have multiple challenges we spawn X goroutines and distribute
-// deployments in those goroutines. The wpool.Task for these wpool.Worker goroutines is specified
-// in deployList, which contains the name of the challenges to be deployed.
-func DeployMultipleChallenges(deployList []string, userId string) []string {
-	deployList = utils.GetUniqueStrings(deployList)
-	log.Infof("Starting deploy for the following challenge list : %v", deployList)
+// deployments in those goroutines. The work for these worker goroutines is specified
+// in list, which contains the name of the challenges.
+func handleMultipleChallenges(list []string, action string) []string {
+	list = utils.GetUniqueStrings(list)
+	log.Infof("Starting %s for the following challenge list : %v", action, list)
+
+	if len(list) == 0 {
+		return []string{"EMPTY LIST"}
+	}
 
 	errstrings := []string{}
 
-	for _, chall := range deployList {
-		log.Infof("Starting to push %s challenge to deploy queue", chall)
-		// TODO: Discuss if to make this challenge force redeploy or not.
-		challEntry, error := database.QueryFirstChallengeEntry("name", chall)
-		if error != nil {
-			log.Infof("Error while getting challenge ID")
-		}
-		TransactionEntry := database.Transaction{
-			Action:      core.MANAGE_ACTION_DEPLOY,
-			UserId:      userId,
-			ChallengeID: challEntry.ID,
-		}
+	challAction, ok := ChallengeActionHandlers[action]
 
-		tran := database.SaveTransaction(&TransactionEntry)
-		if tran != nil {
-			log.Infof("Error while saving transaction : %s ", tran)
-		}
-		err := DeployChallenge(chall)
+	if !ok {
+		return []string{"ACTION NOT IN LIST"}
+	}
+
+	for _, chall := range list {
+
+		log.Infof("Starting to push %s challenge to queue", chall)
+
+		err := challAction(chall)
+
 		if err != nil {
-			log.Errorf("Cannot start deploy for challenge : %s due to : %s", chall, err)
-
-			errstrings = append(errstrings, err.Error())
+			log.Errorf("Cannot start %s for challenge : %s due to : %s", action, chall, err)
+			errstrings = append(errstrings, fmt.Sprintf("%s : %s", chall, err.Error()))
 			continue
 		}
-
-		log.Infof("Started deploy for challenge : %s", chall)
+		log.Infof("Started %s for challenge : %s", action, chall)
 	}
 	return errstrings
 }
 
-// Deploy tag related challenges.
-func DeployTagRelatedChallenges(tag string, userId string) []string {
-	log.Infof("Trying request to deploy CHALLENGES related to %s", tag)
+// Handle tag related challenges.
+func HandleTagRelatedChallenges(action string, tag string, user string) []string {
+	log.Infof("Trying request to %s CHALLENGES related to %s", action, tag)
 
 	tagEntry := &database.Tag{
 		TagName: tag,
 	}
+
+	// TODO: Why are we creating tag entry here, if there does not
+	// exist the provided tag, simply skip doing anything.
 	err := database.QueryOrCreateTagEntry(tagEntry)
 	if err != nil {
 		return []string{fmt.Sprintf("DATABASE_ERROR")}
@@ -313,20 +320,43 @@ func DeployTagRelatedChallenges(tag string, userId string) []string {
 		return []string{fmt.Sprintf("DATABASE_ERROR")}
 	}
 
-	challNames := make([]string, len(challs))
+	var challsNameList []string
 
-	for i := range challs {
-		challNames[i] = challs[i].Name
+	err = appendAndSaveTransaction(&challs, &challsNameList, action, user)
+	if err != nil {
+		return []string{err.Error()}
 	}
 
-	return DeployMultipleChallenges(challNames, userId)
+	return handleMultipleChallenges(challsNameList, action)
 }
 
-// Deploy all challenges.
-func DeployAll(sync bool, userId string) []string {
+func appendAndSaveTransaction(challs *[]database.Challenge, challsNameList *[]string, action string, user string) error {
+	author, err := database.QueryFirstAuthorEntry("name", user)
+	if err != nil {
+		return err
+	}
 
-	log.Infof("Got request to deploy ALL CHALLENGES")
-	if sync {
+	for _, chall := range *challs {
+		*challsNameList = append(*challsNameList, chall.Name)
+		TransactionEntry := database.Transaction{
+			Action:      action,
+			AuthorID:    author.ID,
+			ChallengeID: chall.ID,
+		}
+
+		tran := database.SaveTransaction(&TransactionEntry)
+		if tran != nil {
+			log.Infof("Error while saving transaction : %s ", tran)
+		}
+	}
+	return nil
+}
+
+// Handle all challenges.
+func HandleAll(action string, user string) []string {
+	log.Infof("Got request to %s ALL CHALLENGES", action)
+
+	if action == core.MANAGE_ACTION_DEPLOY {
 		err := SyncBeastRemote()
 		if err != nil {
 			// A hack for go-git which returns error when the git repo
@@ -336,23 +366,57 @@ func DeployAll(sync bool, userId string) []string {
 				return []string{fmt.Sprintf("GIT_REMOTE_SYNC_ERROR")}
 			}
 		}
-
 		log.Debugf("Sync for beast remote done for DEPLOY_ALL")
 	}
 
-	challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-	err, challenges := utils.GetDirsInDir(challengesDirRoot)
-	if err != nil {
-		log.Errorf("DEPLOY_ALL : Error while getting available challenges : %s", err)
-		return []string{fmt.Sprintf("DIRECTORY_ACCESS_ERROR")}
-	}
-
 	var challsNameList []string
-	for _, chall := range challenges {
-		challsNameList = append(challsNameList, chall)
+	var err error
+
+	switch action {
+	case core.MANAGE_ACTION_DEPLOY:
+		challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+		err, challenges := utils.GetDirsInDir(challengesDirRoot)
+		if err != nil {
+			break
+		}
+		for _, chall := range challenges {
+			//TODO : challenge transaction save for deploying is not done since ID is not provided here
+			challsNameList = append(challsNameList, chall)
+		}
+
+	case core.MANAGE_ACTION_UNDEPLOY:
+		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
+			"Status": core.DEPLOY_STATUS["deployed"],
+		})
+		if err != nil {
+			break
+		}
+
+		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
+
+	case core.MANAGE_ACTION_REDEPLOY:
+		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
+			"Status": core.DEPLOY_STATUS["deployed"],
+		})
+		if err != nil {
+			break
+		}
+
+		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
+
+	case core.MANAGE_ACTION_PURGE:
+		challenges, err := database.QueryAllChallenges()
+		if err != nil {
+			break
+		}
+
+		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 	}
 
-	return DeployMultipleChallenges(challsNameList, userId)
+	if err != nil {
+		return []string{fmt.Sprintf("ACCESS_ERROR : %s", err.Error())}
+	}
+	return handleMultipleChallenges(challsNameList, action)
 }
 
 // Unstage a challenge based on the challenge name.
@@ -426,7 +490,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 	// If purge is true then first cleanup the challenge image and container
 	// and then remove the challenge from the staging directory.
 	if purge {
-		configFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName, core.CHALLENGE_CONFIG_FILE_NAME)
+		configFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.CHALLENGE_CONFIG_FILE_NAME)
 		var cfg config.BeastChallengeConfig
 		_, err = toml.DecodeFile(configFile, &cfg)
 		if err != nil {

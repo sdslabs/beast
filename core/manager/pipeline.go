@@ -75,7 +75,6 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
 	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir, filepath.Join(contextDir, core.HIDDEN)})
-
 	if err != nil {
 		return err
 	}
@@ -118,12 +117,13 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
 	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
 	if err != nil || buff == nil {
-		log.Errorf("Could not validate challenge logs directory : %s : %s", challengeStagingLogsDir, err)
+		log.Errorf("Could not create challenge logs directory : %s : %s", challengeStagingLogsDir, err)
 	} else {
 		logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
 		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 		if err != nil {
 			log.Errorf("Error while writing logs to file : %s", logFilePath)
+			return fmt.Errorf("Error logs generated on image build failure could not be written to the logfile")
 		}
 		defer logFile.Close()
 
@@ -137,7 +137,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	if imageId == "" {
-		log.Error("Could not figure out the ImageID for the commited challenge")
+		log.Error("Error while creating image logs written to the logfile")
 		return fmt.Errorf("Error while getting imageId for the commited challenge")
 	}
 
@@ -161,6 +161,13 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	return nil
 }
 
+// Deploy the challenge as a docker container from the image built
+// This function first collects the environment variables and
+// container config including ports, networks, resource limitations needed to spawn the container,
+// then it creates the container and finally the challenge is deployed
+//
+// This function assumes that you have validated the configuration beforehand, so it won't be
+// validated here.
 func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
@@ -184,6 +191,15 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		containerNetwork = getSidecarNetwork(config.Challenge.Metadata.Sidecar)
 	}
 
+	for _, env := range config.Challenge.Env.EnvironmentVars {
+		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)))
+	}
+
+	log.Debugf("Container config for challenge %s are: CPU(%d), Memory(%d), PidsLimit(%d)",
+		config.Challenge.Metadata.Name,
+		config.Resources.CPUShares,
+		config.Resources.PidsLimit)
+
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        config.Challenge.Env.Ports,
 		MountsMap:        staticMount,
@@ -191,6 +207,9 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		ContainerName:    coreUtils.EncodeID(config.Challenge.Metadata.Name),
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
+		CPUShares:        config.Resources.CPUShares,
+		Memory:           config.Resources.Memory,
+		PidsLimit:        config.Resources.PidsLimit,
 	}
 	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {
@@ -255,20 +274,20 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		return fmt.Errorf("CONFIG ERROR: %s : %s", challengeName, err)
 	}
 
-	// We do not validate challenge config here, make sure you have validated the config
-	// beforehand
-	//
-	// err = config.ValidateRequiredFields()
-	// if err != nil {
-	// 	log.Errorf("An error occured while validating the config file : %s", err)
-	//	return
-	//}
+	if !skipStage {
+		err = config.ValidateRequiredFields(challengeDir)
+		if err != nil {
+			return fmt.Errorf("An error occured while validating the config file : %s, cannot continue with pipeline.", err)
+		}
+	}
 
 	// Validate challenge directory name with the name of the challenge
-	// provided in the config file for the beast. THere should be no
+	// provided in the config file for the beast. There should be no
 	// conflict in the name.
 	if challengeName != config.Challenge.Metadata.Name {
-		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
+		log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)",
+			challengeName,
+			config.Challenge.Metadata.Name)
 		return fmt.Errorf("CONFIG ERROR: %s : Inconsistent configuration name and challengeName", challengeName)
 	}
 
@@ -292,7 +311,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		if !skipStage {
 			// Deploy pipeline for static challenge will follow.
 			log.Infof("Deploy static challenge request.")
-			DeployStaticChallenge(&config)
+			DeployStaticChallenge(&config, &challenge, challengeDir)
 		}
 		return nil
 	}
@@ -304,7 +323,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		challenge.Status != core.DEPLOY_STATUS["deployed"] &&
 		challenge.Status != "" {
 		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
-		return fmt.Errorf("PIPELINE START ERROR: %s : Deploy already in progress.", challengeName)
+		return fmt.Errorf("PIPELINE START ERROR: %s : Deploy already in progress. Current Status : %s", challengeName, challenge.Status)
 	}
 
 	log.Debugf("Starting deploy pipeline for challenge %s", challengeName)

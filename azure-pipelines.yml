@@ -1,0 +1,56 @@
+trigger:
+- master
+
+pr:
+- master
+- releases/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  GOBIN:  '$(GOPATH)/bin'
+  GOROOT: '/usr/local/go1.11'
+  GOPATH: '$(system.defaultWorkingDirectory)/gopath'
+  modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)'
+
+steps:
+- script: |
+    mkdir -p '$(GOBIN)'
+    mkdir -p '$(GOPATH)/pkg'
+    mkdir -p '$(modulePath)'
+    shopt -s extglob
+    shopt -s dotglob
+    mv !(gopath) '$(modulePath)'
+    echo '##vso[task.prependpath]$(GOBIN)'
+    echo '##vso[task.prependpath]$(GOROOT)/bin'
+    sudo apt update
+    sudo apt install docker.io
+    sudo usermod -a -G docker $USER
+  displayName: 'Set up the Go and Docker workspace'
+
+- script: |
+    mkdir ~/.beast
+    cp _examples/example.config.toml ~/.beast/config.toml
+    touch ~/.beast/secret.key
+    touch ~/.beast/authorized_keys
+    mkdir ~/.beast/staging
+    mkdir ~/.beast/remote
+    mkdir ~/.beast/scripts
+  workingDirectory: '$(modulePath)'
+  displayName: 'Setup Beast Global Directory'
+
+- script: |
+    make build
+  workingDirectory: '$(modulePath)'
+  displayName: 'Build Beast'
+
+- script: |
+    make requirements
+  workingDirectory: '$(modulePath)'
+  displayName: 'Build Requirements'
+
+- script: |
+    make test
+  workingDirectory: '$(modulePath)'
+  displayName: 'Run tests'

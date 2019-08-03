@@ -23,11 +23,18 @@ check_format:
 
 # Add more tests later on for this
 test: check_format
+	@echo "[*] Running tests for example challenges"
+	@./scripts/test/test_examples.sh
 
 # Format code using gofmt
 format:
 	@echo "[*] Formatting code"
 	@$(GO) fmt $(pkgs)
+
+# Vet code using go vet
+govet:
+	@echo "[*] Vetting code, checking for mistakes"
+	@$(GO) vet $(pkgs)
 
 # Ensure that the required tools are installed for beast to work
 tools:
@@ -52,4 +59,10 @@ requirements:
 	@echo ">>> Building beast extras..."
 	@./scripts/build/extras.sh
 
-.PHONY: build format test check_format tools
+docs:
+	@rm -rf site/
+	@echo ">>> Building Documentation"
+	@mkdocs build
+	@python scripts/tools/swagger-docs.py
+
+.PHONY: build format test check_format tools docs

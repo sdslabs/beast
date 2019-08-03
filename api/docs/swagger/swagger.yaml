@@ -3,8 +3,11 @@ definitions:
   api.AuthorizationChallengeResp:
     properties:
       challenge:
-        example: Challenge String
-        type: string
+        example:
+        - Challenge String
+        items:
+          type: byte
+        type: array
       message:
         example: Response message
         type: string
@@ -34,6 +37,15 @@ definitions:
         example: "2018-12-31T22:20:08.948096189+05:30"
         type: string
     type: object
+  api.ChallengesResp:
+    properties:
+      challenges:
+        items:
+          type: string
+        type: array
+      message:
+        type: string
+    type: object
   api.HTTPAuthorizeResp:
     properties:
       message:
@@ -43,10 +55,25 @@ definitions:
         example: YOUR_AUTHENTICATION_TOKEN
         type: string
     type: object
+  api.HTTPErrorResp:
+    properties:
+      error:
+        example: Error occured while veifying the challenge.
+        type: string
+    type: object
   api.HTTPPlainResp:
     properties:
       message:
         example: Messsage in response to your request
+        type: string
+    type: object
+  api.LogsInfoResp:
+    properties:
+      stderr:
+        example: '[ERROR] Challenge deployment failed.'
+        type: string
+      stdout:
+        example: '[INFO] Challenge is starting to deploy'
         type: string
     type: object
   api.PortsInUseResp:
@@ -101,6 +128,27 @@ paths:
       summary: Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
       tags:
       - config
+  /api/info/challenges/available:
+    get:
+      consumes:
+      - application/json
+      description: Returns all challenges available in the in the database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengesResp'
+            type: object
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Gives all challenges available in the in the database
+      tags:
+      - info
   /api/info/images/available:
     get:
       consumes:
@@ -115,13 +163,35 @@ paths:
           schema:
             $ref: '#/definitions/api.AvailableImagesResp'
             type: object
-        "402":
-          description: Payment Required
-          schema:
-            $ref: '#/definitions/api.AvailableImagesResp'
-            type: object
       summary: Gives all the base images that can be used while creating a beast challenge,
         this is a constant specified in beast global config
+      tags:
+      - info
+  /api/info/logs/:
+    get:
+      consumes:
+      - application/json
+      description: Gives container logs for a particular challenge, useful for debugging
+        purposes.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LogsInfoResp'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Handles route related to logs handling of container
       tags:
       - info
   /api/info/ports/used:
@@ -138,44 +208,11 @@ paths:
           schema:
             $ref: '#/definitions/api.PortsInUseResp'
             type: object
-        "402":
-          description: Payment Required
-          schema:
-            $ref: '#/definitions/api.PortsInUseResp'
-            type: object
       summary: Returns ports in use by beast by looking in the hack git repository,
         also returns min and max value of port allowed while specifying in beast challenge
         config.
       tags:
       - info
-  /api/manage/all/:
-    post:
-      consumes:
-      - application/json
-      description: Handles challenge management routes for all the challenges with
-        actions which includes - DEPLOY, UNDEPLOY.
-      parameters:
-      - description: Action for the challenge
-        in: query
-        name: action
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
-        "402":
-          description: Payment Required
-          schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
-      summary: Handles challenge management actions for multiple(all) challenges.
-      tags:
-      - manage
   /api/manage/challenge/:
     post:
       consumes:
@@ -202,12 +239,36 @@ paths:
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
             type: object
-        "402":
-          description: Payment Required
+        "400":
+          description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
             type: object
       summary: Handles challenge management actions.
+      tags:
+      - manage
+  /api/manage/commit/:
+    post:
+      consumes:
+      - application/json
+      description: Validates challenge configuration for deployment.
+      parameters:
+      - description: Name of the challenge to verify the deployment configuration
+          for.
+        in: query
+        name: challenge
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+            type: object
+      summary: Validates the configuration of the challenge and tells if challenge
+        can be deployed or not.
       tags:
       - manage
   /api/manage/deploy/local:
@@ -235,7 +296,91 @@ paths:
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
             type: object
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
       summary: Deploy a local challenge using the path provided in the post parameter
+      tags:
+      - manage
+  /api/manage/multiple/:
+    post:
+      consumes:
+      - application/json
+      description: Handles challenge management routes for multiple the challenges
+        with actions which includes - DEPLOY, UNDEPLOY.
+      parameters:
+      - description: Action for the challenge
+        in: query
+        name: action
+        required: true
+        type: string
+      - description: Tag for a group of challenges
+        in: query
+        name: tag
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Handles challenge management actions for multiple challenges.
+      tags:
+      - manage
+  /api/manage/schedule/:
+    post:
+      consumes:
+      - application/json
+      description: Handles scheduleing of challenge action to executed at some later
+        point of time
+      parameters:
+      - description: Action for the underlying challenge in context
+        in: query
+        name: action
+        required: true
+        type: string
+      - description: The name of the challenge to schedule the action for.
+        in: query
+        name: challenge
+        type: string
+      - description: Tag corresponding to challenges in context, optional if challenge
+          name is provided
+        in: query
+        name: tags
+        type: string
+      - description: Timestamp at which the challenge should be scheduled should be
+          a unix timestamp string.
+        in: query
+        name: at
+        type: string
+      - description: Time after which the action on the selector should be executed
+          should be of duration format as in '1m20s' etc.
+        in: query
+        name: after
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+            type: object
+      summary: Schedule an action(deploy, undeploy, purge etc.) on a particular challenge
       tags:
       - manage
   /api/manage/static/:
@@ -243,6 +388,12 @@ paths:
       consumes:
       - application/json
       description: Handles beast static content serving container routes.
+      parameters:
+      - description: Action to apply on the beast static content provider
+        in: query
+        name: action
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -407,4 +558,9 @@ paths:
       summary: Handles solution check and token production
       tags:
       - auth
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

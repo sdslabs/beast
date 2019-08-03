@@ -44,6 +44,7 @@ RUN cd /challenge {{ range $index, $elem := .SetupScripts}} && \
     ./{{$elem}} {{end}}
 
 WORKDIR /challenge
+{{if not .Entrypoint}}
 RUN touch /entrypoint.sh && \
     echo "#!/bin/bash" > /entrypoint.sh && \
     echo "set -euxo pipefail" >> /entrypoint.sh && \
@@ -51,11 +52,13 @@ RUN touch /entrypoint.sh && \
     echo "    chmod u+x /challenge/post-build.sh && /challenge/post-build.sh" >> /entrypoint.sh && \
     echo "fi" >> /entrypoint.sh && \
     echo "cd /challenge" >> /entrypoint.sh && \
-    echo {{if .RunAsRoot}} "mv xinetd.conf /etc/xinetd.d/pwn_service && exec {{.RunCmd}}" {{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
+    echo {{if .XinetdService}} "mv xinetd.conf /etc/xinetd.d/pwn_service && exec {{.RunCmd}}" {{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
     chmod u+x /entrypoint.sh
-
+{{else}}
+RUN chmod u+x {{.Entrypoint}}
+{{end}}
 WORKDIR /challenge
 RUN chmod 600 /challenge/beast.toml {{ range $index, $elem := .Executables}} && \
 	chmod +x {{$elem}} {{end}}
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["{{if .Entrypoint}}{{.Entrypoint}}{{else}}/entrypoint.sh{{end}}"]
 `

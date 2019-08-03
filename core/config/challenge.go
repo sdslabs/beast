@@ -24,6 +24,7 @@ const SERVICE_CHALL_RUN_CMD string = "xinetd -dontfork"
 type BeastChallengeConfig struct {
 	Challenge Challenge `toml:"challenge"`
 	Author    Author    `toml:"author"`
+	Resources Resources `toml:"resource"`
 }
 
 func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) error {
@@ -39,6 +40,8 @@ func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) erro
 		log.Debugf("Error while validating `Author`'s required fields : %s", err.Error())
 		return err
 	}
+
+	config.Resources.ValidateRequiredFields()
 
 	log.Debugf("BeastChallengeConfig required fields validated")
 	return nil
@@ -75,9 +78,18 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 
 // This contains challenge meta data
 //
-// * Flag - Apt dependencies for the challenge
-// * Name - relative path to the challenge setup scripts
-// * Type - Relative path to the directory which you want
+// ```toml
+// # Required Fields
+// flag = "" # Flag for the challenge
+// name = "" # Name of the challenge
+// type = "" # Type of the challenge, one of - Get available types from /api/info/types/available
+// description = "" # Descritption for the challenge.
+//
+// # Optional fields.
+// tags = ["", ""] # Tags that the challenge might belong to, used to do bulk query and handling eg. binary, misc etc.
+// hints = ["", ""]
+// sidecar = "" # Name of the sidecar if any used by the challenge.
+// ```
 type ChallengeMetadata struct {
 	Flag        string   `toml:"flag"`
 	Name        string   `toml:"name"`
@@ -85,7 +97,7 @@ type ChallengeMetadata struct {
 	Tags        []string `toml:"tags"`
 	Sidecar     string   `toml:"sidecar"`
 	Description string   `toml:"description"`
-	Hint        string   `toml:"hint"`
+	Hints       []string `toml:"hints"`
 }
 
 // In this validation returned boolean value represents if the challenge type is
@@ -118,31 +130,79 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	return fmt.Errorf("Not a valid challenge type : %s", config.Type), false
 }
 
-// This contains challenge specific properties which includes
+// This contains challenge specific properties which includes the following toml fields
 //
-// * AptDeps: Apt dependencies for the challenge
-// * SetupScripts: relative path to the challenge setup scripts
-// * StaticContentDir: Relative path to the directory which you want
-// 		to serve statically for the challenge, for example a libc for binary
-// 		challenge.
-// * RunCmd: Command to run or start the challenge.
-// * Base for the challenge, this might be extension to dockerfile usage
-// 		like for a php challenge this can be php:web, for node node:web
-// 		for xinetd services xinetd:service
-// * Ports: A list of ports to be used by the challenge.
-// * WebRoot: relative path to web challenge directory
-// * DefaultPort: default port for application
+// ```toml
+// # Ports to reserve for the challenge, we bind only one of these to host other are for internal communictaions only.
+// # Should be within a particular permissible range.
+// ports = [0, 0]
+// default_port = 0 # Default port to use for any port specific action by beast.
+//
+//
+// # Dependencies required by challenge, installed using default package manager of base image apt for most cases.
+// apt_deps = ["", ""]
+//
+//
+// # A list of setup scripts to run for building challenge enviroment.
+// # Keep in mind that these are only for building the challenge environment and are executed
+// # in the iamge building step of the deployment pipeline.
+// setup_scripts = ["", ""]
+//
+//
+// # A directory containing any of the static assets for the challenge, exposed by beast static endpoint.
+// static_dir = ""
+//
+//
+// # Command to execute inside the container, if a predefined type is being used try to
+// # use an existing field to let beast automatically calculate what command to run.
+// # If you want to host a binary using xinetd use type service and specify absolute path
+// # of the service using service_path field.
+// run_cmd = ""
+//
+//
+// # Similar to run_cmd but in this case you have the entire container to yourself
+// # and everything you are doing is done using root permissions inside the container
+// # When using this keep in mind you are root inside the container.
+// entrypoint = ""
+//
+//
+// # Relative path to binary which needs to be executed when the specified
+// # Type for the challenge is service.
+// # This can be anything which can be exeucted, a python file, a binary etc.
+// service_path = ""
+//
+//
+// # Relative directory corresponding to root of the challenge where the root
+// # of the web application lies.
+// web_root = ""
+//
+//
+// # Any custom base image you might want to use for your particular challenge.
+// # Exists for flexibility reasons try to use existing base iamges wherever possible.
+// base_image = ""
+//
+//
+// # Environment variables that can be used in the application code.
+// [[var]]
+//     key = ""
+//     value = ""
+//
+// [[var]]
+//     key = ""
+//     value = ""
+// ```
 type ChallengeEnv struct {
-	AptDeps          []string `toml:"apt_deps"`
-	Ports            []uint32 `toml:"ports"`
-	SetupScripts     []string `toml:"setup_scripts"`
-	StaticContentDir string   `toml:"static_dir"`
-	RunCmd           string   `toml:"run_cmd"`
-	Base             string   `toml:"base"`
-	BaseImage        string   `toml:"base_image"`
-	WebRoot          string   `toml:"web_root"`
-	DefaultPort      uint32   `toml:"default_port"`
-	ServicePath      string   `toml:"service_path"`
+	AptDeps          []string         `toml:"apt_deps"`
+	Ports            []uint32         `toml:"ports"`
+	SetupScripts     []string         `toml:"setup_scripts"`
+	StaticContentDir string           `toml:"static_dir"`
+	RunCmd           string           `toml:"run_cmd"`
+	BaseImage        string           `toml:"base_image"`
+	WebRoot          string           `toml:"web_root"`
+	DefaultPort      uint32           `toml:"default_port"`
+	ServicePath      string           `toml:"service_path"`
+	Entrypoint       string           `toml:"entrypoint"`
+	EnvironmentVars  []EnvironmentVar `toml:"var"`
 }
 
 func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir string) error {
@@ -179,8 +239,12 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		}
 	}
 
+	if config.Entrypoint != "" && config.RunCmd != "" {
+		return fmt.Errorf("run_cmd cannot be non empty when entrypoint is provided")
+	}
+
 	// Run command is only a required value in case of bare challenge types.
-	if config.RunCmd == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
+	if config.RunCmd == "" && config.Entrypoint == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
 		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
 	}
 
@@ -199,7 +263,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			if filepath.IsAbs(config.ServicePath) {
 				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
 			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
-				return fmt.Errorf("File %s does not exist", config.ServicePath);
+				// Skip this, we might create service later too.
+				log.Warnf("Service path file %s does not exist", config.ServicePath)
 			}
 		}
 	} else if strings.HasPrefix(challType, "web") {
@@ -223,6 +288,22 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		}
 	}
 
+	for _, env := range config.EnvironmentVars {
+		if filepath.IsAbs(env.Value) {
+			return fmt.Errorf("Environment Variable contains absolute path : %s", env.Value)
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
+			return fmt.Errorf("File %s does not exist", env.Value)
+		}
+	}
+
+	if config.Entrypoint != "" {
+		if filepath.IsAbs(config.Entrypoint) {
+			return fmt.Errorf("Entrypoint contains absolute path : %s", config.Entrypoint)
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.Entrypoint)); err != nil {
+			return fmt.Errorf("File %s does not exist", config.Entrypoint)
+		}
+	}
+
 	return nil
 }
 
@@ -232,6 +313,15 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 // * Email - Email of the author
 // * SSHKey - Public SSH key for the challenge author, to give the access
 //		to the challenge container.
+//
+// ```toml
+// # Optional fields
+// name = ""
+//
+// # Required Fields
+// email = ""
+// ssh_key = "" # Public ssh Key of the author.
+// ```
 type Author struct {
 	Name   string `toml:"name"`
 	Email  string `toml:"email"`
@@ -248,4 +338,32 @@ func (config *Author) ValidateRequiredFields() error {
 	}
 
 	return nil
+}
+
+type EnvironmentVar struct {
+	Key   string `toml:"key"`
+	Value string `toml:"value"`
+}
+
+type Resources struct {
+	CPUShares int64 `toml:"cpu_shares"`
+	Memory    int64 `toml:"memory_limit"`
+	PidsLimit int64 `toml:"pids_limit"`
+}
+
+func (config *Resources) ValidateRequiredFields() {
+	if config.CPUShares <= 0 {
+		log.Warn("CPU shares not provided in configuration, using default.")
+		config.CPUShares = Cfg.CPUShares
+	}
+
+	if config.Memory <= 0 {
+		log.Warn("Memory Limit not provided in configuration, using default.")
+		config.Memory = Cfg.Memory
+	}
+
+	if config.PidsLimit <= 0 {
+		log.Warn("Pids Limit not provided in configuration, using default.")
+		config.PidsLimit = Cfg.PidsLimit
+	}
 }

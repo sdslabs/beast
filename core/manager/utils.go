@@ -28,8 +28,10 @@ type BeastBareDockerfile struct {
 	SetupScripts    []string
 	Executables     []string
 	RunCmd          string
+	RunScript       string
 	MountVolume     string
-	RunAsRoot       bool
+	XinetdService   bool
+	Entrypoint      string
 }
 
 type BeastXinetdConf struct {
@@ -63,7 +65,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return fmt.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
 	}
 
-	log.Debugf("Parsed config file is : %s", config)
+	// log.Debugf("Parsed config file is : %s", config)
 	err = config.ValidateRequiredFields(challengeDir)
 	if err != nil {
 		return err
@@ -181,15 +183,17 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	baseImage := config.Challenge.Env.BaseImage
 	runCmd := config.Challenge.Env.RunCmd
 	challengeType := config.Challenge.Metadata.Type
+	entrypoint := config.Challenge.Env.Entrypoint
+	setupScripts := config.Challenge.Env.SetupScripts
 	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
-	var runAsRoot bool = false
+	var xinetdService bool = false
 	var executables []string
 
 	// The challenge type we are looking at is service. This should be deployed
 	// using xinetd. The Dockerfile is different for this. Change the runCmd and the
 	// apt dependencies to add xinetd.
 	if challengeType == core.SERVICE_CHALLENGE_TYPE_NAME {
-		runAsRoot = true
+		xinetdService = true
 		runCmd = cfg.SERVICE_CHALL_RUN_CMD
 		aptDeps = fmt.Sprintf("%s %s", cfg.SERVICE_CONTAINER_DEPS, aptDeps)
 		serviceExecutable := filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath)
@@ -211,17 +215,22 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		baseImage = core.DEFAULT_BASE_IMAGE
 	}
 
-	log.Debugf("Command type inside root[true/false] %s", runAsRoot)
+	log.Debugf("Command type inside root[true/false] %s", xinetdService)
+
+	if entrypoint != "" {
+		entrypoint = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, entrypoint)
+	}
 
 	data := BeastBareDockerfile{
 		DockerBaseImage: baseImage,
 		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
 		AptDeps:         aptDeps,
-		SetupScripts:    config.Challenge.Env.SetupScripts,
+		SetupScripts:    setupScripts,
 		RunCmd:          runCmd,
-		MountVolume:     filepath.Join("/challenge", relativeStaticContentDir),
-		RunAsRoot:       runAsRoot,
+		MountVolume:     filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
+		XinetdService:   xinetdService,
 		Executables:     executables,
+		Entrypoint:      entrypoint,
 	}
 
 	var dockerfile bytes.Buffer
@@ -377,14 +386,14 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 			err = database.CreateAuthorEntry(&authorEntry)
 			if err != nil {
-				return fmt.Errorf("Error while creating author entry : %s", err)
+				return fmt.Errorf("Error while creating author entry(%s) : %s", config.Author.Name, err)
 			}
 
 		} else {
 			if authorEntry.Email != config.Author.Email &&
 				authorEntry.SshKey != config.Author.SSHKey &&
 				authorEntry.Name != config.Author.Name {
-				return fmt.Errorf("ERROR, author details did not match with the ones in database")
+				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", authorEntry.Name)
 			}
 		}
 
@@ -399,7 +408,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Type:        config.Challenge.Metadata.Type,
 			Sidecar:     config.Challenge.Metadata.Sidecar,
 			Description: config.Challenge.Metadata.Description,
-			Hint:        config.Challenge.Metadata.Hint,
+			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
@@ -471,7 +480,7 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 	var config cfg.BeastChallengeConfig
 	_, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Error while decoding file : %s", configFile)
 	}
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
@@ -481,16 +490,32 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 }
 
 //Takes and save the data to transaction table
-func SaveTransactionFunc(identifier string, action string, authorization string) error {
-	challengeId, err := database.QueryFirstChallengeEntry("name", identifier)
+func LogTransaction(identifier string, action string, authorization string) error {
+	log.Debugf("Logging transaction for %s on %s", action, identifier)
+
+	challenge, err := database.QueryFirstChallengeEntry("name", identifier)
 	if err != nil {
-		log.Infof("Error while getting challenge ID")
+		return fmt.Errorf("Error while querying challenge: %s", identifier)
+	}
+
+	// We are trying to get the username for the request from JWT claims here
+	// Since upto this point the request is already authorized, we use a default
+	// username if any error occurs while getting the username.
+	userName, err := auth.GetUser(authorization)
+	if err != nil {
+		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
+		userName = core.DEFAULT_USER_NAME
+	}
+
+	author, err := database.QueryFirstAuthorEntry("name", userName)
+	if err != nil {
+		return fmt.Errorf("Error while querying user corresponding to request: %s", err)
 	}
 
 	TransactionEntry := database.Transaction{
 		Action:      action,
-		UserId:      auth.GetUser(authorization),
-		ChallengeID: challengeId.ID,
+		AuthorID:    author.ID,
+		ChallengeID: challenge.ID,
 	}
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
@@ -503,7 +528,7 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
 	err := utils.CreateIfNotExistDir(dirPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error while copying static content : %v", err)
 	}
 
 	err = utils.ValidateDirExists(staticContentDir)
@@ -516,7 +541,7 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 	return err
 }
 
-func GetAvailableChallenges() ([]string, error) {	
+func GetAvailableChallenges() ([]string, error) {
 	challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, cfg.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
 	err, challenges := utils.GetDirsInDir(challengesDirRoot)
 	if err != nil {

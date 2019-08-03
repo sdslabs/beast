@@ -23,6 +23,9 @@ type CreateContainerConfig struct {
 	ContainerName    string
 	ContainerEnv     []string
 	ContainerNetwork string
+	CPUShares        int64
+	Memory           int64
+	PidsLimit        int64
 }
 
 type Log struct {
@@ -114,10 +117,17 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		mountBindings = append(mountBindings, mnt)
 	}
 
+	resources := container.Resources{
+		CPUShares: containerConfig.CPUShares,
+		Memory:    containerConfig.Memory,
+		PidsLimit: containerConfig.PidsLimit,
+	}
+
 	hostConfig := &container.HostConfig{
 		PortBindings: portMap,
 		Mounts:       mountBindings,
 		NetworkMode:  container.NetworkMode(containerConfig.ContainerNetwork),
+		Resources:    resources,
 	}
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, containerName)
