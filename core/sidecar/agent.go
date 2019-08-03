@@ -29,12 +29,12 @@ type SidecarDeployer interface {
 	UndeploySidecar(configPath *cr.CreateContainerConfig) error
 }
 
-func GetSidecarDeployer(sidecar string) (SidecarAgent, error) {
+func GetSidecarDeployer(sidecar string) (SidecarDeployer, error) {
 	switch sidecar {
 	case "mysql":
-		return &mysql.MySQLAgent{}, nil
+		return &mysql.MySQLDeployer{}, nil
 	case "mongo":
-		return &mongo.MongoAgent{}, nil
+		return &mongo.MongoDeployer{}, nil
 	default:
 		return nil, fmt.Errorf("Not a valid sidecar name: %s", sidecar)
 	}
