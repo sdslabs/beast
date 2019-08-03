@@ -14,11 +14,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type MysqlDeployer struct{}
+type MySQLDeployer struct{}
 
 const MYSQL_SIDECAR_PORT uint32 = 9500
 
-func (a *MysqlDeployer) DeploySidecar(config *cr.CreateContainerConfig) error {
+func (a *MySQLDeployer) DeploySidecar(config *cr.CreateContainerConfig) error {
 	err := coreutils.CleanupContainerByFilter("name", core.MYSQL_SIDECAR_HOST)
 	if err != nil {
 		log.Errorf("Error while cleaning old MySQL container : %s", err)
@@ -83,7 +83,7 @@ func (a *MysqlDeployer) DeploySidecar(config *cr.CreateContainerConfig) error {
 	return nil
 }
 
-func (a *MysqlDeployer) UndeploySidecar(config *cr.CreateContainerConfig) error {
+func (a *MySQLDeployer) UndeploySidecar(config *cr.CreateContainerConfig) error {
 	err := coreutils.CleanupContainerByFilter("name", core.MYSQL_SIDECAR_HOST)
 	if err != nil {
 		log.Errorf("Error while cleaning old MySQL container : %s", err)
