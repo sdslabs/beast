@@ -87,8 +87,8 @@ type BeastConfig struct {
 	GitRemote          GitRemote `toml:"remote"`
 	JWTSecret          string    `toml:"jwt_secret"`
 	SlackWebHookURL    string    `toml:"slack_webhook"`
-
-	TickerFrequency int `toml:"ticker_frequency"`
+	DiscordWebHookURL  string    `toml:"disocrd_webhook"`
+	TickerFrequency    int       `toml:"ticker_frequency"`
 
 	RemoteSyncPeriod time.Duration `toml:"-"`
 	Rsp              string        `toml:"remote_sync_period"`
