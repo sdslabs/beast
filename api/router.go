@@ -52,8 +52,9 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/available", availableChallengeInfoHandler)
 			infoGroup.GET("/images/available", availableImagesHandler)
 			infoGroup.GET("/ports/used", usedPortsInfoHandler)
-			infoGroup.GET("/logs/:challenge", challengeLogsHandler)
+			infoGroup.GET("/logs/", challengeLogsHandler)
 			infoGroup.GET("/challenges", challengeInfoByFilterHandler)
+			infoGroup.GET("/challenges/available", availableChallengeHandler)
 		}
 
 		remoteGroup := apiGroup.Group("/remote", adminAuthorize)

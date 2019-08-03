@@ -126,8 +126,8 @@ func challengeLogsHandler(c *gin.Context) {
 	}
 }
 
-// Returns available challenges by filter
-// @Summary Gives all challenges available in the in the database that has a particular parameter same
+// Returns available challenges from the database by filter
+// @Summary Gives all challenges available in the database that has a particular parameter same
 // @Description Returns all challenges available in the in the database that has a particular parameter same
 // @Tags info
 // @Accept json
@@ -136,20 +136,11 @@ func challengeLogsHandler(c *gin.Context) {
 // @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/info/challenges [get]
 func challengeInfoByFilterHandler(c *gin.Context) {
-	filter, ok := c.GetQuery("filter")
-	value, okay := c.GetQuery("value")
-
-	if !ok {
-		fmt.Println("Url Param 'filter' is missing")
-		return
-	}
-	if !okay {
-		fmt.Println("Url Param 'value' is missing")
-		return
-	}
+	filter := c.Query("filter")
+	value := c.Query("value")
 
 	if value == "" || filter == "" {
-		challenges, err := manager.GetAvailableChallenges()
+		challenges, err := database.QueryAllChallenges()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, HTTPPlainResp{
 				Message: err.Error(),
@@ -161,28 +152,84 @@ func challengeInfoByFilterHandler(c *gin.Context) {
 			})
 			return
 		} else {
+			var challNameString []string
+			for _, challenge := range challenges {
+				challNameString = append(challNameString, challenge.Name)
+			}
 			c.JSON(http.StatusOK, ChallengesResp{
 				Message:    "All Challenges",
-				Challenges: challenges,
+				Challenges: challNameString,
 			})
 		}
 	}
 
 	var challenges []database.Challenge
 	var err error
-	challenges, err = database.QueryChallengeEntries(filter, value)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
-		})
-	} else {
-		var challNameString []string
-		for _, challenge := range challenges {
-			challNameString = append(challNameString, challenge.Name)
+	if filter == "name" || filter == "author" || filter == "score" {
+		challenges, err = database.QueryChallengeEntries(filter, value)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+		} else {
+			var challNameString []string
+			for _, challenge := range challenges {
+				challNameString = append(challNameString, challenge.Name)
+			}
+			c.JSON(http.StatusOK, ChallengesResp{
+				Message:    "Challenges with " + filter + " = " + value,
+				Challenges: challNameString,
+			})
 		}
+	}
+
+	if filter == "tag" {
+		tag := database.Tag{
+			TagName: value,
+		}
+		challenges, err = database.QueryRelatedChallenges(&tag)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+		} else {
+			var challNameString []string
+			for _, challenge := range challenges {
+				challNameString = append(challNameString, challenge.Name)
+			}
+			c.JSON(http.StatusOK, ChallengesResp{
+				Message:    "Challenges with " + filter + " = " + value,
+				Challenges: challNameString,
+			})
+		}
+	}
+}
+
+// Returns available challenges from the remote directory
+// @Summary Gives all challenges available in the remote directory
+// @Description Returns all challenges available in the in the remote directory
+// @Tags info
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.ChallengesResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/info/challenges/available [get]
+func availableChallengeHandler(c *gin.Context) {
+	challenges, err := manager.GetAvailableChallenges()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
+		})
+		return
+	} else if challenges == nil {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "No challenges currently in the database",
+		})
+		return
+	} else {
 		c.JSON(http.StatusOK, ChallengesResp{
-			Message:    "Challenges with " + filter + " = " + value,
-			Challenges: challNameString,
+			Message:    "All Challenges",
+			Challenges: challenges,
 		})
 	}
 }
