@@ -42,23 +42,21 @@ type Request struct {
 type ProviderTypeEnum int
 
 const (
-	discord ProviderTypeEnum = 1 + iota
-	slack
+	DiscordProvider ProviderTypeEnum = 1 + iota
+	SlackProvider
 )
 
-//func (p ProviderTypeEnum) String() string {
-//	return [...]string{"Discord", "Slack"}[p]
-//}
-
+//In the Discord notification provider it was using the same payload which was used for slack.
+//By writing "/slack" in the discord WebHookURL, it execute Slack-Compatible Webhook
 func NewNotifier(URL string, ProviderType ProviderTypeEnum) Notifier {
 	switch ProviderType {
-	case slack:
+	case SlackProvider:
 		return &SlackNotificationProvider{
 			Request{
 				WebHookURL: URL,
 			},
 		}
-	case discord:
+	case DiscordProvider:
 		return &DiscordNotificationProvider{
 			Request{
 				WebHookURL: URL + "/slack",
