@@ -73,7 +73,7 @@ func SendNotificationToSlack(nType NotificationType, msg string) error {
 		return fmt.Errorf("No webhook URL in beast config.")
 	}
 
-	slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL, slack)
+	slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL, SlackProvider)
 
 	err := slackNotifier.SendNotification(nType, msg)
 	if err != nil {

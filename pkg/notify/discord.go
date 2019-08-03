@@ -74,7 +74,7 @@ func SendNotificationToDiscord(nType NotificationType, msg string) error {
 		return fmt.Errorf("No webhook URL in beast config.")
 	}
 
-	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, discord)
+	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, DiscordProvider)
 
 	err := discordNotifier.SendNotification(nType, msg)
 	if err != nil {
