@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/sha256"
 	"fmt"
+	"math/rand"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
@@ -34,4 +35,13 @@ func IsImageIdValid(a string) bool {
 
 func IsContainerIdValid(a string) bool {
 	return ((!strings.HasPrefix(a, core.CONTAINER_NA)) && a != "")
+}
+
+func RandString(n int) string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
 }
