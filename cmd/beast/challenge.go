@@ -29,15 +29,13 @@ var challengeCmd = &cobra.Command{
 			if AllChalls {
 				challenges, err := database.QueryAllChallenges()
 				if err != nil {
-					log.Errorf("The action was not performed due to error : %s", err.Error())
+					log.Errorf("Cannot query database for challenges : %s", err.Error())
 					os.Exit(1)
 				} else {
+
+					PrintTableHeader()
 					w := new(tabwriter.Writer)
-					line := strings.Repeat("-", 180)
-					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
-					w.Flush()
-					fmt.Println(line)
+					var errors []error
 
 					for _, challenge := range challenges {
 
@@ -46,8 +44,8 @@ var challengeCmd = &cobra.Command{
 						fmt.Fprint(w, "\t")
 						ports, err := database.GetAllocatedPorts(challenge)
 						if err != nil {
-							log.Errorf("The action was not performed due to error : %s", err.Error())
-							os.Exit(1)
+							errors = append(errors, err)
+
 						}
 
 						for _, port := range ports {
@@ -57,6 +55,11 @@ var challengeCmd = &cobra.Command{
 					}
 
 					w.Flush()
+
+					for _, err := range errors {
+						log.Errorf("Cannot query database for challenges ports : %s", err.Error())
+					}
+
 				}
 			} else if Tag != "" {
 				tagEntry := &database.Tag{
@@ -64,16 +67,12 @@ var challengeCmd = &cobra.Command{
 				}
 				challenges, err := database.QueryRelatedChallenges(tagEntry)
 				if err != nil {
-					log.Errorf("The action was not performed due to error : %s", err.Error())
+					log.Errorf("Cannot query database for related challenges : %s", err.Error())
 					os.Exit(1)
 				} else {
+					PrintTableHeader()
 					w := new(tabwriter.Writer)
-
-					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-					line := strings.Repeat("-", 180)
-					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
-					w.Flush()
-					fmt.Println(line)
+					var errors []error
 
 					for _, challenge := range challenges {
 						s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
@@ -81,8 +80,7 @@ var challengeCmd = &cobra.Command{
 						fmt.Fprint(w, "\t")
 						ports, err := database.GetAllocatedPorts(challenge)
 						if err != nil {
-							log.Errorf("The action was not performed due to error : %s", err.Error())
-							os.Exit(1)
+							errors = append(errors, err)
 						}
 
 						for _, port := range ports {
@@ -92,6 +90,10 @@ var challengeCmd = &cobra.Command{
 					}
 
 					w.Flush()
+
+					for _, err := range errors {
+						log.Errorf("Cannot query database for challenges ports : %s", err.Error())
+					}
 				}
 			} else {
 				if len(args) == 1 {
@@ -101,25 +103,21 @@ var challengeCmd = &cobra.Command{
 
 				challenge, err := database.QueryChallengeEntries("name", args[1])
 				if err != nil {
-					log.Errorf("The action was not performed due to error : %s", err.Error())
+					log.Errorf("Cannot query database for the given challenge : %s", err.Error())
 					os.Exit(1)
 				}
 
 				if len(challenge) > 0 {
+					PrintTableHeader()
 					w := new(tabwriter.Writer)
-					w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-					line := strings.Repeat("-", 180)
-					fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
-					w.Flush()
-					fmt.Println(line)
+					var errors []error
 
 					s := []string{args[1], challenge[0].ContainerId[0:7], challenge[0].ImageId[0:7], challenge[0].Status}
 					fmt.Fprint(w, strings.Join(s, "\t"))
 					fmt.Fprint(w, "\t")
 					ports, err := database.GetAllocatedPorts(challenge[0])
 					if err != nil {
-						log.Errorf("The action was not performed due to error : %s", err.Error())
-						os.Exit(1)
+						errors = append(errors, err)
 					}
 
 					for _, port := range ports {
@@ -127,6 +125,10 @@ var challengeCmd = &cobra.Command{
 					}
 					fmt.Fprintln(w)
 					w.Flush()
+
+					for _, err := range errors {
+						log.Errorf("Cannot query database for challenges ports : %s", err.Error())
+					}
 
 				} else {
 					log.Errorf("Provide valid chall name")
@@ -198,4 +200,14 @@ var challengeCmd = &cobra.Command{
 			}
 		}
 	},
+}
+
+func PrintTableHeader() {
+	w := new(tabwriter.Writer)
+	line := strings.Repeat("-", 180)
+	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
+	fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
+	w.Flush()
+	fmt.Println(line)
+
 }
