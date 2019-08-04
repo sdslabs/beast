@@ -349,75 +349,71 @@ func copyAdditionalContextToStaging(fileCtx map[string]string, stagingDir string
 }
 
 // TODO: Refactor this.
-func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
-	// Challenge is nil, which means the challenge entry does not exist
-	// So create a new challenge entry on the basis of the fields provided
-	// in the config file for the challenge.
-	if challEntry.Name == "" {
-		// For creating a new entry for the challenge first create an entry
-		// in the challenge table using the config file.
-		authorEntry, err := database.QueryFirstAuthorEntry("email", config.Author.Email)
-		if err != nil {
-			return fmt.Errorf("Error while querying author with email %s", config.Author.Email)
-		}
+func CreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
 
-		tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
-
-		for i, tag := range config.Challenge.Metadata.Tags {
-			tags[i] = &database.Tag{
-				TagName: tag,
-			}
-			if err = database.QueryOrCreateTagEntry(tags[i]); err != nil {
-				return fmt.Errorf("Error while querying the tags for challenge(%s) : %v", config.Challenge.Metadata.Name, err)
-			}
-		}
-
-		if authorEntry.Email == "" {
-			// Create a new authentication challenge message for the user.
-			rMessage := make([]byte, 128)
-			rand.Read(rMessage)
-
-			authorEntry = database.Author{
-				Name:          config.Author.Name,
-				Email:         config.Author.Email,
-				SshKey:        config.Author.SSHKey,
-				AuthChallenge: rMessage,
-			}
-
-			err = database.CreateAuthorEntry(&authorEntry)
-			if err != nil {
-				return fmt.Errorf("Error while creating author entry(%s) : %s", config.Author.Name, err)
-			}
-
-		} else {
-			if authorEntry.Email != config.Author.Email &&
-				authorEntry.SshKey != config.Author.SSHKey &&
-				authorEntry.Name != config.Author.Name {
-				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", authorEntry.Name)
-			}
-		}
-
-		*challEntry = database.Challenge{
-			Name:        config.Challenge.Metadata.Name,
-			AuthorID:    authorEntry.ID,
-			Format:      config.Challenge.Metadata.Type,
-			Status:      core.DEPLOY_STATUS["unknown"],
-			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-			Flag:        config.Challenge.Metadata.Flag,
-			Type:        config.Challenge.Metadata.Type,
-			Sidecar:     config.Challenge.Metadata.Sidecar,
-			Description: config.Challenge.Metadata.Description,
-			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
-		}
-
-		err = database.CreateChallengeEntry(challEntry)
-		if err != nil {
-			return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
-		}
-
-		database.Db.Model(challEntry).Association("Tags").Append(tags)
+	// For creating a new entry for the challenge first create an entry
+	// in the challenge table using the config file.
+	authorEntry, err := database.QueryFirstAuthorEntry("email", config.Author.Email)
+	if err != nil {
+		return fmt.Errorf("Error while querying author with email %s", config.Author.Email)
 	}
+
+	tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
+
+	for i, tag := range config.Challenge.Metadata.Tags {
+		tags[i] = &database.Tag{
+			TagName: tag,
+		}
+		if err = database.QueryOrCreateTagEntry(tags[i]); err != nil {
+			return fmt.Errorf("Error while querying the tags for challenge(%s) : %v", config.Challenge.Metadata.Name, err)
+		}
+	}
+
+	if authorEntry.Email == "" {
+		// Create a new authentication challenge message for the user.
+		rMessage := make([]byte, 128)
+		rand.Read(rMessage)
+
+		authorEntry = database.Author{
+			Name:          config.Author.Name,
+			Email:         config.Author.Email,
+			SshKey:        config.Author.SSHKey,
+			AuthChallenge: rMessage,
+		}
+
+		err = database.CreateAuthorEntry(&authorEntry)
+		if err != nil {
+			return fmt.Errorf("Error while creating author entry(%s) : %s", config.Author.Name, err)
+		}
+
+	} else {
+		if authorEntry.Email != config.Author.Email &&
+			authorEntry.SshKey != config.Author.SSHKey &&
+			authorEntry.Name != config.Author.Name {
+			return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", authorEntry.Name)
+		}
+	}
+
+	*challEntry = database.Challenge{
+		Name:        config.Challenge.Metadata.Name,
+		AuthorID:    authorEntry.ID,
+		Format:      config.Challenge.Metadata.Type,
+		Status:      core.DEPLOY_STATUS["unknown"],
+		ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+		ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+		Flag:        config.Challenge.Metadata.Flag,
+		Type:        config.Challenge.Metadata.Type,
+		Sidecar:     config.Challenge.Metadata.Sidecar,
+		Description: config.Challenge.Metadata.Description,
+		Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
+	}
+
+	err = database.CreateChallengeEntry(challEntry)
+	if err != nil {
+		return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
+	}
+
+	database.Db.Model(challEntry).Association("Tags").Append(tags)
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
 	if err != nil {
@@ -438,6 +434,62 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 	// Once the challenge entry has been created, add entries to the ports
 	// table in the database with the ports to expose
+	// for the challenge.
+	// TODO: Do all this under a database transaction so that if any port
+	// request is not available
+	for _, port := range config.Challenge.Env.Ports {
+		if isAllocated(port) {
+			// The port has already been allocated to the challenge
+			// Do nothing for this.
+			continue
+		}
+
+		portEntry := database.Port{
+			ChallengeID: challEntry.ID,
+			PortNo:      port,
+		}
+
+		gotPort, err := database.PortEntryGetOrCreate(portEntry)
+		if err != nil {
+			return err
+		}
+
+		// var gotChall database.Challenge
+		// database.Db.Model(&gotPort).Related(&gotChall)
+
+		if gotPort.ChallengeID != challEntry.ID {
+			return fmt.Errorf("The port %s requested is already in use by another challenge", gotPort.PortNo)
+		}
+	}
+
+	if len(allocatedPorts) > 0 {
+		if err = database.DeleteRelatedPorts(allocatedPorts); err != nil {
+			return fmt.Errorf("There was an error while deleting the ports which were already allocated to the challenge : %s : %s", challEntry.Name, err)
+		}
+	}
+
+	return nil
+}
+
+func UpdateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
+	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
+	if err != nil {
+		return fmt.Errorf("Error while getting allocated ports for : %s : %s", challEntry.Name, err)
+	}
+
+	isAllocated := func(port uint32) bool {
+		for i, p := range allocatedPorts {
+			if port == p.PortNo {
+				allocatedPorts[len(allocatedPorts)-1], allocatedPorts[i] = allocatedPorts[i], allocatedPorts[len(allocatedPorts)-1]
+				allocatedPorts = allocatedPorts[:len(allocatedPorts)-1]
+				return true
+			}
+		}
+
+		return false
+	}
+
+	// add entries to the ports table in the database with the ports to expose
 	// for the challenge.
 	// TODO: Do all this under a database transaction so that if any port
 	// request is not available

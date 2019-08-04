@@ -298,11 +298,23 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	}
 
 	// Using the challenge dir we got, update the database entries for the challenge.
-	err = updateOrCreateChallengeDbEntry(&challenge, config)
-	if err != nil {
-		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
-		log.Errorf("Db error : %s", err)
-		return fmt.Errorf("DB ERROR: %s : %s", challengeName, err)
+
+	// If the challenge is name is not available ,we need to create a new entry
+	if challenge.Name == "" {
+		err = CreateChallengeDbEntry(&challenge, config)
+		if err != nil {
+			log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
+			log.Errorf("Db error : %s", err)
+			return fmt.Errorf("DB ERROR: %s : %s", challengeName, err)
+		}
+	} else {
+		err = UpdateChallengeDbEntry(&challenge, config)
+		if err != nil {
+			log.Errorf("An error occured while updating db entry for challenge :: %s", challengeName)
+			log.Errorf("Db error : %s", err)
+			return fmt.Errorf("DB ERROR: %s : %s", challengeName, err)
+		}
+
 	}
 
 	// Check if the challenge type is static, if it is traditional deploy pipeline would not
