@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/sdslabs/beastv4/core/config"
-	log "github.com/sirupsen/logrus"
 )
 
 type SlackNotificationProvider struct {
@@ -64,23 +61,5 @@ func (s *SlackNotificationProvider) SendNotification(nType NotificationType, msg
 		return fmt.Errorf("Error while posting payload for notification : %s", err)
 	}
 
-	return nil
-}
-
-func SendNotificationToSlack(nType NotificationType, msg string) error {
-	if config.Cfg.SlackWebHookURL == "" {
-		log.Warnf("No slack webhook url provided in beast config, cannot send notification.")
-		return fmt.Errorf("No webhook URL in beast config.")
-	}
-
-	slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL, SlackProvider)
-
-	err := slackNotifier.SendNotification(nType, msg)
-	if err != nil {
-		log.Errorf("Error while sending notification to slack : %s", err)
-		return fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
-	}
-
-	log.Infof("Notfication sent to slack.")
 	return nil
 }
