@@ -1,5 +1,12 @@
 package notify
 
+import (
+	"fmt"
+
+	"github.com/sdslabs/beastv4/core/config"
+	log "github.com/sirupsen/logrus"
+)
+
 type Attachment struct {
 	Fallback     string            `json:"fallback,omitempty"`
 	Color        NotificationColor `json:"color,omitempty"`
@@ -73,4 +80,38 @@ func (req *Request) Post() error {
 		Channel:  "#beast",
 	}
 	return nil
+}
+
+func SendNotification(nType NotificationType, message string) error {
+	if config.Cfg.SlackWebHookURL != "" {
+		slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL, SlackProvider)
+
+		err := slackNotifier.SendNotification(nType, message)
+		if err != nil {
+			log.Errorf("Error while sending notification to slack : %s", err)
+			return fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+		}
+
+		log.Infof("Notfication sent to slack.")
+		return nil
+	} else {
+		log.Warnf("No slack webhook url provided in beast config, cannot send notification.")
+		return fmt.Errorf("No webhook URL in beast config.")
+	}
+
+	if config.Cfg.DiscordWebHookURL != "" {
+		discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, DiscordProvider)
+
+		err := discordNotifier.SendNotification(nType, message)
+		if err != nil {
+			log.Errorf("Error while sending notification to discord : %s", err)
+			return fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+		}
+
+		log.Infof("Notfication sent to discord.")
+		return nil
+	} else {
+		log.Warnf("No discord webhook url provided in beast config, cannot send notification.")
+		return fmt.Errorf("No webhook URL in beast config.")
+	}
 }

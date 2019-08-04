@@ -406,10 +406,10 @@ func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) {
 
 	err := bootstrapDeployPipeline(challengeDir, skipStage, skipCommit)
 	if err != nil {
-		notify.SendNotificationToSlack(notify.Error, err.Error())
+		notify.SendNotification(notify.Error, err.Error())
 	} else {
 		msg := fmt.Sprintf("DEPLOY SUCCESS : %s : Challenge deployment pipeline successful.", challengeName)
-		notify.SendNotificationToSlack(notify.Success, msg)
+		notify.SendNotification(notify.Success, msg)
 	}
 
 	log.Debugf("%s: Notification sent to slack", challengeName)

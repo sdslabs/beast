@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/sdslabs/beastv4/core/config"
-	log "github.com/sirupsen/logrus"
 )
 
 type DiscordNotificationProvider struct {
@@ -65,23 +62,5 @@ func (d *DiscordNotificationProvider) SendNotification(nType NotificationType, m
 		return fmt.Errorf("Error while posting payload for notification : %s", err)
 	}
 
-	return nil
-}
-
-func SendNotificationToDiscord(nType NotificationType, msg string) error {
-	if config.Cfg.DiscordWebHookURL == "" {
-		log.Warnf("No discord webhook url provided in beast config, cannot send notification.")
-		return fmt.Errorf("No webhook URL in beast config.")
-	}
-
-	discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, DiscordProvider)
-
-	err := discordNotifier.SendNotification(nType, msg)
-	if err != nil {
-		log.Errorf("Error while sending notification to discord : %s", err)
-		return fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
-	}
-
-	log.Infof("Notfication sent to discord.")
 	return nil
 }
