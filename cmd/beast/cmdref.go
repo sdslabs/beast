@@ -8,7 +8,7 @@ import (
 
 // automatically generate documentation for beast cli using cobra markdown docs
 var cmdRef = &cobra.Command{
-	Use:   "cmdref [-d]",
+	Use:   "cmdref [-r]",
 	Short: "Generate beast command reference",
 	Run: func(cmd *cobra.Command, args []string) {
 
