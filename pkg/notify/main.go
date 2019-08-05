@@ -89,14 +89,13 @@ func SendNotification(nType NotificationType, message string) error {
 		err := slackNotifier.SendNotification(nType, message)
 		if err != nil {
 			log.Errorf("Error while sending notification to slack : %s", err)
-			return fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+			fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
 		}
 
 		log.Infof("Notfication sent to slack.")
-		return nil
 	} else {
 		log.Warnf("No slack webhook url provided in beast config, cannot send notification.")
-		return fmt.Errorf("No webhook URL in beast config.")
+		fmt.Errorf("No webhook URL in beast config.")
 	}
 
 	if config.Cfg.DiscordWebHookURL != "" {
