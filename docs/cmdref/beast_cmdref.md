@@ -7,13 +7,14 @@ Generate beast command reference
 Generate beast command reference
 
 ```
-beast cmdref [flags]
+beast cmdref [-d] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for cmdref
+  -h, --help                         help for cmdref
+  -r, --reference-directory string   Generate beast command reference files in reference directory
 ```
 
 ### Options inherited from parent commands
