@@ -6,5 +6,6 @@ nav:
   - Setup: Setup.md
   - Documentation: Documentation.md
   - APIDocs: /apidocs.html
+  - CmdRef: cmdref/beast.md
 
 theme: cosmo

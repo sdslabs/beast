@@ -16,6 +16,9 @@ help:
 build: tools
 	@./scripts/build/build.sh
 
+cmdref: build
+	@${GOPATH}/bin/beast cmdref
+
 # Check go formatting
 check_format:
 	@echo "[*] Checking for formatting errors using gofmt"
