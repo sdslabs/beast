@@ -25,6 +25,7 @@ var (
 	Tag               string
 	LocalDirectory    string
 	DeleteEntry       bool
+	RefDirectory      string
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -85,6 +86,8 @@ func init() {
 	challengeCmd.PersistentFlags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Deploys challenge from local directory")
 	challengeCmd.PersistentFlags().BoolVarP(&DeleteEntry, "delete-entry", "d", false, "Deletes db entry related to this challenge")
 
+	cmdRef.PersistentFlags().StringVarP(&RefDirectory, "reference-directory", "r", "", "Generate beast command reference files in reference directory")
+
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(runCmd)
@@ -95,4 +98,5 @@ func init() {
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(challengeCmd)
 	rootCmd.AddCommand(disableAuthorSSH)
+	rootCmd.AddCommand(cmdRef)
 }

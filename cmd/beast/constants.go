@@ -8,4 +8,6 @@ const (
        tool for backdoor an always online wargaming web platform.
 
                      @SDSLabs IIT Roorkee`
+
+	DEFAULT_CMDREF_DIRECTORY string = "docs/cmdref/"
 )
