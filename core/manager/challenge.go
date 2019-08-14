@@ -140,6 +140,7 @@ func DeployChallengePipeline(challengeDir string) error {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		return err
 	}
+
 	database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
 
 	return Q.Push(wpool.Task{
@@ -559,7 +560,9 @@ func DeployChallenge(challengeName string) error {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		return err
 	}
-	database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	if chall.Name == "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
 	return Q.Push(*w)
 }
 
@@ -570,7 +573,10 @@ func UndeployChallenge(challengeName string) error {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		return err
 	}
-	database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+
+	if chall.Name == "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
 
 	return Q.Push(wpool.Task{
 		Info: TaskInfo{Action: core.MANAGE_ACTION_UNDEPLOY},
@@ -585,7 +591,9 @@ func PurgeChallenge(challengeName string) error {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		return err
 	}
-	database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	if chall.Name == "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
 
 	return Q.Push(wpool.Task{
 		Info: TaskInfo{Action: core.MANAGE_ACTION_PURGE},
@@ -600,7 +608,9 @@ func RedeployChallenge(challengeName string) error {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		return err
 	}
-	database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	if chall.Name == "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
 
 	return Q.Push(wpool.Task{
 		Info: TaskInfo{Action: core.MANAGE_ACTION_REDEPLOY},
