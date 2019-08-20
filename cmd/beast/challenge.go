@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
@@ -27,73 +25,21 @@ var challengeCmd = &cobra.Command{
 		if action == core.MANAGE_ACTION_SHOW {
 
 			if AllChalls {
-				challenges, err := database.QueryAllChallenges()
-				if err != nil {
-					log.Errorf("Cannot query database for challenges : %s", err.Error())
-					os.Exit(1)
-				} else {
+				errors := manager.ShowAllChallenges()
 
-					PrintTableHeader()
-					w := new(tabwriter.Writer)
-					var errors []error
-
-					for _, challenge := range challenges {
-
-						s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
-						fmt.Fprint(w, strings.Join(s, "\t"))
-						fmt.Fprint(w, "\t")
-						ports, err := database.GetAllocatedPorts(challenge)
-						if err != nil {
-							errors = append(errors, err)
-
-						}
-
-						for _, port := range ports {
-							fmt.Fprint(w, " ", port.PortNo)
-						}
-						fmt.Fprintln(w)
-					}
-
-					w.Flush()
-
+				if len(errors) > 0 {
 					for _, err := range errors {
-						log.Errorf("Cannot query database for challenges ports : %s", err.Error())
+						log.Errorf("The following errors occurred: %s", err.Error())
 					}
-
+					os.Exit(1)
 				}
+
 			} else if Tag != "" {
-				tagEntry := &database.Tag{
-					TagName: Tag,
-				}
-				challenges, err := database.QueryRelatedChallenges(tagEntry)
-				if err != nil {
-					log.Errorf("Cannot query database for related challenges : %s", err.Error())
+				errors := manager.ShowTagRelatedChallenges(Tag)
+
+				for _, err := range errors {
+					log.Errorf("The following errors occurred: %s", err.Error())
 					os.Exit(1)
-				} else {
-					PrintTableHeader()
-					w := new(tabwriter.Writer)
-					var errors []error
-
-					for _, challenge := range challenges {
-						s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
-						fmt.Fprint(w, strings.Join(s, "\t"))
-						fmt.Fprint(w, "\t")
-						ports, err := database.GetAllocatedPorts(challenge)
-						if err != nil {
-							errors = append(errors, err)
-						}
-
-						for _, port := range ports {
-							fmt.Fprint(w, " ", port.PortNo)
-						}
-						fmt.Fprintln(w)
-					}
-
-					w.Flush()
-
-					for _, err := range errors {
-						log.Errorf("Cannot query database for challenges ports : %s", err.Error())
-					}
 				}
 			} else {
 				if len(args) == 1 {
@@ -108,26 +54,10 @@ var challengeCmd = &cobra.Command{
 				}
 
 				if len(challenge) > 0 {
-					PrintTableHeader()
-					w := new(tabwriter.Writer)
-					var errors []error
-
-					s := []string{args[1], challenge[0].ContainerId[0:7], challenge[0].ImageId[0:7], challenge[0].Status}
-					fmt.Fprint(w, strings.Join(s, "\t"))
-					fmt.Fprint(w, "\t")
-					ports, err := database.GetAllocatedPorts(challenge[0])
-					if err != nil {
-						errors = append(errors, err)
-					}
-
-					for _, port := range ports {
-						fmt.Fprint(w, " ", port.PortNo)
-					}
-					fmt.Fprintln(w)
-					w.Flush()
-
+					errors := manager.ShowChallenge(challenge[0])
 					for _, err := range errors {
 						log.Errorf("Cannot query database for challenges ports : %s", err.Error())
+						os.Exit(1)
 					}
 
 				} else {
@@ -200,14 +130,4 @@ var challengeCmd = &cobra.Command{
 			}
 		}
 	},
-}
-
-func PrintTableHeader() {
-	w := new(tabwriter.Writer)
-	line := strings.Repeat("-", 180)
-	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-	fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
-	w.Flush()
-	fmt.Println(line)
-
 }
