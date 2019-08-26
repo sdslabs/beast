@@ -137,12 +137,6 @@ func DeployChallengePipeline(challengeDir string) error {
 		SkipCommit: false,
 	}
 
-	chall, err := database.QueryFirstChallengeEntry("name", challengeName)
-	if err != nil {
-		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
-		return err
-	}
-
 	//TODO: add status queued
 
 	return Q.Push(wpool.Task{
