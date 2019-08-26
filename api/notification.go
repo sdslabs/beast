@@ -21,13 +21,13 @@ func addNotification(c *gin.Context) {
 	title := c.PostForm("title")
 	desc := c.PostForm("desc")
 
-	Notify := database.Notification{
+	notify := database.Notification{
 		Title:       title,
 		Description: desc,
 	}
 
-	if msgs := database.AddNotification(&Notify); msgs != nil {
-		log.Info("error while adding notification")
+	if msgs := database.AddNotification(&notify); msgs != nil {
+		log.Info("Error while adding notification")
 	}
 }
 
@@ -37,22 +37,19 @@ func addNotification(c *gin.Context) {
 // @Tags notification
 // @Accept  json
 // @Produce json
-// @Param title query string true "Title of notification to be added"
-// @Param desc query string true "Description for the notification to be added"
+// @Param title query string true "Title of notification"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/notification/delete [post]
 func removeNotification(c *gin.Context) {
 	title := c.PostForm("title")
-	desc := c.PostForm("desc")
 
-	Notify := database.Notification{
-		Title:       title,
-		Description: desc,
+	notify := database.Notification{
+		Title: title,
 	}
 
-	if msgs := database.DeleteNotification(&Notify); msgs != nil {
-		log.Info("error while deleting notification")
+	if msgs := database.DeleteNotification(&notify); msgs != nil {
+		log.Info("Error while deleting notification")
 	}
 }
 
@@ -62,41 +59,25 @@ func removeNotification(c *gin.Context) {
 // @Tags notification
 // @Accept  json
 // @Produce json
-// @Param title query string true "Title of notification to be added"
-// @Param desc query string true "Description for the notification to be added"
+// @Param title query string true "Title of notification"
+// @Param description query string true "Description for the notification to be changed"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/notification/update [post]
 func updateNotifications(c *gin.Context) {
 	title := c.PostForm("title")
-	desc := c.PostForm("desc")
-	changedTitle := c.PostForm("changedTitle")
-	changedDesc := c.PostForm("changedDesc")
+	changedDescription := c.PostForm("description")
 
-	if title != "" && desc != "" {
-		Notify := database.Notification{
-			Title:       title,
-			Description: desc,
+	if title != "" && changedDescription != "" {
+		notify := database.Notification{
+			Title: title,
 		}
 
-		if title == "" && desc != "" {
-			if msgs := database.UpdateNotification(&Notify, map[string]interface{}{
-				"Description": changedDesc,
+		if changedDescription != "" {
+			if msgs := database.UpdateNotification(&notify, map[string]interface{}{
+				"Description": changedDescription,
 			}); msgs != nil {
-				log.Info("error while deleting notification")
-			}
-		} else if title != "" && desc == "" {
-			if msgs := database.UpdateNotification(&Notify, map[string]interface{}{
-				"Title": changedTitle,
-			}); msgs != nil {
-				log.Info("error while deleting notification")
-			}
-		} else {
-			if msgs := database.UpdateNotification(&Notify, map[string]interface{}{
-				"Title":       changedTitle,
-				"Description": changedDesc,
-			}); msgs != nil {
-				log.Info("error while deleting notification")
+				log.Info("Error while updating notification")
 			}
 		}
 	}
