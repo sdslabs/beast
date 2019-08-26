@@ -16,7 +16,7 @@ import (
 var challengeCmd = &cobra.Command{
 	Use:   "challenge action [challname] [-atld]",
 	Short: "Performs action to the challs",
-	Long:  "Performs actions like : deploy, undeploy, redeploy, purge, to the challs",
+	Long:  "Performs actions like : deploy, undeploy, redeploy, purge to the challs",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 
@@ -67,67 +67,68 @@ var challengeCmd = &cobra.Command{
 
 			}
 
-		} else {
+			return
+		}
 
-			challAction, ok := manager.ChallengeActionHandlers[action]
-			if !ok {
-				log.Errorf("No action %s exists", action)
+		challAction, ok := manager.ChallengeActionHandlers[action]
+		if !ok {
+			log.Errorf("No action %s exists", action)
+			os.Exit(1)
+		}
+
+		completionChannel := make(chan bool)
+
+		manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, completionChannel)
+		manager.Q.StartWorkers(&manager.Worker{})
+
+		if AllChalls {
+			errstrings := manager.HandleAll(action, core.BEAST_LOCAL_SERVER)
+			if len(errstrings) != 0 {
+				log.Errorf("Following errors occurred : %s", strings.Join(errstrings, " || "))
+				os.Exit(1)
+			} else {
+				log.Info("The action will be performed")
+			}
+		} else if Tag != "" {
+			errstrings := manager.HandleTagRelatedChallenges(action, Tag, core.BEAST_LOCAL_SERVER)
+			if len(errstrings) != 0 {
+				log.Errorf("Following errors occurred : %s", strings.Join(errstrings, " || "))
+				os.Exit(1)
+			} else {
+				log.Info("The action will be performed")
+			}
+		} else if LocalDirectory != "" {
+			err := manager.DeployChallengePipeline(LocalDirectory)
+			if err != nil {
+				log.Errorf("Following errors occurred : %v", err)
 				os.Exit(1)
 			}
-
-			completionChannel := make(chan bool)
-
-			manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, completionChannel)
-			manager.Q.StartWorkers(&manager.Worker{})
-
-			if AllChalls {
-				errstrings := manager.HandleAll(action, core.BEAST_LOCAL_SERVER)
-				if len(errstrings) != 0 {
-					log.Errorf("Following errors occurred : %s", strings.Join(errstrings, " || "))
-					os.Exit(1)
-				} else {
-					log.Info("The action will be performed")
-				}
-			} else if Tag != "" {
-				errstrings := manager.HandleTagRelatedChallenges(action, Tag, core.BEAST_LOCAL_SERVER)
-				if len(errstrings) != 0 {
-					log.Errorf("Following errors occurred : %s", strings.Join(errstrings, " || "))
-					os.Exit(1)
-				} else {
-					log.Info("The action will be performed")
-				}
-			} else if LocalDirectory != "" {
-				err := manager.DeployChallengePipeline(LocalDirectory)
-				if err != nil {
-					log.Errorf("Following errors occurred : %v", err)
-					os.Exit(1)
-				}
-			} else {
-				if len(args) == 1 {
-					log.Errorf("Provide chall name")
-					os.Exit(1)
-				}
-				err := challAction(args[1])
-				if err != nil {
-					log.Errorf("The action was not performed due to error : %s", err.Error())
-					os.Exit(1)
-				} else {
-					log.Info("The action will be performed")
-				}
+		} else {
+			if len(args) == 1 {
+				log.Errorf("Provide chall name")
+				os.Exit(1)
 			}
-			_ = <-completionChannel
-
-			if DeleteEntry && action == core.MANAGE_ACTION_PURGE {
-				log.Info("Deleting database entry")
-				if len(args) == 1 {
-					log.Errorf("Provide chall name")
-					os.Exit(1)
-				}
-				if err := utils.DeleteChallengeEntryWithPorts(args[1]); err != nil {
-					log.Error(err)
-					os.Exit(1)
-				}
+			err := challAction(args[1])
+			if err != nil {
+				log.Errorf("The action was not performed due to error : %s", err.Error())
+				os.Exit(1)
+			} else {
+				log.Info("The action will be performed")
 			}
 		}
+		_ = <-completionChannel
+
+		if DeleteEntry && action == core.MANAGE_ACTION_PURGE {
+			log.Info("Deleting database entry")
+			if len(args) == 1 {
+				log.Errorf("Provide chall name")
+				os.Exit(1)
+			}
+			if err := utils.DeleteChallengeEntryWithPorts(args[1]); err != nil {
+				log.Error(err)
+				os.Exit(1)
+			}
+		}
+
 	},
 }

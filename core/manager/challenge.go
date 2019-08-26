@@ -571,31 +571,30 @@ func ShowAllChallenges() []error {
 	if err != nil {
 
 		errors = append(errors, err)
-
-	} else {
-		w := new(tabwriter.Writer)
-		w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-		PrintTableHeader(w)
-
-		for _, challenge := range challenges {
-			s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
-			fmt.Fprint(w, strings.Join(s, "\t"))
-			fmt.Fprint(w, "\t")
-			ports, err := database.GetAllocatedPorts(challenge)
-			if err != nil {
-				errors = append(errors, err)
-
-			} else {
-				for _, port := range ports {
-					fmt.Fprint(w, " ", port.PortNo)
-				}
-			}
-			fmt.Fprintln(w)
-		}
-
-		w.Flush()
+		return errors
 
 	}
+	w := new(tabwriter.Writer)
+	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
+	PrintTableHeader(w)
+
+	for _, challenge := range challenges {
+		s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
+		fmt.Fprint(w, strings.Join(s, "\t"))
+		fmt.Fprint(w, "\t")
+		ports, err := database.GetAllocatedPorts(challenge)
+		if err != nil {
+			errors = append(errors, err)
+
+		} else {
+			for _, port := range ports {
+				fmt.Fprint(w, " ", port.PortNo)
+			}
+		}
+		fmt.Fprintln(w)
+	}
+
+	w.Flush()
 
 	return errors
 }
@@ -608,30 +607,30 @@ func ShowTagRelatedChallenges(Tag string) []error {
 	var errors []error
 	if err != nil {
 		errors = append(errors, err)
-	} else {
-		w := new(tabwriter.Writer)
-		w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-		PrintTableHeader(w)
+		return errors
+	}
+	w := new(tabwriter.Writer)
+	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
+	PrintTableHeader(w)
 
-		for _, challenge := range challenges {
-			s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
-			fmt.Fprint(w, strings.Join(s, "\t"))
-			fmt.Fprint(w, "\t")
-			ports, err := database.GetAllocatedPorts(challenge)
-			if err != nil {
-				errors = append(errors, err)
-			} else {
+	for _, challenge := range challenges {
+		s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
+		fmt.Fprint(w, strings.Join(s, "\t"))
+		fmt.Fprint(w, "\t")
+		ports, err := database.GetAllocatedPorts(challenge)
+		if err != nil {
+			errors = append(errors, err)
+		} else {
 
-				for _, port := range ports {
-					fmt.Fprint(w, " ", port.PortNo)
-				}
+			for _, port := range ports {
+				fmt.Fprint(w, " ", port.PortNo)
 			}
-
-			fmt.Fprintln(w)
 		}
 
-		w.Flush()
+		fmt.Fprintln(w)
 	}
+
+	w.Flush()
 
 	return errors
 }
