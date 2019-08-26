@@ -135,7 +135,7 @@ func challengeLogsHandler(c *gin.Context) {
 // @Success 200 {object} api.ChallengesResp
 // @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/info/challenges [get]
-func challengeInfoByFilterHandler(c *gin.Context) {
+func challengesInfoHandler(c *gin.Context) {
 	filter := c.Query("filter")
 	value := c.Query("value")
 
@@ -160,6 +160,7 @@ func challengeInfoByFilterHandler(c *gin.Context) {
 				Message:    "All Challenges",
 				Challenges: challNameString,
 			})
+			return
 		}
 	}
 

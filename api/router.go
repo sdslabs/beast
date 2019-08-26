@@ -53,7 +53,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/images/available", availableImagesHandler)
 			infoGroup.GET("/ports/used", usedPortsInfoHandler)
 			infoGroup.GET("/logs/", challengeLogsHandler)
-			infoGroup.GET("/challenges", challengeInfoByFilterHandler)
+			infoGroup.GET("/challenges", challengesInfoHandler)
 			infoGroup.GET("/challenges/available", availableChallengeHandler)
 		}
 
