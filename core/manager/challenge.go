@@ -235,13 +235,27 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	err = utils.ValidateFileExists(stagedFileName)
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
-		challengeDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
+		var challengeDir string
+		var errStrings []string
+		found := false
+		for _, gitRemote := range config.Cfg.GitRemotes {
+			if gitRemote.Active == true {
+				challengeDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
+				if err := ValidateChallengeDir(challengeDir); err != nil {
+					log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
+					errors := fmt.Errorf("CHALLENGE VALIDATION ERROR")
+					errStrings = append(errStrings, errors.Error())
+				} else {
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf(strings.Join(errStrings, "\n"))
+		}
 
 		/// TODO : remove multiple validation while deploying challenge
-		if err := ValidateChallengeDir(challengeDir); err != nil {
-			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
-			return nil, errors.New("CHALLENGE VALIDATION ERROR")
-		}
 
 		log.Debugf("Checking and pushing the task of deploying unstaged challenge in the queue.")
 
@@ -273,6 +287,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			Info: info,
 		}, nil
 	}
+	return nil, nil
 }
 
 // Handle multiple challenges simultaneously.
@@ -385,14 +400,20 @@ func HandleAll(action string, user string) []string {
 
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-		err, challenges := utils.GetDirsInDir(challengesDirRoot)
-		if err != nil {
-			break
-		}
-		for _, chall := range challenges {
-			//TODO : challenge transaction save for deploying is not done since ID is not provided here
-			challsNameList = append(challsNameList, chall)
+		var challengesDirRoot string
+		for _, gitRemote := range config.Cfg.GitRemotes {
+			if gitRemote.Active == true {
+				challengesDirRoot = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+
+				err, challenges := utils.GetDirsInDir(challengesDirRoot)
+				if err != nil {
+					break
+				}
+				for _, chall := range challenges {
+					//TODO : challenge transaction save for deploying is not done since ID is not provided here
+					challsNameList = append(challsNameList, chall)
+				}
+			}
 		}
 
 	case core.MANAGE_ACTION_UNDEPLOY:

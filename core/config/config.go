@@ -84,7 +84,7 @@ type BeastConfig struct {
 	BeastScriptsDir      string                `toml:"scripts_dir"`
 	AllowedBaseImages    []string              `toml:"allowed_base_images"`
 	AvailableSidecars    []string              `toml:"available_sidecars"`
-	GitRemote            GitRemote             `toml:"remote"`
+	GitRemotes           []GitRemote           `toml:"remote"`
 	JWTSecret            string                `toml:"jwt_secret"`
 	NotificationWebhooks []NotificationWebhook `toml:"notification_webhooks"`
 	TickerFrequency      int                   `toml:"ticker_frequency"`
@@ -137,9 +137,13 @@ func (config *BeastConfig) ValidateConfig() error {
 		return fmt.Errorf("Invalid config")
 	}
 
-	err := config.GitRemote.ValidateGitConfig()
-	if err != nil {
-		return err
+	for _, gitRemote := range config.GitRemotes {
+		if gitRemote.Active == true {
+			err := gitRemote.ValidateGitConfig()
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	if config.TickerFrequency <= 0 {
@@ -183,6 +187,7 @@ type GitRemote struct {
 	RemoteName string `toml:"name"`
 	Branch     string `toml:"branch"`
 	Secret     string `toml:"ssh_key"`
+	Active     bool   `toml:"active"`
 }
 
 func (config *GitRemote) ValidateGitConfig() error {
@@ -256,18 +261,21 @@ func UpdateUsedPortList() {
 	USED_PORTS_LIST = make([]uint32, 0)
 
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-	challengeDir := filepath.Join(beastRemoteDir, Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-
-	dirs := utils.GetAllDirectoriesName(challengeDir)
-	for _, dir := range dirs {
-		configFilePath := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
-		var config BeastChallengeConfig
-		_, err := toml.DecodeFile(configFilePath, &config)
-		if err == nil {
-			USED_PORTS_LIST = append(USED_PORTS_LIST, config.Challenge.Env.Ports...)
+	var challengeDir string
+	for _, gitRemote := range Cfg.GitRemotes {
+		if gitRemote.Active == true {
+			challengeDir = filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+			dirs := utils.GetAllDirectoriesName(challengeDir)
+			for _, dir := range dirs {
+				configFilePath := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
+				var config BeastChallengeConfig
+				_, err := toml.DecodeFile(configFilePath, &config)
+				if err == nil {
+					USED_PORTS_LIST = append(USED_PORTS_LIST, config.Challenge.Env.Ports...)
+				}
+			}
 		}
 	}
-
 	log.Debugf("Used port list updated: %v", USED_PORTS_LIST)
 }
 

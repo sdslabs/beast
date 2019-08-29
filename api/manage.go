@@ -248,17 +248,23 @@ func commitChallenge(c *gin.Context) {
 // @Router /api/manage/commit/ [post]
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
-	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
+	var challengeRemoteDir string
+	for _, gitRemote := range config.Cfg.GitRemotes {
+		if gitRemote.Active == true {
+			challengeRemoteDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
 
-	err := manager.ValidateChallengeConfig(challengeStagingDir)
-	if err != nil {
-		c.JSON(http.StatusOK, HTTPErrorResp{
-			Error: err.Error(),
-		})
-	} else {
-		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "This challenge can be deployed",
-		})
+			err := manager.ValidateChallengeConfig(challengeRemoteDir)
+			if err != nil {
+				c.JSON(http.StatusOK, HTTPErrorResp{
+					Error: err.Error(),
+				})
+			} else {
+				c.JSON(http.StatusOK, HTTPPlainResp{
+					Message: "This challenge can be deployed",
+				})
+				break
+			}
+		}
 	}
 }
 
