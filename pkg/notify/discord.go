@@ -17,6 +17,8 @@ func (d *DiscordNotificationProvider) SendNotification(nType NotificationType, m
 		return fmt.Errorf("Need a WebHookURL to send notification.")
 	}
 
+	d.Request.FillReqParams()
+
 	nAttachment := Attachment{
 		AuthorName: "Beast Notifier",
 		AuthorLink: "https://backdoor.sdslabs.co",

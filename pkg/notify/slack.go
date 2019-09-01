@@ -17,6 +17,8 @@ func (s *SlackNotificationProvider) SendNotification(nType NotificationType, msg
 		return fmt.Errorf("Need a WebHookURL to send notification.")
 	}
 
+	s.Request.FillReqParams()
+
 	nAttachment := Attachment{
 		AuthorName: "Beast Notifier",
 		AuthorLink: "https://backdoor.sdslabs.co",
