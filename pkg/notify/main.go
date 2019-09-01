@@ -73,7 +73,7 @@ func NewNotifier(URL string, ProviderType ProviderTypeEnum) Notifier {
 	return nil
 }
 
-func (req *Request) Post() error {
+func (req *Request) FillReqParams() error {
 	req.PostPayload = PostPayload{
 		Username: "Beast",
 		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
