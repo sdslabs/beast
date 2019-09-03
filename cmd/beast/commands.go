@@ -99,4 +99,5 @@ func init() {
 	rootCmd.AddCommand(challengeCmd)
 	rootCmd.AddCommand(disableAuthorSSH)
 	rootCmd.AddCommand(cmdRef)
+	rootCmd.AddCommand(generateTemplateCmd)
 }
