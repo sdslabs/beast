@@ -61,6 +61,10 @@ const (
 	DEFAULT_MEMORY_LIMIT           int64  = (1 << 29)
 	DEFAULT_PIDS_LIMIT             int64  = 100
 	DELIMITER                      string = "::::"
+	ITERATIONS                     int    = 65536
+	HASH_LENGTH                    int    = 32
+	TIMEPERIOD                     int64  = 6 * 60 * 60
+	ISSUER                         string = "beast-sds"
 )
 
 var (
@@ -75,6 +79,13 @@ var DEPLOY_STATUS = map[string]string{
 	"deployed":   "Deployed",
 	"building":   "Building",
 	"queued":     "Queued",
+}
+
+var USER_ROLES = map[string]string{
+	"contestant": "contestant",
+	"admin":      "admin",
+	"author":     "author",
+	"maintainer": "maintainer",
 }
 
 const MYSQL_SIDECAR_HOST = "mysql"

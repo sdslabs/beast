@@ -12,6 +12,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
+	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/scheduler"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 )
@@ -59,6 +60,8 @@ func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
 
 	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
 	manager.Q.StartWorkers(&manager.Worker{})
+
+	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret)
 
 	runBeastApiBootsteps()
 

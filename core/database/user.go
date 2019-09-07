@@ -15,76 +15,77 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/pkg/auth"
 	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
 )
 
-type Author struct {
+type User struct {
 	gorm.Model
+	auth.AuthModel
 
-	Challenges    []Challenge
-	Name          string `gorm:"not null"`
-	SshKey        string
-	Email         string `gorm:"non null"`
-	AuthChallenge []byte
+	Challenges []*Challenge `gorm:"many2many:user_challenges;"`
+	Name       string       `gorm:"not null"`
+	Email      string       `gorm:"non null"`
+	SshKey     string
 }
 
-// Queries all the authors entries where the column represented by key
+// Queries all the users entries where the column represented by key
 // have the value in value.
-func QueryAuthorEntries(key string, value string) ([]Author, error) {
+func QueryUserEntries(key string, value string) ([]User, error) {
 	queryKey := fmt.Sprintf("%s = ?", key)
 
-	var authors []Author
+	var users []User
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where(queryKey, value).Find(&authors)
+	tx := Db.Where(queryKey, value).Find(&users)
 	if tx.RecordNotFound() {
 		return nil, nil
 	}
 
 	if tx.Error != nil {
-		return authors, tx.Error
+		return users, tx.Error
 	}
 
-	return authors, nil
+	return users, nil
 }
 
-// Query all the entries in the Author table
-func QueryAllAuthors() ([]Author, error) {
-	var authors []Author
+// Query all the entries in the User table
+func QueryAllUsers() ([]User, error) {
+	var users []User
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Find(&authors)
+	tx := Db.Find(&users)
 	if tx.RecordNotFound() {
 		return nil, nil
 	}
 
-	return authors, tx.Error
+	return users, tx.Error
 }
 
 // Using the column value in key and value in value get the first
 // result of the query.
-func QueryFirstAuthorEntry(key string, value string) (Author, error) {
-	authors, err := QueryAuthorEntries(key, value)
+func QueryFirstUserEntry(key string, value string) (User, error) {
+	users, err := QueryUserEntries(key, value)
 	if err != nil {
-		return Author{}, err
+		return User{}, err
 	}
 
-	if len(authors) == 0 {
-		return Author{}, nil
+	if len(users) == 0 {
+		return User{}, nil
 	}
 
-	return authors[0], nil
+	return users[0], nil
 }
 
-// Create an entry for the author in the Author table
+// Create an entry for the user in the User table
 // It returns an error if anything wrong happen during the
 // transaction.
-func CreateAuthorEntry(author *Author) error {
+func CreateUserEntry(user *User) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 	tx := Db.Begin()
@@ -93,7 +94,7 @@ func CreateAuthorEntry(author *Author) error {
 		return fmt.Errorf("Error while starting transaction", tx.Error)
 	}
 
-	if err := tx.FirstOrCreate(author, *author).Error; err != nil {
+	if err := tx.FirstOrCreate(user, *user).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -101,23 +102,23 @@ func CreateAuthorEntry(author *Author) error {
 	return tx.Commit().Error
 }
 
-// Update an entry for the author in the Author table
-func UpdateAuthor(author *Author, m map[string]interface{}) error {
+// Update an entry for the user in the User table
+func UpdateUser(user *User, m map[string]interface{}) error {
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	return Db.Model(author).Update(m).Error
+	return Db.Model(user).Update(m).Error
 }
 
 //Get Related Challenges
-func GetRelatedChallenges(author *Author) ([]Challenge, error) {
+func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	var challenges []Challenge
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(author).Related(&challenges).Error; err != nil {
+	if err := Db.Model(user).Related(&challenges).Error; err != nil {
 		return challenges, err
 	}
 
@@ -125,27 +126,33 @@ func GetRelatedChallenges(author *Author) ([]Challenge, error) {
 }
 
 //hook after create
-func (author *Author) AfterCreate(scope *gorm.Scope) error {
-	if err := addToAuthorizedKeys(author); err != nil {
-		return fmt.Errorf("Error while adding authorized_keys : %s", err)
+func (user *User) AfterCreate(scope *gorm.Scope) error {
+	if user.SshKey == "" {
+		return nil
+	}
+	if err := addToAuthorizedKeys(user); err != nil {
+		return fmt.Errorf("Error while adding userized_keys : %s", err)
 	}
 	return nil
 }
 
 //hook after update
-func (author *Author) AfterUpdate(scope *gorm.Scope) error {
+func (user *User) AfterUpdate(scope *gorm.Scope) error {
 	iFace, _ := scope.InstanceGet("gorm:update_attrs")
 	updatedAttr := iFace.(map[string]interface{})
 	if _, ok := updatedAttr["ssh_key"]; ok {
-		err := deleteFromAuthorizedKeys(author)
+		err := deleteFromAuthorizedKeys(user)
 		if err != nil {
-			return fmt.Errorf("Error while deleting from authorized_keys : %s", err)
+			return fmt.Errorf("Error while deleting from userized_keys : %s", err)
 		}
-		err = addToAuthorizedKeys(author)
+		if user.SshKey == "" {
+			return nil
+		}
+		err = addToAuthorizedKeys(user)
 		if err != nil {
-			return fmt.Errorf("Error while adding authorized_keys : %s", err)
+			return fmt.Errorf("Error while adding userized_keys : %s", err)
 		}
-		err = updateScript(author)
+		err = updateScript(user)
 		if err != nil {
 			return fmt.Errorf("Error while updating script : %s", err)
 		}
@@ -154,26 +161,26 @@ func (author *Author) AfterUpdate(scope *gorm.Scope) error {
 }
 
 // Updating data in same transaction
-func (author *Author) AfterDelete(tx *gorm.DB) error {
-	err := deleteFromAuthorizedKeys(author)
+func (user *User) AfterDelete(tx *gorm.DB) error {
+	err := deleteFromAuthorizedKeys(user)
 	return err
 }
 
 type AuthorizedKeyTemplate struct {
-	AuthorID string
-	Command  string
-	PubKey   string
+	UserID  string
+	Command string
+	PubKey  string
 }
 
-func generateContentAuthorizedKeyFile(author *Author) ([]byte, error) {
+func generateContentAuthorizedKeyFile(user *User) ([]byte, error) {
 	SHA256 := sha256.New()
-	SHA256.Write([]byte(author.Email))
+	SHA256.Write([]byte(user.Email))
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
 
 	data := AuthorizedKeyTemplate{
-		AuthorID: strconv.Itoa(int(author.Model.ID)),
-		Command:  scriptPath,
-		PubKey:   author.SshKey,
+		UserID:  strconv.Itoa(int(user.Model.ID)),
+		Command: scriptPath,
+		PubKey:  user.SshKey,
 	}
 
 	var authKey bytes.Buffer
@@ -191,18 +198,19 @@ func generateContentAuthorizedKeyFile(author *Author) ([]byte, error) {
 }
 
 //adds to authorized keys
-func addToAuthorizedKeys(author *Author) error {
+func addToAuthorizedKeys(user *User) error {
 	if config.Cfg == nil {
 		log.Warn("No config initialized, skipping add to authorized keys hook")
 		return nil
 	}
+
 	f, err := os.OpenFile(config.Cfg.AuthorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("Error while opening authorized keys file : %s", err)
+		return fmt.Errorf("Error while opening userized keys file : %s", err)
 	}
 	defer f.Close()
 
-	authBytes, err := generateContentAuthorizedKeyFile(author)
+	authBytes, err := generateContentAuthorizedKeyFile(user)
 	if err != nil {
 		return err
 	}
@@ -210,22 +218,24 @@ func addToAuthorizedKeys(author *Author) error {
 	authBytes = bytes.Replace(authBytes, []byte("&#43;"), []byte("+"), -1)
 
 	if _, err := f.Write(authBytes); err != nil {
-		return fmt.Errorf("Error while appending key to authorized keys file : %s", err)
+		return fmt.Errorf("Error while appending key to userized keys file : %s", err)
 	}
 	return nil
 }
 
-func deleteFromAuthorizedKeys(author *Author) error {
+func deleteFromAuthorizedKeys(user *User) error {
+
 	if config.Cfg == nil {
 		log.Warn("Config is not initialized, skipping delete from auth keys hook")
 		return nil
 	}
+
 	keys, err := ioutil.ReadFile(config.Cfg.AuthorizedKeysFile)
 	if err != nil {
 		return fmt.Errorf("Error while reading auth file : %s", err)
 	}
 
-	regex := "(?m)[\r\n]+^.*\"SSH_USER=" + strconv.Itoa(int(author.ID)) + "\".*$"
+	regex := "(?m)[\r\n]+^.*\"SSH_USER=" + strconv.Itoa(int(user.ID)) + "\".*$"
 
 	re := regexp.MustCompile(regex)
 	newKeys := []byte(re.ReplaceAllString(string(keys), ""))

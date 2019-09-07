@@ -11,7 +11,7 @@ type Transaction struct {
 	gorm.Model
 
 	Action      string
-	AuthorID    uint `gorm:"not null"`
+	UserID      uint `gorm:"not null"`
 	ChallengeID uint `gorm:"not null"`
 }
 

@@ -2,7 +2,6 @@ package manager
 
 import (
 	"bytes"
-	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -10,7 +9,6 @@ import (
 	"text/template"
 
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/auth"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
@@ -353,9 +351,9 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	if challEntry.Name == "" {
 		// For creating a new entry for the challenge first create an entry
 		// in the challenge table using the config file.
-		authorEntry, err := database.QueryFirstAuthorEntry("email", config.Author.Email)
+		userEntry, err := database.QueryFirstUserEntry("email", config.Author.Email)
 		if err != nil {
-			return fmt.Errorf("Error while querying author with email %s", config.Author.Email)
+			return fmt.Errorf("Error while querying user with email %s", config.Author.Email)
 		}
 
 		tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
@@ -369,34 +367,21 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			}
 		}
 
-		if authorEntry.Email == "" {
-			// Create a new authentication challenge message for the user.
-			rMessage := make([]byte, 128)
-			rand.Read(rMessage)
+		if userEntry.Email == "" {
 
-			authorEntry = database.Author{
-				Name:          config.Author.Name,
-				Email:         config.Author.Email,
-				SshKey:        config.Author.SSHKey,
-				AuthChallenge: rMessage,
-			}
-
-			err = database.CreateAuthorEntry(&authorEntry)
-			if err != nil {
-				return fmt.Errorf("Error while creating author entry(%s) : %s", config.Author.Name, err)
-			}
-
+			return fmt.Errorf("User with the given email does not exist : %v", config.Author.Email)
 		} else {
-			if authorEntry.Email != config.Author.Email &&
-				authorEntry.SshKey != config.Author.SSHKey &&
-				authorEntry.Name != config.Author.Name {
-				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", authorEntry.Name)
+			if userEntry.Email != config.Author.Email &&
+				userEntry.SshKey != config.Author.SSHKey &&
+				userEntry.Name != config.Author.Name &&
+				userEntry.Role != core.USER_ROLES["author"] {
+				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", userEntry.Name)
 			}
 		}
 
 		*challEntry = database.Challenge{
 			Name:        config.Challenge.Metadata.Name,
-			AuthorID:    authorEntry.ID,
+			AuthorID:    userEntry.ID,
 			Format:      config.Challenge.Metadata.Type,
 			Status:      core.DEPLOY_STATUS["unknown"],
 			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
@@ -502,20 +487,20 @@ func LogTransaction(identifier string, action string, authorization string) erro
 	// We are trying to get the username for the request from JWT claims here
 	// Since upto this point the request is already authorized, we use a default
 	// username if any error occurs while getting the username.
-	userName, err := auth.GetUser(authorization)
+	userName, err := coreUtils.GetUser(authorization)
 	if err != nil {
 		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
 		userName = core.DEFAULT_USER_NAME
 	}
 
-	author, err := database.QueryFirstAuthorEntry("name", userName)
+	user, err := database.QueryFirstUserEntry("username", userName)
 	if err != nil {
 		return fmt.Errorf("Error while querying user corresponding to request: %s", err)
 	}
 
 	TransactionEntry := database.Transaction{
 		Action:      action,
-		AuthorID:    author.ID,
+		UserID:      user.ID,
 		ChallengeID: challenge.ID,
 	}
 

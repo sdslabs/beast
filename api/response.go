@@ -15,11 +15,6 @@ type HTTPAuthorizeResp struct {
 	Message string `json:"message" example:"Response message"`
 }
 
-type AuthorizationChallengeResp struct {
-	Challenge []byte `json:"challenge" example:"Challenge String"`
-	Message   string `json:"message" example:"Response message"`
-}
-
 type AvailableImagesResp struct {
 	Message string   `json:"message" example:"Available Base images."`
 	Images  []string `json:"images" example:"['ubuntu16.04', 'ubuntu18.04']"`
@@ -36,6 +31,7 @@ type ChallengeStatusResp struct {
 	Status    string    `json:"status" example:"deployed"`
 	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }
+
 type ChallengesResp struct {
 	Message    string
 	Challenges []string

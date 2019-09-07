@@ -1,39 +1,43 @@
 package utils
 
 import (
-	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 )
 
-func CreateAuthor(name, email, publicKeyPath string) {
-	err := utils.ValidateFileExists(publicKeyPath)
-	if err != nil {
-		log.Error("Error while checking file existence: %v", err)
-		return
+func CreateAuthor(name, username, email, publicKeyPath, password string) {
+	var sshKey []byte
+	if publicKeyPath != "" {
+		err := utils.ValidateFileExists(publicKeyPath)
+		if err != nil {
+			log.Error("Error while checking validity of file(%v): %v : ", publicKeyPath, err)
+			return
+		}
+
+		sshKey, err = ioutil.ReadFile(publicKeyPath)
+		if err != nil {
+			log.Error("Error while reading file: %v", err)
+			return
+		}
+
+	} else {
+		log.Warn("SSH Key for author is not provided")
 	}
 
-	sshKey, err := ioutil.ReadFile(publicKeyPath)
-	if err != nil {
-		log.Error("Error while reading file: %v", err)
-		return
+	userEntry := database.User{
+		Name:      name,
+		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["author"]),
+		Email:     email,
+		SshKey:    string(sshKey),
 	}
 
-	rMessage := make([]byte, 128)
-	rand.Read(rMessage)
-
-	authorEntry := database.Author{
-		Name:          name,
-		Email:         email,
-		SshKey:        string(sshKey),
-		AuthChallenge: rMessage,
-	}
-
-	err = database.CreateAuthorEntry(&authorEntry)
+	err := database.CreateUserEntry(&userEntry)
 	if err != nil {
 		log.Error("Error while creating author entry : %v", err)
 	}

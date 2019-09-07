@@ -6,12 +6,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var disableAuthorSSH = &cobra.Command{
+var disableUserSSH = &cobra.Command{
 	Use:   "disable-author-ssh",
 	Short: "Disables current authors to ssh into the containers",
 	Run: func(cmd *cobra.Command, args []string) {
 		config.InitConfig()
-
-		auth.DisableAuthorSSH()
+		auth.DisableUserSSH()
 	},
 }

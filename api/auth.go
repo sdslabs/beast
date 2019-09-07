@@ -5,8 +5,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sdslabs/beastv4/core/auth"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/auth"
 )
 
 // Acts as a middleware to authorize user
@@ -48,19 +50,27 @@ func authorize(c *gin.Context) {
 }
 
 // Handles route related to receive JWT token
-// @Summary Handles solution check and token production
-// @Description JWT can be received by sending back correct answer to challenge
+// @Summary Handles signin and token production
+// @Description JWT can be received by signing in
 // @Tags auth
 // @Accept json
 // @Produce json
 // @Success 200 {object} api.HTTPAuthorizeResp
 // @Failure 401 {object} api.HTTPPlainResp
-// @Router /auth/:username [post]
-func getJWT(c *gin.Context) {
-	username := c.Param("username")
-	decrMess := c.PostForm("decrmess")
+// @Router /auth/signin [post]
+func signin(c *gin.Context) {
+	username := c.PostForm("username")
+	password := c.PostForm("password")
 
-	jwt, err := auth.GenerateJWT(username, decrMess)
+	userEntry, err := database.QueryFirstUserEntry("username", username)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: err.Error(),
+		})
+	}
+
+	jwt, err := auth.Authenticate(username, password, userEntry.AuthModel)
 
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
@@ -76,18 +86,30 @@ func getJWT(c *gin.Context) {
 	return
 }
 
-// Handles route related to getting user challenge for authorization
-// @Summary Handles challenge generation
-// @Description Sends challenge for authorization of user
+// Signup
+// @Summary Signup for the user
+// @Description Signup route for the user
 // @Tags auth
 // @Produce json
-// @Success 200 {object} api.AuthorizationChallengeResp
+// @Success 200 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
-// @Router /auth/:username [get]
-func getAuthChallenge(c *gin.Context) {
-	username := c.Param("username")
+// @Router /auth/signup [post]
+func signup(c *gin.Context) {
 
-	challenge, err := auth.GenerateAuthChallenge(username)
+	name := c.PostForm("name")
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+	email := c.PostForm("email")
+	sshKey := c.PostForm("ssh-key")
+
+	userEntry := database.User{
+		Name:      name,
+		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["maintainer"]),
+		Email:     email,
+		SshKey:    sshKey,
+	}
+
+	err := database.CreateUserEntry(&userEntry)
 
 	if err != nil {
 		c.JSON(http.StatusNotAcceptable, HTTPPlainResp{
@@ -96,9 +118,8 @@ func getAuthChallenge(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, AuthorizationChallengeResp{
-		Challenge: []byte(challenge),
-		Message:   "Solve the above challenge and POST to same route to get AUTHORIZATION KEY",
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "User created successfully",
 	})
 	return
 }

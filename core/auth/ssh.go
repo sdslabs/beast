@@ -75,19 +75,19 @@ func ParsePrivateKey(keyFile string) (*rsa.PrivateKey, error) {
 }
 
 // This function disables the SSH based container access to all the current users
-func DisableAuthorSSH() {
-	authors, err := database.QueryAllAuthors()
+func DisableUserSSH() {
+	users, err := database.QueryAllUsers()
 	if err != nil {
 		log.Errorf("DB ERROR : %v", err)
 		return
 	}
-	for _, author := range authors {
+	for _, user := range users {
 		SHA256 := sha256.New()
-		SHA256.Write([]byte(author.Email))
+		SHA256.Write([]byte(user.Email))
 		scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
 
 		data := database.ScriptFile{
-			Author: author.Name,
+			User: user.Name,
 		}
 
 		var script bytes.Buffer

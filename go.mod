@@ -71,3 +71,5 @@ require (
 	gopkg.in/src-d/go-git.v4 v4.7.0
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
+
+go 1.13

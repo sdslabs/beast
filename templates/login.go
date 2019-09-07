@@ -3,7 +3,7 @@ package templates
 // This template is to be inserted in the authorized_keys file which contains
 // authorized ssh keys to login to the challenge container
 var AUTHORIZED_KEY_TEMPLATE string = `
-command="{{.Command}}",environment="SSH_USER={{.AuthorID}}",no-agent-forwarding,no-port-forwarding,no-X11-forwarding` +
+command="{{.Command}}",environment="SSH_USER={{.UserID}}",no-agent-forwarding,no-port-forwarding,no-X11-forwarding` +
 	` {{.PubKey}} `
 
 // This script will be run for each login, and command will be forced
