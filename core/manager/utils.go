@@ -235,7 +235,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 
 	var dockerfile bytes.Buffer
 	log.Debugf("Preparing dockerfile template")
-	dockerfileTemplate, err := template.New("dockerfile").Parse(tools.BEAST_BARE_DOCKERFILE_TEMPLATE)
+	dockerfileTemplate, err := template.New("dockerfile").Parse(tools.BEAST_DOCKERFILE_TEMPLATE)
 	if err != nil {
 		return "", fmt.Errorf("Error while parsing Dockerfile template :: %s", err)
 	}
