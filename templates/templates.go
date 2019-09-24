@@ -22,7 +22,7 @@ ssh_key   = {{.AuthorPubKey}}                    # Required: Public SSH key for 
     sidecar          = {{.SidecarHelper}}        # Specify helper sidecar container for example mysql
 `
 
-var BEAST_BARE_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
+var BEAST_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
 FROM {{.DockerBaseImage}}
 
 LABEL version="0.2"
@@ -33,18 +33,18 @@ RUN useradd -u 1337 -g 1337 -ms /bin/bash beast
 
 RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install {{.AptDeps}}
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 {{if .Ports}}EXPOSE {{.Ports}} {{end}}
 VOLUME ["{{.MountVolume}}"]
 
 COPY . /challenge
 
+WORKDIR /challenge
+
 RUN cd /challenge {{ range $index, $elem := .SetupScripts}} && \
-	chmod u+x {{$elem}} {{end}} {{ range $index, $elem := .SetupScripts}} && \
+    chmod u+x {{$elem}} {{end}} {{ range $index, $elem := .SetupScripts}} && \
     ./{{$elem}} {{end}}
 
-WORKDIR /challenge
 {{if not .Entrypoint}}
 RUN touch /entrypoint.sh && \
     echo "#!/bin/bash" > /entrypoint.sh && \
@@ -64,6 +64,6 @@ RUN chmod u+x {{.Entrypoint}}
 {{end}}
 WORKDIR /challenge
 RUN chmod 600 /challenge/beast.toml {{ range $index, $elem := .Executables}} && \
-	chmod +x {{$elem}} {{end}}
+    chmod +x {{$elem}} {{end}}
 ENTRYPOINT ["{{if .Entrypoint}}{{.Entrypoint}}{{else}}/entrypoint.sh{{end}}"]
 `
