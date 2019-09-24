@@ -101,7 +101,15 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 		}
 
 	default:
-		log.Errorf("The action(%s) specified for challenge : %s does not exist", info.Action, w.ID)
+		chall, err := database.QueryFirstChallengeEntry("name", w.ID)
+		if err != nil {
+			log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		}
+
+		if chall.Name != "" {
+			database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
+			log.Errorf("The action(%s) specified for challenge : %s does not exist", info.Action, w.ID)
+		}
 	}
 
 	return nil
@@ -128,6 +136,9 @@ func DeployChallengePipeline(challengeDir string) error {
 		SkipStage:  false,
 		SkipCommit: false,
 	}
+
+	//TODO: add status queued
+
 	return Q.Push(wpool.Task{
 		ID:   challengeName,
 		Info: info,
@@ -539,10 +550,30 @@ func DeployChallenge(challengeName string) error {
 	if err != nil {
 		return err
 	}
+
+	chall, err := database.QueryFirstChallengeEntry("name", challengeName)
+	if err != nil {
+		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		return err
+	}
+	if chall.Name != "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
 	return Q.Push(*w)
 }
 
 func UndeployChallenge(challengeName string) error {
+
+	chall, err := database.QueryFirstChallengeEntry("name", challengeName)
+	if err != nil {
+		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		return err
+	}
+
+	if chall.Name != "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
+
 	return Q.Push(wpool.Task{
 		Info: TaskInfo{Action: core.MANAGE_ACTION_UNDEPLOY},
 		ID:   challengeName,
@@ -550,6 +581,16 @@ func UndeployChallenge(challengeName string) error {
 }
 
 func PurgeChallenge(challengeName string) error {
+
+	chall, err := database.QueryFirstChallengeEntry("name", challengeName)
+	if err != nil {
+		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		return err
+	}
+	if chall.Name != "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
+
 	return Q.Push(wpool.Task{
 		Info: TaskInfo{Action: core.MANAGE_ACTION_PURGE},
 		ID:   challengeName,
@@ -557,6 +598,16 @@ func PurgeChallenge(challengeName string) error {
 }
 
 func RedeployChallenge(challengeName string) error {
+
+	chall, err := database.QueryFirstChallengeEntry("name", challengeName)
+	if err != nil {
+		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		return err
+	}
+	if chall.Name != "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
+
 	return Q.Push(wpool.Task{
 		Info: TaskInfo{Action: core.MANAGE_ACTION_REDEPLOY},
 		ID:   challengeName,
