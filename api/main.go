@@ -91,5 +91,6 @@ func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
 		go manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
 	}
 
+	go manager.SidecarDeployer()
 	router.Run(port)
 }

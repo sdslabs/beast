@@ -18,17 +18,16 @@ type MySQLDeployer struct{}
 
 const MYSQL_SIDECAR_PORT uint32 = 9500
 
-func (a *MySQLDeployer) DeploySidecar(config *cr.CreateContainerConfig) error {
-	err := coreutils.CleanupContainerByFilter("name", core.MYSQL_SIDECAR_HOST)
-	if err != nil {
-		log.Errorf("Error while cleaning old MySQL container : %s", err)
-		return errors.New("CLEANUP_ERROR")
-	}
-
+func (a *MySQLDeployer) DeploySidecar() error {
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.MYSQL_SIDECAR_HOST)})
 	if len(images) == 0 {
-		log.Debugf("MySQL image does not exist, build image manually")
-		return errors.New("IMAGE_NOT_FOUND_ERROR")
+		log.Debugf("MySQL image does not exist, building image")
+		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/remote/temp/challenges/mysql")
+		buff, imageID, err := cr.BuildImageFromTarContext("mysql", "", imageLocation)
+		if buff == nil || err != nil {
+			return errors.New("IMAGE_NOT_FOUND_ERROR")
+		}
+		log.Infof("Image ID of image : %s", imageID)
 	}
 
 	imageId := images[0].ID[7:]
@@ -45,6 +44,25 @@ func (a *MySQLDeployer) DeploySidecar(config *cr.CreateContainerConfig) error {
 		p := fmt.Errorf("BEAST STATIC: Authentication file does not exist for beast static container, cannot proceed deployment")
 		log.Error(p.Error())
 		return p
+	}
+
+	networkList, err := cr.SearchNetworkByFilter(map[string]string{"networkName": "beast-mysql"})
+	if networkList == nil || err != nil {
+		log.Warnf("No MySQL network found. Creating one")
+		networkconfig := &cr.CreateNetworkConfig{
+			NetworkName: "beast-mysql",
+		}
+		network, err := cr.CreateNetwork(networkconfig)
+		if network == "" || err != nil {
+			log.Errorf("Error in creating beast network.")
+			return nil
+		}
+	}
+
+	container, err := cr.SearchContainerByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.MYSQL_SIDECAR_HOST)})
+	if len(container) != 0 {
+		log.Infof("Container for mysql sidecar with name mysql already exists.")
+		return nil
 	}
 
 	staticMount := make(map[string]string)
@@ -83,7 +101,7 @@ func (a *MySQLDeployer) DeploySidecar(config *cr.CreateContainerConfig) error {
 	return nil
 }
 
-func (a *MySQLDeployer) UndeploySidecar(config *cr.CreateContainerConfig) error {
+func (a *MySQLDeployer) UndeploySidecar() error {
 	err := coreutils.CleanupContainerByFilter("name", core.MYSQL_SIDECAR_HOST)
 	if err != nil {
 		log.Errorf("Error while cleaning old MySQL container : %s", err)

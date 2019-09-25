@@ -5,7 +5,7 @@ import (
 
 	"github.com/sdslabs/beastv4/core/sidecar/mongo"
 	"github.com/sdslabs/beastv4/core/sidecar/mysql"
-	"github.com/sdslabs/beastv4/pkg/cr"
+	"github.com/sdslabs/beastv4/core/sidecar/static"
 )
 
 type SidecarAgent interface {
@@ -25,8 +25,8 @@ func GetSidecarAgent(sidecar string) (SidecarAgent, error) {
 }
 
 type SidecarDeployer interface {
-	DeploySidecar(configPath *cr.CreateContainerConfig) error
-	UndeploySidecar(configPath *cr.CreateContainerConfig) error
+	DeploySidecar() error
+	UndeploySidecar() error
 }
 
 func GetSidecarDeployer(sidecar string) (SidecarDeployer, error) {
@@ -35,6 +35,8 @@ func GetSidecarDeployer(sidecar string) (SidecarDeployer, error) {
 		return &mysql.MySQLDeployer{}, nil
 	case "mongo":
 		return &mongo.MongoDeployer{}, nil
+	case "beast-static":
+		return &static.StaticDeployer{}, nil
 	default:
 		return nil, fmt.Errorf("Not a valid sidecar name: %s", sidecar)
 	}

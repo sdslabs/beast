@@ -75,6 +75,7 @@ var DEPLOY_STATUS = map[string]string{
 
 const MYSQL_SIDECAR_HOST = "mysql"
 const MONGO_SIDECAR_HOST = "mongo"
+const STATIC_SIDECAR_HOST = "beast-static"
 
 var SIDECAR_CONTAINER_MAP = map[string]string{
 	"mysql": "mysql",

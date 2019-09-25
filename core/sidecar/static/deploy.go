@@ -1,4 +1,4 @@
-package mongo
+package static
 
 import (
 	"errors"
@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
-	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	coreutils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/utils"
@@ -14,14 +13,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type MongoDeployer struct{}
+type StaticDeployer struct{}
 
-const MONGO_SIDECAR_PORT uint32 = 9501
+const STATIC_SIDECAR_PORT uint32 = 8080
 
-func (a *MongoDeployer) DeploySidecar() error {
-	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.MONGO_SIDECAR_HOST)})
+func (a *StaticDeployer) DeploySidecar() error {
+	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.STATIC_SIDECAR_HOST)})
 	if len(images) == 0 {
-		log.Debugf("Mongo image does not exist, build image manually")
+		log.Debugf("Static image does not exist, build image manually")
 		return errors.New("IMAGE_NOT_FOUND_ERROR")
 	}
 
@@ -41,26 +40,22 @@ func (a *MongoDeployer) DeploySidecar() error {
 		return p
 	}
 
+	container, err := cr.SearchContainerByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.STATIC_SIDECAR_HOST)})
+	if len(container) != 0 {
+		log.Infof("Container for static sidecar with name beast-static already exists.")
+		return nil
+	}
+
 	staticMount := make(map[string]string)
 	staticMount[stagingDirPath] = core.BEAST_STAGING_AREA_MOUNT_POINT
 	staticMount[beastStaticAuthFile] = filepath.Join("/", core.BEAST_STATIC_AUTH_FILE)
-	port := []uint32{MONGO_SIDECAR_PORT}
-	mongoRootPassword := coreUtils.RandString(8)
-	mongoRootUsername := coreUtils.RandString(8)
-	m := map[string]string{
-		"MONGO_INITDB_ROOT_USERNAME": mongoRootPassword,
-		"MONGO_INITDB_ROOT_PASSWORD": mongoRootUsername,
-	}
-
-	count := len(m)
-	all := make([]string, count*2)
+	port := []uint32{STATIC_SIDECAR_PORT}
 
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        port,
 		ImageId:          imageId,
-		ContainerName:    "mongo",
-		ContainerNetwork: "beast-mongo",
-		ContainerEnv:     all,
+		ContainerName:    "beast-static",
+		ContainerNetwork: "beast-static",
 	}
 	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {
@@ -73,18 +68,17 @@ func (a *MongoDeployer) DeploySidecar() error {
 		return errors.New("CONTAINER_ERROR")
 	}
 
-	log.Infof("Mongo CONTAINER deployed and started : %s", containerId)
+	log.Infof("Beast-static CONTAINER deployed and started : %s", containerId)
 
-	return nil
 	return nil
 }
 
-func (a *MongoDeployer) UndeploySidecar() error {
-	err := coreutils.CleanupContainerByFilter("name", core.MONGO_SIDECAR_HOST)
+func (a *StaticDeployer) UndeploySidecar() error {
+	err := coreutils.CleanupContainerByFilter("name", core.STATIC_SIDECAR_HOST)
 	if err != nil {
-		log.Errorf("Error while cleaning old Mongo container : %s", err)
+		log.Errorf("Error while cleaning old beast-static container : %s", err)
 	} else {
-		log.Infof("Mongo container undeployed")
+		log.Infof("Beast-static container undeployed")
 	}
 	return nil
 }
