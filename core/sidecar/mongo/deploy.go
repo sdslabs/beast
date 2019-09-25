@@ -22,7 +22,12 @@ func (a *MongoDeployer) DeploySidecar() error {
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.MONGO_SIDECAR_HOST)})
 	if len(images) == 0 {
 		log.Debugf("Mongo image does not exist, build image manually")
-		return errors.New("IMAGE_NOT_FOUND_ERROR")
+		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/remote/temp/challenges/mongo/")
+		buff, imageID, err := cr.BuildImageFromTarContext("mongo", "", imageLocation)
+		if buff == nil || err != nil {
+			return errors.New("IMAGE_NOT_FOUND_ERROR")
+		}
+		log.Infof("Image ID of image : %s", imageID)
 	}
 
 	imageId := images[0].ID[7:]
@@ -39,6 +44,25 @@ func (a *MongoDeployer) DeploySidecar() error {
 		p := fmt.Errorf("BEAST STATIC: Authentication file does not exist for beast static container, cannot proceed deployment")
 		log.Error(p.Error())
 		return p
+	}
+
+	networkList, err := cr.SearchNetworkByFilter(map[string]string{"networkName": "beast-mongo"})
+	if networkList == nil || err != nil {
+		log.Warnf("No Mongo network found. Creating one")
+		networkconfig := &cr.CreateNetworkConfig{
+			NetworkName: "beast-mongo",
+		}
+		network, err := cr.CreateNetwork(networkconfig)
+		if network == "" || err != nil {
+			log.Errorf("Error in creating beast network.")
+			return nil
+		}
+	}
+
+	container, err := cr.SearchContainerByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.MONGO_SIDECAR_HOST)})
+	if len(container) != 0 {
+		log.Infof("Container for mongo sidecar with name Mongo already exists.")
+		return nil
 	}
 
 	staticMount := make(map[string]string)
