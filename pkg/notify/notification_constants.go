@@ -15,3 +15,9 @@ const (
 	WarningColor NotificationColor = "#FF4500"
 	SuccessColor NotificationColor = "#32CD32"
 )
+
+const (
+	USERNAME     string = "Beast"
+	ICON_URL     string = "https://i.ibb.co/sjC5dRY/beast-eye-39371.png"
+	CHANNEL_NAME string = "#beast"
+)
