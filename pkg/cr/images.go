@@ -65,7 +65,7 @@ func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, err
 	return images, err
 }
 
-func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath string) (*bytes.Buffer, string, error) {
+func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, dockerCtxFile string) (*bytes.Buffer, string, error) {
 	builderContext, err := os.Open(tarContextPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("Error while opening staged file :: %s", tarContextPath)
@@ -73,8 +73,9 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath string
 	defer builderContext.Close()
 
 	buildOptions := types.ImageBuildOptions{
-		Tags:   []string{challengeTag},
-		Remove: true,
+		Tags:       []string{challengeTag},
+		Remove:     true,
+		Dockerfile: dockerCtxFile,
 	}
 
 	dockerClient, err := client.NewEnvClient()

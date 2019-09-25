@@ -36,6 +36,7 @@ const (
 	STATIC_CHALLENGE_TYPE_NAME     string = "static"
 	SERVICE_CHALLENGE_TYPE_NAME    string = "service"
 	BARE_CHALLENGE_TYPE_NAME       string = "bare"
+	DOCKER_CHALLENGE_TYPE_NAME     string = "docker"
 	PUBLIC                         string = "public"
 	HIDDEN                         string = ".hidden"
 	DEFAULT_BASE_IMAGE             string = "ubuntu:16.04"
@@ -43,6 +44,7 @@ const (
 	BEAST_STATIC_AUTH_FILE         string = ".static.beast.htpasswd"
 	ALLOWED_MIN_PORT_VALUE         uint32 = 10000
 	ALLOWED_MAX_PORT_VALUE         uint32 = 20000
+	DEFAULT_DOCKER_FILE            string = "Dockerfile"
 	IMAGE_NA                       string = "IMAGE_NA"
 	CONTAINER_NA                   string = "CONTAINER_NA"
 	MANAGE_ACTION_UNDEPLOY         string = "undeploy"
@@ -93,7 +95,7 @@ var SIDECAR_ENV_PREFIX = map[string]string{
 }
 
 // Available challenge types
-var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME}
+var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, DOCKER_CHALLENGE_TYPE_NAME}
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	"php": {
