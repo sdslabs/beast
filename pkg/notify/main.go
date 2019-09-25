@@ -75,42 +75,36 @@ func NewNotifier(URL string, ProviderType ProviderTypeEnum) Notifier {
 
 func (req *Request) FillReqParams() error {
 	req.PostPayload = PostPayload{
-		Username: "Beast",
-		IconUrl:  "https://i.ibb.co/sjC5dRY/beast-eye-39371.png",
-		Channel:  "#beast",
+		Username: USERNAME,
+		IconUrl:  ICON_URL,
+		Channel:  CHANNEL_NAME,
 	}
 	return nil
 }
 
 func SendNotification(nType NotificationType, message string) error {
-	if config.Cfg.SlackWebHookURL != "" {
-		slackNotifier := NewNotifier(config.Cfg.SlackWebHookURL, SlackProvider)
+	for _, webhook := range config.Cfg.Webhooks {
+		if webhook.ServiceName != "" || webhook.Status == true {
+			var Provider ProviderTypeEnum
+			if webhook.ServiceName == "slack" {
+				Provider = SlackProvider
+			}
+			if webhook.ServiceName == "discord" {
+				Provider = DiscordProvider
+			}
+			Notifier := NewNotifier(webhook.URL, Provider)
 
-		err := slackNotifier.SendNotification(nType, message)
-		if err != nil {
-			log.Errorf("Error while sending notification to slack : %s", err)
-			fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+			err := Notifier.SendNotification(nType, message)
+			if err != nil {
+				log.Errorf("Error while sending notification to %s : %s", webhook.ServiceName, err)
+				fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+			}
+
+			log.Infof("Notfication sent to %s.", webhook.ServiceName)
+		} else {
+			log.Warnf("No %s webhook url provided in beast config, cannot send notification.", webhook.ServiceName)
+			fmt.Errorf("No webhook URL in beast config.")
 		}
-
-		log.Infof("Notfication sent to slack.")
-	} else {
-		log.Warnf("No slack webhook url provided in beast config, cannot send notification.")
-		fmt.Errorf("No webhook URL in beast config.")
 	}
-
-	if config.Cfg.DiscordWebHookURL != "" {
-		discordNotifier := NewNotifier(config.Cfg.DiscordWebHookURL, DiscordProvider)
-
-		err := discordNotifier.SendNotification(nType, message)
-		if err != nil {
-			log.Errorf("Error while sending notification to discord : %s", err)
-			return fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
-		}
-
-		log.Infof("Notfication sent to discord.")
-		return nil
-	} else {
-		log.Warnf("No discord webhook url provided in beast config, cannot send notification.")
-		return fmt.Errorf("No webhook URL in beast config.")
-	}
+	return nil
 }

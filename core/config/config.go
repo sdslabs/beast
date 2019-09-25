@@ -86,8 +86,7 @@ type BeastConfig struct {
 	AvailableSidecars  []string  `toml:"available_sidecars"`
 	GitRemote          GitRemote `toml:"remote"`
 	JWTSecret          string    `toml:"jwt_secret"`
-	SlackWebHookURL    string    `toml:"slack_webhook"`
-	DiscordWebHookURL  string    `toml:"discord_webhook"`
+	Webhooks           []Webhook `toml:webhook`
 	TickerFrequency    int       `toml:"ticker_frequency"`
 
 	RemoteSyncPeriod time.Duration `toml:"-"`
@@ -214,6 +213,12 @@ func (config *GitRemote) ValidateGitConfig() error {
 	}
 
 	return nil
+}
+
+type Webhook struct {
+	URL         string `toml:"url"`
+	ServiceName string `toml:"service_name"`
+	Status      bool   `toml:"status"`
 }
 
 // From the path of the config file provided as an arguement this function

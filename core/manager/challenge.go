@@ -530,7 +530,7 @@ func StartUndeployChallenge(challengeName string, purge bool) error {
 		notify.SendNotification(notify.Success, msg)
 	}
 
-	log.Infof("Notification for the event sent to slack.")
+	log.Infof("Notification for the event sent.")
 	return err
 }
 

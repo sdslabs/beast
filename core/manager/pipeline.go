@@ -412,5 +412,5 @@ func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) {
 		notify.SendNotification(notify.Success, msg)
 	}
 
-	log.Debugf("%s: Notification sent to slack", challengeName)
+	log.Debugf("%s: Notification sent", challengeName)
 }
