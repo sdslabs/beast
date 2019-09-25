@@ -22,7 +22,7 @@ func (a *MySQLDeployer) DeploySidecar() error {
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.MYSQL_SIDECAR_HOST)})
 	if len(images) == 0 {
 		log.Debugf("MySQL image does not exist, building image")
-		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/remote/temp/challenges/mysql/")
+		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/extras/sidecars/mysql/")
 		buff, imageID, err := cr.BuildImageFromTarContext("mysql", "", imageLocation)
 		if buff == nil || err != nil {
 			return errors.New("IMAGE_NOT_FOUND_ERROR")

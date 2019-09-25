@@ -21,7 +21,7 @@ func (a *StaticDeployer) DeploySidecar() error {
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.STATIC_SIDECAR_HOST)})
 	if len(images) == 0 {
 		log.Debugf("Static image does not exist, build image manually")
-		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/remote/temp/challenges/beast-static/")
+		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/extras/static-content/")
 		buff, imageID, err := cr.BuildImageFromTarContext("beast-static", "", imageLocation)
 		if buff == nil || err != nil {
 			return errors.New("IMAGE_NOT_FOUND_ERROR")

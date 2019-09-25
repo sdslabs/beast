@@ -22,8 +22,8 @@ func (a *MongoDeployer) DeploySidecar() error {
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.MONGO_SIDECAR_HOST)})
 	if len(images) == 0 {
 		log.Debugf("Mongo image does not exist, build image manually")
-		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/remote/temp/challenges/mongo/")
-		buff, imageID, err := cr.BuildImageFromTarContext("mongo", "", imageLocation)
+		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/extras/sidecars/mongo/")
+		buff, imageID, err := cr.BuildImageFromTarContext(MONGO_SIDECAR_HOST, "", imageLocation)
 		if buff == nil || err != nil {
 			return errors.New("IMAGE_NOT_FOUND_ERROR")
 		}
@@ -55,7 +55,7 @@ func (a *MongoDeployer) DeploySidecar() error {
 		network, err := cr.CreateNetwork(networkconfig)
 		if network == "" || err != nil {
 			log.Errorf("Error in creating beast network.")
-			return nil
+			return Errorf("Error in creating beast network")
 		}
 	}
 
@@ -71,12 +71,12 @@ func (a *MongoDeployer) DeploySidecar() error {
 	port := []uint32{MONGO_SIDECAR_PORT}
 	mongoRootPassword := coreUtils.RandString(8)
 	mongoRootUsername := coreUtils.RandString(8)
-	m := map[string]string{
+	mongoCredentials := map[string]string{
 		"MONGO_INITDB_ROOT_USERNAME": mongoRootPassword,
 		"MONGO_INITDB_ROOT_PASSWORD": mongoRootUsername,
 	}
 
-	count := len(m)
+	count := len(mongoCredentials)
 	all := make([]string, count*2)
 
 	containerConfig := cr.CreateContainerConfig{
@@ -99,7 +99,6 @@ func (a *MongoDeployer) DeploySidecar() error {
 
 	log.Infof("Mongo CONTAINER deployed and started : %s", containerId)
 
-	return nil
 	return nil
 }
 
