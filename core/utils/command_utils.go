@@ -36,7 +36,6 @@ func CreateAuthor(name, username, email, publicKeyPath, password string) {
 		Email:     email,
 		SshKey:    string(sshKey),
 	}
-
 	err := database.CreateUserEntry(&userEntry)
 	if err != nil {
 		log.Error("Error while creating author entry : %v", err)

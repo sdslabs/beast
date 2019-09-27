@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +42,8 @@ var createAuthorCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		config.InitConfig()
+
+		auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret)
 
 		utils.CreateAuthor(Name, Username, Email, PublicKeyPath, Password)
 	},

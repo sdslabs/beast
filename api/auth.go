@@ -57,8 +57,8 @@ func authorize(c *gin.Context) {
 // @Produce json
 // @Success 200 {object} api.HTTPAuthorizeResp
 // @Failure 401 {object} api.HTTPPlainResp
-// @Router /auth/signin [post]
-func signin(c *gin.Context) {
+// @Router /auth/login [post]
+func login(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
@@ -93,8 +93,8 @@ func signin(c *gin.Context) {
 // @Produce json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
-// @Router /auth/signup [post]
-func signup(c *gin.Context) {
+// @Router /auth/register [post]
+func register(c *gin.Context) {
 
 	name := c.PostForm("name")
 	username := c.PostForm("username")

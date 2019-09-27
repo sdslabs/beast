@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
-	"fmt"
 
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"golang.org/x/crypto/pbkdf2"
@@ -37,11 +36,6 @@ func CreateModel(username, password, role string) AuthModel {
 		Salt:     salt,
 		Role:     role,
 	}
-	fmt.Println(string(salt))
-	fmt.Println(username)
-	fmt.Println(auth1.Role)
-	fmt.Println(len(auth1.Password), string(auth1.Password))
-	fmt.Println(len(password), password)
 	return auth1
 }
 

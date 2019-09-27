@@ -1,16 +1,11 @@
 package client
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-
-	"github.com/sdslabs/beastv4/core/auth"
-	"github.com/sdslabs/beastv4/utils"
 )
 
 type Response struct {
@@ -19,20 +14,9 @@ type Response struct {
 	Token     string `json:"token"`
 }
 
-func Authorize(keyFile string, host string, username string) {
-	err := utils.ValidateFileExists(keyFile)
-	if err != nil {
-		fmt.Printf("File Location does not exist")
-		return
-	}
+func Authorize(password string, host string, username string) {
 
-	key, err := auth.ParsePrivateKey(keyFile)
-	if err != nil {
-		fmt.Printf("Error while parsing private key : %v", err)
-		return
-	}
-
-	u, err := url.Parse("auth/" + username)
+	u, err := url.Parse("auth/login")
 	if err != nil {
 		fmt.Printf("Error while parsing url : %v", err)
 		return
@@ -44,15 +28,18 @@ func Authorize(keyFile string, host string, username string) {
 		return
 	}
 
-	res, err := http.Get(base.ResolveReference(u).String())
+	res, err := http.PostForm(base.ResolveReference(u).String(), url.Values{
+		"username": {username},
+		"password": {password},
+	})
 	if err != nil {
-		fmt.Printf("Error while making get request : %v", err)
+		fmt.Printf("Error while making post request : %v", err)
 		return
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		fmt.Printf("Error while making get request : %v", err)
+		fmt.Printf("Error while making post request : %v", err)
 		return
 	}
 
@@ -62,36 +49,6 @@ func Authorize(keyFile string, host string, username string) {
 	}
 
 	var response Response
-
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		fmt.Printf("Error while parsing response : %v", err)
-		return
-	}
-
-	if response.Challenge == nil {
-		fmt.Printf("The response challenge is empty")
-		return
-	}
-
-	decodedMessage, err := rsa.DecryptPKCS1v15(rand.Reader, key, []byte(response.Challenge))
-
-	res, err = http.PostForm(base.ResolveReference(u).String(), url.Values{"decrmess": {string(decodedMessage)}})
-	if err != nil {
-		fmt.Printf("Error while making post request : %v", err)
-		return
-	}
-
-	body, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Printf("Error while making post request : %v", err)
-		return
-	}
-
-	if res.StatusCode != http.StatusOK {
-		fmt.Printf("Response code : %v \nBody : %v", res.StatusCode, string(body))
-		return
-	}
 
 	err = json.Unmarshal(body, &response)
 	if err != nil {

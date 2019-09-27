@@ -87,6 +87,8 @@ func QueryFirstUserEntry(key string, value string) (User, error) {
 // transaction.
 func CreateUserEntry(user *User) error {
 	DBMux.Lock()
+	fmt.Println("user----------")
+	fmt.Println(user)
 	defer DBMux.Unlock()
 	tx := Db.Begin()
 

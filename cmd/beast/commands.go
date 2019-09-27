@@ -13,7 +13,6 @@ var (
 	Verbose           bool
 	HealthProbe       bool
 	Port              string
-	KeyFile           string
 	Name              string
 	Host              string
 	Username          string
@@ -74,8 +73,8 @@ func init() {
 	runCmd.PersistentFlags().BoolVarP(&PeriodicSync, "periodic-sync", "s", false, "Periodically sync remote with beast.")
 	runCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
 
-	getAuthCmd.PersistentFlags().StringVarP(&KeyFile, "identity", "i", "", "Private File location")
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
+	getAuthCmd.PersistentFlags().StringVarP(&Password, "password", "p", "", "Password")
 	getAuthCmd.PersistentFlags().StringVarP(&Host, "host", "H", "http://localhost:5005/", "Hostname or IP along with port where beast is hosted")
 
 	createAuthorCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new author")

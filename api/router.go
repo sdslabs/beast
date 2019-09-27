@@ -18,9 +18,8 @@ func initGinRouter() *gin.Engine {
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
-		authGroup.POST("/signup", signup)
-		authGroup.POST("/signin", signin)
-		authGroup.POST("/refresh", dummyHandler)
+		authGroup.POST("/register", register)
+		authGroup.POST("/login", login)
 	}
 
 	// API routes group
