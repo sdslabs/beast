@@ -48,10 +48,13 @@ func Authenticate(username, password string, authEntry AuthModel) (string, error
 	return GenerateJWT(authEntry)
 }
 
-func Init(iter, hashLength int, timePeriod int64, issuer, jwtSecret string) {
+func Init(iter, hashLength int, timePeriod int64, issuer, jwtSecret string, managerRoles, adminRoles, userRoles []string) {
 	ITERATIONS = iter
 	HASH_LENGTH = hashLength
 	TIME_PERIOD = timePeriod
 	ISSUER = issuer
 	JWTSECRET = jwtSecret
+	ManagerRoles = managerRoles
+	AdminRoles = adminRoles
+	UserRoles = userRoles
 }

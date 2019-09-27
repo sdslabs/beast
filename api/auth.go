@@ -36,7 +36,83 @@ func authorize(c *gin.Context) {
 		return
 	}
 
-	err := auth.Authorize(values[1])
+	err := auth.Authorize(values[1], core.MANAGER|core.ADMIN|core.USER)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: err.Error(),
+		})
+		c.Abort()
+		return
+	}
+
+	c.Next()
+}
+
+// Acts as a middleware to authorize manager roles
+// @Summary Handles authorization of manager roles
+// @Description Authorizes authors and admin by checking if JWT token exists and is valid
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Failure 401 {object} api.HTTPPlainResp
+// @Security ApiKeyAuth
+func managerAuthorize(c *gin.Context) {
+	if config.SkipAuthorization {
+		return
+	}
+
+	authHeader := c.GetHeader("Authorization")
+
+	values := strings.Split(authHeader, " ")
+
+	if len(values) < 2 || values[0] != "Bearer" {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: "No Token Provided",
+		})
+		c.Abort()
+		return
+	}
+
+	err := auth.Authorize(values[1], core.MANAGER|core.ADMIN)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: err.Error(),
+		})
+		c.Abort()
+		return
+	}
+
+	c.Next()
+}
+
+// Acts as a middleware to authorize admin roles
+// @Summary Handles authorization of admin roles
+// @Description Authorizes admin by checking if JWT token exists and is valid
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Failure 401 {object} api.HTTPPlainResp
+// @Security ApiKeyAuth
+func adminAuthorize(c *gin.Context) {
+	if config.SkipAuthorization {
+		return
+	}
+
+	authHeader := c.GetHeader("Authorization")
+
+	values := strings.Split(authHeader, " ")
+
+	if len(values) < 2 || values[0] != "Bearer" {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: "No Token Provided",
+		})
+		c.Abort()
+		return
+	}
+
+	err := auth.Authorize(values[1], core.ADMIN)
 
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
