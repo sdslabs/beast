@@ -30,6 +30,6 @@ name = "nonexistent"
 branch = "nonexistent"
 
 [[webhooks]]
-url = "https://discordapp.com/api/webhooks/615970326093758464/Dui7gVZVIaGvdys87I9O2Gn9Bx3ssNkdgkxSf3etEXN0ClxlNYSeTflbJd0obO81a_m1"
+url = ""
 service_name= "discord"
 status=true
