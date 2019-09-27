@@ -9,7 +9,6 @@ import (
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	coreutils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/cr"
-	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -21,9 +20,9 @@ const MONGO_SIDECAR_PORT uint32 = 9501
 func (a *MongoDeployer) DeploySidecar() error {
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.MONGO_SIDECAR_HOST)})
 	if len(images) == 0 {
-		log.Debugf("Mongo image does not exist, build image manually")
+		log.Debugf("Mongo image does not exist, building image")
 		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/extras/sidecars/mongo/")
-		buff, imageID, err := cr.BuildImageFromTarContext(MONGO_SIDECAR_HOST, "", imageLocation)
+		buff, imageID, err := cr.BuildImageFromTarContext(core.MONGO_SIDECAR_HOST, "", imageLocation)
 		if buff == nil || err != nil {
 			return errors.New("IMAGE_NOT_FOUND_ERROR")
 		}
@@ -31,20 +30,6 @@ func (a *MongoDeployer) DeploySidecar() error {
 	}
 
 	imageId := images[0].ID[7:]
-	stagingDirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-	err = utils.CreateIfNotExistDir(stagingDirPath)
-	if err != nil {
-		log.Errorf("Error in validating staging mount point : %s", err)
-		return errors.New("INVALID_STAGING_AREA")
-	}
-
-	beastStaticAuthFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STATIC_AUTH_FILE)
-	err = utils.ValidateFileExists(beastStaticAuthFile)
-	if err != nil {
-		p := fmt.Errorf("BEAST STATIC: Authentication file does not exist for beast static container, cannot proceed deployment")
-		log.Error(p.Error())
-		return p
-	}
 
 	networkList, err := cr.SearchNetworkByFilter(map[string]string{"networkName": "beast-mongo"})
 	if networkList == nil || err != nil {
@@ -55,7 +40,7 @@ func (a *MongoDeployer) DeploySidecar() error {
 		network, err := cr.CreateNetwork(networkconfig)
 		if network == "" || err != nil {
 			log.Errorf("Error in creating beast network.")
-			return Errorf("Error in creating beast network")
+			return fmt.Errorf("Error in creating beast network")
 		}
 	}
 
@@ -65,9 +50,6 @@ func (a *MongoDeployer) DeploySidecar() error {
 		return nil
 	}
 
-	staticMount := make(map[string]string)
-	staticMount[stagingDirPath] = core.BEAST_STAGING_AREA_MOUNT_POINT
-	staticMount[beastStaticAuthFile] = filepath.Join("/", core.BEAST_STATIC_AUTH_FILE)
 	port := []uint32{MONGO_SIDECAR_PORT}
 	mongoRootPassword := coreUtils.RandString(8)
 	mongoRootUsername := coreUtils.RandString(8)
@@ -82,7 +64,7 @@ func (a *MongoDeployer) DeploySidecar() error {
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        port,
 		ImageId:          imageId,
-		ContainerName:    "mongo",
+		ContainerName:    core.MONGO_SIDECAR_HOST,
 		ContainerNetwork: "beast-mongo",
 		ContainerEnv:     all,
 	}

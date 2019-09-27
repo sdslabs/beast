@@ -20,9 +20,9 @@ const STATIC_SIDECAR_PORT uint32 = 8080
 func (a *StaticDeployer) DeploySidecar() error {
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.STATIC_SIDECAR_HOST)})
 	if len(images) == 0 {
-		log.Debugf("Static image does not exist, build image manually")
+		log.Debugf("Static image does not exist, building image")
 		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/extras/static-content/")
-		buff, imageID, err := cr.BuildImageFromTarContext("beast-static", "", imageLocation)
+		buff, imageID, err := cr.BuildImageFromTarContext(core.STATIC_SIDECAR_HOST, "", imageLocation)
 		if buff == nil || err != nil {
 			return errors.New("IMAGE_NOT_FOUND_ERROR")
 		}
@@ -59,6 +59,7 @@ func (a *StaticDeployer) DeploySidecar() error {
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        port,
 		ImageId:          imageId,
+		MountsMap:        staticMount,
 		ContainerName:    "beast-static",
 		ContainerNetwork: "beast-static",
 	}

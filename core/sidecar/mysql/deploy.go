@@ -9,7 +9,6 @@ import (
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	coreutils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/cr"
-	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -23,7 +22,7 @@ func (a *MySQLDeployer) DeploySidecar() error {
 	if len(images) == 0 {
 		log.Debugf("MySQL image does not exist, building image")
 		imageLocation := filepath.Join(core.BEAST_REMOTES_DIR, ".beast/extras/sidecars/mysql/")
-		buff, imageID, err := cr.BuildImageFromTarContext("mysql", "", imageLocation)
+		buff, imageID, err := cr.BuildImageFromTarContext(core.MYSQL_SIDECAR_HOST, "", imageLocation)
 		if buff == nil || err != nil {
 			return errors.New("IMAGE_NOT_FOUND_ERROR")
 		}
@@ -31,20 +30,6 @@ func (a *MySQLDeployer) DeploySidecar() error {
 	}
 
 	imageId := images[0].ID[7:]
-	stagingDirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-	err = utils.CreateIfNotExistDir(stagingDirPath)
-	if err != nil {
-		log.Errorf("Error in validating staging mount point : %s", err)
-		return errors.New("INVALID_STAGING_AREA")
-	}
-
-	beastStaticAuthFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STATIC_AUTH_FILE)
-	err = utils.ValidateFileExists(beastStaticAuthFile)
-	if err != nil {
-		p := fmt.Errorf("BEAST STATIC: Authentication file does not exist for beast static container, cannot proceed deployment")
-		log.Error(p.Error())
-		return p
-	}
 
 	networkList, err := cr.SearchNetworkByFilter(map[string]string{"networkName": "beast-mysql"})
 	if networkList == nil || err != nil {
@@ -55,7 +40,7 @@ func (a *MySQLDeployer) DeploySidecar() error {
 		network, err := cr.CreateNetwork(networkconfig)
 		if network == "" || err != nil {
 			log.Errorf("Error in creating beast network.")
-			return nil
+			return fmt.Errorf("Error in creating beast network")
 		}
 	}
 
@@ -65,9 +50,6 @@ func (a *MySQLDeployer) DeploySidecar() error {
 		return nil
 	}
 
-	staticMount := make(map[string]string)
-	staticMount[stagingDirPath] = core.BEAST_STAGING_AREA_MOUNT_POINT
-	staticMount[beastStaticAuthFile] = filepath.Join("/", core.BEAST_STATIC_AUTH_FILE)
 	port := []uint32{MYSQL_SIDECAR_PORT}
 	mysqlRootPassword := coreUtils.RandString(8)
 	m := map[string]string{
@@ -80,7 +62,7 @@ func (a *MySQLDeployer) DeploySidecar() error {
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        port,
 		ImageId:          imageId,
-		ContainerName:    "mysql",
+		ContainerName:    core.MYSQL_SIDECAR_HOST,
 		ContainerNetwork: "beast-mysql",
 		ContainerEnv:     all,
 	}
@@ -97,7 +79,6 @@ func (a *MySQLDeployer) DeploySidecar() error {
 
 	log.Infof("MySQL CONTAINER deployed and started : %s", containerId)
 
-	return nil
 	return nil
 }
 
