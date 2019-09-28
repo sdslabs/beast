@@ -53,20 +53,17 @@ func (a *MongoDeployer) DeploySidecar() error {
 	port := []uint32{MONGO_SIDECAR_PORT}
 	mongoRootPassword := coreUtils.RandString(8)
 	mongoRootUsername := coreUtils.RandString(8)
-	mongoCredentials := map[string]string{
-		"MONGO_INITDB_ROOT_USERNAME": mongoRootPassword,
-		"MONGO_INITDB_ROOT_PASSWORD": mongoRootUsername,
+	containerEnv := []string{
+		fmt.Sprintf("%s:%s", "MONGO_INITDB_ROOT_PASSWORD", mongoRootPassword),
+		fmt.Sprintf("%s:%s", "MONGO_INITDB_ROOT_USERNAME", mongoRootUsername),
 	}
-
-	count := len(mongoCredentials)
-	all := make([]string, count*2)
 
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        port,
 		ImageId:          imageId,
 		ContainerName:    core.MONGO_SIDECAR_HOST,
 		ContainerNetwork: "beast-mongo",
-		ContainerEnv:     all,
+		ContainerEnv:     containerEnv,
 	}
 	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {

@@ -61,7 +61,6 @@ func (a *StaticDeployer) DeploySidecar() error {
 		ImageId:          imageId,
 		MountsMap:        staticMount,
 		ContainerName:    "beast-static",
-		ContainerNetwork: "beast-static",
 	}
 	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {

@@ -52,19 +52,16 @@ func (a *MySQLDeployer) DeploySidecar() error {
 
 	port := []uint32{MYSQL_SIDECAR_PORT}
 	mysqlRootPassword := coreUtils.RandString(8)
-	m := map[string]string{
-		"MYSQL_ROOT_PASSWORD": mysqlRootPassword,
+	containerEnv := []string{
+		fmt.Sprintf("%s:%s", "MYSQL_ROOT_PASSWORD", mysqlRootPassword),
 	}
-
-	count := len(m)
-	all := make([]string, count*2)
 
 	containerConfig := cr.CreateContainerConfig{
 		PortsList:        port,
 		ImageId:          imageId,
 		ContainerName:    core.MYSQL_SIDECAR_HOST,
 		ContainerNetwork: "beast-mysql",
-		ContainerEnv:     all,
+		ContainerEnv:     containerEnv,
 	}
 	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {
