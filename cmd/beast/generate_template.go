@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -28,21 +30,8 @@ var generateTemplateCmd = &cobra.Command{
 			challName = ""
 		}
 
-		data := BeastBareConfigfile{
-			AuthorName:       "",
-			AuthorMail:       "",
-			AuthorPubKey:     "",
-			ChallengeName:    challName,
-			ChallengeType:    "",
-			ChallengeFlag:    "",
-			AptDeps:          []string{},
-			Ports:            []uint32{},
-			SetupScript:      []string{},
-			StaticContentDir: "",
-			ChallengeBase:    "",
-			RunCmd:           "",
-			SidecarHelper:    "",
-		}
+		var config config.BeastChallengeConfig
+		config.PopulateDefualtValues()
 
 		var configfile bytes.Buffer
 		log.Debugf("Preparing Config template")
@@ -53,7 +42,7 @@ var generateTemplateCmd = &cobra.Command{
 		}
 
 		log.Debugf("Executing dockerfile template with challenge config")
-		err = configfileTemplate.Execute(&configfile, data)
+		err = configfileTemplate.Execute(&configfile, config)
 		if err != nil {
 			log.Errorf("Error while executing configfile template :: %s", err)
 			return
@@ -65,7 +54,7 @@ var generateTemplateCmd = &cobra.Command{
 			return
 		}
 
-		var file, erro = os.OpenFile("beast.toml", os.O_RDWR, 0644)
+		var file, erro = os.OpenFile(core.CHALLENGE_CONFIG_FILE_NAME, os.O_RDWR, 0644)
 		if erro != nil {
 			log.Fatal(erro)
 		}
@@ -89,12 +78,12 @@ var generateTemplateCmd = &cobra.Command{
 func createFile() error {
 
 	// check if file exists
-	_, err := os.Stat("beast.toml")
+	_, err := os.Stat(core.CHALLENGE_CONFIG_FILE_NAME)
 
 	// create file if not exists
 	if os.IsNotExist(err) {
 
-		file, err := os.Create("beast.toml")
+		file, err := os.Create(core.CHALLENGE_CONFIG_FILE_NAME)
 		if err != nil {
 			return err
 		}
@@ -105,7 +94,7 @@ func createFile() error {
 		return err
 	}
 
-	log.Errorf("beast.toml already exists")
+	log.Errorf("%s already exists", core.CHALLENGE_CONFIG_FILE_NAME)
 
 	return nil
 }
@@ -113,11 +102,11 @@ func createFile() error {
 func createPublicDir() error {
 
 	// check if public directory exists
-	_, err := os.Stat("public")
+	_, err := os.Stat(core.PUBLIC)
 
 	// create public directory if not exists
 	if os.IsNotExist(err) {
-		err = os.MkdirAll("public", 0755)
+		err = os.MkdirAll(core.PUBLIC, 0755)
 		if err != nil {
 			return err
 		}
@@ -126,22 +115,6 @@ func createPublicDir() error {
 		return err
 	}
 
-	log.Errorf("public directory already exists")
+	log.Errorf("%s directory already exists", core.PUBLIC)
 	return nil
-}
-
-type BeastBareConfigfile struct {
-	AuthorName       string
-	AuthorMail       string
-	AuthorPubKey     string
-	ChallengeName    string
-	ChallengeType    string
-	ChallengeFlag    string
-	AptDeps          []string
-	Ports            []uint32
-	SetupScript      []string
-	StaticContentDir string
-	ChallengeBase    string
-	RunCmd           string
-	SidecarHelper    string
 }
