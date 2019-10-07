@@ -28,21 +28,31 @@ type BeastChallengeConfig struct {
 }
 
 func (config *BeastChallengeConfig) PopulateDefualtValues() {
+	config.Author.PopulateAuthor()
+	config.Challenge.Metadata.PopulateChallengeMetadata()
+	config.Challenge.Env.PopulateChallengeEnv()
+}
 
-	config.Author.Name = "AuthorName"
-	config.Author.Email = "AuthorMail"
-	config.Author.SSHKey = "AuthorPubKey"
-	config.Challenge.Metadata.Name = "ChallengeName"
-	config.Challenge.Metadata.Type = "ChallengeType"
-	config.Challenge.Metadata.Flag = "ChallengeFlag"
-	config.Challenge.Metadata.Sidecar = "SidecarHelper"
-	config.Challenge.Env.AptDeps = []string{}
-	config.Challenge.Env.Ports = []uint32{}
-	config.Challenge.Env.SetupScripts = []string{}
-	config.Challenge.Env.StaticContentDir = "StaticContentDir"
-	config.Challenge.Env.BaseImage = "ChallengeBase"
-	config.Challenge.Env.RunCmd = "RunCmd"
+func (Author *Author) PopulateAuthor() {
+	Author.Name = "AuthorName"
+	Author.Email = "AuthorMail"
+	Author.SSHKey = "AuthorPubKey"
+}
 
+func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
+	Metadata.Name = "ChallengeName"
+	Metadata.Type = "ChallengeType"
+	Metadata.Flag = "ChallengeFlag"
+	Metadata.Sidecar = "SidecarHelper"
+}
+
+func (Env *ChallengeEnv) PopulateChallengeEnv() {
+	Env.AptDeps = []string{}
+	Env.Ports = []uint32{}
+	Env.SetupScripts = []string{}
+	Env.StaticContentDir = "StaticContentDir"
+	Env.BaseImage = "ChallengeBase"
+	Env.RunCmd = "RunCmd"
 }
 
 func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) error {

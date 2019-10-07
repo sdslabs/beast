@@ -2,14 +2,15 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"text/template"
+
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
-	"path/filepath"
-	"text/template"
 )
 
 var generateTemplateCmd = &cobra.Command{
@@ -76,7 +77,6 @@ var generateTemplateCmd = &cobra.Command{
 }
 
 func createFile() error {
-
 	// check if file exists
 	_, err := os.Stat(core.CHALLENGE_CONFIG_FILE_NAME)
 
@@ -100,7 +100,6 @@ func createFile() error {
 }
 
 func createPublicDir() error {
-
 	// check if public directory exists
 	_, err := os.Stat(core.PUBLIC)
 
