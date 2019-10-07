@@ -3,10 +3,8 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/BurntSushi/toml"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -563,107 +561,4 @@ func RedeployChallenge(challengeName string) error {
 		Info: TaskInfo{Action: core.MANAGE_ACTION_REDEPLOY},
 		ID:   challengeName,
 	})
-}
-
-func ShowAllChallenges() []error {
-	challenges, err := database.QueryAllChallenges()
-	var errors []error
-	if err != nil {
-
-		errors = append(errors, err)
-		return errors
-
-	}
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-	PrintTableHeader(w)
-
-	for _, challenge := range challenges {
-		s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
-		fmt.Fprint(w, strings.Join(s, "\t"))
-		fmt.Fprint(w, "\t")
-		ports, err := database.GetAllocatedPorts(challenge)
-		if err != nil {
-			errors = append(errors, err)
-
-		} else {
-			for _, port := range ports {
-				fmt.Fprint(w, " ", port.PortNo)
-			}
-		}
-		fmt.Fprintln(w)
-	}
-
-	w.Flush()
-
-	return errors
-}
-
-func ShowTagRelatedChallenges(Tag string) []error {
-	tagEntry := &database.Tag{
-		TagName: Tag,
-	}
-	challenges, err := database.QueryRelatedChallenges(tagEntry)
-	var errors []error
-	if err != nil {
-		errors = append(errors, err)
-		return errors
-	}
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-	PrintTableHeader(w)
-
-	for _, challenge := range challenges {
-		s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
-		fmt.Fprint(w, strings.Join(s, "\t"))
-		fmt.Fprint(w, "\t")
-		ports, err := database.GetAllocatedPorts(challenge)
-		if err != nil {
-			errors = append(errors, err)
-		} else {
-
-			for _, port := range ports {
-				fmt.Fprint(w, " ", port.PortNo)
-			}
-		}
-
-		fmt.Fprintln(w)
-	}
-
-	w.Flush()
-
-	return errors
-}
-
-func ShowChallenge(chall database.Challenge) []error {
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
-	PrintTableHeader(w)
-	var errors []error
-
-	s := []string{chall.Name, chall.ContainerId[0:7], chall.ImageId[0:7], chall.Status}
-	fmt.Fprint(w, strings.Join(s, "\t"))
-	fmt.Fprint(w, "\t")
-	ports, err := database.GetAllocatedPorts(chall)
-	if err != nil {
-		errors = append(errors, err)
-	} else {
-		for _, port := range ports {
-			fmt.Fprint(w, " ", port.PortNo)
-		}
-	}
-
-	fmt.Fprintln(w)
-	w.Flush()
-
-	return errors
-
-}
-
-func PrintTableHeader(w *tabwriter.Writer) {
-	line := strings.Repeat("-", 180)
-	fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
-	w.Flush()
-	fmt.Println(line)
-
 }

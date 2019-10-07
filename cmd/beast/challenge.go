@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
@@ -25,7 +24,7 @@ var challengeCmd = &cobra.Command{
 		if action == core.MANAGE_ACTION_SHOW {
 
 			if AllChalls {
-				errors := manager.ShowAllChallenges()
+				errors := utils.ShowAllChallenges()
 
 				if len(errors) > 0 {
 					for _, err := range errors {
@@ -35,10 +34,12 @@ var challengeCmd = &cobra.Command{
 				}
 
 			} else if Tag != "" {
-				errors := manager.ShowTagRelatedChallenges(Tag)
+				errors := utils.ShowTagRelatedChallenges(Tag)
 
-				for _, err := range errors {
-					log.Errorf("The following errors occurred: %s", err.Error())
+				if len(errors) > 0 {
+					for _, err := range errors {
+						log.Errorf("The following errors occurred: %s", err.Error())
+					}
 					os.Exit(1)
 				}
 			} else {
@@ -47,21 +48,11 @@ var challengeCmd = &cobra.Command{
 					os.Exit(1)
 				}
 
-				challenge, err := database.QueryChallengeEntries("name", args[1])
-				if err != nil {
-					log.Errorf("Cannot query database for the given challenge : %s", err.Error())
-					os.Exit(1)
-				}
-
-				if len(challenge) > 0 {
-					errors := manager.ShowChallenge(challenge[0])
+				errors := utils.ShowChallengeByName(args[1])
+				if len(errors) > 0 {
 					for _, err := range errors {
-						log.Errorf("Cannot query database for challenges ports : %s", err.Error())
-						os.Exit(1)
+						log.Errorf("The following errors occurred: %s", err.Error())
 					}
-
-				} else {
-					log.Errorf("Provide valid chall name")
 					os.Exit(1)
 				}
 
