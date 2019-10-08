@@ -27,6 +27,34 @@ type BeastChallengeConfig struct {
 	Resources Resources `toml:"resource"`
 }
 
+func (config *BeastChallengeConfig) PopulateDefualtValues() {
+	config.Author.PopulateAuthor()
+	config.Challenge.Metadata.PopulateChallengeMetadata()
+	config.Challenge.Env.PopulateChallengeEnv()
+}
+
+func (Author *Author) PopulateAuthor() {
+	Author.Name = "AuthorName"
+	Author.Email = "AuthorMail"
+	Author.SSHKey = "AuthorPubKey"
+}
+
+func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
+	Metadata.Name = "ChallengeName"
+	Metadata.Type = "ChallengeType"
+	Metadata.Flag = "ChallengeFlag"
+	Metadata.Sidecar = "SidecarHelper"
+}
+
+func (Env *ChallengeEnv) PopulateChallengeEnv() {
+	Env.AptDeps = []string{}
+	Env.Ports = []uint32{}
+	Env.SetupScripts = []string{}
+	Env.StaticContentDir = "StaticContentDir"
+	Env.BaseImage = "ChallengeBase"
+	Env.RunCmd = "RunCmd"
+}
+
 func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) error {
 	log.Debugf("Validating BeastChallengeConfig required fields")
 	err := config.Challenge.ValidateRequiredFields(challdir)

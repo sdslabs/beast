@@ -2,24 +2,23 @@ package templates
 
 var CHALLENGE_CONFIG_FILE_TEMPLATE string = `# This a sample challenge configuration file.
 [author]
-name      = {{.AuthorName}}                      # Required: Name of the challenge creator
-email     = {{.AuthorMail}}                      # Required: Email for contact
-ssh_key   = {{.AuthorPubKey}}                    # Required: Public SSH key for the challenge author
+name      = {{.Author.Name}}                      # Required: Name of the challenge creator
+email     = {{.Author.Email}}                      # Required: Email for contact
+ssh_key   = {{.Author.SSHKey}}                    # Required: Public SSH key for the challenge author
 
-[challenge]
-    [challenge.metadata]
-    name            = {{.ChallengeName}}         # Required: Name of the challenge, should be same as directory.
-    type            = {{.ChallengeType}}         # Required: Type of challenge -> [web:<language>:<version>:<framework> static service]
-    flag            = {{.ChallengeFlag}}         # Required: Challenge Flag
+[challenge.metadata]
+name            = {{.Challenge.Metadata.Name}}         # Required: Name of the challenge, should be same as directory.
+type            = {{.Challenge.Metadata.Type}}         # Required: Type of challenge -> [web:<language>:<version>:<framework> static service]
+flag            = {{.Challenge.Metadata.Flag}}         # Required: Challenge Flag
+sidecar          = {{.Challenge.Metadata.Sidecar}}        # Specify helper sidecar container for example mysql
 
-    [challenge.env]
-    apt_deps         = {{.AptDeps}}              # Custom apt-dependencies for challenge
-    ports            = {{.Ports}}                # Required: Port to expose for the challenge
-    setup_script     = {{.SetupScript}}          # Setup script to run additional steps for challenge deployment
-    static_dir       = {{.StaticContentDir}}     # Static directory to be served for the challenge
-    base             = {{.ChallengeBase}}        # Base image-type for the challenge[bare("web", "service"), php(web), node(web)]
-    run_cmd          = {{.RunCmd}}               # Required(not for web): Entrypoint command for the challenge container(for bare base specify compelete command)
-    sidecar          = {{.SidecarHelper}}        # Specify helper sidecar container for example mysql
+[challenge.env]
+apt_deps         = {{.Challenge.Env.AptDeps}}              # Custom apt-dependencies for challenge
+ports            = {{.Challenge.Env.Ports}}                # Required: Port to expose for the challenge
+setup_script     = {{.Challenge.Env.SetupScripts}}          # Setup script to run additional steps for challenge deployment
+static_dir       = {{.Challenge.Env.StaticContentDir}}     # Static directory to be served for the challenge
+base             = {{.Challenge.Env.BaseImage}}        # Base image-type for the challenge[bare("web", "service"), php(web), node(web)]
+run_cmd          = {{.Challenge.Env.RunCmd}}               # Required(not for web): Entrypoint command for the challenge container(for bare base specify compelete command)
 `
 
 var BEAST_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
