@@ -2,6 +2,7 @@ package notify
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
@@ -56,17 +57,21 @@ const (
 //In the Discord notification provider it was using the same payload which was used for slack.
 //By writing "/slack" in the discord WebHookURL, it execute Slack-Compatible Webhook
 func NewNotifier(URL string, ProviderType ProviderTypeEnum) Notifier {
+	url, err := url.ParseRequestURI(URL)
+	if url == nil || err != nil {
+		fmt.Errorf("Invalid notification webhook URL")
+	}
 	switch ProviderType {
 	case SlackProvider:
 		return &SlackNotificationProvider{
 			Request{
-				WebHookURL: URL,
+				WebHookURL: url.String(),
 			},
 		}
 	case DiscordProvider:
 		return &DiscordNotificationProvider{
 			Request{
-				WebHookURL: URL + "/slack",
+				WebHookURL: url.String() + "/slack",
 			},
 		}
 	}
@@ -83,8 +88,8 @@ func (req *Request) FillReqParams() error {
 }
 
 func SendNotification(nType NotificationType, message string) error {
-	for _, webhook := range config.Cfg.Webhooks {
-		if webhook.ServiceName != "" || webhook.Status == true {
+	for _, webhook := range config.Cfg.NotificationWebhooks {
+		if webhook.ServiceName != "" || webhook.Active == true {
 			var Provider ProviderTypeEnum
 			if webhook.ServiceName == "slack" {
 				Provider = SlackProvider
