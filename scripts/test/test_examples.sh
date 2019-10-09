@@ -144,6 +144,23 @@ else
 	exit 1	
 fi
 
+# Test challenge xinetd-service
+CHALLENGE="docker-type"
+PORT=10005
+## Check if port is taken
+checkPortAvailable $CHALLENGE $PORT
+## Deploy challenge
+deployChallenge $CHALLENGE $PWD/_examples/$CHALLENGE
+## Test deployment
+echo -e "$INFO : $CHALLENGE : Test deployment"
+checkPortReachable $PORT
+if [[ $? -eq 0 ]]; then
+	echo -e "$SUCCESS : $CHALLENGE : Deployed successfully"
+else
+	echo -e "$ERROR : $CHALLENGE : There was an error in deployment of challenge"
+	exit 1	
+fi
+
 ## Purge all challenges
 # simple
 purge simple

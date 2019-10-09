@@ -43,6 +43,10 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME {
 		dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
+		err := utils.ValidateFileExists(dockerfileCtx)
+		if err != nil {
+			return err
+		}
 	} else {
 		dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
 		if err != nil {
