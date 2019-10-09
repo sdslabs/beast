@@ -16,6 +16,7 @@ service_path = ""
 ## Web Challenge
 
 Web challenges are hosted using the corresponding images from Dockerhub. Currently only these types are supported:
+
 * Node
 * Python : Django and Flask
 * Php

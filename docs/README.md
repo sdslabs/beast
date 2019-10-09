@@ -12,6 +12,7 @@ This directory contains documentation related to beast and will guide you throug
 * [Authentication Flow](APIAuth)
 * [Challenge Types](ChallTypes)
 * [Challenge Configuration](ChallConfig)
+* [Sample Challenges](SampleChallenges)
 * [Deployment](Deployment)
 * [Sidecars](Sidecars)
 
