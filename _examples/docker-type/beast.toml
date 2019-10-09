@@ -1,0 +1,14 @@
+[author]
+name = "fristonio"						# Name of the challenge creator
+email = "fristonio@protonmail.com"		# Email for contact
+ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author
+
+[challenge.metadata]
+name = "docker-type"
+flag = "FLAG{r3GEx_i5_3vi1!!}"
+type = "docker"
+hints = ["simple_hint_1", "simple_hint_2"]
+
+[challenge.env]
+docker_context = "docker-file"
+ports = [10005]

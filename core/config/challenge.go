@@ -230,6 +230,7 @@ type ChallengeEnv struct {
 	DefaultPort      uint32           `toml:"default_port"`
 	ServicePath      string           `toml:"service_path"`
 	Entrypoint       string           `toml:"entrypoint"`
+	DockerCtx        string           `toml:"docker_context"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
 }
 
@@ -330,6 +331,18 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.Entrypoint)); err != nil {
 			return fmt.Errorf("File %s does not exist", config.Entrypoint)
 		}
+	}
+
+	if challType == core.DOCKER_CHALLENGE_TYPE_NAME {
+		if config.DockerCtx == "" {
+			return errors.New("Docker Context file not provided in docker-type challenge")
+		} else if filepath.IsAbs(config.DockerCtx) {
+			return fmt.Errorf("For challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
+			return fmt.Errorf("File : %s does not exist", config.DockerCtx)
+		}
+	} else {
+		config.DockerCtx = core.DEFAULT_DOCKER_FILE
 	}
 
 	return nil

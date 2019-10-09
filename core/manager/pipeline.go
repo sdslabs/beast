@@ -39,11 +39,21 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	challengeConfig := filepath.Join(contextDir, core.CHALLENGE_CONFIG_FILE_NAME)
 	log.Debugf("Reading challenge config from : %s", challengeConfig)
 
-	dockerfileCtx, err := GenerateChallengeDockerfileCtx(config)
-	if err != nil {
-		return err
+	var dockerfileCtx string
+
+	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME {
+		dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
+		err := utils.ValidateFileExists(dockerfileCtx)
+		if err != nil {
+			return err
+		}
+	} else {
+		dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
+		if err != nil {
+			return err
+		}
+		log.Debug("Got dockerfile context from the challenge config")
 	}
-	log.Debug("Got dockerfile context from the challenge config")
 
 	additionalCtx := make(map[string]string)
 	additionalCtx["Dockerfile"] = dockerfileCtx
@@ -74,6 +84,10 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	}
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
+
+	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME {
+		delete(additionalCtx, "Dockerfile")
+	}
 	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir, filepath.Join(contextDir, core.HIDDEN)})
 	if err != nil {
 		return err
@@ -111,7 +125,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	challengeTag := coreUtils.EncodeID(challengeName)
-	buff, imageId, buildErr := cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath)
+	buff, imageId, buildErr := cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx)
 
 	// Create logs directory for the challenge in staging directory.
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
