@@ -10,6 +10,7 @@ This directory contains documentation related to beast and will guide you throug
 * [Features](Features)
 * [Architecture](Architecture)
 * [Authentication Flow](APIAuth)
+* [Challenge Types](ChallTypes)
 * [Challenge Configuration](ChallConfig)
 * [Deployment](Deployment)
 * [Sidecars](Sidecars)
@@ -22,6 +23,8 @@ Beast is a service that runs on your host(may be a bare metal server or a cloud 
 * Service - A service hosted on beast container instance
 * Web - Web based challenges for various languages including PHP, Python, Node.js etc.
 * Static - Challenges with static files, this may include forensics challenges.
+* Bare - Highly customisable challenges.
+* Docker - Challenges which are provided with their own docker file.
 
 ## Tech Stack
 
