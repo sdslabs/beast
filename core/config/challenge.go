@@ -210,6 +210,11 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // base_image = ""
 //
 //
+// # Docker file name for specific type challenge - `docker`.
+// # Helps to build flexible images for specific user-custom challenges
+// docket_context = ""
+//
+//
 // # Environment variables that can be used in the application code.
 // [[var]]
 //     key = ""
