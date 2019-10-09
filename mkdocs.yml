@@ -5,6 +5,7 @@ nav:
   - Usage: Usage.md
   - Setup: Setup.md
   - Documentation: Documentation.md
+  - Samples: SampleChallenges.md
   - APIDocs: /apidocs.html
   - CmdRef: cmdref/beast.md
 

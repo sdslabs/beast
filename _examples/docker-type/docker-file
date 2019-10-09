@@ -3,13 +3,12 @@ FROM ubuntu:16.04
 RUN apt-get update \
 	&& apt-get install -y gcc socat
 
-COPY untitled.sh /script.sh
+COPY challenge.sh /script.sh
 COPY entrypoint.sh /entry.sh
 COPY flag /flag
 
 EXPOSE 10005
 
-RUN chmod +x /script.sh
-RUN chmod +x /entry.sh
+RUN chmod +x /script.sh /entry.sh
 
-CMD ["/entry.sh"]
+CMD ["/challenge.sh"]

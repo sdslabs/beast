@@ -1,11 +1,11 @@
 [author]
-name = "fristonio"						# Name of the challenge creator
-email = "fristonio@protonmail.com"		# Email for contact
-ssh_key = "ssh-rsa AAAAB3NzaC1y"		# Public SSH key for the challenge author
+name = "fristonio"
+email = "contact+fristonio@sdslabs.co.in"
+ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
 name = "web-php-mysql"
-flag = "BACKDOOR{WEB_CHALLENGE_FLAG}"
+flag = "CTF{sample_flag}"
 type = "web:php:7.1:cli"
 sidecar = "mysql"
 hints = ["web-php-mysql_hint_1", "web-php-mysql_hint_2"]
