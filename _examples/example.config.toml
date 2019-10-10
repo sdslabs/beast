@@ -32,4 +32,4 @@ branch = "nonexistent"
 [[webhooks]]
 url = ""
 service_name= "discord"
-status=true
+active=true

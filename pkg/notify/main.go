@@ -59,7 +59,8 @@ const (
 func NewNotifier(URL string, ProviderType ProviderTypeEnum) Notifier {
 	url, err := url.ParseRequestURI(URL)
 	if url == nil || err != nil {
-		fmt.Errorf("Invalid notification webhook URL")
+		log.Error("Invalid notification webhook URL")
+		return nil
 	}
 	switch ProviderType {
 	case SlackProvider:
