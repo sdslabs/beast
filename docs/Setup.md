@@ -75,9 +75,18 @@ jwt_secret = "beast_jwt_secret_SUPER_STRONG_0x100010000100"
 
 
 # To allow beast to send notification to a notification channel povide this webhook URL
-# We are also working on implmeneting notification using Discord and IRC.
-slack_webhook = ""
+# We are also working on implmeneting notification using IRC.
+[[webhooks]]
 
+# The webhook URL of notification channel where notification should be sent
+url = ""
+
+# The service name to be used. It can be `discord` and `slack`
+service_name = "discord"
+
+# Status of webhook URL to be used. 
+# If it is false then notification will not be sent on this URL
+active = true
 
 # The sidecar that we support with beast, currently we only support two MySQL and 
 # MongoDB.
