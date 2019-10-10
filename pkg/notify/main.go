@@ -92,10 +92,10 @@ func SendNotification(nType NotificationType, message string) error {
 	for _, webhook := range config.Cfg.NotificationWebhooks {
 		if webhook.ServiceName != "" || webhook.Active == true {
 			var Provider ProviderTypeEnum
-			if webhook.ServiceName == "slack" {
+			switch webhook.ServiceName {
+			case "slack":
 				Provider = SlackProvider
-			}
-			if webhook.ServiceName == "discord" {
+			case "discord":
 				Provider = DiscordProvider
 			}
 			Notifier := NewNotifier(webhook.URL, Provider)
@@ -108,7 +108,7 @@ func SendNotification(nType NotificationType, message string) error {
 
 			log.Infof("Notfication sent to %s.", webhook.ServiceName)
 		} else {
-			log.Warnf("No %s webhook url provided in beast config, cannot send notification.", webhook.ServiceName)
+			log.Errorf("No %s webhook url provided in beast config, cannot send notification.", webhook.ServiceName)
 			fmt.Errorf("No webhook URL in beast config.")
 		}
 	}

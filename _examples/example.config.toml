@@ -29,7 +29,7 @@ url = "git@github.com:sdslabs/nonexistent.git"
 name = "nonexistent"
 branch = "nonexistent"
 
-[[webhooks]]
+[[notification_webhooks]]
 url = ""
 service_name= "discord"
 active=true
