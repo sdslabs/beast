@@ -218,7 +218,7 @@ func (config *GitRemote) ValidateGitConfig() error {
 type NotificationWebhook struct {
 	URL         string `toml:"url"`
 	ServiceName string `toml:"service_name"`
-	Active      bool   `toml:"status"`
+	Active      bool   `toml:"active"`
 }
 
 // From the path of the config file provided as an arguement this function
