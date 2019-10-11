@@ -9,29 +9,31 @@ import (
 
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/utils"
 )
+
+const maxShowLen int = 20
 
 func ShowAllChallenges() []error {
 	challenges, err := database.QueryAllChallenges()
 	var errs []error
-	if err != nil {
 
+	if err != nil {
 		errs = append(errs, err)
 		return errs
-
 	}
+
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
 	PrintTableHeader(w)
 
 	for _, challenge := range challenges {
-		s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
+		s := []string{challenge.Name, utils.TruncateString(challenge.ContainerId, maxShowLen), utils.TruncateString(challenge.ImageId, maxShowLen), challenge.Status}
 		fmt.Fprint(w, strings.Join(s, "\t"))
 		fmt.Fprint(w, "\t")
 		ports, err := database.GetAllocatedPorts(challenge)
 		if err != nil {
 			errs = append(errs, err)
-
 		} else {
 			for _, port := range ports {
 				fmt.Fprint(w, " ", port.PortNo)
@@ -39,7 +41,6 @@ func ShowAllChallenges() []error {
 		}
 		fmt.Fprintln(w)
 	}
-
 	w.Flush()
 
 	return errs
@@ -51,31 +52,30 @@ func ShowTagRelatedChallenges(Tag string) []error {
 	}
 	challenges, err := database.QueryRelatedChallenges(tagEntry)
 	var errs []error
+
 	if err != nil {
 		errs = append(errs, err)
 		return errs
 	}
+
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 30, 8, 2, ' ', tabwriter.Debug)
 	PrintTableHeader(w)
 
 	for _, challenge := range challenges {
-		s := []string{challenge.Name, challenge.ContainerId[0:7], challenge.ImageId[0:7], challenge.Status}
+		s := []string{challenge.Name, utils.TruncateString(challenge.ContainerId, maxShowLen), utils.TruncateString(challenge.ImageId, maxShowLen), challenge.Status}
 		fmt.Fprint(w, strings.Join(s, "\t"))
 		fmt.Fprint(w, "\t")
 		ports, err := database.GetAllocatedPorts(challenge)
 		if err != nil {
 			errs = append(errs, err)
 		} else {
-
 			for _, port := range ports {
 				fmt.Fprint(w, " ", port.PortNo)
 			}
 		}
-
 		fmt.Fprintln(w)
 	}
-
 	w.Flush()
 
 	return errs
@@ -87,10 +87,11 @@ func ShowChallenge(chall database.Challenge) []error {
 	PrintTableHeader(w)
 	var errs []error
 
-	s := []string{chall.Name, chall.ContainerId[0:7], chall.ImageId[0:7], chall.Status}
+	s := []string{chall.Name, utils.TruncateString(chall.ContainerId, maxShowLen), utils.TruncateString(chall.ImageId, maxShowLen), chall.Status}
 	fmt.Fprint(w, strings.Join(s, "\t"))
 	fmt.Fprint(w, "\t")
 	ports, err := database.GetAllocatedPorts(chall)
+
 	if err != nil {
 		errs = append(errs, err)
 	} else {
@@ -98,17 +99,16 @@ func ShowChallenge(chall database.Challenge) []error {
 			fmt.Fprint(w, " ", port.PortNo)
 		}
 	}
-
 	fmt.Fprintln(w)
 	w.Flush()
 
 	return errs
-
 }
 
 func ShowChallengeByName(name string) []error {
 	challenge, err := database.QueryChallengeEntries("name", name)
 	var errs []error
+
 	if err != nil {
 		errs = append(errs, err)
 		return errs
@@ -120,7 +120,6 @@ func ShowChallengeByName(name string) []error {
 			errs = append(errs, e)
 			return errs
 		}
-
 	} else {
 		errs = append(errs, errors.New("Provide valid chall name"))
 		return errs
@@ -134,5 +133,4 @@ func PrintTableHeader(w *tabwriter.Writer) {
 	fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
 	w.Flush()
 	fmt.Println(line)
-
 }
