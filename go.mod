@@ -36,7 +36,6 @@ require (
 	github.com/jinzhu/now v0.0.0-20180511015916-ed742868f2ae // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20180830205328-81db2a75821e // indirect
-	github.com/kisielk/gotool v1.0.0 // indirect
 	github.com/lib/pq v1.0.0 // indirect
 	github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
@@ -44,7 +43,6 @@ require (
 	github.com/mitchellh/go-homedir v1.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/mongodb/mongo-go-driver v0.3.0 // indirect
 	github.com/onsi/gomega v1.4.2 // indirect
 	github.com/pelletier/go-buffruneio v0.2.0 // indirect
 	github.com/pkg/errors v0.8.0 // indirect
@@ -53,7 +51,7 @@ require (
 	github.com/sirupsen/logrus v1.0.6
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.2 // indirect
-	github.com/src-d/gcfg v1.3.0
+	github.com/src-d/gcfg v1.3.0 // indirect
 	github.com/stevvooe/resumable v0.0.0-20180830230917-22b14a53ba50 // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
 	github.com/swaggo/gin-swagger v1.0.0
@@ -71,5 +69,5 @@ require (
 	gopkg.in/src-d/go-billy.v4 v4.3.0 // indirect
 	gopkg.in/src-d/go-git-fixtures.v3 v3.3.0 // indirect
 	gopkg.in/src-d/go-git.v4 v4.7.0
-	gopkg.in/warnings.v0 v0.1.2
+	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
