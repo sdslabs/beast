@@ -1,7 +1,6 @@
 package notify
 
 import (
-	"fmt"
 	"net/url"
 
 	"github.com/sdslabs/beastv4/core/config"
@@ -92,10 +91,17 @@ func SendNotification(nType NotificationType, message string) error {
 	for _, webhook := range config.Cfg.NotificationWebhooks {
 		if webhook.ServiceName != "" || webhook.Active == true {
 			var Provider ProviderTypeEnum
+<<<<<<< HEAD
 			if webhook.ServiceName == "slack" {
 				Provider = SlackProvider
 			}
 			if webhook.ServiceName == "discord" {
+=======
+			switch webhook.ServiceName {
+			case "slack":
+				Provider = SlackProvider
+			case "discord":
+>>>>>>> d9433fa4c1c3f508d6a51d8587e9d1bb5aeea3c9
 				Provider = DiscordProvider
 			}
 			Notifier := NewNotifier(webhook.URL, Provider)
@@ -103,13 +109,22 @@ func SendNotification(nType NotificationType, message string) error {
 			err := Notifier.SendNotification(nType, message)
 			if err != nil {
 				log.Errorf("Error while sending notification to %s : %s", webhook.ServiceName, err)
+<<<<<<< HEAD
 				fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+=======
+				log.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+>>>>>>> d9433fa4c1c3f508d6a51d8587e9d1bb5aeea3c9
 			}
 
 			log.Infof("Notfication sent to %s.", webhook.ServiceName)
 		} else {
+<<<<<<< HEAD
 			log.Warnf("No %s webhook url provided in beast config, cannot send notification.", webhook.ServiceName)
 			fmt.Errorf("No webhook URL in beast config.")
+=======
+			log.Errorf("No %s webhook url provided in beast config, cannot send notification.", webhook.ServiceName)
+			log.Errorf("No webhook URL in beast config.")
+>>>>>>> d9433fa4c1c3f508d6a51d8587e9d1bb5aeea3c9
 		}
 	}
 	return nil
