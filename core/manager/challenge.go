@@ -238,6 +238,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
 		if challengeDir == "" {
 			log.Errorf("Challenge does not exist")
+			return nil, nil
 		}
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
@@ -387,20 +388,7 @@ func HandleAll(action string, user string) []string {
 
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		for _, gitRemote := range config.Cfg.GitRemotes {
-			if gitRemote.Active == true {
-				challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-
-				err, challenges := utils.GetDirsInDir(challengesDirRoot)
-				if err != nil {
-					continue
-				}
-				for _, chall := range challenges {
-					//TODO : challenge transaction save for deploying is not done since ID is not provided here
-					challsNameList = append(challsNameList, chall)
-				}
-			}
-		}
+		GetAvailableChallenges()
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{

@@ -141,7 +141,7 @@ func (config *BeastConfig) ValidateConfig() error {
 		if gitRemote.Active == true {
 			err := gitRemote.ValidateGitConfig()
 			if err != nil {
-				return err
+				return fmt.Errorf("Error while validating config : %s", gitRemote.RemoteName)
 			}
 		}
 	}

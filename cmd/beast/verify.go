@@ -16,12 +16,13 @@ var verifyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		challengeName := args[0]
 
-		challengeStagingDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
-		if challengeStagingDir == "" {
+		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		if challengeDir == "" {
 			log.Errorf("Challenge does not exist")
+			return
 		}
 
-		err := manager.ValidateChallengeConfig(challengeStagingDir)
+		err := manager.ValidateChallengeConfig(challengeDir)
 		if err != nil {
 			log.Warnf("Error while validating challenge %s : %s", challengeName, err.Error())
 		} else {
