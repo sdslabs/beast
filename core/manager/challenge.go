@@ -238,18 +238,13 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 		var challengeDir string
 		var errStrings []string
 		found := false
-		for _, gitRemote := range config.Cfg.GitRemotes {
-			if gitRemote.Active == true {
-				challengeDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
-				if err := ValidateChallengeDir(challengeDir); err != nil {
-					log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
-					errors := fmt.Errorf("CHALLENGE VALIDATION ERROR")
-					errStrings = append(errStrings, errors.Error())
-				} else {
-					found = true
-					break
-				}
-			}
+		challengeDir = coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		if err := ValidateChallengeDir(challengeDir); err != nil {
+			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
+			errors := fmt.Errorf("CHALLENGE VALIDATION ERROR")
+			errStrings = append(errStrings, errors.Error())
+		} else {
+			found = true
 		}
 		if !found {
 			return nil, fmt.Errorf(strings.Join(errStrings, "\n"))
