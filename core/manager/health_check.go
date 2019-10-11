@@ -53,7 +53,7 @@ func ChallengesHealthProber(waitTime int) {
 					log.WithFields(log.Fields{
 						"ChallName": chall.Name,
 					}).Error(msg)
-					notify.SendNotificationToSlack(notify.Error, msg)
+					notify.SendNotification(notify.Error, msg)
 				} else {
 					log.WithFields(log.Fields{
 						"ChallName": chall.Name,

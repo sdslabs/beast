@@ -80,15 +80,14 @@ import (
 // ssh_key = "/home/fristonio/.beast/secrets/key.priv"
 // ```
 type BeastConfig struct {
-	AuthorizedKeysFile string    `toml:"authorized_keys_file"`
-	BeastScriptsDir    string    `toml:"scripts_dir"`
-	AllowedBaseImages  []string  `toml:"allowed_base_images"`
-	AvailableSidecars  []string  `toml:"available_sidecars"`
-	GitRemote          GitRemote `toml:"remote"`
-	JWTSecret          string    `toml:"jwt_secret"`
-	SlackWebHookURL    string    `toml:"slack_webhook"`
-
-	TickerFrequency int `toml:"ticker_frequency"`
+	AuthorizedKeysFile   string                `toml:"authorized_keys_file"`
+	BeastScriptsDir      string                `toml:"scripts_dir"`
+	AllowedBaseImages    []string              `toml:"allowed_base_images"`
+	AvailableSidecars    []string              `toml:"available_sidecars"`
+	GitRemote            GitRemote             `toml:"remote"`
+	JWTSecret            string                `toml:"jwt_secret"`
+	NotificationWebhooks []NotificationWebhook `toml:"notification_webhooks"`
+	TickerFrequency      int                   `toml:"ticker_frequency"`
 
 	RemoteSyncPeriod time.Duration `toml:"-"`
 	Rsp              string        `toml:"remote_sync_period"`
@@ -214,6 +213,12 @@ func (config *GitRemote) ValidateGitConfig() error {
 	}
 
 	return nil
+}
+
+type NotificationWebhook struct {
+	URL         string `toml:"url"`
+	ServiceName string `toml:"service_name"`
+	Active      bool   `toml:"active"`
 }
 
 // From the path of the config file provided as an arguement this function

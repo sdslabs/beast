@@ -534,14 +534,14 @@ func StartUndeployChallenge(challengeName string, purge bool) error {
 	if err != nil {
 		msg := fmt.Sprintf("UNDEPLOY ERROR: %s : %s", challengeName, err)
 		log.Error(msg)
-		notify.SendNotificationToSlack(notify.Error, msg)
+		notify.SendNotification(notify.Error, msg)
 	} else {
 		msg := fmt.Sprintf("UNDEPLOY SUCCESSFUL: %s", challengeName)
 		log.Info(msg)
-		notify.SendNotificationToSlack(notify.Success, msg)
+		notify.SendNotification(notify.Success, msg)
 	}
 
-	log.Infof("Notification for the event sent to slack.")
+	log.Info("Notification for the event sent.")
 	return err
 }
 

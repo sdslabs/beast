@@ -8,22 +8,22 @@ import (
 	"time"
 )
 
-type SlackNotificationProvider struct {
+type DiscordNotificationProvider struct {
 	Request
 }
 
-func (s *SlackNotificationProvider) SendNotification(nType NotificationType, msg string) error {
-	if s.Request.WebHookURL == "" {
+func (d *DiscordNotificationProvider) SendNotification(nType NotificationType, msg string) error {
+	if d.Request.WebHookURL == "" {
 		return fmt.Errorf("Need a WebHookURL to send notification.")
 	}
 
-	s.Request.FillReqParams()
+	d.Request.FillReqParams()
 
 	nAttachment := Attachment{
 		AuthorName: "Beast Notifier",
 		AuthorLink: "https://backdoor.sdslabs.co",
-		Footer:     "Beast Slack API",
-		FooterIcon: "https://platform.slack-edge.com/img/default_application_icon.png",
+		Footer:     "Beast Discord API",
+		FooterIcon: "https://discordapp.com/assets/e05ead6e6ebc08df9291738d0aa6986d.png",
 		Timestamp:  time.Now().Unix(),
 		Text:       msg,
 	}
@@ -38,19 +38,20 @@ func (s *SlackNotificationProvider) SendNotification(nType NotificationType, msg
 		nAttachment.Title = "Beast Deployment Error"
 		break
 	}
-	s.Request.PostPayload.Attachments = []Attachment{nAttachment}
 
-	if s.Request.PostPayload.Channel == "" || s.Request.PostPayload.Username == "" {
+	d.Request.PostPayload.Attachments = []Attachment{nAttachment}
+
+	if d.Request.PostPayload.Channel == "" || d.Request.PostPayload.Username == "" {
 		return fmt.Errorf("Username and Channel required to send the notification.")
 	}
 
-	payload, err := json.Marshal(s.PostPayload)
+	payload, err := json.Marshal(d.PostPayload)
 	if err != nil {
 		return fmt.Errorf("Error while converting payload to JSON : %s", err)
 	}
 
 	payloadReader := bytes.NewReader(payload)
-	req, err := http.NewRequest("POST", s.Request.WebHookURL, payloadReader)
+	req, err := http.NewRequest("POST", d.Request.WebHookURL, payloadReader)
 	if err != nil {
 		return fmt.Errorf("Error while connecting to webhook url host : %s", err)
 	}
