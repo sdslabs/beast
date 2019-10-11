@@ -238,10 +238,11 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
 		if challengeDir == "" {
 			log.Errorf("Challenge does not exist")
-			return nil, nil
+			return nil, fmt.Errorf("challenge does not exist")
 		}
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
+			return nil, fmt.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
 		}
 		/// TODO : remove multiple validation while deploying challenge
 
@@ -389,7 +390,7 @@ func HandleAll(action string, user string) []string {
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
 		challsNameList, err := GetAvailableChallenges()
-		if err == nil || len(challsNameList) == 0 {
+		if err != nil || len(challsNameList) == 0 {
 			fmt.Errorf("No challenge available")
 			return nil
 		}
