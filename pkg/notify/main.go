@@ -103,13 +103,13 @@ func SendNotification(nType NotificationType, message string) error {
 			err := Notifier.SendNotification(nType, message)
 			if err != nil {
 				log.Errorf("Error while sending notification to %s : %s", webhook.ServiceName, err)
-				fmt.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+				log.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
 			}
 
 			log.Infof("Notfication sent to %s.", webhook.ServiceName)
 		} else {
 			log.Warnf("No %s webhook url provided in beast config, cannot send notification.", webhook.ServiceName)
-			fmt.Errorf("No webhook URL in beast config.")
+			log.Errorf("No webhook URL in beast config.")
 		}
 	}
 	return nil

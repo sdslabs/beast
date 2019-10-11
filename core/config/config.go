@@ -86,7 +86,7 @@ type BeastConfig struct {
 	AvailableSidecars    []string              `toml:"available_sidecars"`
 	GitRemote            GitRemote             `toml:"remote"`
 	JWTSecret            string                `toml:"jwt_secret"`
-	NotificationWebhooks []NotificationWebhook `toml:webhook`
+	NotificationWebhooks []NotificationWebhook `toml:"notification_webhooks"`
 	TickerFrequency      int                   `toml:"ticker_frequency"`
 
 	RemoteSyncPeriod time.Duration `toml:"-"`

@@ -23,13 +23,19 @@ available_sidecars = ["mysql"]
 jwt_secret = "beast"
 allowed_base_images = ["ubuntu:16.04", "php:7.1-cli"]
 authorized_keys_file = "/home/vsts/.beast/authorized_keys"
+
 [remote]
 ssh_key = "/home/vsts/.beast/secret.key"
 url = "git@github.com:sdslabs/nonexistent.git"
 name = "nonexistent"
 branch = "nonexistent"
 
-[[webhooks]]
+[[notification_webhooks]]
 url = ""
-service_name= "discord"
-active=true
+service_name = "discord"
+active = true
+
+[[notification_webhooks]]
+url = ""
+service_name = "slack"
+active = false
