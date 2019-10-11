@@ -388,7 +388,11 @@ func HandleAll(action string, user string) []string {
 
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		GetAvailableChallenges()
+		challsNameList, err := GetAvailableChallenges()
+		if err == nil || len(challsNameList) == 0 {
+			fmt.Errorf("No challenge available")
+			return nil
+		}
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
