@@ -3,6 +3,7 @@ package notify
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
@@ -56,12 +57,9 @@ const (
 
 //In the Discord notification provider it was using the same payload which was used for slack.
 //By writing "/slack" in the discord WebHookURL, it execute Slack-Compatible Webhook
-func NewNotifier(URL string, ProviderType ProviderTypeEnum) Notifier {
-	url, err := url.ParseRequestURI(URL)
-	if url == nil || err != nil {
-		log.Error("Invalid notification webhook URL")
-		return nil
-	}
+func NewNotifier(url *url.URL, ProviderType ProviderTypeEnum) Notifier {
+	log.Info("Inside notifier: Webhook URL: " + url.String())
+
 	switch ProviderType {
 	case SlackProvider:
 		return &SlackNotificationProvider{
@@ -89,28 +87,50 @@ func (req *Request) FillReqParams() error {
 }
 
 func SendNotification(nType NotificationType, message string) error {
-	for _, webhook := range config.Cfg.NotificationWebhooks {
-		if webhook.ServiceName != "" || webhook.Active == true {
-			var Provider ProviderTypeEnum
-			if webhook.ServiceName == "slack" {
-				Provider = SlackProvider
-			}
-			if webhook.ServiceName == "discord" {
-				Provider = DiscordProvider
-			}
-			Notifier := NewNotifier(webhook.URL, Provider)
+	var errs []string
 
-			err := Notifier.SendNotification(nType, message)
+	for _, webhook := range config.Cfg.NotificationWebhooks {
+		if webhook.ServiceName != "" || webhook.Active == true || webhook.URL != "" {
+			var provider ProviderTypeEnum
+
+			url, err := url.ParseRequestURI(webhook.URL)
+			if url == nil || err != nil {
+				log.Error("Invalid notification webhook URL")
+				errs = append(errs, fmt.Sprintf("Invalid URL for notifier webhook %s", webhook.URL))
+				continue
+			}
+
+			switch webhook.ServiceName {
+			case "slack":
+				provider = SlackProvider
+			case "discord":
+				provider = DiscordProvider
+			default:
+				log.Errorf("Not a valid service name for notification.")
+				errs = append(errs, fmt.Sprintf("Not a valid service name for notification %s", webhook.ServiceName))
+				continue
+			}
+			notifier := NewNotifier(url, provider)
+
+			err = notifier.SendNotification(nType, message)
 			if err != nil {
-				log.Errorf("Error while sending notification to %s : %s", webhook.ServiceName, err)
+				e := fmt.Sprintf("Error while sending notification to %s : %s", webhook.ServiceName, err)
 				log.Errorf("NOTIFICATION_SEND_ERROR: %s", err)
+
+				errs = append(errs, e)
+				continue
 			}
 
 			log.Infof("Notfication sent to %s.", webhook.ServiceName)
 		} else {
 			log.Warnf("No %s webhook url provided in beast config, cannot send notification.", webhook.ServiceName)
-			log.Errorf("No webhook URL in beast config.")
+			log.Errorf("Notification webhook configuration not valid")
 		}
 	}
-	return nil
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(strings.Join(errs, "\n"))
 }
