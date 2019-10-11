@@ -76,7 +76,7 @@ jwt_secret = "beast_jwt_secret_SUPER_STRONG_0x100010000100"
 
 # To allow beast to send notification to a notification channel povide this webhook URL
 # We are also working on implmeneting notification using IRC.
-[[webhooks]]
+[[notification_webhooks]]
 
 # The webhook URL of notification channel where notification should be sent
 url = ""
