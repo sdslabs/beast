@@ -391,8 +391,7 @@ func HandleAll(action string, user string) []string {
 	case core.MANAGE_ACTION_DEPLOY:
 		challsNameList, err := GetAvailableChallenges()
 		if err != nil || len(challsNameList) == 0 {
-			fmt.Errorf("No challenge available")
-			return nil
+			return []string{"No challenge available"}
 		}
 
 	case core.MANAGE_ACTION_UNDEPLOY:
