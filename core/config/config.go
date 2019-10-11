@@ -261,10 +261,9 @@ func UpdateUsedPortList() {
 	USED_PORTS_LIST = make([]uint32, 0)
 
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-	var challengeDir string
 	for _, gitRemote := range Cfg.GitRemotes {
 		if gitRemote.Active == true {
-			challengeDir = filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+			challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
 			dirs := utils.GetAllDirectoriesName(challengeDir)
 			for _, dir := range dirs {
 				configFilePath := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)

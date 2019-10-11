@@ -235,8 +235,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	err = utils.ValidateFileExists(stagedFileName)
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
-		var challengeDir string
-		challengeDir = coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
 		if challengeDir == "" {
 			log.Errorf("Challenge does not exist")
 		}
@@ -388,10 +387,9 @@ func HandleAll(action string, user string) []string {
 
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		var challengesDirRoot string
 		for _, gitRemote := range config.Cfg.GitRemotes {
 			if gitRemote.Active == true {
-				challengesDirRoot = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+				challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
 
 				err, challenges := utils.GetDirsInDir(challengesDirRoot)
 				if err != nil {

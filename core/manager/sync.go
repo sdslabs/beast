@@ -17,12 +17,11 @@ import (
 func SyncBeastRemote() error {
 	log.Info("Syncing local challenge repository with remote.")
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-	var remote string
 	var dirGitRemote map[string]string
 	var errStrings []string
 	for _, gitRemote := range config.Cfg.GitRemotes {
 		if gitRemote.Active == true {
-			remote = filepath.Join(beastRemoteDir, gitRemote.RemoteName)
+			remote := filepath.Join(beastRemoteDir, gitRemote.RemoteName)
 
 			err := utils.ValidateDirExists(remote)
 			log.Debugf("Remote : %s, SSHKEY file : %s, Branch : %s", remote, gitRemote.Secret, gitRemote.Branch)
@@ -74,28 +73,25 @@ func SyncBeastRemote() error {
 }
 
 func ResetBeastRemote() error {
-	var remoteDir string
 	var errStrings []string
-	var err error
+	log.Debugf("Cleaning existing remote directories")
 	for _, gitRemote := range config.Cfg.GitRemotes {
 		if gitRemote.Active == true {
-			remoteDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName)
-			log.Debugf("Cleaning existing remote directory")
-			err = utils.RemoveDirRecursively(remoteDir)
+			remoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName)
+			err := utils.RemoveDirRecursively(remoteDir)
 			if err != nil {
-				log.Error(err)
-				errors := fmt.Errorf("Error while cloning repository : %s", err)
-				errStrings = append(errStrings, errors.Error())
-				continue
+				e := fmt.Errorf("Error while cloning repository : %s", err)
+				log.Error(e)
+				errStrings = append(errStrings, e.Error())
 			}
 		}
 	}
-	err = SyncBeastRemote()
+	err := SyncBeastRemote()
 	if err != nil {
 		log.Errorf("Error while syncing remote after clean : %s", err)
-		log.Errorf("Error while cloning repository : %s", err)
 	}
-	return fmt.Errorf(strings.Join(errStrings, "\n"))
+	errors := strings.Join(errStrings, "\n") + err.Error()
+	return fmt.Errorf(errors)
 }
 
 func RunBeastBootsetps() error {

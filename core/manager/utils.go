@@ -542,12 +542,11 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 }
 
 func GetAvailableChallenges() ([]string, error) {
-	var challengesDirRoot string
 	var challsNameList []string
 
 	for _, gitRemote := range cfg.Cfg.GitRemotes {
 		if gitRemote.Active == true {
-			challengesDirRoot = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+			challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
 
 			err, challenges := utils.GetDirsInDir(challengesDirRoot)
 			if err != nil {
