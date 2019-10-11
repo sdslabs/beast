@@ -20,6 +20,47 @@ var challengeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		action := args[0]
+
+		if action == core.MANAGE_ACTION_SHOW {
+
+			if AllChalls {
+				errors := utils.ShowAllChallenges()
+
+				if len(errors) > 0 {
+					for _, err := range errors {
+						log.Errorf("The following errors occurred: %s", err.Error())
+					}
+					os.Exit(1)
+				}
+
+			} else if Tag != "" {
+				errors := utils.ShowTagRelatedChallenges(Tag)
+
+				if len(errors) > 0 {
+					for _, err := range errors {
+						log.Errorf("The following errors occurred: %s", err.Error())
+					}
+					os.Exit(1)
+				}
+			} else {
+				if len(args) == 1 {
+					log.Errorf("Provide chall name")
+					os.Exit(1)
+				}
+
+				errors := utils.ShowChallengeByName(args[1])
+				if len(errors) > 0 {
+					for _, err := range errors {
+						log.Errorf("The following errors occurred: %s", err.Error())
+					}
+					os.Exit(1)
+				}
+
+			}
+
+			return
+		}
+
 		challAction, ok := manager.ChallengeActionHandlers[action]
 		if !ok {
 			log.Errorf("No action %s exists", action)
@@ -79,5 +120,6 @@ var challengeCmd = &cobra.Command{
 				os.Exit(1)
 			}
 		}
+
 	},
 }

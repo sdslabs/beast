@@ -51,6 +51,7 @@ const (
 	MANAGE_ACTION_DEPLOY           string = "deploy"
 	MANAGE_ACTION_PURGE            string = "purge"
 	MANAGE_ACTION_REDEPLOY         string = "redeploy"
+	MANAGE_ACTION_SHOW             string = "show"
 	MAX_QUEUE_SIZE                 uint32 = 100
 	DEFAULT_TICKER_FREQUENCY       int    = 1500
 	DEFAULT_PROBE_TIMEOUT          int    = 10

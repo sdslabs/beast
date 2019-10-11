@@ -53,7 +53,7 @@ require (
 	github.com/sirupsen/logrus v1.0.6
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.2 // indirect
-	github.com/src-d/gcfg v1.3.0 // indirect
+	github.com/src-d/gcfg v1.3.0
 	github.com/stevvooe/resumable v0.0.0-20180830230917-22b14a53ba50 // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
 	github.com/swaggo/gin-swagger v1.0.0
@@ -71,5 +71,5 @@ require (
 	gopkg.in/src-d/go-billy.v4 v4.3.0 // indirect
 	gopkg.in/src-d/go-git-fixtures.v3 v3.3.0 // indirect
 	gopkg.in/src-d/go-git.v4 v4.7.0
-	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gopkg.in/warnings.v0 v0.1.2
 )
