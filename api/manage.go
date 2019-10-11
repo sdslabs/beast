@@ -249,6 +249,13 @@ func commitChallenge(c *gin.Context) {
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
 	challengeRemoteDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+	if challengeRemoteDir == "" {
+		log.Errorf("Challenge does not exist")
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Challenge does not exist",
+		})
+		return
+	}
 	err := manager.ValidateChallengeConfig(challengeRemoteDir)
 	if err != nil {
 		c.JSON(http.StatusOK, HTTPErrorResp{
@@ -256,7 +263,7 @@ func verifyHandler(c *gin.Context) {
 		})
 	} else {
 		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "This challenge can be deployed",
+			Message: "Challenge verified",
 		})
 	}
 }

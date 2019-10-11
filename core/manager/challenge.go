@@ -236,20 +236,13 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
 		var challengeDir string
-		var errStrings []string
-		found := false
 		challengeDir = coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		if challengeDir == "" {
+			log.Errorf("Challenge does not exist")
+		}
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
-			errors := fmt.Errorf("CHALLENGE VALIDATION ERROR")
-			errStrings = append(errStrings, errors.Error())
-		} else {
-			found = true
 		}
-		if !found {
-			return nil, fmt.Errorf(strings.Join(errStrings, "\n"))
-		}
-
 		/// TODO : remove multiple validation while deploying challenge
 
 		log.Debugf("Checking and pushing the task of deploying unstaged challenge in the queue.")
@@ -402,7 +395,7 @@ func HandleAll(action string, user string) []string {
 
 				err, challenges := utils.GetDirsInDir(challengesDirRoot)
 				if err != nil {
-					break
+					continue
 				}
 				for _, chall := range challenges {
 					//TODO : challenge transaction save for deploying is not done since ID is not provided here

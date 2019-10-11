@@ -15,8 +15,11 @@ var verifyCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		challengeName := args[0]
-		var challengeStagingDir string
-		challengeStagingDir = coreUtils.GetChallengeDirFromGitRemote(challengeName)
+
+		challengeStagingDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		if challengeStagingDir == "" {
+			log.Errorf("Challenge does not exist")
+		}
 
 		err := manager.ValidateChallengeConfig(challengeStagingDir)
 		if err != nil {

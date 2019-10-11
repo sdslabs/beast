@@ -76,26 +76,24 @@ func SyncBeastRemote() error {
 func ResetBeastRemote() error {
 	var remoteDir string
 	var errStrings []string
+	var err error
 	for _, gitRemote := range config.Cfg.GitRemotes {
 		if gitRemote.Active == true {
 			remoteDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName)
 			log.Debugf("Cleaning existing remote directory")
-			err := utils.RemoveDirRecursively(remoteDir)
+			err = utils.RemoveDirRecursively(remoteDir)
 			if err != nil {
 				log.Error(err)
 				errors := fmt.Errorf("Error while cloning repository : %s", err)
 				errStrings = append(errStrings, errors.Error())
 				continue
 			}
-
-			err = SyncBeastRemote()
-			if err != nil {
-				log.Errorf("Error while syncing remote after clean : %s", err)
-				errors := fmt.Errorf("Error while cloning repository : %s", err)
-				errStrings = append(errStrings, errors.Error())
-				continue
-			}
 		}
+	}
+	err = SyncBeastRemote()
+	if err != nil {
+		log.Errorf("Error while syncing remote after clean : %s", err)
+		log.Errorf("Error while cloning repository : %s", err)
 	}
 	return fmt.Errorf(strings.Join(errStrings, "\n"))
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func GetChallengeDirFromGitRemote(challengeName string) string {
-	var challengeRemoteDir string
+	challengeRemoteDir := ""
 
 	for _, gitRemote := range config.Cfg.GitRemotes {
 		if gitRemote.Active == true {
