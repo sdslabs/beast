@@ -235,13 +235,16 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	err = utils.ValidateFileExists(stagedFileName)
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
-		challengeDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
-
-		/// TODO : remove multiple validation while deploying challenge
+		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		if challengeDir == "" {
+			log.Errorf("Challenge does not exist")
+			return nil, fmt.Errorf("challenge does not exist")
+		}
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
-			return nil, errors.New("CHALLENGE VALIDATION ERROR")
+			return nil, fmt.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
 		}
+		/// TODO : remove multiple validation while deploying challenge
 
 		log.Debugf("Checking and pushing the task of deploying unstaged challenge in the queue.")
 
@@ -273,6 +276,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			Info: info,
 		}, nil
 	}
+	return nil, nil
 }
 
 // Handle multiple challenges simultaneously.
@@ -385,14 +389,9 @@ func HandleAll(action string, user string) []string {
 
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-		err, challenges := utils.GetDirsInDir(challengesDirRoot)
-		if err != nil {
-			break
-		}
-		for _, chall := range challenges {
-			//TODO : challenge transaction save for deploying is not done since ID is not provided here
-			challsNameList = append(challsNameList, chall)
+		challsNameList, err := GetAvailableChallenges()
+		if err != nil || len(challsNameList) == 0 {
+			return []string{"No challenge available"}
 		}
 
 	case core.MANAGE_ACTION_UNDEPLOY:

@@ -2,7 +2,7 @@
 
 ### Git based source of truth
 
-* A single(we are currently exploring supporting multiple git repositories) and reliable source of truth for all the challenges.
+* Single or multiple git repositories as reliable source of truth for all the challenges.
 
 * Easy to collaborate similar to an open source application where everyone can give their reviews on your contribution.
 

@@ -1,11 +1,8 @@
 package main
 
 import (
-	"path/filepath"
-
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -18,11 +15,16 @@ var verifyCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		challengeName := args[0]
-		challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
 
-		err := manager.ValidateChallengeConfig(challengeStagingDir)
+		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		if challengeDir == "" {
+			log.Errorf("Challenge does not exist")
+			return
+		}
+
+		err := manager.ValidateChallengeConfig(challengeDir)
 		if err != nil {
-			log.Errorf("Error while validating challenge %s : %s", challengeName, err.Error())
+			log.Warnf("Error while validating challenge %s : %s", challengeName, err.Error())
 		} else {
 			log.Infof("The challenge config is verified.")
 		}

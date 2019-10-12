@@ -107,7 +107,7 @@ default_pids_limit = 100
 
 # Configuration corresponding to the remote repository used by beast
 # We use ssh authentication mechanism for interacting with git repository.
-[remote]
+[[remote]]
 
 # URL of the remote git repository, this should be user@host:<git_repository> format
 url = "git@github.com:sdslabs/hack-test.git"
@@ -120,6 +120,10 @@ branch = "master"
 
 # Path to private SSH key for interacting with the git repository.
 ssh_key = "/home/fristonio/.beast/secrets/key.priv"
+
+# Status of remote git repository URL to be used
+# If it is set to false then that remote git repository will not be used
+active = true
 ```
 
 Along with this configuration file we also need one more configuration file which is used by beast static content provider

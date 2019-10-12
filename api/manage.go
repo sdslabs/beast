@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/auth"
-	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -248,16 +248,22 @@ func commitChallenge(c *gin.Context) {
 // @Router /api/manage/commit/ [post]
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
-	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, config.Cfg.GitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR, challengeName)
-
-	err := manager.ValidateChallengeConfig(challengeStagingDir)
+	challengeRemoteDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+	if challengeRemoteDir == "" {
+		log.Errorf("Challenge does not exist")
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Challenge does not exist",
+		})
+		return
+	}
+	err := manager.ValidateChallengeConfig(challengeRemoteDir)
 	if err != nil {
 		c.JSON(http.StatusOK, HTTPErrorResp{
 			Error: err.Error(),
 		})
 	} else {
 		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "This challenge can be deployed",
+			Message: "Challenge verified",
 		})
 	}
 }
