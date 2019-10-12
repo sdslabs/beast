@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -164,8 +165,11 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # Ports to reserve for the challenge, we bind only one of these to host other are for internal communictaions only.
 // # Should be within a particular permissible range.
 // ports = [0, 0]
-// default_port = 0 # Default port to use for any port specific action by beast.
+// default_port = 0 # Default port to use for any port specific action by beast. This is the container port.
 //
+// # Ports can also be specified as a mapping between host and the container.
+// # This can be used when we need customized port mapping between container and the host.
+// port_mappings = ["10001:80"]
 //
 // # Dependencies required by challenge, installed using default package manager of base image apt for most cases.
 // apt_deps = ["", ""]
@@ -227,39 +231,152 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 type ChallengeEnv struct {
 	AptDeps          []string         `toml:"apt_deps"`
 	Ports            []uint32         `toml:"ports"`
+	DefaultPort      uint32           `toml:"default_port"`
+	PortMappings     []string         `toml:"port_mappings"`
 	SetupScripts     []string         `toml:"setup_scripts"`
 	StaticContentDir string           `toml:"static_dir"`
 	RunCmd           string           `toml:"run_cmd"`
 	BaseImage        string           `toml:"base_image"`
 	WebRoot          string           `toml:"web_root"`
-	DefaultPort      uint32           `toml:"default_port"`
 	ServicePath      string           `toml:"service_path"`
 	Entrypoint       string           `toml:"entrypoint"`
 	DockerCtx        string           `toml:"docker_context"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
 }
 
-func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir string) error {
-	if len(config.Ports) == 0 {
-		return errors.New("Are you sure you have specified the ports used by challenge")
+// NewPortMapping returns a new port mapping instance.
+func NewPortMapping(hp, cp uint32) cr.PortMapping {
+	return cr.PortMapping{
+		HostPort:      hp,
+		ContainerPort: cp,
+	}
+}
+
+// Given a port mapping array and a port the function checks whether the port exists in the mapping
+// as a container port.
+func checkIfPortExistInMapping(portMapping []cr.PortMapping, port uint32) bool {
+	for _, portMap := range portMapping {
+		if port == portMap.ContainerPort {
+			return true
+		}
 	}
 
-	if len(config.Ports) > int(core.MAX_PORT_PER_CHALL) {
+	return false
+}
+
+// GetPortMappings returns the entire port mapping for the challenge from the challenge
+// environment configuration.
+func (config *ChallengeEnv) GetPortMappings() ([]cr.PortMapping, error) {
+	var mapping []cr.PortMapping
+
+	var containerPorts []uint32
+	for _, portMap := range config.PortMappings {
+		hp, cp, err := utils.ParsePortMapping(portMap)
+		if err != nil {
+			return mapping, err
+		}
+		mapping = append(mapping, NewPortMapping(hp, cp))
+		containerPorts = append(containerPorts, cp)
+	}
+
+	for _, port := range config.Ports {
+		if !utils.UInt32InList(port, containerPorts) {
+			containerPorts = append(containerPorts, port)
+			mapping = append(mapping, NewPortMapping(port, port))
+		}
+	}
+
+	return mapping, nil
+}
+
+// GetAllHostPorts is utility function for the ChallengeEnv configuration which returns
+// the entire list of all the host ports which are being used by the challenge.
+func (config *ChallengeEnv) GetAllHostPorts() ([]uint32, error) {
+	var hostPorts []uint32
+	var containerPorts []uint32
+
+	for _, portMap := range config.PortMappings {
+		hp, cp, err := utils.ParsePortMapping(portMap)
+		if err != nil {
+			return hostPorts, err
+		}
+		hostPorts = append(hostPorts, hp)
+		containerPorts = append(containerPorts, cp)
+	}
+
+	for _, port := range config.Ports {
+		if !utils.UInt32InList(port, containerPorts) {
+			hostPorts = append(hostPorts, port)
+			containerPorts = append(containerPorts, port)
+		}
+	}
+
+	return hostPorts, nil
+}
+
+// GetAllContainerPorts is utility function for the ChallengeEnv configuration which returns
+// the entire list of all the container ports which are being used by the challenge.
+func (config *ChallengeEnv) GetAllContainerPorts() ([]uint32, error) {
+	var containerPorts []uint32
+
+	for _, portMap := range config.PortMappings {
+		_, cp, err := utils.ParsePortMapping(portMap)
+		if err != nil {
+			return containerPorts, err
+		}
+		containerPorts = append(containerPorts, cp)
+	}
+
+	for _, port := range config.Ports {
+		if !utils.UInt32InList(port, containerPorts) {
+			containerPorts = append(containerPorts, port)
+		}
+	}
+
+	return containerPorts, nil
+}
+
+// GetDefaultPort returns the default port used by the challenge from the challenge environment
+// configuration.
+func (config *ChallengeEnv) GetDefaultPort() uint32 {
+	mappings, err := config.GetPortMappings()
+	if err != nil || len(mappings) == 0 {
+		return 0
+	}
+
+	return mappings[0].ContainerPort
+}
+
+// ValidateRequiredFields validates required fields for the Challenge environment configuration.
+// This requires challenge type to be passed so that we can verfiy based on type
+// of the challenge.
+func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir string) error {
+	// Validate port related stuff for the challenge environment configuration.
+	if len(config.Ports) == 0 && len(config.PortMappings) == 0 {
+		return errors.New("Some port is required to be specified by the challenge")
+	}
+
+	if len(config.Ports)+len(config.PortMappings) > int(core.MAX_PORT_PER_CHALL) {
 		return fmt.Errorf("Max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
+	}
+
+	portMappings, err := config.GetPortMappings()
+	if err != nil {
+		return fmt.Errorf("Error while parsing port mapping: %s", err)
 	}
 
 	// By default if no port is specified to be default, the first port
 	// from the list is assumed to be default and the service is deployed accordingly.
 	if config.DefaultPort == 0 {
-		config.DefaultPort = config.Ports[0]
+		config.DefaultPort = portMappings[0].ContainerPort
 	}
 
-	if !utils.UInt32InList(config.DefaultPort, config.Ports) {
+	if !checkIfPortExistInMapping(portMappings, config.DefaultPort) {
 		return fmt.Errorf("`default_port` must be one of the Ports in the `ports` list")
 	}
 
-	for _, port := range config.Ports {
-		if port < core.ALLOWED_MIN_PORT_VALUE || port > core.ALLOWED_MAX_PORT_VALUE {
+	for _, portMap := range portMappings {
+		if portMap.HostPort < core.ALLOWED_MIN_PORT_VALUE || portMap.HostPort > core.ALLOWED_MAX_PORT_VALUE {
 			return fmt.Errorf("Port value must be between %s and %s", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE)
 		}
 	}

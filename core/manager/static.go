@@ -65,10 +65,13 @@ func DeployStaticContentContainer() error {
 	staticMount := make(map[string]string)
 	staticMount[stagingDirPath] = core.BEAST_STAGING_AREA_MOUNT_POINT
 	staticMount[beastStaticAuthFile] = filepath.Join("/", core.BEAST_STATIC_AUTH_FILE)
-	port := []uint32{core.BEAST_CHALLENGES_STATIC_PORT}
+	portMap := cr.PortMapping{
+		ContainerPort: core.BEAST_CHALLENGES_STATIC_PORT,
+		HostPort:      core.BEAST_CHALLENGES_STATIC_PORT,
+	}
 
 	containerConfig := cr.CreateContainerConfig{
-		PortsList:     port,
+		PortMapping:   []cr.PortMapping{portMap},
 		MountsMap:     staticMount,
 		ImageId:       imageId,
 		ContainerName: core.BEAST_STATIC_CONTAINER_NAME,

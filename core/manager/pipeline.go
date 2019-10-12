@@ -214,8 +214,15 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		config.Resources.CPUShares,
 		config.Resources.PidsLimit)
 
+	// Since till this point we have already valiadated the challenge config this is highly
+	// unlikely to fail.
+	portMapping, err := config.Challenge.Env.GetPortMappings()
+	if err != nil {
+		return fmt.Errorf("Error while parsing port mapping for the challenge %s: %s", config.Challenge.Metadata.Name, err)
+	}
+
 	containerConfig := cr.CreateContainerConfig{
-		PortsList:        config.Challenge.Env.Ports,
+		PortMapping:      portMapping,
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
 		ContainerName:    coreUtils.EncodeID(config.Challenge.Metadata.Name),

@@ -16,8 +16,13 @@ import (
 	"golang.org/x/net/context"
 )
 
+type PortMapping struct {
+	HostPort      uint32
+	ContainerPort uint32
+}
+
 type CreateContainerConfig struct {
-	PortsList        []uint32
+	PortMapping      []PortMapping
 	MountsMap        map[string]string
 	ImageId          string
 	ContainerName    string
@@ -86,17 +91,17 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	portSet := make(nat.PortSet)
 	portMap := make(nat.PortMap)
 
-	for _, port := range containerConfig.PortsList {
-		natPort, err := nat.NewPort("tcp", strconv.Itoa(int(port)))
+	for _, portMapping := range containerConfig.PortMapping {
+		natPort, err := nat.NewPort("tcp", strconv.Itoa(int(portMapping.ContainerPort)))
 		if err != nil {
-			return "", fmt.Errorf("Error while creating new port from port %d", port)
+			return "", fmt.Errorf("Error while creating new port from port %d", portMapping.ContainerPort)
 		}
 
 		portSet[natPort] = struct{}{}
 
 		portMap[natPort] = []nat.PortBinding{{
 			HostIP:   "0.0.0.0",
-			HostPort: strconv.Itoa(int(port)),
+			HostPort: strconv.Itoa(int(portMapping.HostPort)),
 		}}
 	}
 

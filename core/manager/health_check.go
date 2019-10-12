@@ -44,6 +44,8 @@ func ChallengesHealthProber(waitTime int) {
 				}
 
 				log.Debugf("Doing helthcheck probe for %s", chall.Name)
+
+				// Do a better job at health probing mechanism.
 				port := int(allocatedPorts[0].PortNo)
 				prober := probes.NewTcpProber()
 				result, err := prober.Probe(CHALLENGE_HOST, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
