@@ -299,10 +299,7 @@ func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.B
 			return fmt.Errorf("Error while parsing Xinetd config template :: %s", err)
 		}
 
-		port := config.Challenge.Env.DefaultPort
-		if port == 0 {
-			port = config.Challenge.Env.Ports[0]
-		}
+		port := config.Challenge.Env.GetDefaultPort()
 
 		data := BeastXinetdConf{
 			Port:        fmt.Sprintf("%d", port),
@@ -436,12 +433,16 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		return false
 	}
 
+	hostPorts, err := config.Challenge.Env.GetAllHostPorts()
+	if err != nil {
+		return fmt.Errorf("Error while parsing host port for challenge %s : %s", challEntry.Name, err)
+	}
 	// Once the challenge entry has been created, add entries to the ports
 	// table in the database with the ports to expose
 	// for the challenge.
 	// TODO: Do all this under a database transaction so that if any port
 	// request is not available
-	for _, port := range config.Challenge.Env.Ports {
+	for _, port := range hostPorts {
 		if isAllocated(port) {
 			// The port has already been allocated to the challenge
 			// Do nothing for this.

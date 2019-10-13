@@ -261,17 +261,26 @@ func UpdateUsedPortList() {
 	USED_PORTS_LIST = make([]uint32, 0)
 
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
+
 	for _, gitRemote := range Cfg.GitRemotes {
-		if gitRemote.Active == true {
-			challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-			dirs := utils.GetAllDirectoriesName(challengeDir)
-			for _, dir := range dirs {
-				configFilePath := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
-				var config BeastChallengeConfig
-				_, err := toml.DecodeFile(configFilePath, &config)
-				if err == nil {
-					USED_PORTS_LIST = append(USED_PORTS_LIST, config.Challenge.Env.Ports...)
+		if gitRemote.Active != true {
+			continue
+		}
+
+		challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+		dirs := utils.GetAllDirectoriesName(challengeDir)
+		for _, dir := range dirs {
+			configFilePath := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
+			var config BeastChallengeConfig
+			_, err := toml.DecodeFile(configFilePath, &config)
+			if err == nil {
+				hostPorts, err := config.Challenge.Env.GetAllHostPorts()
+				if err != nil {
+					log.Errorf("Error while parsing host ports for challenge %s", dir)
+					continue
 				}
+
+				USED_PORTS_LIST = append(USED_PORTS_LIST, hostPorts...)
 			}
 		}
 	}
