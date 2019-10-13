@@ -90,6 +90,12 @@ Acceptable fields for this section are:
 ports = [0, 0]
 default_port = 0 # Default port to use for any port specific action by beast.
 
+# Port mapping is the array of port mapping from host to container.
+# The first port mentioned in the mapping is the host port and the second is the container port.
+# Port Mapping is given preference as compared to ports, so if you have a port and the same port in mapping
+# then the host port corresponding to container port in the port mapping.
+port_mappings = ["10005:80"]
+
 
 # Dependencies required by challenge, installed using default package manager of base image apt for most cases.
 apt_deps = ["", ""] 
