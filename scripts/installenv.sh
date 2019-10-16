@@ -42,20 +42,24 @@ function install_go() {
 
         rm -rf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
 
-        sudo echo 'export GOROOT=/usr/local/go' >> /etc/profile
+        echo 'export GOROOT=/usr/local/go' | tee -a $HOME/.bashrc
+        echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin/' | tee -a $HOME/.bashrc
+        echo 'export GOPATH=$HOME/go' | tee -a $HOME/.bashrc
+
+        source ~/.bashrc
 
         echo 'Golang installed.'
     fi
 
-    go version
+    /usr/local/go/bin/go version
 }
 
 update
 upgrade
 
+sudo apt-get install -y apt-transport-https libsqlite3-dev build-essential gcc g++
+
 install_docker
 install_go
-
-sudo apt-get install -y libsqlite3-dev build-essential
 
 exit 0
