@@ -14,6 +14,7 @@ import (
 // @Tags config
 // @Accept  json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/config/reaload/ [patch]

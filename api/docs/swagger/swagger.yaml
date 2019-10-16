@@ -112,6 +112,12 @@ paths:
       consumes:
       - application/json
       description: Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -133,6 +139,12 @@ paths:
       consumes:
       - application/json
       description: Returns all challenges available in the in the database
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -155,6 +167,12 @@ paths:
       - application/json
       description: Returns all the available base images  which can be used for challenge
         creation as the base OS for challenge.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -173,6 +191,12 @@ paths:
       - application/json
       description: Gives container logs for a particular challenge, useful for debugging
         purposes.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -200,6 +224,12 @@ paths:
       - application/json
       description: Returns the ports in use by beast, which cannot be used in creating
         a new challenge..
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -343,6 +373,11 @@ paths:
       description: Handles scheduleing of challenge action to executed at some later
         point of time
       parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       - description: Action for the underlying challenge in context
         in: query
         name: action
@@ -417,6 +452,12 @@ paths:
       - application/json
       description: Resets local copy of remote git directory, it first deletes the
         existing directory and then clone from the remote again.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -437,6 +478,12 @@ paths:
       - application/json
       description: Syncs beasts local challenges database with the remote git repository(hack)
         the local copy of the challenge database is located at $HOME/.beast/remote/$REMOTE_NAME.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -461,6 +508,11 @@ paths:
       - description: Status type to filter with, if none specified then all
         in: query
         name: filter
+        required: true
+        type: string
+      - description: Bearer
+        in: header
+        name: Authorization
         required: true
         type: string
       produces:
@@ -496,6 +548,11 @@ paths:
       - description: Name of the challenge
         in: query
         name: name
+        required: true
+        type: string
+      - description: Bearer
+        in: header
+        name: Authorization
         required: true
         type: string
       produces:

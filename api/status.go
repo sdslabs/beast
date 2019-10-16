@@ -18,6 +18,7 @@ import (
 // @Accept  json
 // @Produce json
 // @Param name query string true "Name of the challenge"
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 500 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
@@ -62,6 +63,7 @@ func challengeStatusHandler(c *gin.Context) {
 // @Accept  json
 // @Produce json
 // @Param filter query string true "Status type to filter with, if none specified then all"
+// @Param Authorization header string true "Bearer"
 // @Failure 500 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Success 200 {array} api.ChallengeStatusResp
