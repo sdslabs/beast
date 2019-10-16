@@ -17,6 +17,7 @@ import (
 // @Tags info
 // @Accept  json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.PortsInUseResp
 // @Router /api/info/ports/used [get]
 func usedPortsInfoHandler(c *gin.Context) {
@@ -45,6 +46,7 @@ func availableChallengeInfoHandler(c *gin.Context) {
 // @Tags info
 // @Accept  json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.AvailableImagesResp
 // @Router /api/info/images/available [get]
 func availableImagesHandler(c *gin.Context) {
@@ -60,6 +62,7 @@ func availableImagesHandler(c *gin.Context) {
 // @Tags info
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.ChallengesResp
 // @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/info/challenges/available [get]
@@ -89,6 +92,7 @@ func challengesHandler(c *gin.Context) {
 // @Tags info
 // @Accept  json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.LogsInfoResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp

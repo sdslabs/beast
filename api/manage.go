@@ -274,6 +274,7 @@ func verifyHandler(c *gin.Context) {
 // @Tags manage
 // @Accept  json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Param action query string true "Action for the underlying challenge in context"
 // @Param challenge query string false "The name of the challenge to schedule the action for."
 // @Param tags query string false "Tag corresponding to challenges in context, optional if challenge name is provided"

@@ -14,6 +14,7 @@ import (
 // @Description Syncs beasts local challenges database with the remote git repository(hack) the local copy of the challenge database is located at $HOME/.beast/remote/$REMOTE_NAME.
 // @Accept  json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
 // @Router /api/remote/sync/ [post]
@@ -37,6 +38,7 @@ func syncBeastGitRemote(c *gin.Context) {
 // @Description Resets local copy of remote git directory, it first deletes the existing directory and then clone from the remote again.
 // @Accept  json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
 // @Router /api/remote/reset/ [post]
