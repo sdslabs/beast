@@ -68,4 +68,8 @@ docs:
 	@mkdocs build
 	@python scripts/tools/swagger-docs.py
 
-.PHONY: build format test check_format tools docs
+installenv:
+	@echo 'Setting up environment for beast.'
+	@./scripts/installenv.sh
+
+.PHONY: build format test check_format tools docs installenv
