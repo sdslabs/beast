@@ -17,7 +17,7 @@ import (
 func SyncBeastRemote() error {
 	log.Info("Syncing local challenge repository with remote.")
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-	var dirGitRemote map[string]string
+	dirGitRemote := make(map[string]string)
 	var errStrings []string
 	for _, gitRemote := range config.Cfg.GitRemotes {
 		if gitRemote.Active == true {

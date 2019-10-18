@@ -342,6 +342,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	// deploying
 	if challenge.Status != core.DEPLOY_STATUS["unknown"] &&
 		challenge.Status != core.DEPLOY_STATUS["deployed"] &&
+		challenge.Status != core.DEPLOY_STATUS["queued"] &&
 		challenge.Status != "" {
 		log.Errorf("Deploy for %s already in progress, wait and check for the status(cur: %s)", challengeName, challenge.Status)
 		return fmt.Errorf("PIPELINE START ERROR: %s : Deploy already in progress. Current Status : %s", challengeName, challenge.Status)
