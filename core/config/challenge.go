@@ -227,6 +227,9 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // [[var]]
 //     key = ""
 //     value = ""
+//
+// Type of traffic to expose through the port mapping provided.
+// traffic = "udp" / "tcp"
 // ```
 type ChallengeEnv struct {
 	AptDeps          []string         `toml:"apt_deps"`
@@ -242,6 +245,14 @@ type ChallengeEnv struct {
 	Entrypoint       string           `toml:"entrypoint"`
 	DockerCtx        string           `toml:"docker_context"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
+	Traffic          string           `toml:"traffic"`
+}
+
+func (config *ChallengeEnv) TrafficType() cr.TrafficType {
+	if config.Traffic == "" {
+		return cr.DefaultTraffic
+	}
+	return cr.TrafficType(config.Traffic)
 }
 
 // NewPortMapping returns a new port mapping instance.
@@ -467,6 +478,10 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		config.DockerCtx = core.DEFAULT_DOCKER_FILE
 	}
 
+	if config.Traffic != "" && !cr.IsValidTrafficType(config.Traffic) {
+		return fmt.Errorf("Not a valid traffic type provided, required (%v), got %s", cr.GetValidTrafficTypes(), config.Traffic)
+	}
+
 	return nil
 }
 
@@ -516,17 +531,17 @@ type Resources struct {
 
 func (config *Resources) ValidateRequiredFields() {
 	if config.CPUShares <= 0 {
-		log.Warn("CPU shares not provided in configuration, using default.")
+		log.Debug("CPU shares not provided in configuration, using default.")
 		config.CPUShares = Cfg.CPUShares
 	}
 
 	if config.Memory <= 0 {
-		log.Warn("Memory Limit not provided in configuration, using default.")
+		log.Debug("Memory Limit not provided in configuration, using default.")
 		config.Memory = Cfg.Memory
 	}
 
 	if config.PidsLimit <= 0 {
-		log.Warn("Pids Limit not provided in configuration, using default.")
+		log.Debug("Pids Limit not provided in configuration, using default.")
 		config.PidsLimit = Cfg.PidsLimit
 	}
 }

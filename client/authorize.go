@@ -20,7 +20,6 @@ type Response struct {
 }
 
 func Authorize(keyFile string, host string, username string) {
-
 	err := utils.ValidateFileExists(keyFile)
 	if err != nil {
 		fmt.Printf("File Location does not exist")
