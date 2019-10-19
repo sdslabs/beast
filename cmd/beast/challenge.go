@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
@@ -18,7 +19,10 @@ var challengeCmd = &cobra.Command{
 	Long:  "Performs actions like : deploy, undeploy, redeploy, purge to the challs",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		config.InitConfig()
 
+		// Since action is already verfied to exist it does not make sense to check
+		// its existence here therefore we directly parse the action from the command.
 		action := args[0]
 
 		if action == core.MANAGE_ACTION_SHOW {
@@ -67,6 +71,17 @@ var challengeCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// Handle local directory deployment separately.
+		if LocalDirectory != "" {
+			if action != core.MANAGE_ACTION_DEPLOY {
+				log.Errorf("Only deploy action is available for the challenge with local directory")
+				os.Exit(1)
+			}
+
+			manager.StartDeployPipeline(LocalDirectory, false, false)
+			return
+		}
+
 		completionChannel := make(chan bool)
 
 		manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, completionChannel)
@@ -87,12 +102,6 @@ var challengeCmd = &cobra.Command{
 				os.Exit(1)
 			} else {
 				log.Info("The action will be performed")
-			}
-		} else if LocalDirectory != "" {
-			err := manager.DeployChallengePipeline(LocalDirectory)
-			if err != nil {
-				log.Errorf("Following errors occurred : %v", err)
-				os.Exit(1)
 			}
 		} else {
 			if len(args) == 1 {

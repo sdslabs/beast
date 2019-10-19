@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	log "github.com/sirupsen/logrus"
@@ -14,6 +15,7 @@ var verifyCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
+		config.InitConfig()
 		challengeName := args[0]
 
 		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)

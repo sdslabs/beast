@@ -67,11 +67,11 @@ func Execute() {
 // * runCmd: Run beast API server.
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
-	rootCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
 
 	runCmd.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to run the beast server on.")
 	runCmd.PersistentFlags().BoolVarP(&HealthProbe, "health-probe", "k", false, "Run health check service for beast deployed challenges")
 	runCmd.PersistentFlags().BoolVarP(&PeriodicSync, "periodic-sync", "s", false, "Periodically sync remote with beast.")
+	runCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
 
 	getAuthCmd.PersistentFlags().StringVarP(&KeyFile, "identity", "i", "", "Private File location")
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
