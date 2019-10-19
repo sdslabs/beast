@@ -48,6 +48,9 @@ func runBeastApiBootsteps() error {
 
 func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
 	log.Info("Bootstrapping Beast API server")
+
+	config.InitConfig()
+
 	if port != "" {
 		port = ":" + port
 	} else {

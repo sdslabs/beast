@@ -12,6 +12,8 @@ var healthProbeCmd = &cobra.Command{
 	Long:  "Run Health Probe only without API server",
 
 	Run: func(cmd *cobra.Command, args []string) {
+		config.InitConfig()
+
 		manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
 	},
 }

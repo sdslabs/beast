@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/utils"
 	"github.com/spf13/cobra"
 )
@@ -11,6 +12,8 @@ var logsCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
+		config.InitConfig()
+
 		utils.GetLogs(args[0], true)
 	},
 }

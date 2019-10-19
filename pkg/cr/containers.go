@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/sdslabs/beastv4/pkg/defaults"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -21,6 +22,35 @@ type PortMapping struct {
 	ContainerPort uint32
 }
 
+// TrafficType is the protocol supported by container ingress and egress through
+// the port mappings.
+type TrafficType string
+
+// String returns the string representation of the traffic type.
+func (t TrafficType) String() string {
+	return string(t)
+}
+
+const (
+	TCPTraffic TrafficType = "tcp"
+	UDPTraffic TrafficType = "udp"
+
+	DefaultTraffic TrafficType = TCPTraffic
+)
+
+func IsValidTrafficType(t string) bool {
+	switch TrafficType(t) {
+	case TCPTraffic, UDPTraffic:
+		return true
+	default:
+		return false
+	}
+}
+
+func GetValidTrafficTypes() []string {
+	return []string{UDPTraffic.String(), TCPTraffic.String()}
+}
+
 type CreateContainerConfig struct {
 	PortMapping      []PortMapping
 	MountsMap        map[string]string
@@ -28,9 +58,19 @@ type CreateContainerConfig struct {
 	ContainerName    string
 	ContainerEnv     []string
 	ContainerNetwork string
-	CPUShares        int64
-	Memory           int64
-	PidsLimit        int64
+	Traffic          TrafficType
+
+	CPUShares int64
+	Memory    int64
+	PidsLimit int64
+}
+
+func (c *CreateContainerConfig) TrafficType() string {
+	if c.Traffic.String() == "" {
+		return DefaultTraffic.String()
+	}
+
+	return c.Traffic.String()
 }
 
 type Log struct {
@@ -63,8 +103,8 @@ func StopAndRemoveContainer(containerId string) error {
 		return err
 	}
 
-	// Try to stop using default timeout of docker
-	err = cli.ContainerStop(context.Background(), containerId, nil)
+	// Try to stop using default timeout we are using for beast
+	err = cli.ContainerStop(context.Background(), containerId, &defaults.DefaultDockerStopTimeout)
 	if err != nil {
 		return err
 	}
@@ -92,7 +132,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	portMap := make(nat.PortMap)
 
 	for _, portMapping := range containerConfig.PortMapping {
-		natPort, err := nat.NewPort("tcp", strconv.Itoa(int(portMapping.ContainerPort)))
+		natPort, err := nat.NewPort(containerConfig.TrafficType(), strconv.Itoa(int(portMapping.ContainerPort)))
 		if err != nil {
 			return "", fmt.Errorf("Error while creating new port from port %d", portMapping.ContainerPort)
 		}

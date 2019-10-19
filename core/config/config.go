@@ -287,11 +287,18 @@ func UpdateUsedPortList() {
 	log.Debugf("Used port list updated: %v", USED_PORTS_LIST)
 }
 
-var Cfg BeastConfig = InitConfig()
+var Cfg *BeastConfig
 var SkipAuthorization bool
 var USED_PORTS_LIST []uint32
 
-func InitConfig() BeastConfig {
+// InitConfig loads the config from the global config file and populate
+// the Cfg global variable used everywhere else.
+func InitConfig() {
+	log.Info("Loading up beast configuration.")
+	if Cfg != nil {
+		log.Warn("Config is already initialized, reinitilize/reload using ReloadBeastConfig method")
+		return
+	}
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
 	cfg, err := LoadBeastConfig(configPath)
 
@@ -301,9 +308,11 @@ func InitConfig() BeastConfig {
 	}
 
 	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
-	return cfg
+	Cfg = &cfg
 }
 
+// ReloadBeastConfig reloads the beast configuration and reinitializes the Cfg global
+// variable.
 func ReloadBeastConfig() error {
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
 	cfg, err := LoadBeastConfig(configPath)
@@ -312,7 +321,7 @@ func ReloadBeastConfig() error {
 		return fmt.Errorf("Error while loading beast config: %s", err)
 	}
 
-	Cfg = cfg
-	log.Debugf("CONFIG LOAD: New Config : %v", Cfg)
+	Cfg = &cfg
+	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
 	return nil
 }

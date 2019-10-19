@@ -16,6 +16,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
+	log "github.com/sirupsen/logrus"
 )
 
 type Author struct {
@@ -191,6 +192,10 @@ func generateContentAuthorizedKeyFile(author *Author) ([]byte, error) {
 
 //adds to authorized keys
 func addToAuthorizedKeys(author *Author) error {
+	if config.Cfg == nil {
+		log.Warn("No config initialized, skipping add to authorized keys hook")
+		return nil
+	}
 	f, err := os.OpenFile(config.Cfg.AuthorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("Error while opening authorized keys file : %s", err)
@@ -211,7 +216,10 @@ func addToAuthorizedKeys(author *Author) error {
 }
 
 func deleteFromAuthorizedKeys(author *Author) error {
-
+	if config.Cfg == nil {
+		log.Warn("Config is not initialized, skipping delete from auth keys hook")
+		return nil
+	}
 	keys, err := ioutil.ReadFile(config.Cfg.AuthorizedKeysFile)
 	if err != nil {
 		return fmt.Errorf("Error while reading auth file : %s", err)
