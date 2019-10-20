@@ -97,9 +97,9 @@ func challengesHandler(c *gin.Context) {
 // @Success 200 {object} api.LogsInfoResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/info/logs/ [get]
+// @Router /api/info/logs [get]
 func challengeLogsHandler(c *gin.Context) {
-	chall := c.Param("challenge")
+	chall := c.Query("challenge")
 	if chall == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: fmt.Sprintf("Challenge name cannot be empty"),
