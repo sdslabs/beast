@@ -93,6 +93,7 @@ func challengesHandler(c *gin.Context) {
 // @Accept  json
 // @Produce json
 // @Param Authorization header string true "Bearer"
+// @Param challenge query string false "The name of the challenge to get the logs for."
 // @Success 200 {object} api.LogsInfoResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp

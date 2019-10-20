@@ -153,6 +153,9 @@ docket_context = ""
 [[var]]
     key = ""
     value = ""
+
+# Protocol supported by the challenge, currently supported are tcp and udp.
+traffic = "tcp"/"udp"
 ```
 
 If you want to checkout some example challenge configuration, checkout `_example` directory in the 

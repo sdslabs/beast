@@ -150,6 +150,12 @@
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "The name of the challenge to get the logs for.",
+                        "name": "challenge",
+                        "in": "query"
                     }
                 ],
                 "responses": {
