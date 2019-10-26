@@ -16,13 +16,13 @@ func CreateAuthor(name, username, email, publicKeyPath, password string) {
 	if publicKeyPath != "" {
 		err := utils.ValidateFileExists(publicKeyPath)
 		if err != nil {
-			log.Error("Error while checking validity of file(%v): %v : ", publicKeyPath, err)
+			log.Errorf("Error while checking validity of file(%v): %v : ", publicKeyPath, err)
 			return
 		}
 
 		sshKey, err = ioutil.ReadFile(publicKeyPath)
 		if err != nil {
-			log.Error("Error while reading file: %v", err)
+			log.Errorf("Error while reading file: %v", err)
 			return
 		}
 
@@ -38,7 +38,7 @@ func CreateAuthor(name, username, email, publicKeyPath, password string) {
 	}
 	err := database.CreateUserEntry(&userEntry)
 	if err != nil {
-		log.Error("Error while creating author entry : %v", err)
+		log.Errorf("Error while creating author entry : %v", err)
 	}
 }
 

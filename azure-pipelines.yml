@@ -51,6 +51,8 @@ steps:
   displayName: 'Build Requirements'
 
 - script: |
+    echo -ne "ssh-rsa AAAAB3NzaC1y" > pub.key
+    beast create-author --name fristonio --email fristonio@protonmail.com --publickey pub.key -v --username fristonio --password pass123
     make test
   workingDirectory: '$(modulePath)'
   displayName: 'Run tests'

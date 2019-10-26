@@ -221,35 +221,44 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 //hook after update of challenge
 func (challenge *Challenge) AfterUpdate(scope *gorm.Scope) error {
 	iFace, _ := scope.InstanceGet("gorm:update_attrs")
+	if iFace == nil {
+		return nil
+	}
 	updatedAttr := iFace.(map[string]interface{})
-
 	if _, ok := updatedAttr["container_id"]; ok {
-		var user User
-		Db.Model(challenge).Related(&user)
-		go updateScript(&user)
+		var users []*User
+		Db.Model(challenge).Related(&users, "Users")
+		go updateScripts(users)
 	}
 	return nil
 }
 
 //hook after create of challenge
 func (challenge *Challenge) AfterCreate(scope *gorm.Scope) error {
-	var user User
-	Db.Model(challenge).Related(&user)
-	go updateScript(&user)
+	var users []*User
+	Db.Model(challenge).Related(&users, "Users")
+	go updateScripts(users)
 	return nil
 }
 
 //hook after deleting the challenge
 func (challenge *Challenge) AfterDelete() error {
-	var user User
-	Db.Model(challenge).Related(&user)
-	go updateScript(&user)
+	var users []*User
+	Db.Model(challenge).Related(&users, "Users")
+	go updateScripts(users)
 	return nil
 }
 
 type ScriptFile struct {
 	User       string
 	Challenges map[string]string
+}
+
+//updates users' script
+func updateScripts(users []*User) {
+	for _, user := range users {
+		go updateScript(user)
+	}
 }
 
 //updates user script
@@ -260,7 +269,6 @@ func updateScript(user *User) error {
 	SHA256 := sha256.New()
 	SHA256.Write([]byte(user.Email))
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
-
 	challs, err := GetRelatedChallenges(user)
 	if err != nil {
 		return fmt.Errorf("Error while getting related challenges : %v", err)

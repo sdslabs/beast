@@ -367,17 +367,28 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			}
 		}
 
-		if userEntry.Email == "" {
+		users := make([]*database.User, len(config.Maintainers)+1)
 
+		for i, user := range config.Maintainers {
+			u, err := database.QueryFirstUserEntry("email", user.Email)
+			if err != nil {
+				return fmt.Errorf("Error while querying user with email %s", user.Email)
+			}
+			users[i] = &u
+		}
+
+		if userEntry.Email == "" {
 			return fmt.Errorf("User with the given email does not exist : %v", config.Author.Email)
 		} else {
 			if userEntry.Email != config.Author.Email &&
-				userEntry.SshKey != config.Author.SSHKey &&
-				userEntry.Name != config.Author.Name &&
+				(userEntry.SshKey != config.Author.SSHKey || config.Author.SSHKey == "") &&
+				(userEntry.Name != config.Author.Name || config.Author.Name == "") &&
 				userEntry.Role != core.USER_ROLES["author"] {
-				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", userEntry.Name)
+				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", userEntry.Email)
 			}
 		}
+
+		users[len(config.Maintainers)] = &userEntry
 
 		*challEntry = database.Challenge{
 			Name:        config.Challenge.Metadata.Name,
@@ -399,6 +410,8 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 
 		database.Db.Model(challEntry).Association("Tags").Append(tags)
+
+		database.Db.Model(challEntry).Association("Users").Append(users)
 	}
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)

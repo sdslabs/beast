@@ -109,7 +109,7 @@ func (s *mysqlAgentServer) DeleteMySQLInstance(ctx context.Context, instance *pb
 func main() {
 	listner, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", MYSQL_AGENT_PORT))
 	if err != nil {
-		fmt.Println("Error while starting listner : %s", err)
+		fmt.Println("Error while starting listener : %s", err)
 		os.Exit(1)
 	}
 

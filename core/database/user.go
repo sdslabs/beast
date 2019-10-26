@@ -26,7 +26,7 @@ type User struct {
 
 	Challenges []*Challenge `gorm:"many2many:user_challenges;"`
 	Name       string       `gorm:"not null"`
-	Email      string       `gorm:"non null"`
+	Email      string       `gorm:"non null";unique`
 	SshKey     string
 }
 
@@ -87,8 +87,6 @@ func QueryFirstUserEntry(key string, value string) (User, error) {
 // transaction.
 func CreateUserEntry(user *User) error {
 	DBMux.Lock()
-	fmt.Println("user----------")
-	fmt.Println(user)
 	defer DBMux.Unlock()
 	tx := Db.Begin()
 
@@ -120,7 +118,7 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(user).Related(&challenges).Error; err != nil {
+	if err := Db.Model(user).Related(&challenges, "Challenges").Error; err != nil {
 		return challenges, err
 	}
 
@@ -141,6 +139,9 @@ func (user *User) AfterCreate(scope *gorm.Scope) error {
 //hook after update
 func (user *User) AfterUpdate(scope *gorm.Scope) error {
 	iFace, _ := scope.InstanceGet("gorm:update_attrs")
+	if iFace == nil {
+		return nil
+	}
 	updatedAttr := iFace.(map[string]interface{})
 	if _, ok := updatedAttr["ssh_key"]; ok {
 		err := deleteFromAuthorizedKeys(user)

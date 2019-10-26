@@ -42,18 +42,29 @@ func init() {
 
 	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{})
 
-	salt := make([]byte, 16)
-	rand.Read(salt)
-	randPass := make([]byte, 32)
-	rand.Read(randPass)
-
-	err := CreateUserEntry(&User{
-		Name:      core.DEFAULT_USER_NAME,
-		Email:     core.DEFAULT_USER_EMAIL,
-		AuthModel: auth.CreateModel(core.DEFAULT_USER_NAME, string(randPass), core.USER_ROLES["author"]),
-	})
+	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
-		log.Errorf("Error while creating dummy author entry.")
+		log.Errorf("Error while checking dummy user entry.")
 		os.Exit(1)
+	}
+
+	if users == nil || len(users) == 0 {
+		log.Info("Creating dummy user entry")
+
+		salt := make([]byte, 16)
+		rand.Read(salt)
+		randPass := make([]byte, 32)
+		rand.Read(randPass)
+
+		err := CreateUserEntry(&User{
+			Name:      core.DEFAULT_USER_NAME,
+			Email:     core.DEFAULT_USER_EMAIL,
+			AuthModel: auth.CreateModel(core.DEFAULT_USER_NAME, string(randPass), core.USER_ROLES["author"]),
+		})
+
+		if err != nil {
+			log.Errorf("Error while creating dummy user entry.")
+			os.Exit(1)
+		}
 	}
 }
