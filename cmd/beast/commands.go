@@ -13,11 +13,11 @@ var (
 	Verbose           bool
 	HealthProbe       bool
 	Port              string
-	KeyFile           string
-	Username          string
-	Host              string
 	Name              string
+	Host              string
+	Username          string
 	Email             string
+	Password          string
 	PublicKeyPath     string
 	SkipAuthorization bool
 	AllChalls         bool
@@ -73,11 +73,13 @@ func init() {
 	runCmd.PersistentFlags().BoolVarP(&PeriodicSync, "periodic-sync", "s", false, "Periodically sync remote with beast.")
 	runCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
 
-	getAuthCmd.PersistentFlags().StringVarP(&KeyFile, "identity", "i", "", "Private File location")
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
+	getAuthCmd.PersistentFlags().StringVarP(&Password, "password", "p", "", "Password")
 	getAuthCmd.PersistentFlags().StringVarP(&Host, "host", "H", "http://localhost:5005/", "Hostname or IP along with port where beast is hosted")
 
 	createAuthorCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new author")
+	createAuthorCmd.PersistentFlags().StringVarP(&Username, "username", "", "", "Username of the new author")
+	createAuthorCmd.PersistentFlags().StringVarP(&Password, "password", "", "", "Password of the author")
 	createAuthorCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new author")
 	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new author")
 
@@ -97,7 +99,7 @@ func init() {
 	rootCmd.AddCommand(healthProbeCmd)
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(challengeCmd)
-	rootCmd.AddCommand(disableAuthorSSH)
+	rootCmd.AddCommand(disableUserSSH)
 	rootCmd.AddCommand(cmdRef)
 	rootCmd.AddCommand(generateTemplateCmd)
 }

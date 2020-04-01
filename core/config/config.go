@@ -22,7 +22,7 @@ import (
 // ```toml
 // # Authorized key file used by ssh daemon running on the host
 // # This is used for forwarding ssh connection to docker containers, the
-// # access to a container is only given to the author of the challenge.
+// # access to a container is only given to the author, maintainers of challenge and admin.
 // authorized_keys_file = "/home/fristonio/.beast/beast_authorized_keys"
 //
 //

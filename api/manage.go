@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/auth"
 	"github.com/sdslabs/beastv4/core/manager"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
@@ -37,10 +36,10 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 	// We are trying to get the username for the request from JWT claims here
 	// Since upto this point the request is already authorized, we use a default
 	// username if any error occurs while getting the username.
-	authorName, err := auth.GetUser(c.GetHeader("Authorization"))
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
 	if err == nil {
 		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
-		authorName = core.DEFAULT_USER_NAME
+		username = core.DEFAULT_USER_NAME
 	}
 
 	_, ok := manager.ChallengeActionHandlers[action]
@@ -55,7 +54,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 
 	if tag != "" {
 		log.Infof("Starting %s for all challenges related to tags", action)
-		msgs := manager.HandleTagRelatedChallenges(action, tag, authorName)
+		msgs := manager.HandleTagRelatedChallenges(action, tag, username)
 
 		if len(msgs) != 0 {
 			msg = fmt.Sprintf("Error while performing %s : %s", action, strings.Join(msgs, " || "))
@@ -64,7 +63,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 		}
 	} else {
 		log.Infof("Starting %s for all challenges", action)
-		msgs := manager.HandleAll(action, authorName)
+		msgs := manager.HandleAll(action, username)
 
 		if len(msgs) != 0 {
 			msg = fmt.Sprintf("Error while performing %s : %s", action, strings.Join(msgs, " || "))
@@ -289,10 +288,10 @@ func manageScheduledAction(c *gin.Context) {
 	tag := c.PostForm("tag")
 
 	authorization := c.GetHeader("Authorization")
-	authorName, err := auth.GetUser(authorization)
+	username, err := coreUtils.GetUser(authorization)
 	if err == nil {
 		log.Warn("Error while getting user from authorization header, using default user(since already authorized)")
-		authorName = core.DEFAULT_USER_NAME
+		username = core.DEFAULT_USER_NAME
 	}
 
 	if action == "" || (challenge == "" && tag == "") {
@@ -343,7 +342,7 @@ func manageScheduledAction(c *gin.Context) {
 	if tag != "" {
 		manager.LogTransaction(fmt.Sprintf("TAG:%s", tag), "SCHEDULE::"+action, authorization)
 
-		BeastScheduler.ScheduleAfter(duration, manager.HandleTagRelatedChallenges, action, tag, authorName)
+		BeastScheduler.ScheduleAfter(duration, manager.HandleTagRelatedChallenges, action, tag, username)
 		log.Infof("Scheduled %s for challenges with tag %s", action, tag)
 	} else {
 		manager.LogTransaction(challenge, "SCHEDULE::"+action, authorization)

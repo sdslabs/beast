@@ -345,8 +345,8 @@ func HandleTagRelatedChallenges(action string, tag string, user string) []string
 	return handleMultipleChallenges(challsNameList, action)
 }
 
-func appendAndSaveTransaction(challs *[]database.Challenge, challsNameList *[]string, action string, user string) error {
-	author, err := database.QueryFirstAuthorEntry("name", user)
+func appendAndSaveTransaction(challs *[]database.Challenge, challsNameList *[]string, action string, username string) error {
+	user, err := database.QueryFirstUserEntry("username", username)
 	if err != nil {
 		return err
 	}
@@ -355,7 +355,7 @@ func appendAndSaveTransaction(challs *[]database.Challenge, challsNameList *[]st
 		*challsNameList = append(*challsNameList, chall.Name)
 		TransactionEntry := database.Transaction{
 			Action:      action,
-			AuthorID:    author.ID,
+			UserID:      user.ID,
 			ChallengeID: chall.ID,
 		}
 

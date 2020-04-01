@@ -13,8 +13,8 @@ var getAuthCmd = &cobra.Command{
 	Short: "Gets Auth token from beast server",
 	Long:  "Gets Auth Token from the beast server by completing the challenge from the server",
 	PreRun: func(cmd *cobra.Command, args []string) {
-		if KeyFile == "" {
-			fmt.Printf("File Location not provided")
+		if Password == "" {
+			fmt.Printf("Password not provided")
 			os.Exit(1)
 		}
 
@@ -24,6 +24,6 @@ var getAuthCmd = &cobra.Command{
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		client.Authorize(KeyFile, Host, Username)
+		client.Authorize(Password, Host, Username)
 	},
 }

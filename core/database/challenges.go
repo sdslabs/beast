@@ -52,7 +52,8 @@ type Challenge struct {
 	AuthorID    uint   `gorm:"not null"`
 	HealthCheck uint   `gorm:"not null;default:1"`
 	Ports       []Port
-	Tags        []*Tag `gorm:"many2many:tag_challenges;"`
+	Tags        []*Tag  `gorm:"many2many:tag_challenges;"`
+	Users       []*User `gorm:"many2many:user_challenges;"`
 }
 
 // Create an entry for the challenge in the Challenge table
@@ -220,47 +221,55 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 //hook after update of challenge
 func (challenge *Challenge) AfterUpdate(scope *gorm.Scope) error {
 	iFace, _ := scope.InstanceGet("gorm:update_attrs")
+	if iFace == nil {
+		return nil
+	}
 	updatedAttr := iFace.(map[string]interface{})
-
 	if _, ok := updatedAttr["container_id"]; ok {
-		var author Author
-		Db.Model(challenge).Related(&author)
-		go updateScript(&author)
+		var users []*User
+		Db.Model(challenge).Related(&users, "Users")
+		go updateScripts(users)
 	}
 	return nil
 }
 
 //hook after create of challenge
 func (challenge *Challenge) AfterCreate(scope *gorm.Scope) error {
-	var author Author
-	Db.Model(challenge).Related(&author)
-	go updateScript(&author)
+	var users []*User
+	Db.Model(challenge).Related(&users, "Users")
+	go updateScripts(users)
 	return nil
 }
 
 //hook after deleting the challenge
 func (challenge *Challenge) AfterDelete() error {
-	var author Author
-	Db.Model(challenge).Related(&author)
-	go updateScript(&author)
+	var users []*User
+	Db.Model(challenge).Related(&users, "Users")
+	go updateScripts(users)
 	return nil
 }
 
 type ScriptFile struct {
-	Author     string
+	User       string
 	Challenges map[string]string
 }
 
+//updates users' script
+func updateScripts(users []*User) {
+	for _, user := range users {
+		go updateScript(user)
+	}
+}
+
 //updates user script
-func updateScript(author *Author) error {
+func updateScript(user *User) error {
 
 	time.Sleep(3 * time.Second)
 
 	SHA256 := sha256.New()
-	SHA256.Write([]byte(author.Email))
+	SHA256.Write([]byte(user.Email))
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
-
-	challs, err := GetRelatedChallenges(author)
+	challs, err := GetRelatedChallenges(user)
 	if err != nil {
 		return fmt.Errorf("Error while getting related challenges : %v", err)
 	}
@@ -272,7 +281,7 @@ func updateScript(author *Author) error {
 	}
 
 	data := ScriptFile{
-		Author:     author.Name,
+		User:       user.Name,
 		Challenges: mapOfChall,
 	}
 

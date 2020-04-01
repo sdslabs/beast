@@ -23,9 +23,10 @@ const SERVICE_CHALL_RUN_CMD string = "xinetd -dontfork"
 // Take a look at template beast.toml file in templates package
 // to see how to specify the file and what all fields are available.
 type BeastChallengeConfig struct {
-	Challenge Challenge `toml:"challenge"`
-	Author    Author    `toml:"author"`
-	Resources Resources `toml:"resource"`
+	Challenge   Challenge `toml:"challenge"`
+	Author      Author    `toml:"author"`
+	Resources   Resources `toml:"resource"`
+	Maintainers []Author  `toml:"maintainer"`
 }
 
 func (config *BeastChallengeConfig) PopulateDefualtValues() {
@@ -71,6 +72,14 @@ func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) erro
 	}
 
 	config.Resources.ValidateRequiredFields()
+
+	for _, maintainer := range config.Maintainers {
+		err = maintainer.ValidateRequiredFields()
+		if err != nil {
+			log.Debugf("Error while validating `Maintainer`'s required fields : %s", err.Error())
+			return err
+		}
+	}
 
 	log.Debugf("BeastChallengeConfig required fields validated")
 	return nil
