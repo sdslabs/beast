@@ -27,6 +27,7 @@ steps:
     sudo apt update
     sudo apt install docker.io
     sudo usermod -a -G docker $USER
+    sudo systemctl restart docker
   displayName: 'Set up the Go and Docker workspace'
 
 - script: |
