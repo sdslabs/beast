@@ -41,3 +41,9 @@ type LogsInfoResp struct {
 	Stdout string `json:"stdout" example:"[INFO] Challenge is starting to deploy"`
 	Stderr string `json:"stderr" example:"[ERROR] Challenge deployment failed."`
 }
+
+type ChallengeDescriptionResp struct {
+	Name   string `json:"name" example:"Web Challenge"`
+	Author string `json:"author" example:"Fristonio"`
+	Desc   string `json:"desc" example:"Challenge Description"`
+}
