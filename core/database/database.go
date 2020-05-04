@@ -40,7 +40,7 @@ func init() {
 		}).Fatal(dberr)
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{})
+	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{})
 
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
