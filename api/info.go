@@ -30,7 +30,7 @@ func usedPortsInfoHandler(c *gin.Context) {
 }
 
 func challengeInfoHandler(c *gin.Context) {
-	name := c.Param("name")
+	name := c.PostForm("name")
 	if name == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: fmt.Sprintf("Challenge name cannot be empty"),
@@ -55,7 +55,7 @@ func challengeInfoHandler(c *gin.Context) {
 		challDescription = "Not Available"
 		challAuthorID = 0
 	}
-	challAuthor, err := database.QueryAuthorById(challAuthorID)
+	challAuthor, err := database.QueryUserById(challAuthorID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "DATABASE ERROR while fetching author info.",

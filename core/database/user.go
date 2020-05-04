@@ -67,18 +67,18 @@ func QueryAllUsers() ([]User, error) {
 	return users, tx.Error
 }
 
-func QueryAuthorById(authorID uint) (Author, error) {
-	var author Author
+func QueryUserById(authorID uint) (User, error) {
+	var user User
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.First(&author, authorID)
+	tx := Db.First(&user, authorID)
 	if tx.RecordNotFound() {
-		return Author{}, nil
+		return User{}, nil
 	}
 
-	return author, tx.Error
+	return user, tx.Error
 }
 
 // Using the column value in key and value in value get the first
