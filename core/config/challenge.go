@@ -29,7 +29,7 @@ type BeastChallengeConfig struct {
 	Maintainers []Author  `toml:"maintainer"`
 }
 
-func (config *BeastChallengeConfig) PopulateDefualtValues() {
+func (config *BeastChallengeConfig) PopulateDefaultValues() {
 	config.Author.PopulateAuthor()
 	config.Challenge.Metadata.PopulateChallengeMetadata()
 	config.Challenge.Env.PopulateChallengeEnv()
@@ -46,6 +46,7 @@ func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
 	Metadata.Type = "ChallengeType"
 	Metadata.Flag = "ChallengeFlag"
 	Metadata.Sidecar = "SidecarHelper"
+	Metadata.Points = 0
 }
 
 func (Env *ChallengeEnv) PopulateChallengeEnv() {
@@ -132,6 +133,7 @@ type ChallengeMetadata struct {
 	Flag        string   `toml:"flag"`
 	Name        string   `toml:"name"`
 	Type        string   `toml:"type"`
+	Points      uint64   `toml:"points"`
 	Tags        []string `toml:"tags"`
 	Sidecar     string   `toml:"sidecar"`
 	Description string   `toml:"description"`

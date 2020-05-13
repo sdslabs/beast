@@ -389,7 +389,7 @@ func HandleAll(action string, user string) []string {
 
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		challsNameList, err := GetAvailableChallenges()
+		challsNameList, err = GetAvailableChallenges()
 		if err != nil || len(challsNameList) == 0 {
 			return []string{"No challenge available"}
 		}

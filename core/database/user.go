@@ -24,10 +24,12 @@ type User struct {
 	gorm.Model
 	auth.AuthModel
 
-	Challenges []*Challenge `gorm:"many2many:user_challenges;"`
-	Name       string       `gorm:"not null"`
-	Email      string       `gorm:"non null";unique`
-	SshKey     string
+	Challenges       []*Challenge `gorm:"many2many:user_challenges;"`
+	SolvedChallenges []*Challenge `gorm:"many2many:solved_challenges;"`
+	Name             string       `gorm:"not null"`
+	Email            string       `gorm:"non null";unique`
+	TotalPoints      uint64       `gorm:"non null;default:0";`
+	SshKey           string
 }
 
 // Queries all the users entries where the column represented by key
