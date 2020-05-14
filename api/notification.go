@@ -30,7 +30,14 @@ func addNotification(c *gin.Context) {
 
 	if msgs := database.AddNotification(&notify); msgs != nil {
 		log.Info("Error while adding notification")
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Error while adding notification",
+		})
+		return
 	}
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Notification successfully added",
+	})
 }
 
 // Removes notifications
@@ -46,18 +53,26 @@ func addNotification(c *gin.Context) {
 func removeNotification(c *gin.Context) {
 	title := c.PostForm("title")
 
-	notify := database.Notification{
-		Title: title,
+	notify, err := database.QueryFirstNotificationEntry("title", title)
+	if err != nil {
+		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 	}
 
 	if msgs := database.DeleteNotification(&notify); msgs != nil {
 		log.Info("Error while deleting notification")
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Error while deleting notification",
+		})
+		return
 	}
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Notification successfully removed",
+	})
 }
 
 // Updates notifications
 // @Summary Updates notifications
-// @Description Updates any changes in the notification notifications
+// @Description Updates any changes in the notifications
 // @Tags notification
 // @Accept  json
 // @Produce json
@@ -68,20 +83,26 @@ func removeNotification(c *gin.Context) {
 // @Router /api/notification/update [post]
 func updateNotifications(c *gin.Context) {
 	title := c.PostForm("title")
-	changedDescription := c.PostForm("description")
+	changedDescription := c.PostForm("desc")
 
 	if title != "" && changedDescription != "" {
-		notify := database.Notification{
-			Title: title,
+		notify, err := database.QueryFirstNotificationEntry("title", title)
+		if err != nil {
+			log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		}
 
-		if changedDescription != "" {
-			if msgs := database.UpdateNotification(&notify, map[string]interface{}{
-				"Description": changedDescription,
-			}); msgs != nil {
-				log.Info("Error while updating notification")
-			}
+		if msgs := database.UpdateNotification(&notify, map[string]interface{}{
+			"Description": changedDescription,
+		}); msgs != nil {
+			log.Info("Error while updating notification")
+			c.JSON(http.StatusOK, HTTPPlainResp{
+				Message: "Error while updating notification",
+			})
+			return
 		}
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Notification successfully updated",
+		})
 	}
 }
 
@@ -89,8 +110,14 @@ func availableNotificationHandler(c *gin.Context) {
 	notifications, err := database.QueryAllNotification()
 	if err != nil {
 		log.Errorf("Error while retriving notifications")
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Error while retriving notifications",
+		})
 	} else if len(notifications) == 0 {
 		log.Info("No notifications present in database")
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "No notification present in database",
+		})
 	} else {
 		c.JSON(http.StatusOK, NotificationResp{
 			Message:       "All notifications",

@@ -49,6 +49,39 @@ func DeleteNotification(notification *Notification) error {
 	return tx.Commit().Error
 }
 
+func QueryNotificationEntries(key string, value string) ([]Notification, error) {
+	queryKey := fmt.Sprintf("%s = ?", key)
+
+	var notifications []Notification
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where(queryKey, value).Find(&notifications)
+	if tx.RecordNotFound() {
+		return nil, nil
+	}
+
+	if tx.Error != nil {
+		return notifications, tx.Error
+	}
+
+	return notifications, nil
+}
+
+func QueryFirstNotificationEntry(key string, value string) (Notification, error) {
+	notifications, err := QueryNotificationEntries(key, value)
+	if err != nil {
+		return Notification{}, err
+	}
+
+	if len(notifications) == 0 {
+		return Notification{}, nil
+	}
+
+	return notifications[0], nil
+}
+
 func QueryAllNotification() ([]Notification, error) {
 	var notifications []Notification
 
