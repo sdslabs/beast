@@ -1,6 +1,10 @@
 package api
 
-import "time"
+import (
+	"time"
+
+	"github.com/sdslabs/beastv4/core/database"
+)
 
 type HTTPPlainResp struct {
 	Message string `json:"message" example:"Messsage in response to your request"`
@@ -46,4 +50,9 @@ type ChallengeDescriptionResp struct {
 	Name   string `json:"name" example:"Web Challenge"`
 	Author string `json:"author" example:"Fristonio"`
 	Desc   string `json:"desc" example:"Challenge Description"`
+}
+
+type NotificationResp struct {
+	Message       string
+	Notifications []database.Notification
 }

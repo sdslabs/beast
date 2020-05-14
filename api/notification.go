@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/database"
 	log "github.com/sirupsen/logrus"
@@ -80,5 +82,20 @@ func updateNotifications(c *gin.Context) {
 				log.Info("Error while updating notification")
 			}
 		}
+	}
+}
+
+func availableNotificationHandler(c *gin.Context) {
+	notifications, err := database.QueryAllNotification()
+	if err != nil {
+		log.Errorf("Error while retriving notifications")
+	} else if len(notifications) == 0 {
+		log.Info("No notifications present in database")
+	} else {
+		c.JSON(http.StatusOK, NotificationResp{
+			Message:       "All notifications",
+			Notifications: notifications,
+		})
+		return
 	}
 }
