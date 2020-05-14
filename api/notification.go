@@ -106,6 +106,15 @@ func updateNotifications(c *gin.Context) {
 	}
 }
 
+// Fetch available notifications
+// @Summary Fetch available notifications
+// @Description Fetch all the notifications from database
+// @Tags notification
+// @Accept  json
+// @Produce json
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/notification/available [post]
 func availableNotificationHandler(c *gin.Context) {
 	notifications, err := database.QueryAllNotification()
 	if err != nil {
