@@ -10,7 +10,7 @@ pool:
 
 variables:
   GOBIN:  '$(GOPATH)/bin'
-  GOROOT: '/usr/local/go1.11'
+  GOROOT: '/usr/local/go1.13'
   GOPATH: '$(system.defaultWorkingDirectory)/gopath'
   modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)'
 
