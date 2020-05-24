@@ -28,7 +28,7 @@ func addNotification(c *gin.Context) {
 		Description: desc,
 	}
 
-	if msgs := database.AddNotification(&notify); msgs != nil {
+	if err := database.AddNotification(&notify); err != nil {
 		log.Info("Error while adding notification")
 		c.JSON(http.StatusOK, HTTPPlainResp{
 			Message: "Error while adding notification",
@@ -56,12 +56,16 @@ func removeNotification(c *gin.Context) {
 	notify, err := database.QueryFirstNotificationEntry("title", title)
 	if err != nil {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Error while accessing database",
+		})
+		return
 	}
 
-	if msgs := database.DeleteNotification(&notify); msgs != nil {
-		log.Info("Error while deleting notification")
+	if err := database.DeleteNotification(&notify); err != nil {
+		log.Errorf("Error while deleting notification from the database: %v", err)
 		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "Error while deleting notification",
+			Message: "Error while deleting notification from the database",
 		})
 		return
 	}
@@ -89,11 +93,15 @@ func updateNotifications(c *gin.Context) {
 		notify, err := database.QueryFirstNotificationEntry("title", title)
 		if err != nil {
 			log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+			c.JSON(http.StatusOK, HTTPPlainResp{
+				Message: "Error while accessing database",
+			})
+			return
 		}
 
-		if msgs := database.UpdateNotification(&notify, map[string]interface{}{
+		if err := database.UpdateNotification(&notify, map[string]interface{}{
 			"Description": changedDescription,
-		}); msgs != nil {
+		}); err != nil {
 			log.Info("Error while updating notification")
 			c.JSON(http.StatusOK, HTTPPlainResp{
 				Message: "Error while updating notification",
@@ -128,10 +136,17 @@ func availableNotificationHandler(c *gin.Context) {
 			Message: "No notification present in database",
 		})
 	} else {
-		c.JSON(http.StatusOK, NotificationResp{
-			Message:       "All notifications",
-			Notifications: notifications,
-		})
+		var resp []NotificationResp
+		for _, notification := range notifications {
+			r := NotificationResp{
+				Title:     notification.Title,
+				Desc:      notification.Description,
+				UpdatedAt: notification.UpdatedAt,
+			}
+			resp = append(resp, r)
+		}
+
+		c.JSON(http.StatusOK, resp)
 		return
 	}
 }

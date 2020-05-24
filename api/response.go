@@ -2,8 +2,6 @@ package api
 
 import (
 	"time"
-
-	"github.com/sdslabs/beastv4/core/database"
 )
 
 type HTTPPlainResp struct {
@@ -53,6 +51,7 @@ type ChallengeDescriptionResp struct {
 }
 
 type NotificationResp struct {
-	Message       string
-	Notifications []database.Notification
+	Title     string    `json:"title" example:"CTF is live now!"`
+	Desc      string    `json:"desc" example:"Notification Description"`
+	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }
