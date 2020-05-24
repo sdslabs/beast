@@ -8,28 +8,22 @@ pr:
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-  GOBIN:  '$(GOPATH)/bin'
-  GOROOT: '/usr/local/go1.13'
-  GOPATH: '$(system.defaultWorkingDirectory)/gopath'
-  modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)'
-
 steps:
+- task: GoTool@0
+  inputs:
+    version: '1.13.5'
+- task: Go@0
+  inputs:
+    command: 'get'
+    arguments: '-d'
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
 - script: |
-    mkdir -p '$(GOBIN)'
-    mkdir -p '$(GOPATH)/pkg'
-    mkdir -p '$(modulePath)'
-    shopt -s extglob
-    shopt -s dotglob
-    mv !(gopath) '$(modulePath)'
-    echo '##vso[task.prependpath]$(GOBIN)'
-    echo '##vso[task.prependpath]$(GOROOT)/bin'
     sudo apt update
     sudo apt install docker.io
     sudo usermod -a -G docker $USER
     sudo systemctl unmask docker
     sudo systemctl start docker
-  displayName: 'Set up the Go and Docker workspace'
+  displayName: 'Set up the Docker workspace'
 
 - script: |
     mkdir ~/.beast
@@ -39,22 +33,22 @@ steps:
     mkdir ~/.beast/staging
     mkdir ~/.beast/remote
     mkdir ~/.beast/scripts
-  workingDirectory: '$(modulePath)'
+  workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Setup Beast Global Directory'
 
 - script: |
     make build
-  workingDirectory: '$(modulePath)'
+  workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Build Beast'
 
 - script: |
     make requirements
-  workingDirectory: '$(modulePath)'
+  workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Build Requirements'
 
 - script: |
     echo -ne "ssh-rsa AAAAB3NzaC1y" > pub.key
     beast create-author --name fristonio --email contact+fristonio@sdslabs.co.in --publickey pub.key -v --username fristonio --password pass123
     make test
-  workingDirectory: '$(modulePath)'
+  workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Run tests'
