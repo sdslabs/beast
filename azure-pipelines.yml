@@ -8,18 +8,20 @@ pr:
 pool:
   vmImage: 'ubuntu-latest'
 
+variables:
+  GOPATH: '$(system.defaultWorkingDirectory)/gopath'
+
 steps:
 - task: GoTool@0
   inputs:
     version: '1.13.5'
 - script: |
-    go mod vendor
     sudo apt update
     sudo apt install docker.io
     sudo usermod -a -G docker $USER
     sudo systemctl unmask docker
     sudo systemctl start docker
-  displayName: 'Set up the Docker workspace and Dependencies'
+  displayName: 'Set up the Docker workspace'
   workingDirectory: '$(System.DefaultWorkingDirectory)'
 
 - script: |
@@ -30,7 +32,6 @@ steps:
     mkdir ~/.beast/staging
     mkdir ~/.beast/remote
     mkdir ~/.beast/scripts
-  workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Setup Beast Global Directory'
 
 - script: |
