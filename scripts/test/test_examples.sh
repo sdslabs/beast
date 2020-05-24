@@ -6,6 +6,8 @@ ERROR="\e[31;1mERROR\e[0m"
 SUCCESS="\e[32;1mSUCCESS\e[0m"
 INFO="\e[34;1mINFO\e[0m"
 
+BEAST="${GOPATH}/bin/beast"
+
 checkPortAvailable() {
 	local challenge=$1
 	local port=$2
@@ -21,7 +23,7 @@ deployChallenge() {
 	local challenge=$1
 	local challdir=$2
 	echo -e "$INFO : $challenge : Start deploy"
-	beast -v challenge deploy --local-directory $challdir
+	$BEAST -v challenge deploy --local-directory $challdir
 	if [[ $? -ne 0 ]]; then
 		echo -e "$ERROR: $challenge : There was an error in deployment of challenge"
 		exit 1
@@ -36,7 +38,7 @@ checkPortReachable() {
 purge() {
 	local challenge=$1
 	echo -e "$INFO : $challenge : Purge challenge"
-	beast -v challenge purge $challenge -d
+	$BEAST -v challenge purge $challenge -d
 	if [[ $? -ne 0 ]]; then
 		echo -e "$ERROR : $challenge : Error while purging"
 		exit 1	

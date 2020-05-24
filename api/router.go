@@ -74,6 +74,7 @@ func initGinRouter() *gin.Engine {
 			notificationGroup.POST("/add", addNotification)
 			notificationGroup.POST("/delete", removeNotification)
 			notificationGroup.POST("/update", updateNotifications)
+			notificationGroup.POST("/available", availableNotificationHandler)
 		}
 
 		remoteGroup := apiGroup.Group("/remote", adminAuthorize)

@@ -1,6 +1,8 @@
 package api
 
-import "time"
+import (
+	"time"
+)
 
 type HTTPPlainResp struct {
 	Message string `json:"message" example:"Messsage in response to your request"`
@@ -46,4 +48,10 @@ type ChallengeDescriptionResp struct {
 	Name   string `json:"name" example:"Web Challenge"`
 	Author string `json:"author" example:"Fristonio"`
 	Desc   string `json:"desc" example:"Challenge Description"`
+}
+
+type NotificationResp struct {
+	Title     string    `json:"title" example:"CTF is live now!"`
+	Desc      string    `json:"desc" example:"Notification Description"`
+	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }
