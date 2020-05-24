@@ -12,18 +12,15 @@ steps:
 - task: GoTool@0
   inputs:
     version: '1.13.5'
-- task: Go@0
-  inputs:
-    command: 'get'
-    arguments: '-d'
-    workingDirectory: '$(System.DefaultWorkingDirectory)'
 - script: |
+    go mod vendor
     sudo apt update
     sudo apt install docker.io
     sudo usermod -a -G docker $USER
     sudo systemctl unmask docker
     sudo systemctl start docker
-  displayName: 'Set up the Docker workspace'
+  displayName: 'Set up the Docker workspace and Dependencies'
+  workingDirectory: '$(System.DefaultWorkingDirectory)'
 
 - script: |
     mkdir ~/.beast
