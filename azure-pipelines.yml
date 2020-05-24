@@ -46,7 +46,7 @@ steps:
 
 - script: |
     echo -ne "ssh-rsa AAAAB3NzaC1y" > pub.key
-    beast create-author --name fristonio --email contact+fristonio@sdslabs.co.in --publickey pub.key -v --username fristonio --password pass123
+    $GOPATH/bin/beast create-author --name fristonio --email contact+fristonio@sdslabs.co.in --publickey pub.key -v --username fristonio --password pass123
     make test
   workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Run tests'
