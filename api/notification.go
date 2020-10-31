@@ -71,7 +71,7 @@ func removeNotification(c *gin.Context) {
 	}
 
 	if notify.ID == 0 {
-		log.Warnf("No notification exist with id : %s", id)
+		log.Errorf("No notification exist with id : %s", id)
 		c.JSON(http.StatusOK, HTTPPlainResp{
 			Message: "No such notification exists",
 		})
@@ -117,7 +117,7 @@ func updateNotifications(c *gin.Context) {
 		}
 
 		if notify.ID == 0 {
-			log.Warnf("No notification exist with id : %s", id)
+			log.Errorf("No notification exist with id : %s", id)
 			c.JSON(http.StatusOK, HTTPPlainResp{
 				Message: "No such notification exists",
 			})
