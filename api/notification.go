@@ -51,13 +51,29 @@ func addNotification(c *gin.Context) {
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/notification/delete [post]
 func removeNotification(c *gin.Context) {
-	title := c.PostForm("title")
+	id := c.PostForm("id")
 
-	notify, err := database.QueryFirstNotificationEntry("title", title)
+	if id == "" {
+		log.Errorf("Please provide notification Id")
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Please provide notification Id",
+		})
+		return
+	}
+
+	notify, err := database.QueryFirstNotificationEntry("ID", id)
 	if err != nil {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		c.JSON(http.StatusOK, HTTPPlainResp{
 			Message: "Error while accessing database",
+		})
+		return
+	}
+
+	if notify.ID == 0 {
+		log.Warnf("No notification exist with id : %s", id)
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "No such notification exists",
 		})
 		return
 	}
@@ -86,11 +102,12 @@ func removeNotification(c *gin.Context) {
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/notification/update [post]
 func updateNotifications(c *gin.Context) {
-	title := c.PostForm("title")
+	id := c.PostForm("id")
+	changedtitle := c.PostForm("title")
 	changedDescription := c.PostForm("desc")
 
-	if title != "" && changedDescription != "" {
-		notify, err := database.QueryFirstNotificationEntry("title", title)
+	if changedtitle != "" && changedDescription != "" {
+		notify, err := database.QueryFirstNotificationEntry("ID", id)
 		if err != nil {
 			log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 			c.JSON(http.StatusOK, HTTPPlainResp{
@@ -99,8 +116,17 @@ func updateNotifications(c *gin.Context) {
 			return
 		}
 
+		if notify.ID == 0 {
+			log.Warnf("No notification exist with id : %s", id)
+			c.JSON(http.StatusOK, HTTPPlainResp{
+				Message: "No such notification exists",
+			})
+			return
+		}
+
 		if err := database.UpdateNotification(&notify, map[string]interface{}{
 			"Description": changedDescription,
+			"Title":       changedtitle,
 		}); err != nil {
 			log.Info("Error while updating notification")
 			c.JSON(http.StatusOK, HTTPPlainResp{
@@ -139,6 +165,7 @@ func availableNotificationHandler(c *gin.Context) {
 		var resp []NotificationResp
 		for _, notification := range notifications {
 			r := NotificationResp{
+				ID:        notification.ID,
 				Title:     notification.Title,
 				Desc:      notification.Description,
 				UpdatedAt: notification.UpdatedAt,
