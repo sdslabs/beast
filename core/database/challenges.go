@@ -3,16 +3,17 @@ package database
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
 	"path/filepath"
 	"time"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	tools "github.com/sdslabs/beastv4/templates"
+	_ "gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // The `challenges` table has the following columns
@@ -86,7 +87,8 @@ func QueryAllChallenges() ([]Challenge, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Find(&challenges)
-	if tx.RecordNotFound() {
+
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
@@ -104,7 +106,7 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Where(queryKey, value).Find(&challenges)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
@@ -124,7 +126,7 @@ func QueryChallengeEntriesMap(whereMap map[string]interface{}) ([]Challenge, err
 	defer DBMux.Unlock()
 
 	tx := Db.Where(whereMap).Find(&challenges)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
@@ -156,7 +158,7 @@ func UpdateChallenge(chall *Challenge, m map[string]interface{}) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	return Db.Model(chall).Update(m).Error
+	return Db.Model(chall).Updates(m).Error
 }
 
 // This function updates a challenge entry in the database, whereMap is the map
@@ -172,7 +174,7 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 	defer DBMux.Unlock()
 
 	tx := Db.Where(whereMap).First(&challenge)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return fmt.Errorf("No challenge entry to update : WhereClause : %s", whereMap)
 	}
 
@@ -193,7 +195,7 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(challenge).Related(&tags, "Tags").Error; err != nil {
+	if err := Db.Model(challenge).Association("Tags").Error; err != nil {
 		return tags, err
 	}
 
@@ -219,32 +221,32 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 }
 
 //hook after update of challenge
-func (challenge *Challenge) AfterUpdate(scope *gorm.Scope) error {
-	iFace, _ := scope.InstanceGet("gorm:update_attrs")
+func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
+	iFace, _ := tx.InstanceGet("gorm:update_attrs")
 	if iFace == nil {
 		return nil
 	}
 	updatedAttr := iFace.(map[string]interface{})
 	if _, ok := updatedAttr["container_id"]; ok {
 		var users []*User
-		Db.Model(challenge).Related(&users, "Users")
+		Db.Model(challenge).Association("Users")
 		go updateScripts(users)
 	}
 	return nil
 }
 
 //hook after create of challenge
-func (challenge *Challenge) AfterCreate(scope *gorm.Scope) error {
+func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
 	var users []*User
-	Db.Model(challenge).Related(&users, "Users")
+	Db.Model(challenge).Association("Users")
 	go updateScripts(users)
 	return nil
 }
 
 //hook after deleting the challenge
-func (challenge *Challenge) AfterDelete() error {
+func (challenge *Challenge) AfterDelete(tx *gorm.DB) error {
 	var users []*User
-	Db.Model(challenge).Related(&users, "Users")
+	Db.Model(challenge).Association("Users")
 	go updateScripts(users)
 	return nil
 }

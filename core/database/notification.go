@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -64,7 +65,7 @@ func QueryNotificationEntries(key string, value string) ([]Notification, error) 
 	defer DBMux.Unlock()
 
 	tx := Db.Where(queryKey, value).Find(&notifications)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
@@ -98,7 +99,7 @@ func QueryAllNotification() ([]Notification, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Find(&notifications)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
@@ -111,5 +112,5 @@ func UpdateNotification(notify *Notification, m map[string]interface{}) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	return Db.Model(notify).Update(m).Error
+	return Db.Model(notify).Updates(m).Error
 }
