@@ -80,8 +80,10 @@ github.com/jbenet/go-context/io
 # github.com/jinzhu/gorm v1.9.1
 github.com/jinzhu/gorm
 github.com/jinzhu/gorm/dialects/sqlite
-# github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a
+# github.com/jinzhu/inflection v1.0.0
 github.com/jinzhu/inflection
+# github.com/jinzhu/now v1.1.1
+github.com/jinzhu/now
 # github.com/json-iterator/go v1.1.7
 github.com/json-iterator/go
 # github.com/kevinburke/ssh_config v0.0.0-20180830205328-81db2a75821e
@@ -94,7 +96,7 @@ github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/mattn/go-isatty v0.0.9
 github.com/mattn/go-isatty
-# github.com/mattn/go-sqlite3 v1.9.0
+# github.com/mattn/go-sqlite3 v1.14.3
 github.com/mattn/go-sqlite3
 # github.com/mitchellh/go-homedir v1.0.0
 github.com/mitchellh/go-homedir
@@ -261,3 +263,13 @@ gopkg.in/src-d/go-git.v4/utils/merkletrie/noder
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2
+# gorm.io/driver/sqlite v1.1.3
+gorm.io/driver/sqlite
+# gorm.io/gorm v1.20.6
+gorm.io/gorm
+gorm.io/gorm/callbacks
+gorm.io/gorm/clause
+gorm.io/gorm/logger
+gorm.io/gorm/migrator
+gorm.io/gorm/schema
+gorm.io/gorm/utils
