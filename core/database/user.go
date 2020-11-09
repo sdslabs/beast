@@ -133,9 +133,10 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(user).Association("Challenges").Error; err != nil {
+	if err := Db.Model(user).Association("Challenges").Find(&challenges); err != nil {
 		return challenges, err
 	}
+	fmt.Print(challenges)
 
 	return challenges, nil
 }

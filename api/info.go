@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
@@ -10,6 +11,7 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 // Returns port in use by beast.
@@ -233,4 +235,64 @@ func availableChallengeHandler(c *gin.Context) {
 			Challenges: challenges,
 		})
 	}
+}
+
+func userInfoHandler(c *gin.Context) {
+	userId := c.PostForm("userId")
+
+	if userId == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("User Id cannot be empty"),
+		})
+		return
+	}
+
+	i, err := strconv.ParseUint(userId, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	id := uint(i)
+
+	user, err := database.QueryUserById(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	challenges, err := database.GetRelatedChallenges(&user)
+	if err != nil {
+		log.Error(err)
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	var resp UserResp
+
+	var challNameString []string
+	for _, challenge := range challenges {
+		challNameString = append(challNameString, challenge.Name)
+	}
+
+	var r []ChallengeSolveResp
+	for _, challenge := range challenges {
+		challResp := ChallengeSolveResp{
+			Name:     challenge.Name,
+			SolvedAt: challenge.CreatedAt,
+			Points:   challenge.Points,
+		}
+		r = append(r, challResp)
+	}
+
+	resp = UserResp{
+		Username:   user.Username,
+		Role:       user.Role,
+		Challenges: r,
+	}
+
+	c.JSON(http.StatusOK, resp)
+	return
 }

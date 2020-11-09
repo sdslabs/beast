@@ -56,3 +56,15 @@ type NotificationResp struct {
 	Desc      string    `json:"desc" example:"Notification Description"`
 	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }
+
+type UserResp struct {
+	Username   string               `json:"username" example:"CTF is live now!"`
+	Role       string               `json:"role" example:"2018-12-31T22:20:08.948096189+05:30"`
+	Challenges []ChallengeSolveResp `json:"challenges" example:"Notification Description"`
+}
+
+type ChallengeSolveResp struct {
+	Name     string    `json:"name" example:"Web Challenge"`
+	SolvedAt time.Time `json:"solvedAt"`
+	Points   uint      `json:"points" example:"50"`
+}
