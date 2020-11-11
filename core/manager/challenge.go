@@ -522,6 +522,11 @@ func undeployChallenge(challengeName string, purge bool) error {
 			return fmt.Errorf("Error while purging in unstage step: %s", err)
 		}
 
+		log.Info("Deleting database entry")
+		if err := coreUtils.DeleteChallengeEntryWithPorts(challenge.Name); err != nil {
+			log.Error(err)
+		}
+
 		log.Infof("Challenge purge successful")
 	}
 

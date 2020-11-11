@@ -75,9 +75,7 @@ func DeleteRelatedPorts(portList []Port) error {
 		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
 	}
 
-	fmt.Print(portList)
-
-	if err := tx.Where(portList).Unscoped().Delete(Port{}).Error; err != nil {
+	if err := tx.Where("1 = 1").Unscoped().Delete(portList).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
