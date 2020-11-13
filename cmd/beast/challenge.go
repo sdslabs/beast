@@ -117,18 +117,5 @@ var challengeCmd = &cobra.Command{
 			}
 		}
 		_ = <-completionChannel
-
-		if DeleteEntry && action == core.MANAGE_ACTION_PURGE {
-			log.Info("Deleting database entry")
-			if len(args) == 1 {
-				log.Errorf("Provide chall name")
-				os.Exit(1)
-			}
-			if err := utils.DeleteChallengeEntryWithPorts(args[1]); err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
-		}
-
 	},
 }

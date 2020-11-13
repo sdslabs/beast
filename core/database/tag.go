@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -39,7 +40,7 @@ func QueryRelatedChallenges(tag *Tag) ([]Challenge, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(tag).Related(&challenges, "Challenges").Error; err != nil {
+	if err := Db.Model(tag).Association("Challenges").Error; err != nil {
 		return challenges, err
 	}
 
@@ -54,7 +55,7 @@ func QueryTags(whereMap map[string]interface{}) ([]*Tag, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Where(whereMap).Find(&tags)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 

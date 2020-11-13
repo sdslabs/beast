@@ -3,6 +3,7 @@ package database
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -11,13 +12,13 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
+	_ "gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -41,7 +42,7 @@ func QueryUserEntries(key string, value string) ([]User, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Where(queryKey, value).Find(&users)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
@@ -60,7 +61,7 @@ func QueryAllUsers() ([]User, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Find(&users)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
@@ -74,7 +75,7 @@ func QueryUserById(authorID uint) (User, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.First(&user, authorID)
-	if tx.RecordNotFound() {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return User{}, nil
 	}
 
@@ -122,7 +123,7 @@ func UpdateUser(user *User, m map[string]interface{}) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	return Db.Model(user).Update(m).Error
+	return Db.Model(user).Updates(m).Error
 }
 
 //Get Related Challenges
@@ -132,7 +133,7 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(user).Related(&challenges, "Challenges").Error; err != nil {
+	if err := Db.Model(user).Association("Challenges").Error; err != nil {
 		return challenges, err
 	}
 
@@ -140,7 +141,7 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 }
 
 //hook after create
-func (user *User) AfterCreate(scope *gorm.Scope) error {
+func (user *User) AfterCreate(tx *gorm.DB) error {
 	if user.SshKey == "" {
 		return nil
 	}
@@ -151,8 +152,8 @@ func (user *User) AfterCreate(scope *gorm.Scope) error {
 }
 
 //hook after update
-func (user *User) AfterUpdate(scope *gorm.Scope) error {
-	iFace, _ := scope.InstanceGet("gorm:update_attrs")
+func (user *User) AfterUpdate(tx *gorm.DB) error {
+	iFace, _ := tx.InstanceGet("gorm:update_attrs")
 	if iFace == nil {
 		return nil
 	}

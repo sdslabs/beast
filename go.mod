@@ -34,12 +34,9 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jinzhu/gorm v1.9.1
-	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a // indirect
-	github.com/jinzhu/now v0.0.0-20180511015916-ed742868f2ae // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20180830205328-81db2a75821e // indirect
 	github.com/lib/pq v1.0.0 // indirect
 	github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329 // indirect
-	github.com/mattn/go-sqlite3 v1.9.0 // indirect
 	github.com/mitchellh/go-homedir v1.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
@@ -70,6 +67,8 @@ require (
 	gopkg.in/src-d/go-git-fixtures.v3 v3.3.0 // indirect
 	gopkg.in/src-d/go-git.v4 v4.7.0
 	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gorm.io/driver/sqlite v1.1.3
+	gorm.io/gorm v1.20.6
 )
 
 replace github.com/docker/docker v1.13.1 => github.com/docker/engine v1.13.1

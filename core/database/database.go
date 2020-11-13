@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/driver/sqlite"
+	_ "gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 var (
@@ -32,7 +33,7 @@ func init() {
 	DBMux = &sync.Mutex{}
 
 	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
-	Db, dberr = gorm.Open("sqlite3", beastDb)
+	Db, dberr = gorm.Open(sqlite.Open(beastDb), &gorm.Config{})
 
 	if dberr != nil {
 		log.WithFields(log.Fields{

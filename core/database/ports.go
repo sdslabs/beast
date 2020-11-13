@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -30,7 +31,9 @@ func PortEntryGetOrCreate(port Port) (Port, error) {
 		return Port{}, fmt.Errorf("Error while starting transaction : %s", tx.Error)
 	}
 
-	if tx.Where("port_no = ?", port.PortNo).First(&portEntry).RecordNotFound() {
+	err := tx.Where("port_no = ?", port.PortNo).First(&portEntry)
+
+	if !errors.Is(err.Error, gorm.ErrRecordNotFound) {
 		if err := tx.Create(&port).Error; err != nil {
 			tx.Rollback()
 			return Port{}, err
@@ -52,7 +55,7 @@ func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	err := Db.Model(&challenge).Related(&ports).Error
+	err := Db.Model(&challenge).Association("Ports").Error
 
 	if err != nil {
 		return nil, fmt.Errorf("Error while searching port for challenge : %s", err)
@@ -72,7 +75,7 @@ func DeleteRelatedPorts(portList []Port) error {
 		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
 	}
 
-	if err := tx.Unscoped().Delete(portList).Error; err != nil {
+	if err := tx.Where("1 = 1").Unscoped().Delete(portList).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
