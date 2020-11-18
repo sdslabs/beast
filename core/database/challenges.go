@@ -14,6 +14,7 @@ import (
 	tools "github.com/sdslabs/beastv4/templates"
 	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // The `challenges` table has the following columns
@@ -52,9 +53,16 @@ type Challenge struct {
 	Status      string `gorm:"not null;default:'Unknown'"`
 	AuthorID    uint   `gorm:"not null"`
 	HealthCheck uint   `gorm:"not null;default:1"`
+	Points      uint   `gorm:"default:0"`
 	Ports       []Port
 	Tags        []*Tag  `gorm:"many2many:tag_challenges;"`
 	Users       []*User `gorm:"many2many:user_challenges;"`
+}
+
+type UserChallenges struct {
+	CreatedAt   time.Time
+	UserID      int
+	ChallengeID int
 }
 
 // Create an entry for the challenge in the Challenge table
@@ -158,7 +166,7 @@ func UpdateChallenge(chall *Challenge, m map[string]interface{}) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	return Db.Model(chall).Updates(m).Error
+	return Db.Omit(clause.Associations).Model(chall).Updates(m).Error
 }
 
 // This function updates a challenge entry in the database, whereMap is the map
@@ -240,6 +248,7 @@ func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
 	var users []*User
 	Db.Model(challenge).Association("Users")
 	go updateScripts(users)
+
 	return nil
 }
 
