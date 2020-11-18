@@ -247,13 +247,16 @@ func userInfoHandler(c *gin.Context) {
 		return
 	}
 
-	i, err := strconv.ParseUint(userId, 10, 64)
+	id, err := strconv.ParseUint(userId, 10, 64)
 	if err != nil {
-		panic(err)
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Could not parse User Id or invalid User Id"),
+		})
+		return
 	}
-	id := uint(i)
+	parsedUserId := uint(id)
 
-	user, err := database.QueryUserById(id)
+	user, err := database.QueryUserById(parsedUserId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "DATABASE ERROR while processing the request.",
@@ -277,20 +280,20 @@ func userInfoHandler(c *gin.Context) {
 		challNameString = append(challNameString, challenge.Name)
 	}
 
-	var r []ChallengeSolveResp
+	var userChallenges []ChallengeSolveResp
 	for _, challenge := range challenges {
 		challResp := ChallengeSolveResp{
 			Name:     challenge.Name,
 			SolvedAt: challenge.CreatedAt,
 			Points:   challenge.Points,
 		}
-		r = append(r, challResp)
+		userChallenges = append(userChallenges, challResp)
 	}
 
 	resp = UserResp{
 		Username:   user.Username,
 		Role:       user.Role,
-		Challenges: r,
+		Challenges: userChallenges,
 	}
 
 	c.JSON(http.StatusOK, resp)
