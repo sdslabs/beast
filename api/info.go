@@ -31,6 +31,15 @@ func usedPortsInfoHandler(c *gin.Context) {
 	})
 }
 
+// Returns information about a challenge
+// @Summary Returns all information about the challenges.
+// @Description Returns all information about the challenges by the challenge name.
+// @Tags info
+// @Accept  json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.ChallengeInfoResp
+// @Router /api/info/challenge/info [post]
 func challengeInfoHandler(c *gin.Context) {
 	name := c.PostForm("name")
 	if name == "" {
@@ -95,10 +104,70 @@ func challengeInfoHandler(c *gin.Context) {
 	return
 }
 
+// Returns information about all challenges
+// @Summary Returns information about all challenges.
+// @Description Returns information about all the challenges present in the database.
+// @Tags info
+// @Accept  json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.ChallengeInfoResp
+// @Router /api/info/available [post]
 func availableChallengeInfoHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, HTTPPlainResp{
-		Message: WIP_TEXT,
-	})
+	challenges, err := database.QueryAllChallenges()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	if len(challenges) > 0 {
+		for _, challenge := range challenges {
+
+			users, err := database.GetRelatedUsers(&challenge)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+					Message: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			// (-1) since one user will be the author itself
+			challSolves := len(users) - 1
+
+			var challengeUser []UserSolveResp
+			for _, user := range users {
+				userResp := UserSolveResp{
+					UserID:   user.ID,
+					Username: user.Username,
+					SolvedAt: user.CreatedAt,
+				}
+				challengeUser = append(challengeUser, userResp)
+			}
+
+			c.JSON(http.StatusOK, ChallengeInfoResp{
+				Name:         challenge.Name,
+				ChallId:      challenge.ID,
+				Category:     challenge.Type,
+				CreatedAt:    challenge.CreatedAt,
+				Status:       challenge.Status,
+				Ports:        challenge.Ports,
+				Hints:        challenge.Hints,
+				Desc:         challenge.Description,
+				Points:       challenge.Points,
+				SolvesNumber: challSolves,
+				Solves:       challengeUser,
+			})
+		}
+	} else {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "No challenge found in the database",
+		})
+	}
+
+	return
 }
 
 // Returns available base images.

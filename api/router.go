@@ -60,7 +60,7 @@ func initGinRouter() *gin.Engine {
 		infoGroup := apiGroup.Group("/info")
 		{
 			infoGroup.POST("/challenge/info", challengeInfoHandler)
-			infoGroup.GET("/available", availableChallengeInfoHandler)
+			infoGroup.POST("/available", availableChallengeInfoHandler)
 			infoGroup.GET("/images/available", availableImagesHandler)
 			infoGroup.GET("/ports/used", usedPortsInfoHandler)
 			infoGroup.GET("/logs", challengeLogsHandler)
