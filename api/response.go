@@ -90,3 +90,12 @@ type ChallengeInfoResp struct {
 	SolvesNumber int
 	Solves       []UserSolveResp
 }
+
+type SubmissionResp struct {
+	UserId    uint      `json:"user_id" example:"3"`
+	Username  string    `json:"username" example:"fristonio"`
+	ChallId   uint      `json:"chall_id" example:"3"`
+	ChallName string    `json:"name" example:"Web Challenge"`
+	Category  string    `json:"category" example:"web"`
+	SolvedAt  time.Time `json:"solvedAt"`
+}

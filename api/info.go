@@ -395,3 +395,46 @@ func userInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 	return
 }
+
+func submissionsHandler(c *gin.Context) {
+	submissions, err := database.QueryAllSubmissions()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	var submissionsResp []SubmissionResp
+
+	for _, submission := range submissions {
+		user, err := database.QueryUserById(submission.UserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while fetching user details.",
+			})
+			return
+		}
+
+		if user.Role != "author" {
+			challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+					Message: "DATABASE ERROR while fetching user details.",
+				})
+				return
+			}
+
+			singleSubmissionResp := SubmissionResp{
+				UserId:    user.ID,
+				Username:  user.Username,
+				ChallId:   challenge[0].ID,
+				ChallName: challenge[0].Name,
+				Category:  challenge[0].Type,
+				SolvedAt:  submission.CreatedAt,
+			}
+			submissionsResp = append(submissionsResp, singleSubmissionResp)
+		}
+	}
+	c.JSON(http.StatusOK, submissionsResp)
+	return
+}
