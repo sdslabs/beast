@@ -40,7 +40,7 @@ func challengeInfoHandler(c *gin.Context) {
 		return
 	}
 
-	challenge, err := database.QueryChallengeEntries("name", name)
+	challenges, err := database.QueryChallengeEntries("name", name)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "DATABASE ERROR while processing the request.",
@@ -48,27 +48,50 @@ func challengeInfoHandler(c *gin.Context) {
 		return
 	}
 
-	var challDescription string
-	var challAuthorID uint
-	if len(challenge) > 0 {
-		challDescription = challenge[0].Description
-		challAuthorID = challenge[0].AuthorID
-	} else {
-		challDescription = "Not Available"
-		challAuthorID = 0
-	}
-	challAuthor, err := database.QueryUserById(challAuthorID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while fetching author info.",
+	if len(challenges) > 0 {
+		challenge := challenges[0]
+
+		users, err := database.GetRelatedUsers(&challenge)
+		if err != nil {
+			log.Error(err)
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		// (-1) since one user will be the author itself
+		challSolves := len(users) - 1
+
+		var challengeUser []UserSolveResp
+		for _, user := range users {
+			userResp := UserSolveResp{
+				UserID:   user.ID,
+				Username: user.Username,
+				SolvedAt: user.CreatedAt,
+			}
+			challengeUser = append(challengeUser, userResp)
+		}
+
+		c.JSON(http.StatusOK, ChallengeInfoResp{
+			Name:         name,
+			ChallId:      challenge.ID,
+			Category:     challenge.Type,
+			CreatedAt:    challenge.CreatedAt,
+			Status:       challenge.Status,
+			Ports:        challenge.Ports,
+			Hints:        challenge.Hints,
+			Desc:         challenge.Description,
+			Points:       challenge.Points,
+			SolvesNumber: challSolves,
+			Solves:       challengeUser,
 		})
-		return
+	} else {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "No challenge found with name: " + name,
+		})
 	}
-	c.JSON(http.StatusOK, ChallengeDescriptionResp{
-		Name:   name,
-		Author: challAuthor.Name,
-		Desc:   challDescription,
-	})
+
 	return
 }
 

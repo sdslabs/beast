@@ -210,6 +210,21 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	return tags, nil
 }
 
+//Get Related Users
+func GetRelatedUsers(challenge *Challenge) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	if err := Db.Model(challenge).Association("Users").Find(&users); err != nil {
+		return users, err
+	}
+	fmt.Print(users)
+
+	return users, nil
+}
+
 func DeleteChallengeEntry(challenge *Challenge) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
