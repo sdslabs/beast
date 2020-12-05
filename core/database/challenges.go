@@ -61,8 +61,8 @@ type Challenge struct {
 
 type UserChallenges struct {
 	CreatedAt   time.Time
-	UserID      int
-	ChallengeID int
+	UserID      uint
+	ChallengeID uint
 }
 
 // Create an entry for the challenge in the Challenge table
@@ -240,6 +240,22 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 	}
 
 	return tx.Commit().Error
+}
+
+// Query challenges table to get all the entries in the table
+func QueryAllSubmissions() ([]UserChallenges, error) {
+	var userChallenges []UserChallenges
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Find(&userChallenges)
+
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	return userChallenges, tx.Error
 }
 
 //hook after update of challenge
