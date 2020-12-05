@@ -220,7 +220,6 @@ func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	if err := Db.Model(challenge).Association("Users").Find(&users); err != nil {
 		return users, err
 	}
-	fmt.Print(users)
 
 	return users, nil
 }

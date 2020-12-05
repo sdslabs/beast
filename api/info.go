@@ -69,17 +69,19 @@ func challengeInfoHandler(c *gin.Context) {
 			return
 		}
 
-		// (-1) since one user will be the author itself
-		challSolves := len(users) - 1
-
+		var challSolves int
 		var challengeUser []UserSolveResp
+
 		for _, user := range users {
-			userResp := UserSolveResp{
-				UserID:   user.ID,
-				Username: user.Username,
-				SolvedAt: user.CreatedAt,
+			if user.Role != "author" {
+				userResp := UserSolveResp{
+					UserID:   user.ID,
+					Username: user.Username,
+					SolvedAt: user.CreatedAt,
+				}
+				challengeUser = append(challengeUser, userResp)
+				challSolves++
 			}
-			challengeUser = append(challengeUser, userResp)
 		}
 
 		c.JSON(http.StatusOK, ChallengeInfoResp{
@@ -134,17 +136,19 @@ func availableChallengeInfoHandler(c *gin.Context) {
 				return
 			}
 
-			// (-1) since one user will be the author itself
-			challSolves := len(users) - 1
-
+			var challSolves int
 			var challengeUser []UserSolveResp
+
 			for _, user := range users {
-				userResp := UserSolveResp{
-					UserID:   user.ID,
-					Username: user.Username,
-					SolvedAt: user.CreatedAt,
+				if user.Role != "author" {
+					userResp := UserSolveResp{
+						UserID:   user.ID,
+						Username: user.Username,
+						SolvedAt: user.CreatedAt,
+					}
+					challengeUser = append(challengeUser, userResp)
+					challSolves++
 				}
-				challengeUser = append(challengeUser, userResp)
 			}
 
 			c.JSON(http.StatusOK, ChallengeInfoResp{
