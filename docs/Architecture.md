@@ -37,7 +37,7 @@ All the tasks performed by beast are non synchronous and are handled by a queue.
 a new task is created using the action configuration and pushed to an internal queue. The result is returned immediately by the API server notifying about
 the start of the process.
 
-Beast workers are the actual underlying goroutines which handles the tasks assigned by the Queue. They perform the required task an then takes on
+Beast workers are the actual underlying goroutines which handles the tasks assigned by the Queue. They perform the required task and then take on
 the next. Consider them as the threadpool for beast.
 
 ## Challenge Flow
