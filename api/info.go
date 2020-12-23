@@ -125,7 +125,8 @@ func availableChallengeInfoHandler(c *gin.Context) {
 	}
 
 	if len(challenges) > 0 {
-		for _, challenge := range challenges {
+		availableChallenges := make([]ChallengeInfoResp, len(challenges))
+		for index, challenge := range challenges {
 
 			users, err := database.GetRelatedUsers(&challenge)
 			if err != nil {
@@ -151,7 +152,7 @@ func availableChallengeInfoHandler(c *gin.Context) {
 				}
 			}
 
-			c.JSON(http.StatusOK, ChallengeInfoResp{
+			availableChallenges[index] = ChallengeInfoResp{
 				Name:         challenge.Name,
 				ChallId:      challenge.ID,
 				Category:     challenge.Type,
@@ -163,8 +164,9 @@ func availableChallengeInfoHandler(c *gin.Context) {
 				Points:       challenge.Points,
 				SolvesNumber: challSolves,
 				Solves:       challengeUser,
-			})
+			}
 		}
+		c.JSON(http.StatusOK, availableChallenges)
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No challenge found in the database",
