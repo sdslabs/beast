@@ -335,6 +335,15 @@ func availableChallengeHandler(c *gin.Context) {
 	}
 }
 
+// Returns user info
+// @Summary Returns user info
+// @Description Returns user info based on userId
+// @Tags info
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.UserResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/info/user [get]
 func userInfoHandler(c *gin.Context) {
 	userId := c.PostForm("userId")
 
