@@ -346,31 +346,49 @@ func availableChallengeHandler(c *gin.Context) {
 // @Router /api/info/user [get]
 func userInfoHandler(c *gin.Context) {
 	userId := c.PostForm("user_id")
-
-	if userId == "" {
+	username := c.PostForm("username")
+	if userId == "" && username == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("User Id cannot be empty"),
+			Message: fmt.Sprintf("Both User Id and Username cannot be empty"),
 		})
 		return
 	}
+	var user database.User
+	var parsedUserId uint
+	if userId != "" {
+		id, err := strconv.ParseUint(userId, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Could not parse User Id or invalid User Id"),
+			})
+			return
+		}
+		parsedUserId = uint(id)
 
-	id, err := strconv.ParseUint(userId, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Could not parse User Id or invalid User Id"),
-		})
-		return
+		user, err = database.QueryUserById(parsedUserId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+	} else {
+		users, err := database.QueryUserByUsername("username", username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		if len(users) == 0 {
+			c.JSON(http.StatusNotFound, HTTPErrorResp{
+				Error: "No user found with username: " + username,
+			})
+			return
+		}
+		user = users[0]
+		parsedUserId = uint(user.ID)
 	}
-	parsedUserId := uint(id)
-
-	user, err := database.QueryUserById(parsedUserId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-
 	challenges, err := database.GetRelatedChallenges(&user)
 	if err != nil {
 		log.Error(err)

@@ -85,6 +85,22 @@ func QueryUserById(authorID uint) (User, error) {
 	return user, tx.Error
 }
 
+func QueryUserByUsername(key string, value string) ([]User, error) {
+	var users []User
+	queryKey := fmt.Sprintf("%s = ?", key)
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where(queryKey, value).Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if tx.Error != nil {
+		return users, tx.Error
+	}
+	return users, tx.Error
+}
+
 func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, error error) {
 	var user User
 
