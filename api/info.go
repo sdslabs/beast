@@ -345,7 +345,7 @@ func availableChallengeHandler(c *gin.Context) {
 // @Failure 402 {object} api.HTTPPlainResp
 // @Router /api/info/user [get]
 func userInfoHandler(c *gin.Context) {
-	userId := c.PostForm("userId")
+	userId := c.PostForm("user_id")
 
 	if userId == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
