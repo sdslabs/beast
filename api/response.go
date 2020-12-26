@@ -70,6 +70,15 @@ type UserResp struct {
 	Challenges []ChallengeSolveResp `json:"challenges"`
 }
 
+type UsersResp struct {
+	Id       uint   `json:"id" example:"5"`
+	Username string `json:"username" example:"CTF is live now!"`
+	Role     string `json:"role" example:"author"`
+	Status   uint   `json:"status" example:"0"`
+	Score    uint   `json:"score" example:"750"`
+	Email    string `json:"email" example:"fristonio@gmail.com"`
+}
+
 type ChallengeSolveResp struct {
 	Id       uint      `json:"id" example:"4"`
 	Name     string    `json:"name" example:"Web Challenge"`

@@ -435,9 +435,9 @@ func getAllUsersInfoHandler(c *gin.Context) {
 	}
 
 	if len(users) > 0 {
-		availableUsers := make([]UserResp, len(users))
+		availableUsers := make([]UsersResp, len(users))
 		for index, user := range users {
-			availableUsers[index] = UserResp{
+			availableUsers[index] = UsersResp{
 				Username: user.Username,
 				Id:       user.ID,
 				Role:     user.Role,
