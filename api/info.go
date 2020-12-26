@@ -416,6 +416,72 @@ func userInfoHandler(c *gin.Context) {
 	return
 }
 
+func getAllUsersInfoHandler(c *gin.Context) {
+	users, err := database.QueryAllUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	if len(users) > 0 {
+		availableUsers := make([]UserResp, len(users))
+		for index, user := range users {
+			challenges, err := database.GetRelatedChallenges(&user)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+					Message: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			var challNameString []string
+			for _, challenge := range challenges {
+				challNameString = append(challNameString, challenge.Name)
+			}
+
+			var userChallenges []ChallengeSolveResp
+			for _, challenge := range challenges {
+				challResp := ChallengeSolveResp{
+					Id:       challenge.ID,
+					Name:     challenge.Name,
+					Category: challenge.Type,
+					SolvedAt: challenge.CreatedAt,
+					Points:   challenge.Points,
+				}
+				userChallenges = append(userChallenges, challResp)
+			}
+
+			rank, err := database.GetUserRank(user.ID, user.Score, user.UpdatedAt)
+
+			// assigning max rank to the author so that he can never come in the leader board
+			if user.Role == "author" {
+				rank = int64(^uint(0) >> 1)
+			}
+
+			availableUsers[index] = UserResp{
+				Username:   user.Username,
+				Id:         user.ID,
+				Role:       user.Role,
+				Status:     user.Status,
+				Score:      user.Score,
+				Rank:       rank,
+				Email:      user.Email,
+				Challenges: userChallenges,
+			}
+		}
+		c.JSON(http.StatusOK, availableUsers)
+	} else {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "No users found in the database",
+		})
+	}
+
+	return
+}
+
 func submissionsHandler(c *gin.Context) {
 	submissions, err := database.QueryAllSubmissions()
 	if err != nil {
