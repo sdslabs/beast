@@ -381,16 +381,25 @@ func userInfoHandler(c *gin.Context) {
 	var userChallenges []ChallengeSolveResp
 	for _, challenge := range challenges {
 		challResp := ChallengeSolveResp{
+			Id:       challenge.ID,
 			Name:     challenge.Name,
+			Category: challenge.Type,
 			SolvedAt: challenge.CreatedAt,
 			Points:   challenge.Points,
 		}
 		userChallenges = append(userChallenges, challResp)
 	}
 
+	rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+
 	resp = UserResp{
 		Username:   user.Username,
+		Id:         user.ID,
 		Role:       user.Role,
+		Status:     user.Status,
+		Score:      user.Score,
+		Rank:       rank,
+		Email:      user.Email,
 		Challenges: userChallenges,
 	}
 

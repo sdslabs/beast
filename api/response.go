@@ -60,13 +60,20 @@ type NotificationResp struct {
 }
 
 type UserResp struct {
+	Id         uint                 `json:"id" example:"5"`
 	Username   string               `json:"username" example:"CTF is live now!"`
-	Role       string               `json:"role" example:"2018-12-31T22:20:08.948096189+05:30"`
-	Challenges []ChallengeSolveResp `json:"challenges" example:"Notification Description"`
+	Role       string               `json:"role" example:"author"`
+	Status     uint                 `json:"status" example:"0"`
+	Score      uint                 `json:"score" example:"750"`
+	Rank       int64                `json:"rank" example:"15"`
+	Email      string               `json:"email" example:"fristonio@gmail.com"`
+	Challenges []ChallengeSolveResp `json:"challenges"`
 }
 
 type ChallengeSolveResp struct {
+	Id       uint      `json:"id" example:"4"`
 	Name     string    `json:"name" example:"Web Challenge"`
+	Category string    `json:"category" example:"web"`
 	SolvedAt time.Time `json:"solvedAt"`
 	Points   uint      `json:"points" example:"50"`
 }
