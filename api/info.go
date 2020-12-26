@@ -416,6 +416,15 @@ func userInfoHandler(c *gin.Context) {
 	return
 }
 
+// Returns all user's info
+// @Summary Returns all user's info
+// @Description Returns all available user's info
+// @Tags info
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.UserResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/info/user/available [get]
 func getAllUsersInfoHandler(c *gin.Context) {
 	users, err := database.QueryAllUsers()
 	if err != nil {
