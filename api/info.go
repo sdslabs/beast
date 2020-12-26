@@ -343,7 +343,7 @@ func availableChallengeHandler(c *gin.Context) {
 // @Produce json
 // @Success 200 {object} api.UserResp
 // @Failure 402 {object} api.HTTPPlainResp
-// @Router /api/info/user [get]
+// @Router /api/info/user [post]
 func userInfoHandler(c *gin.Context) {
 	userId := c.PostForm("user_id")
 	username := c.PostForm("username")
@@ -397,14 +397,12 @@ func userInfoHandler(c *gin.Context) {
 		})
 		return
 	}
-
 	var resp UserResp
 
 	var challNameString []string
 	for _, challenge := range challenges {
 		challNameString = append(challNameString, challenge.Name)
 	}
-
 	var userChallenges []ChallengeSolveResp
 	for _, challenge := range challenges {
 		challResp := ChallengeSolveResp{
@@ -429,7 +427,6 @@ func userInfoHandler(c *gin.Context) {
 		Email:      user.Email,
 		Challenges: userChallenges,
 	}
-
 	c.JSON(http.StatusOK, resp)
 	return
 }
@@ -501,7 +498,9 @@ func submissionsHandler(c *gin.Context) {
 				})
 				return
 			}
-
+			if len(challenge) == 0 {
+				continue
+			}
 			singleSubmissionResp := SubmissionResp{
 				UserId:    user.ID,
 				Username:  user.Username,

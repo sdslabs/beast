@@ -66,7 +66,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/logs", challengeLogsHandler)
 			infoGroup.GET("/challenges", challengesInfoHandler)
 			infoGroup.GET("/challenges/available", availableChallengeHandler)
-			infoGroup.GET("/user", userInfoHandler)
+			infoGroup.POST("/user", userInfoHandler)
 			infoGroup.GET("/user/available", getAllUsersInfoHandler)
 			infoGroup.POST("/submissions", submissionsHandler)
 		}
