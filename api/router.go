@@ -95,6 +95,11 @@ func initGinRouter() *gin.Engine {
 		{
 			submitGroup.POST("/challenge", submitFlagHandler)
 		}
+
+		adminPanelGroup := apiGroup.Group("/admin", adminAuthorize)
+		{
+			adminPanelGroup.POST("/:action/:id", banUserHandler)
+		}
 	}
 
 	return router
