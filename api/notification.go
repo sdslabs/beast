@@ -23,6 +23,13 @@ func addNotification(c *gin.Context) {
 	title := c.PostForm("title")
 	desc := c.PostForm("desc")
 
+	if title == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Notification title cannot be empty",
+		})
+		return
+	}
+
 	notify := database.Notification{
 		Title:       title,
 		Description: desc,
