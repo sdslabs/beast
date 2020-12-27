@@ -146,6 +146,13 @@ func login(c *gin.Context) {
 		})
 	}
 
+	if userEntry.Status == 1 {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: "The user has been banned from this competition. Please contact competition admin for more information",
+		})
+		return
+	}
+
 	jwt, err := auth.Authenticate(username, password, userEntry.AuthModel)
 
 	if err != nil {
