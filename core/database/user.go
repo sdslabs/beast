@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
@@ -29,6 +30,8 @@ type User struct {
 	Name       string       `gorm:"not null"`
 	Email      string       `gorm:"non null";unique`
 	SshKey     string
+	Status     uint `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Score      uint `gorm:"default:0"`
 }
 
 // Queries all the users entries where the column represented by key
@@ -80,6 +83,21 @@ func QueryUserById(authorID uint) (User, error) {
 	}
 
 	return user, tx.Error
+}
+
+func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, error error) {
+	var user User
+
+	// assigning max possible value to rank
+	const MaxUint = ^uint(0)
+	rank = int64(MaxUint >> 1)
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("id != ? AND score >= ? AND role == ? ", userID, userScore, core.USER_ROLES["contestant"]).Find(&user).Count(&rank)
+
+	return rank + 1, tx.Error
 }
 
 // Using the column value in key and value in value get the first

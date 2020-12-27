@@ -335,31 +335,53 @@ func availableChallengeHandler(c *gin.Context) {
 	}
 }
 
+// Returns user info
+// @Summary Returns user info
+// @Description Returns user info based on userId
+// @Tags info
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.UserResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/info/user [post]
 func userInfoHandler(c *gin.Context) {
-	userId := c.PostForm("userId")
-
-	if userId == "" {
+	userId := c.PostForm("user_id")
+	username := c.PostForm("username")
+	if userId == "" && username == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("User Id cannot be empty"),
+			Message: fmt.Sprintf("Both User Id and Username cannot be empty"),
 		})
 		return
 	}
+	var user database.User
+	var parsedUserId uint
+	if userId != "" {
+		id, err := strconv.ParseUint(userId, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Could not parse User Id or invalid User Id"),
+			})
+			return
+		}
+		parsedUserId = uint(id)
 
-	id, err := strconv.ParseUint(userId, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Could not parse User Id or invalid User Id"),
-		})
-		return
-	}
-	parsedUserId := uint(id)
+		user, err = database.QueryUserById(parsedUserId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+	} else {
+		user, err := database.QueryFirstUserEntry("username", username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
 
-	user, err := database.QueryUserById(parsedUserId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
-		})
-		return
+		parsedUserId = uint(user.ID)
 	}
 
 	challenges, err := database.GetRelatedChallenges(&user)
@@ -370,31 +392,77 @@ func userInfoHandler(c *gin.Context) {
 		})
 		return
 	}
-
 	var resp UserResp
 
 	var challNameString []string
 	for _, challenge := range challenges {
 		challNameString = append(challNameString, challenge.Name)
 	}
-
 	var userChallenges []ChallengeSolveResp
 	for _, challenge := range challenges {
 		challResp := ChallengeSolveResp{
+			Id:       challenge.ID,
 			Name:     challenge.Name,
+			Category: challenge.Type,
 			SolvedAt: challenge.CreatedAt,
 			Points:   challenge.Points,
 		}
 		userChallenges = append(userChallenges, challResp)
 	}
 
+	rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+
 	resp = UserResp{
 		Username:   user.Username,
+		Id:         user.ID,
 		Role:       user.Role,
+		Status:     user.Status,
+		Score:      user.Score,
+		Rank:       rank,
+		Email:      user.Email,
 		Challenges: userChallenges,
 	}
-
 	c.JSON(http.StatusOK, resp)
+	return
+}
+
+// Returns all user's info
+// @Summary Returns all user's info
+// @Description Returns all available user's info
+// @Tags info
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.UserResp
+// @Failure 402 {object} api.HTTPPlainResp
+// @Router /api/info/user/available [get]
+func getAllUsersInfoHandler(c *gin.Context) {
+	users, err := database.QueryAllUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	if len(users) > 0 {
+		availableUsers := make([]UsersResp, len(users))
+		for index, user := range users {
+			availableUsers[index] = UsersResp{
+				Username: user.Username,
+				Id:       user.ID,
+				Role:     user.Role,
+				Status:   user.Status,
+				Score:    user.Score,
+				Email:    user.Email,
+			}
+		}
+		c.JSON(http.StatusOK, availableUsers)
+	} else {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "No users found in the database",
+		})
+	}
+
 	return
 }
 
@@ -425,7 +493,9 @@ func submissionsHandler(c *gin.Context) {
 				})
 				return
 			}
-
+			if len(challenge) == 0 {
+				continue
+			}
 			singleSubmissionResp := SubmissionResp{
 				UserId:    user.ID,
 				Username:  user.Username,
