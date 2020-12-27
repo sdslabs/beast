@@ -373,22 +373,17 @@ func userInfoHandler(c *gin.Context) {
 			return
 		}
 	} else {
-		users, err := database.QueryUserByUsername("username", username)
+		user, err := database.QueryFirstUserEntry("username", username)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 				Message: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
-		if len(users) == 0 {
-			c.JSON(http.StatusNotFound, HTTPErrorResp{
-				Error: "No user found with username: " + username,
-			})
-			return
-		}
-		user = users[0]
+
 		parsedUserId = uint(user.ID)
 	}
+
 	challenges, err := database.GetRelatedChallenges(&user)
 	if err != nil {
 		log.Error(err)
