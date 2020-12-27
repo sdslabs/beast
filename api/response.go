@@ -115,8 +115,3 @@ type SubmissionResp struct {
 	Category  string    `json:"category" example:"web"`
 	SolvedAt  time.Time `json:"solvedAt"`
 }
-
-type FlagSubmitResp struct {
-	Message string `json:"message" example:"Your answer is correct"`
-	Success bool   `json:"success" example:true`
-}

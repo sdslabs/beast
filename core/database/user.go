@@ -154,26 +154,9 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	if err := Db.Model(user).Association("Challenges").Find(&challenges); err != nil {
 		return challenges, err
 	}
+	fmt.Print(challenges)
 
 	return challenges, nil
-}
-
-// Check whether challenge is submitted by the user
-func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
-	var userChallenges []UserChallenges
-	var count int64
-	count = 0
-
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	tx := Db.Where("user_id = ? AND challenge_id = ?", userId, challId).Find(&userChallenges).Count(&count)
-
-	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
-
-	return (count >= 1), tx.Error
 }
 
 //hook after create
