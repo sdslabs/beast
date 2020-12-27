@@ -8,19 +8,18 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 )
 
-// Verifies and creates an entry in the database for successful submission of flag for a challenge.
-// @Summary Verifies and creates an entry in the database for successful submission of flag for a challenge.
-// @Description Returns success or error response based on the flag submitted. Also, the flag will not be submitted if it was previously submitted
+// Ban/Unban a user based on his id and the action provided.
+// @Summary Ban/Unban a user based on his id and the action provided.
+// @Description Ban/unban a user based on his user id. This operation can only be done by admins
 // @Tags status
 // @Accept  json
 // @Produce json
-// @Param chall formData string "Name of challenge"
-// @Param flag formData string "Flag for the challenge"
+// @Param action param "Action to perform (ban/unban)"
+// @Param id param "Id of user"
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Failure 401 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/submit/challenge [post]
+// @Router /api/admin/:action/:id [post]
 func banUserHandler(c *gin.Context) {
 	action := c.Param("action")
 	userId := c.Param("id")
