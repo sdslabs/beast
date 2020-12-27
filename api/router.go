@@ -90,6 +90,11 @@ func initGinRouter() *gin.Engine {
 		{
 			configGroup.PATCH("/reload", reloadBeastConfig)
 		}
+
+		submitGroup := apiGroup.Group("/submit")
+		{
+			submitGroup.POST("/challenge", submitFlagHandler)
+		}
 	}
 
 	return router
