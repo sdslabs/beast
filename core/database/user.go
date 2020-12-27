@@ -170,7 +170,6 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	if err := Db.Model(user).Association("Challenges").Find(&challenges); err != nil {
 		return challenges, err
 	}
-	fmt.Print(challenges)
 
 	return challenges, nil
 }
@@ -185,8 +184,6 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Where("user_id = ? AND challenge_id = ?", userId, challId).Find(&userChallenges).Count(&count)
-
-	fmt.Println(count, tx)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return false, nil
