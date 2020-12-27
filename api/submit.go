@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ import (
 // @Failure 500 {object} api.HTTPPlainResp
 // @Router /api/submit/challenge [post]
 func submitFlagHandler(c *gin.Context) {
-	challName := c.PostForm("chall")
+	challId := c.PostForm("chall_id")
 	flag := c.PostForm("flag")
 
 	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
@@ -34,9 +35,9 @@ func submitFlagHandler(c *gin.Context) {
 		return
 	}
 
-	if challName == "" {
+	if challId == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Name of the challenge is a required parameter to process request.",
+			Message: "Id of the challenge is a required parameter to process request.",
 		})
 		return
 	}
@@ -48,7 +49,9 @@ func submitFlagHandler(c *gin.Context) {
 		return
 	}
 
-	chall, err := database.QueryChallengeEntries("name", challName)
+	parsedChallId, err := strconv.Atoi(challId)
+
+	chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "DATABASE ERROR while processing the request.",
@@ -81,7 +84,7 @@ func submitFlagHandler(c *gin.Context) {
 		return
 	}
 
-	if solved == true {
+	if solved {
 		c.JSON(http.StatusOK, FlagSubmitResp{
 			Message: "Question has already been answered.",
 			Success: false,
