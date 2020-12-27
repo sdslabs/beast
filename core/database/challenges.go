@@ -258,6 +258,23 @@ func QueryAllSubmissions() ([]UserChallenges, error) {
 	return userChallenges, tx.Error
 }
 
+func SaveFlagSubmission(user_challenges *UserChallenges) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+
+	if tx.Error != nil {
+		return fmt.Errorf("Error while saving record", tx.Error)
+	}
+
+	if err := tx.FirstOrCreate(user_challenges, *user_challenges).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit().Error
+}
+
 //hook after update of challenge
 func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
 	iFace, _ := tx.InstanceGet("gorm:update_attrs")
