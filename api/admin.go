@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -25,7 +26,7 @@ func banUserHandler(c *gin.Context) {
 	action := c.Param("action")
 	userId := c.Param("id")
 
-	if (action != "ban") && (action != "unban") {
+	if (action != core.USER_STATUS["ban"]) && (action != core.USER_STATUS["unban"]) {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: "Action not provided or invalid action format",
 		})
@@ -65,7 +66,7 @@ func banUserHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
-		Message: "Successfully " + action + "ned the user with id " + userId,
+		Message: fmt.Sprintf("Successfully %sned the user with id %s", action, userId),
 	})
 	return
 }
