@@ -515,3 +515,49 @@ func submissionsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, submissionsResp)
 	return
 }
+
+// Returns statistics of users in competition
+// @Summary statistics of users in competition
+// @Description returns statistics of users in competition (currently limited to ban/unban status of users)
+// @Tags info
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.UserResp
+// @Failure 404 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /api/admin/statistics [post]
+func getUsersStatisticsHandler(c *gin.Context) {
+	users, err := database.QueryAllUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	var totalRegisteredUsers uint
+	var bannedUsers uint
+
+	if len(users) <= 0 {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "No users found in the database",
+		})
+	}
+
+	for _, user := range users {
+		if user.Role != "author" {
+			if user.Status == 1 {
+				bannedUsers++
+			}
+			totalRegisteredUsers++
+		}
+	}
+
+	c.JSON(http.StatusOK, UsersStatisticsResp{
+		TotalRegisteredUsers: totalRegisteredUsers,
+		BannedUsers:          bannedUsers,
+		UnbannedUsers:        totalRegisteredUsers - bannedUsers,
+	})
+
+	return
+}

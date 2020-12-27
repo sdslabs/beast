@@ -120,3 +120,9 @@ type FlagSubmitResp struct {
 	Message string `json:"message" example:"Your answer is correct"`
 	Success bool   `json:"success" example:true`
 }
+
+type UsersStatisticsResp struct {
+	TotalRegisteredUsers uint `json:"total_registered_users" example:"120"`
+	BannedUsers          uint `json:"banned_users" example:"60`
+	UnbannedUsers        uint `json:"unbanned_users" example:"60`
+}
