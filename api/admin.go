@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
 )
 
@@ -24,7 +25,7 @@ func banUserHandler(c *gin.Context) {
 	action := c.Param("action")
 	userId := c.Param("id")
 
-	if ((action != "ban") && (action != "unban")) || action == "" {
+	if (action != "ban") && (action != "unban") {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: "Action not provided or invalid action format",
 		})
@@ -33,9 +34,9 @@ func banUserHandler(c *gin.Context) {
 
 	var userState uint
 
-	if action == "ban" {
+	if action == core.USER_STATUS["ban"] {
 		userState = 1
-	} else if action == "unban" {
+	} else if action == core.USER_STATUS["unban"] {
 		userState = 0
 	}
 

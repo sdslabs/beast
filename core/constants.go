@@ -184,3 +184,8 @@ var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 		},
 	},
 }
+
+var USER_STATUS = map[string]string{
+	"ban":   "ban",
+	"unban": "unban",
+}
