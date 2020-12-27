@@ -545,7 +545,7 @@ func getUsersStatisticsHandler(c *gin.Context) {
 	}
 
 	for _, user := range users {
-		if user.Role != "author" {
+		if user.Role == core.USER_ROLES["contestant"] {
 			if user.Status == 1 {
 				bannedUsers++
 			}
