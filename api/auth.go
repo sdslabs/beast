@@ -138,6 +138,12 @@ func login(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
+	if username == "" || password == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Username and password can not be empty",
+		})
+	}
+
 	userEntry, err := database.QueryFirstUserEntry("username", username)
 
 	if err != nil {
@@ -185,9 +191,15 @@ func register(c *gin.Context) {
 	email := c.PostForm("email")
 	sshKey := c.PostForm("ssh-key")
 
+	if username == "" || password == "" || email == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Username ,password and email can not be empty",
+		})
+	}
+
 	userEntry := database.User{
 		Name:      name,
-		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["maintainer"]),
+		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["contestant"]),
 		Email:     email,
 		SshKey:    sshKey,
 	}
