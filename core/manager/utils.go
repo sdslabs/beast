@@ -394,7 +394,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Name:        config.Challenge.Metadata.Name,
 			AuthorID:    userEntry.ID,
 			Format:      config.Challenge.Metadata.Type,
-			Status:      core.DEPLOY_STATUS["unknown"],
+			Status:      core.DEPLOY_STATUS["undeployed"],
 			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
 			Flag:        config.Challenge.Metadata.Flag,

@@ -277,7 +277,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 // directory as the staged challenge directory, which contains the challenge config.
 //
 // During the staging steup if any error occurs, then the state of the challenge
-// in the database is set to unknown.
+// in the database is set to undeployed.
 func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) error {
 	log.Debug("Loading Beast config")
 
@@ -342,7 +342,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	// Look into the database to check if the deploy is already in progress
 	// or not, return if a deploy is already in progress or else continue
 	// deploying
-	if challenge.Status != core.DEPLOY_STATUS["unknown"] &&
+	if challenge.Status != core.DEPLOY_STATUS["undeployed"] &&
 		challenge.Status != core.DEPLOY_STATUS["deployed"] &&
 		challenge.Status != core.DEPLOY_STATUS["queued"] &&
 		challenge.Status != "" {
@@ -364,7 +364,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 				"DEPLOY_ERROR": "STAGING :: " + challengeName,
 			}).Errorf("%s", err)
 
-			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
+			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["undeployed"]})
 			return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, err)
 		}
 	} else {
@@ -392,12 +392,12 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 				"DEPLOY_ERROR": "COMMIT :: " + challengeName,
 			}).Errorf("%s", err)
 
-			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
+			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["undeployed"]})
 			return fmt.Errorf("COMMIT ERROR: %s : %s", challengeName, err)
 		}
 	} else {
 		if challenge.ImageId == "" {
-			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
+			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["undeployed"]})
 			return fmt.Errorf("COMMIT ERROR: Cannot skip commit step, no Image ID found for challenge.")
 		}
 		log.Debugf("Skipping commit phase")
@@ -411,7 +411,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 			"DEPLOY_ERROR": "DEPLOY :: " + challengeName,
 		}).Errorf("%s", err)
 
-		database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
+		database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["undeployed"]})
 
 		return fmt.Errorf("DEPLOY ERROR: %s : %s", challengeName, err)
 	}

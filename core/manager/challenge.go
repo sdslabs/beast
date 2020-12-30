@@ -107,7 +107,7 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 		}
 
 		if chall.Name != "" {
-			database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["unknown"]})
+			database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["undeployed"]})
 			log.Errorf("The action(%s) specified for challenge : %s does not exist", info.Action, w.ID)
 		}
 	}
@@ -467,7 +467,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 	}
 
 	// If a existing container ID is not found make sure that you atleast
-	// set the deploy status to unknown. This earlier caused problem since if a challenge
+	// set the deploy status to undeployed. This earlier caused problem since if a challenge
 	// was in staging state(and deployed is cancled) then we can neither deploy new
 	// version nor we can undeploy the existing version(since it does not exist)
 	// So this....
@@ -486,7 +486,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 	}
 
 	err = database.UpdateChallenge(&challenge, map[string]interface{}{
-		"Status":      core.DEPLOY_STATUS["unknown"],
+		"Status":      core.DEPLOY_STATUS["undeployed"],
 		"ContainerId": coreUtils.GetTempContainerId(challengeName),
 	})
 
