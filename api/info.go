@@ -374,7 +374,7 @@ func userInfoHandler(c *gin.Context) {
 			return
 		}
 	} else {
-		user, err = database.QueryFirstUserEntry("name", username)
+		user, err = database.QueryFirstUserEntry("username", username)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 				Message: "DATABASE ERROR while processing the request.",
