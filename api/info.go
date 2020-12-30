@@ -354,6 +354,7 @@ func userInfoHandler(c *gin.Context) {
 		return
 	}
 	var user database.User
+	var err error
 	var parsedUserId uint
 	if userId != "" {
 		id, err := strconv.ParseUint(userId, 10, 64)
@@ -373,15 +374,13 @@ func userInfoHandler(c *gin.Context) {
 			return
 		}
 	} else {
-		user, err := database.QueryFirstUserEntry("username", username)
+		user, err = database.QueryFirstUserEntry("username", username)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 				Message: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
-
-		parsedUserId = uint(user.ID)
 	}
 
 	challenges, err := database.GetRelatedChallenges(&user)
