@@ -107,7 +107,7 @@ info:
   title: Beast API
   version: "1.0"
 paths:
-  /api/config/reaload/:
+  /api/config/reload/:
     patch:
       consumes:
       - application/json

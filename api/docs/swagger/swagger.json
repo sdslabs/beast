@@ -17,7 +17,7 @@
     "host": "beast.sdslabs.co",
     "basePath": "/",
     "paths": {
-        "/api/config/reaload/": {
+        "/api/config/reload/": {
             "patch": {
                 "description": "Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.",
                 "consumes": [

@@ -17,7 +17,7 @@ import (
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/config/reaload/ [patch]
+// @Router /api/config/reload/ [patch]
 func reloadBeastConfig(c *gin.Context) {
 	err := config.ReloadBeastConfig()
 	if err != nil {
