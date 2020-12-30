@@ -50,7 +50,7 @@ type Challenge struct {
 	Format      string `gorm:"not null"`
 	ContainerId string `gorm:"size:64;unique"`
 	ImageId     string `gorm:"size:64;unique"`
-	Status      string `gorm:"not null;default:'Unknown'"`
+	Status      string `gorm:"not null;default:'Undeployed'"`
 	AuthorID    uint   `gorm:"not null"`
 	HealthCheck uint   `gorm:"not null;default:1"`
 	Points      uint   `gorm:"default:0"`

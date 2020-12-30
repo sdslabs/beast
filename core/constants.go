@@ -92,7 +92,7 @@ var (
 )
 
 var DEPLOY_STATUS = map[string]string{
-	"unknown":    "Unknown",
+	"undeployed": "Undeployed",
 	"staging":    "Staging",
 	"committing": "Commiting",
 	"deploying":  "Deploying",
