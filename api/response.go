@@ -113,6 +113,7 @@ type SubmissionResp struct {
 	ChallId   uint      `json:"chall_id" example:"3"`
 	ChallName string    `json:"name" example:"Web Challenge"`
 	Category  string    `json:"category" example:"web"`
+	Points    uint      `json:"points" example:"50"`
 	SolvedAt  time.Time `json:"solvedAt"`
 }
 
