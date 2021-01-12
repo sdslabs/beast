@@ -355,3 +355,42 @@ func manageScheduledAction(c *gin.Context) {
 		Message: fmt.Sprintf("Challenge with the provided selector has been scheduled for %s", action),
 	})
 }
+
+func manageUploadHandler(c *gin.Context) {
+	file, err := c.FormFile("file")
+
+	// The file cannot be received.
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("No file received from user"),
+		})
+		return
+	}
+
+	// Get file name for the new uploaded file
+	newFileName := file.Filename
+	tarContextPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR, newFileName)
+
+	// The file is received, save it
+	if err := c.SaveUploadedFile(file, tarContextPath); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: fmt.Sprintf("Unable to save file: %s", err),
+		})
+		return
+	}
+
+	// Extract and show from tar and return response
+	tempStageDir, err := manager.UnTarChallengeFolder(tarContextPath)
+
+	// The file cannot be successfully un-tar-ed or the resultant was a malformed directory
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("The un-TAR process failed or the TAR was unacceptable: %s", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: fmt.Sprintf("tempDir: %s", tempStageDir),
+	})
+}

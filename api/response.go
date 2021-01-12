@@ -94,17 +94,26 @@ type UserSolveResp struct {
 }
 
 type ChallengeInfoResp struct {
-	Name         string
+	Name         string `json:"name" example:"Web Challenge"`
 	ChallId      uint
-	Category     string
+	Category     string `json:"category" example:"web"`
 	CreatedAt    time.Time
 	Status       string
-	Ports        []database.Port
-	Hints        string
-	Desc         string
-	Points       uint
+	Ports        []database.Port `json:"ports" example:[3001, 3002]`
+	Hints        string          `json:hints example:Try robots`
+	Desc         string          `json:description example:A simple web challenge`
+	Points       uint            `json:"points" example:"50"`
 	SolvesNumber int
 	Solves       []UserSolveResp
+}
+
+type ChallengePreviewResp struct {
+	Name     string          `json:"name" example:"Web Challenge"`
+	Category string          `json:"category" example:"web"`
+	Ports    []database.Port `json:"ports" example:[3001, 3002]`
+	Hints    string          `json:hints example:Try robots`
+	Desc     string          `json:description example:A simple web challenge`
+	Points   uint            `json:"points" example:"50"`
 }
 
 type SubmissionResp struct {

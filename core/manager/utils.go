@@ -1,9 +1,12 @@
 package manager
 
 import (
+	"archive/tar"
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -36,6 +39,15 @@ type BeastXinetdConf struct {
 	Port        string
 	ServicePath string
 	ServiceName string
+}
+
+type ChallengePreview struct {
+	Name     string
+	Category string
+	Ports    []database.Port
+	Hints    string
+	Desc     string
+	Points   uint
 }
 
 // This if the function which validates the challenge directory
@@ -559,4 +571,45 @@ func GetAvailableChallenges() ([]string, error) {
 		}
 	}
 	return challsNameList, nil
+}
+
+func UnTarChallengeFolder(tarContextPath string) (string, error) {
+	baseFileName := filepath.Base(tarContextPath)
+	targetDir := filepath.Join(os.TempDir(), strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
+
+	reader, err := os.Open(tarContextPath)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+	tarReader := tar.NewReader(reader)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return "", err
+		}
+
+		path := filepath.Join(filepath.Join(targetDir), header.Name)
+		info := header.FileInfo()
+		if info.IsDir() {
+			if err = os.MkdirAll(path, info.Mode()); err != nil {
+				return "", err
+			}
+			continue
+		}
+
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
+		_, err = io.Copy(file, tarReader)
+		if err != nil {
+			return "", err
+		}
+	}
+	return targetDir, nil
 }
