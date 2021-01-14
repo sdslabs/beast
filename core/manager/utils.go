@@ -575,7 +575,7 @@ func GetAvailableChallenges() ([]string, error) {
 
 func UnTarChallengeFolder(tarContextPath string) (string, error) {
 	baseFileName := filepath.Base(tarContextPath)
-	targetDir := filepath.Join(os.TempDir(), strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
+	targetDir := filepath.Join(core.BEAST_TEMP_DIR, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
 	reader, err := os.Open(tarContextPath)
 	if err != nil {

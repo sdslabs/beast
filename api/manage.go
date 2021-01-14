@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
@@ -390,7 +392,29 @@ func manageUploadHandler(c *gin.Context) {
 		return
 	}
 
+	challengeName := filepath.Base(tempStageDir)
+	configFile := filepath.Join(tempStageDir, core.CHALLENGE_CONFIG_FILE_NAME)
+
+	var config cfg.BeastChallengeConfig
+	challengeConf, err := toml.DecodeFile(configFile, &config)
+	if err != nil {
+		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("CONFIG ERROR: %s : %s", challengeName, err),
+		})
+		return
+	}
+
+	fmt.Println(challengeConf)
+	// c.JSON(http.StatusOK, ChallengePreviewResp{
+	// 	Name:     challengeConf.Challenge.metadata.name,
+	// 	Category: challengeConf.Challenge.metadata.tags,
+	// 	Ports:    challengeConf.Challenge.env.ports,
+	// 	Hints:    challengeConf.Challenge.metadata.hints,
+	// 	Desc:     challengeConf.Challenge.metadata.description,
+	// 	Points:   challengeConf.Challenge.metadata.points,
+	// })
 	c.JSON(http.StatusOK, HTTPPlainResp{
-		Message: fmt.Sprintf("tempDir: %s", tempStageDir),
+		Message: "Hello",
 	})
 }
