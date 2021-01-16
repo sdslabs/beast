@@ -136,6 +136,7 @@ type ChallengeMetadata struct {
 	Sidecar     string   `toml:"sidecar"`
 	Description string   `toml:"description"`
 	Hints       []string `toml:"hints"`
+	Points      uint     `toml:"points"`
 }
 
 // In this validation returned boolean value represents if the challenge type is

@@ -358,6 +358,17 @@ func manageScheduledAction(c *gin.Context) {
 	})
 }
 
+// Prepare challenge info from .tar file.
+// @Summary Untar and fetch info from beast.toml file in challenge
+// @Description Handles the challenge management from a challenge in tar file
+// @Tags manage
+// @Accept  json
+// @Produce json
+// @Param file query file true ".tar file to be uploaded to fetch challenge info"
+// @Success 200 {object} api.ChallengePreviewResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/manage/challenge/upload [post]
 func manageUploadHandler(c *gin.Context) {
 	file, err := c.FormFile("file")
 
@@ -375,8 +386,8 @@ func manageUploadHandler(c *gin.Context) {
 
 	// The file is received, save it
 	if err := c.SaveUploadedFile(file, tarContextPath); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: fmt.Sprintf("Unable to save file: %s", err),
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to save file: %s", err),
 		})
 		return
 	}
@@ -386,35 +397,38 @@ func manageUploadHandler(c *gin.Context) {
 
 	// The file cannot be successfully un-tar-ed or the resultant was a malformed directory
 	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("The un-TAR process failed or the TAR was unacceptable: %s", err),
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: fmt.Sprintf("The un-TAR process failed or the TAR was unacceptable: %s", err),
 		})
 		return
+	}
+
+	err = manager.ValidateChallengeConfig(tempStageDir)
+	if err != nil {
+		c.JSON(http.StatusOK, HTTPErrorResp{
+			Error: err.Error(),
+		})
 	}
 
 	challengeName := filepath.Base(tempStageDir)
 	configFile := filepath.Join(tempStageDir, core.CHALLENGE_CONFIG_FILE_NAME)
 
 	var config cfg.BeastChallengeConfig
-	challengeConf, err := toml.DecodeFile(configFile, &config)
+	_, err = toml.DecodeFile(configFile, &config)
 	if err != nil {
 		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("CONFIG ERROR: %s : %s", challengeName, err),
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: fmt.Sprintf("CONFIG ERROR: %s : %s", challengeName, err),
 		})
 		return
 	}
 
-	fmt.Println(challengeConf)
-	// c.JSON(http.StatusOK, ChallengePreviewResp{
-	// 	Name:     challengeConf.Challenge.metadata.name,
-	// 	Category: challengeConf.Challenge.metadata.tags,
-	// 	Ports:    challengeConf.Challenge.env.ports,
-	// 	Hints:    challengeConf.Challenge.metadata.hints,
-	// 	Desc:     challengeConf.Challenge.metadata.description,
-	// 	Points:   challengeConf.Challenge.metadata.points,
-	// })
-	c.JSON(http.StatusOK, HTTPPlainResp{
-		Message: "Hello",
+	c.JSON(http.StatusOK, ChallengePreviewResp{
+		Name:     config.Challenge.Metadata.Name,
+		Category: config.Challenge.Metadata.Tags,
+		Ports:    config.Challenge.Env.Ports,
+		Hints:    config.Challenge.Metadata.Hints,
+		Desc:     config.Challenge.Metadata.Description,
+		Points:   config.Challenge.Metadata.Points,
 	})
 }
