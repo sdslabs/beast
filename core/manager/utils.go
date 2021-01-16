@@ -414,6 +414,7 @@ func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Sidecar:     config.Challenge.Metadata.Sidecar,
 			Description: config.Challenge.Metadata.Description,
 			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
+			Points:      config.Challenge.Metadata.Points,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
