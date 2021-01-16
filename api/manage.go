@@ -380,9 +380,7 @@ func manageUploadHandler(c *gin.Context) {
 		return
 	}
 
-	// Get file name for the new uploaded file
-	newFileName := file.Filename
-	tarContextPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR, newFileName)
+	tarContextPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR, file.Filename)
 
 	// The file is received, save it
 	if err := c.SaveUploadedFile(file, tarContextPath); err != nil {
