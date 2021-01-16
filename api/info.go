@@ -501,6 +501,7 @@ func submissionsHandler(c *gin.Context) {
 				ChallId:   challenge[0].ID,
 				ChallName: challenge[0].Name,
 				Category:  challenge[0].Type,
+				Points:    challenge[0].Points,
 				SolvedAt:  submission.CreatedAt,
 			}
 			submissionsResp = append(submissionsResp, singleSubmissionResp)
