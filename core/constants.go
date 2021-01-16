@@ -9,6 +9,7 @@ import (
 var (
 	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
 	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
+	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
 )
 
 const ( //names
@@ -39,6 +40,7 @@ const ( //paths
 	BEAST_SCRIPTS_DIR              string = "scripts"
 	BEAST_REMOTES_DIR              string = "remote"
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
+	BEAST_UPLOADS_DIR              string = "uploads"
 )
 
 const ( //chall types

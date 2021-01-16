@@ -46,6 +46,7 @@ func initGinRouter() *gin.Engine {
 			manageGroup.POST("/commit/", commitChallenge)
 			manageGroup.POST("/challenge/verify", verifyHandler)
 			manageGroup.POST("/schedule/:action", manageScheduledAction)
+			manageGroup.POST("/challenge/upload", manageUploadHandler)
 		}
 
 		// Status route group

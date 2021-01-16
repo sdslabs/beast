@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
@@ -353,5 +355,78 @@ func manageScheduledAction(c *gin.Context) {
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: fmt.Sprintf("Challenge with the provided selector has been scheduled for %s", action),
+	})
+}
+
+// Prepare challenge info from .tar file.
+// @Summary Untar and fetch info from beast.toml file in challenge
+// @Description Handles the challenge management from a challenge in tar file
+// @Tags manage
+// @Accept  json
+// @Produce json
+// @Param file query file true ".tar file to be uploaded to fetch challenge info"
+// @Success 200 {object} api.ChallengePreviewResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/manage/challenge/upload [post]
+func manageUploadHandler(c *gin.Context) {
+	file, err := c.FormFile("file")
+
+	// The file cannot be received.
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("No file received from user"),
+		})
+		return
+	}
+
+	tarContextPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR, file.Filename)
+
+	// The file is received, save it
+	if err := c.SaveUploadedFile(file, tarContextPath); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to save file: %s", err),
+		})
+		return
+	}
+
+	// Extract and show from tar and return response
+	tempStageDir, err := manager.UnTarChallengeFolder(tarContextPath)
+
+	// The file cannot be successfully un-tar-ed or the resultant was a malformed directory
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: fmt.Sprintf("The un-TAR process failed or the TAR was unacceptable: %s", err),
+		})
+		return
+	}
+
+	err = manager.ValidateChallengeConfig(tempStageDir)
+	if err != nil {
+		c.JSON(http.StatusOK, HTTPErrorResp{
+			Error: err.Error(),
+		})
+	}
+
+	challengeName := filepath.Base(tempStageDir)
+	configFile := filepath.Join(tempStageDir, core.CHALLENGE_CONFIG_FILE_NAME)
+
+	var config cfg.BeastChallengeConfig
+	_, err = toml.DecodeFile(configFile, &config)
+	if err != nil {
+		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: fmt.Sprintf("CONFIG ERROR: %s : %s", challengeName, err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, ChallengePreviewResp{
+		Name:     config.Challenge.Metadata.Name,
+		Category: config.Challenge.Metadata.Tags,
+		Ports:    config.Challenge.Env.Ports,
+		Hints:    config.Challenge.Metadata.Hints,
+		Desc:     config.Challenge.Metadata.Description,
+		Points:   config.Challenge.Metadata.Points,
 	})
 }
