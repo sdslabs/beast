@@ -380,7 +380,7 @@ func manageUploadHandler(c *gin.Context) {
 		return
 	}
 
-	tarContextPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR, file.Filename)
+	tarContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
 
 	// The file is received, save it
 	if err := c.SaveUploadedFile(file, tarContextPath); err != nil {
@@ -391,7 +391,7 @@ func manageUploadHandler(c *gin.Context) {
 	}
 
 	// Extract and show from tar and return response
-	tempStageDir, err := manager.UnTarChallengeFolder(tarContextPath)
+	tempStageDir, err := manager.UnTarChallengeFolder(tarContextPath, core.BEAST_TEMP_DIR)
 
 	// The file cannot be successfully un-tar-ed or the resultant was a malformed directory
 	if err != nil {
@@ -408,8 +408,21 @@ func manageUploadHandler(c *gin.Context) {
 		})
 	}
 
-	challengeName := filepath.Base(tempStageDir)
-	configFile := filepath.Join(tempStageDir, core.CHALLENGE_CONFIG_FILE_NAME)
+	challengeUploadDirectory := filepath.Join(
+		core.BEAST_GLOBAL_DIR,
+		core.BEAST_UPLOADS_DIR,
+		strings.TrimSuffix(file.Filename, filepath.Ext(file.Filename)),
+	)
+
+	if err = manager.CopyDir(tempStageDir, challengeUploadDirectory); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to move challenge directory: %s", err),
+		})
+		return
+	}
+
+	challengeName := filepath.Base(challengeUploadDirectory)
+	configFile := filepath.Join(challengeUploadDirectory, core.CHALLENGE_CONFIG_FILE_NAME)
 
 	var config cfg.BeastChallengeConfig
 	_, err = toml.DecodeFile(configFile, &config)
