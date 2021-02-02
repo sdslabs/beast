@@ -235,7 +235,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	err = utils.ValidateFileExists(stagedFileName)
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
-		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		challengeDir := coreUtils.GetChallengeDir(challengeName)
 		if challengeDir == "" {
 			log.Errorf("Challenge does not exist")
 			return nil, fmt.Errorf("challenge does not exist")

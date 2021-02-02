@@ -8,7 +8,7 @@ import (
 	"github.com/sdslabs/beastv4/utils"
 )
 
-func GetChallengeDirFromGitRemote(challengeName string) string {
+func GetChallengeDir(challengeName string) string {
 	challengeRemoteDir := ""
 
 	for _, gitRemote := range config.Cfg.GitRemotes {
@@ -20,6 +20,12 @@ func GetChallengeDirFromGitRemote(challengeName string) string {
 				return challengeRemoteDir
 			}
 		}
+	}
+
+	challengeRemoteDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR, challengeName)
+	err := utils.ValidateDirExists(challengeRemoteDir)
+	if err == nil {
+		return challengeRemoteDir
 	}
 
 	return challengeRemoteDir
