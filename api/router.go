@@ -90,6 +90,7 @@ func initGinRouter() *gin.Engine {
 		configGroup := apiGroup.Group("/config", adminAuthorize)
 		{
 			configGroup.PATCH("/reload", reloadBeastConfig)
+			configGroup.POST("/competitionInfo", updateCompetitionInfoHandler)
 		}
 
 		submitGroup := apiGroup.Group("/submit")

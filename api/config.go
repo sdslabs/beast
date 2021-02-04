@@ -32,3 +32,36 @@ func reloadBeastConfig(c *gin.Context) {
 		Message: "CONFIG RELOAD SUCCESSFUL",
 	})
 }
+
+func updateCompetitionInfoHandler(c *gin.Context) {
+	name := c.PostForm("name")
+	about := c.PostForm("about")
+	prizes := c.PostForm("prizes")
+	starting_time := c.PostForm("starting_time")
+	ending_time := c.PostForm("ending_time")
+	timezone := c.PostForm("timezone")
+	logo_url := c.PostForm("logo_url")
+
+	configInfo := config.CompetitionInfo{
+		Name:         name,
+		About:        about,
+		Prizes:       prizes,
+		StartingTime: starting_time,
+		EndingTime:   ending_time,
+		TimeZone:     timezone,
+		LogoURL:      logo_url,
+	}
+
+	err := config.UpdateCompetitionInfo(&configInfo)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Competition information updated successfully",
+	})
+	return
+}
