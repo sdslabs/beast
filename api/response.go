@@ -136,3 +136,13 @@ type UsersStatisticsResp struct {
 	BannedUsers          uint `json:"banned_users" example:"60`
 	UnbannedUsers        uint `json:"unbanned_users" example:"60`
 }
+
+type CompetitionInfoResp struct {
+	Name         string `json:"name" example:"fristonio"`
+	About        string `json:"about" example:"This is a CTF competition"`
+	Prizes       string `json:"prizes" example:"1st and 2nd place winners will get $10K"`
+	StartingTime string `json:"starting_time" example:`
+	EndingTime   string `json:"ending_time" example:`
+	TimeZone     string `json:"timezone" example:`
+	LogoURL      string `json:"logo_url" example:`
+}

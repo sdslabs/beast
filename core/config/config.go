@@ -268,6 +268,24 @@ func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {
 	return err
 }
 
+func GetCompetitionInfo() (CompetitionInfo, error) {
+	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
+	var config BeastConfig
+	var competitionInfo CompetitionInfo
+
+	err := utils.ValidateFileExists(configPath)
+	if err != nil {
+		return competitionInfo, err
+	}
+
+	_, err = toml.DecodeFile(configPath, &config)
+	if err != nil {
+		return competitionInfo, err
+	}
+
+	return config.CompetitionInfo, nil
+}
+
 // From the path of the config file provided as an arguement this function
 // loads the parse the config file and load it into the BeastConfig
 // structure. After parsing it validates the data in the config file and returns
