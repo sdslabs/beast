@@ -1,9 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
 )
@@ -40,7 +43,24 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 	starting_time := c.PostForm("starting_time")
 	ending_time := c.PostForm("ending_time")
 	timezone := c.PostForm("timezone")
-	logo_url := c.PostForm("logo_url")
+	logo, err := c.FormFile("logo")
+
+	// The file cannot be received.
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("No file received from user"),
+		})
+	}
+
+	logoFilePath := filepath.Join(core.BEAST_GLOBAL_DIR, logo.Filename)
+
+	// The file is received, save it
+	if err := c.SaveUploadedFile(logo, logoFilePath); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to save file: %s", err),
+		})
+		return
+	}
 
 	configInfo := config.CompetitionInfo{
 		Name:         name,
@@ -49,10 +69,10 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 		StartingTime: starting_time,
 		EndingTime:   ending_time,
 		TimeZone:     timezone,
-		LogoURL:      logo_url,
+		LogoURL:      logoFilePath,
 	}
 
-	err := config.UpdateCompetitionInfo(&configInfo)
+	err = config.UpdateCompetitionInfo(&configInfo)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: err.Error(),
