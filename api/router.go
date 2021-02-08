@@ -26,9 +26,6 @@ func initGinRouter() *gin.Engine {
 	}
 	router.Use(cors.New(corsConfig))
 
-	// For serving static files
-	router.StaticFile("/logo", getLogoPath())
-
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
@@ -74,6 +71,8 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/user/available", getAllUsersInfoHandler)
 			infoGroup.POST("/submissions", submissionsHandler)
 			infoGroup.GET("/competitionInfo", competitionInfoHandler)
+			// For serving static files
+			infoGroup.StaticFile("/logo", getLogoPath())
 		}
 
 		// Notification route group

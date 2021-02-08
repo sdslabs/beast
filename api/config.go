@@ -52,7 +52,7 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 		})
 	}
 
-	logoFilePath := filepath.Join(core.BEAST_GLOBAL_DIR, logo.Filename)
+	logoFilePath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, logo.Filename)
 
 	// The file is received, save it
 	if err := c.SaveUploadedFile(logo, logoFilePath); err != nil {

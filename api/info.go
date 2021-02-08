@@ -579,7 +579,7 @@ func competitionInfoHandler(c *gin.Context) {
 		StartingTime: competitionInfo.StartingTime,
 		EndingTime:   competitionInfo.EndingTime,
 		TimeZone:     competitionInfo.TimeZone,
-		LogoURL:      competitionInfo.LogoURL,
+		LogoURL:      "/api/info/logo",
 	})
 	return
 }
