@@ -26,6 +26,9 @@ func initGinRouter() *gin.Engine {
 	}
 	router.Use(cors.New(corsConfig))
 
+	// For serving static files
+	router.StaticFile("/logo", getLogoPath())
+
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
@@ -105,6 +108,10 @@ func initGinRouter() *gin.Engine {
 			adminPanelGroup.POST("/statistics", getUsersStatisticsHandler)
 		}
 	}
+
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(404, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
+	})
 
 	return router
 }

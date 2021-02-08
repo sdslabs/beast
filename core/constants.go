@@ -41,6 +41,7 @@ const ( //paths
 	BEAST_REMOTES_DIR              string = "remote"
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
 	BEAST_UPLOADS_DIR              string = "uploads"
+	BEAST_ASSETS_DIR               string = "assets"
 )
 
 const ( //chall types
