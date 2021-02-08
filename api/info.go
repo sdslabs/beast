@@ -553,16 +553,15 @@ func getUsersStatisticsHandler(c *gin.Context) {
 	return
 }
 
-// Returns statistics of users in competition
-// @Summary statistics of users in competition
-// @Description returns statistics of users in competition (currently limited to ban/unban status of users)
+// Returns competition information
+// @Summary returns competition info
+// @Description returns various information about the competition which are used to control competition
 // @Tags info
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.UserResp
-// @Failure 404 {object} api.HTTPPlainResp
-// @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/admin/statistics [post]
+// @Success 200 {object} api.CompetitionInfoResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/admin/statistics [get]
 func competitionInfoHandler(c *gin.Context) {
 	competitionInfo, err := config.GetCompetitionInfo()
 	if err != nil {

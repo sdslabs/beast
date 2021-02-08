@@ -70,7 +70,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.POST("/user", userInfoHandler)
 			infoGroup.GET("/user/available", getAllUsersInfoHandler)
 			infoGroup.POST("/submissions", submissionsHandler)
-			infoGroup.GET("/competitionInfo", competitionInfoHandler)
+			infoGroup.GET("/competition-info", competitionInfoHandler)
 			// For serving static files
 			infoGroup.StaticFile("/logo", getLogoPath())
 		}
@@ -93,7 +93,7 @@ func initGinRouter() *gin.Engine {
 		configGroup := apiGroup.Group("/config", adminAuthorize)
 		{
 			configGroup.PATCH("/reload", reloadBeastConfig)
-			configGroup.POST("/competitionInfo", updateCompetitionInfoHandler)
+			configGroup.POST("/competition-info", updateCompetitionInfoHandler)
 		}
 
 		submitGroup := apiGroup.Group("/submit")

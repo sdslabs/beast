@@ -45,21 +45,21 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 	timezone := c.PostForm("timezone")
 	logo, err := c.FormFile("logo")
 
+	logoFilePath := ""
+
 	// The file cannot be received.
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("No file received from user"),
-		})
-	}
+		log.Info("No file recieved from the user")
+	} else {
+		logoFilePath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, logo.Filename)
 
-	logoFilePath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, logo.Filename)
-
-	// The file is received, save it
-	if err := c.SaveUploadedFile(logo, logoFilePath); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: fmt.Sprintf("Unable to save file: %s", err),
-		})
-		return
+		// The file is received, save it
+		if err := c.SaveUploadedFile(logo, logoFilePath); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("Unable to save file: %s", err),
+			})
+			return
+		}
 	}
 
 	configInfo := config.CompetitionInfo{
