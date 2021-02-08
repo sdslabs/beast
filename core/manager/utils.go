@@ -24,16 +24,18 @@ import (
 )
 
 type BeastBareDockerfile struct {
-	DockerBaseImage string
-	Ports           string
-	AptDeps         string
-	SetupScripts    []string
-	Executables     []string
-	RunCmd          string
-	RunScript       string
-	MountVolume     string
-	XinetdService   bool
-	Entrypoint      string
+	DockerBaseImage      string
+	Ports                string
+	AptDeps              string
+	SetupScripts         []string
+	Executables          []string
+	RunCmd               string
+	EnvironmentVariables map[string]string
+	MountVolume          string
+	XinetdService        bool
+	RunRoot              bool
+	Entrypoint           string
+	SetupCommand         string
 }
 
 type BeastXinetdConf struct {
@@ -120,36 +122,53 @@ func getContextDirPath(dirPath string) (string, error) {
 	return absContextDir, nil
 }
 
-func getCommandForWebChall(language, framework, webRoot, port string) string {
-	dir := "cd " + filepath.Join("/challenge", webRoot) + " && "
-	var cmd string
+func emptyFunction(config *BeastBareDockerfile) {
+
+}
+
+func getCommandAndModifierForWebChall(language, framework, webRoot, port string) (string, func(*BeastBareDockerfile)) {
+	commands := make([]string, 0)
+	commands = append(commands, fmt.Sprintf("cd %s", filepath.Join("/challenge", webRoot)))
+
+	modifier := emptyFunction
 
 	switch language {
 	case "php":
 		switch framework {
 		case "apache":
-			cmd = "<some command>"
-		case "cli":
-			cmd = "php -S 0.0.0.0:"
+			modifier = func(config *BeastBareDockerfile) {
+				if _, ok := config.EnvironmentVariables["APACHE_DOCUMENT_ROOT"]; !ok {
+					config.EnvironmentVariables["APACHE_DOCUMENT_ROOT"] = filepath.Join("/challenge", webRoot)
+				}
+				setupCommands := make([]string, 0)
+				setupCommands = append(setupCommands, fmt.Sprintf("sed -ri -e 's!80!%v!g' /etc/apache2/ports.conf", port))
+				setupCommands = append(setupCommands, fmt.Sprintf("sed -ri -e 's!80!%v!g' /etc/apache2/sites-enabled/000-default.conf", port))
+				setupCommands = append(setupCommands, "sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-enabled/000-default.conf /etc/apache2/sites-available/*.conf")
+				setupCommands = append(setupCommands, "sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf")
+				config.SetupCommand = strings.Join(setupCommands, " && ")
+				config.RunRoot = true
+			}
+			commands = append(commands, "docker-php-entrypoint apache2-foreground")
 		default:
-			cmd = "php -S 0.0.0.0:"
+			commands = append(commands, fmt.Sprintf("php -S 0.0.0.0:%v", port))
 		}
 	case "node":
-		cmd = "npm install && node server.js "
+		commands = append(commands, "npm install")
+		commands = append(commands, fmt.Sprintf("node server.js %v", port))
 	case "python":
 		switch framework {
 		case "django":
-			cmd = "python manage.py runserver 0.0.0.0:"
+			commands = append(commands, fmt.Sprintf("python manage.py runserver 0.0.0.0:%v", port))
 		case "flask":
-			cmd = "flask run --host=0.0.0.0 --port="
+			commands = append(commands, fmt.Sprintf("flask run --host=0.0.0.0 --port=%v", port))
 		default:
-			return ""
+			return "", modifier
 		}
 	default:
-		return ""
+		return "", modifier
 	}
 
-	return dir + cmd + port
+	return strings.Join(commands, " && "), modifier
 }
 
 // This function provides the run command and image for a particular type of web challenge
@@ -159,7 +178,7 @@ func getCommandForWebChall(language, framework, webRoot, port string) string {
 //
 //  It returns the run command for challenge
 //  and the docker base image corresponding to language
-func GetCommandAndImageForWebChall(webRoot, port string, challengeInfo []string) (string, string) {
+func GetWebChallSetup(webRoot, port string, challengeInfo []string) (string, string, func(*BeastBareDockerfile)) {
 	length := len(challengeInfo)
 	reqLength := 4
 
@@ -173,10 +192,10 @@ func GetCommandAndImageForWebChall(webRoot, port string, challengeInfo []string)
 	version := challengeInfo[2]
 	framework := challengeInfo[3]
 
-	cmd := getCommandForWebChall(language, framework, webRoot, port)
+	cmd, modifier := getCommandAndModifierForWebChall(language, framework, webRoot, port)
 	image := core.DockerBaseImageForWebChall[language][version][framework]
 
-	return cmd, image
+	return cmd, image, modifier
 }
 
 // From the provided configFIle path it generates the dockerfile for
@@ -199,6 +218,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
 	var xinetdService bool = false
 	var executables []string
+	modifier := emptyFunction
 
 	// The challenge type we are looking at is service. This should be deployed
 	// using xinetd. The Dockerfile is different for this. Change the runCmd and the
@@ -213,13 +233,13 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		// Challenge type is web here, so set the required variables.
 		challengeInfo := strings.Split(challengeType, ":")
 		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
-		defaultRunCmd, webBaseImage := GetCommandAndImageForWebChall(config.Challenge.Env.WebRoot, webPort, challengeInfo)
+		var defaultRunCmd string
+		defaultRunCmd, baseImage, modifier = GetWebChallSetup(config.Challenge.Env.WebRoot, webPort, challengeInfo)
 
 		// runCmd can only be empty when the challenge has a web prefix.
 		if runCmd == "" {
 			runCmd = defaultRunCmd
 		}
-		baseImage = webBaseImage
 	}
 
 	if baseImage == "" {
@@ -233,16 +253,22 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	}
 
 	data := BeastBareDockerfile{
-		DockerBaseImage: baseImage,
-		Ports:           strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
-		AptDeps:         aptDeps,
-		SetupScripts:    setupScripts,
-		RunCmd:          runCmd,
-		MountVolume:     filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
-		XinetdService:   xinetdService,
-		Executables:     executables,
-		Entrypoint:      entrypoint,
+		DockerBaseImage:      baseImage,
+		Ports:                strings.Trim(strings.Replace(fmt.Sprint(config.Challenge.Env.Ports), " ", " ", -1), "[]"),
+		AptDeps:              aptDeps,
+		SetupScripts:         setupScripts,
+		RunCmd:               runCmd,
+		MountVolume:          filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
+		XinetdService:        xinetdService,
+		RunRoot:              xinetdService,
+		Executables:          executables,
+		Entrypoint:           entrypoint,
+		EnvironmentVariables: map[string]string{},
 	}
+
+	modifier(&data)
+
+	log.Error(data)
 
 	var dockerfile bytes.Buffer
 	log.Debugf("Preparing dockerfile template")
