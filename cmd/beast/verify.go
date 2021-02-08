@@ -18,7 +18,7 @@ var verifyCmd = &cobra.Command{
 		config.InitConfig()
 		challengeName := args[0]
 
-		challengeDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+		challengeDir := coreUtils.GetChallengeDir(challengeName)
 		if challengeDir == "" {
 			log.Errorf("Challenge does not exist")
 			return

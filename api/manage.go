@@ -249,7 +249,7 @@ func commitChallenge(c *gin.Context) {
 // @Router /api/manage/commit/ [post]
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
-	challengeRemoteDir := coreUtils.GetChallengeDirFromGitRemote(challengeName)
+	challengeRemoteDir := coreUtils.GetChallengeDir(challengeName)
 	if challengeRemoteDir == "" {
 		log.Errorf("Challenge does not exist")
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
