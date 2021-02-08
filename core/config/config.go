@@ -87,6 +87,7 @@ type BeastConfig struct {
 	GitRemotes           []GitRemote           `toml:"remote"`
 	JWTSecret            string                `toml:"jwt_secret"`
 	NotificationWebhooks []NotificationWebhook `toml:"notification_webhooks"`
+	CompetitionInfo      CompetitionInfo       `toml:"competition_info"`
 	TickerFrequency      int                   `toml:"ticker_frequency"`
 
 	RemoteSyncPeriod time.Duration `toml:"-"`
@@ -224,6 +225,65 @@ type NotificationWebhook struct {
 	URL         string `toml:"url"`
 	ServiceName string `toml:"service_name"`
 	Active      bool   `toml:"active"`
+}
+
+type CompetitionInfo struct {
+	Name         string `toml:"name"`
+	About        string `toml:"about"`
+	Prizes       string `toml:"prizes"`
+	StartingTime string `toml:"starting_time"`
+	EndingTime   string `toml:"ending_time"`
+	TimeZone     string `toml:"timezone"`
+	LogoURL      string `toml:"logo_url"`
+}
+
+func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {
+	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
+	var config BeastConfig
+
+	err := utils.ValidateFileExists(configPath)
+	if err != nil {
+		return err
+	}
+
+	_, err = toml.DecodeFile(configPath, &config)
+	if err != nil {
+		return err
+	}
+
+	config.CompetitionInfo = *competitionInfo
+
+	configFile, err := os.Create(configPath)
+	if err != nil {
+		return err
+	}
+
+	if err := toml.NewEncoder(configFile).Encode(config); err != nil {
+		return err
+	}
+
+	if err := configFile.Close(); err != nil {
+		return err
+	}
+	return err
+}
+
+func GetCompetitionInfo() (CompetitionInfo, error) {
+	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
+	var config BeastConfig
+	var competitionInfo CompetitionInfo
+
+	err := utils.ValidateFileExists(configPath)
+	if err != nil {
+		return competitionInfo, err
+	}
+
+	_, err = toml.DecodeFile(configPath, &config)
+	if err != nil {
+		return competitionInfo, err
+	}
+
+	return config.CompetitionInfo, nil
 }
 
 // From the path of the config file provided as an arguement this function

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
@@ -549,5 +550,35 @@ func getUsersStatisticsHandler(c *gin.Context) {
 		UnbannedUsers:        totalRegisteredUsers - bannedUsers,
 	})
 
+	return
+}
+
+// Returns competition information
+// @Summary returns competition info
+// @Description returns various information about the competition which are used to control competition
+// @Tags info
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.CompetitionInfoResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/admin/statistics [get]
+func competitionInfoHandler(c *gin.Context) {
+	competitionInfo, err := config.GetCompetitionInfo()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, CompetitionInfoResp{
+		Name:         competitionInfo.Name,
+		About:        competitionInfo.About,
+		Prizes:       competitionInfo.Prizes,
+		StartingTime: competitionInfo.StartingTime,
+		EndingTime:   competitionInfo.EndingTime,
+		TimeZone:     competitionInfo.TimeZone,
+		LogoURL:      "/api/info/logo",
+	})
 	return
 }

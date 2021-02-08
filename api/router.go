@@ -70,6 +70,9 @@ func initGinRouter() *gin.Engine {
 			infoGroup.POST("/user", userInfoHandler)
 			infoGroup.GET("/user/available", getAllUsersInfoHandler)
 			infoGroup.POST("/submissions", submissionsHandler)
+			infoGroup.GET("/competition-info", competitionInfoHandler)
+			// For serving static files
+			infoGroup.StaticFile("/logo", getLogoPath())
 		}
 
 		// Notification route group
@@ -90,6 +93,7 @@ func initGinRouter() *gin.Engine {
 		configGroup := apiGroup.Group("/config", adminAuthorize)
 		{
 			configGroup.PATCH("/reload", reloadBeastConfig)
+			configGroup.POST("/competition-info", updateCompetitionInfoHandler)
 		}
 
 		submitGroup := apiGroup.Group("/submit")
@@ -103,6 +107,10 @@ func initGinRouter() *gin.Engine {
 			adminPanelGroup.POST("/statistics", getUsersStatisticsHandler)
 		}
 	}
+
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(404, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
+	})
 
 	return router
 }
