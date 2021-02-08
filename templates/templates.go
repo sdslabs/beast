@@ -40,6 +40,10 @@ COPY . /challenge
 
 WORKDIR /challenge
 
+{{ range $key, $elem := .EnvironmentVariables}}
+ENV {{$key}} "{{$elem}}" 
+{{end}}
+
 RUN cd /challenge {{ range $index, $elem := .SetupScripts}} && \
     chmod u+x {{$elem}} {{end}} {{ range $index, $elem := .SetupScripts}} && \
     ./{{$elem}} {{end}}
@@ -56,7 +60,9 @@ RUN touch /entrypoint.sh && \
     echo "    chgrp beast-grp -R /challenge/public" >> /entrypoint.sh && \
     echo "    chmod -R 755 /challenge/public" >> /entrypoint.sh && \
     echo "fi" >> /entrypoint.sh && \
-    echo {{if .XinetdService}} "mv xinetd.conf /etc/xinetd.d/pwn_service && exec {{.RunCmd}}" {{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
+{{if .SetupCommand}}    echo "{{.SetupCommand}}" >> /entrypoint.sh && {{end}}\
+{{if .XinetdService}}   echo "mv xinetd.conf /etc/xinetd.d/pwn_service" >> /entrypoint.sh && {{end}}\
+    echo {{if .RunRoot}}"exec /bin/bash -c \"{{.RunCmd}}\""{{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
     chmod u+x /entrypoint.sh
 {{else}}
 RUN chmod u+x {{.Entrypoint}}
