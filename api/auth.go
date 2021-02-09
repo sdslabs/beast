@@ -150,6 +150,7 @@ func login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: err.Error(),
 		})
+		return
 	}
 
 	if userEntry.Status == 1 {
@@ -170,6 +171,7 @@ func login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, HTTPAuthorizeResp{
 		Token:   jwt,
+		Role:    userEntry.Role,
 		Message: "Expires in 6 hours. To access APIs send the token in header as \"Authorization: Bearer <token>\"",
 	})
 	return
@@ -195,6 +197,7 @@ func register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: "Username ,password and email can not be empty",
 		})
+		return
 	}
 
 	userEntry := database.User{

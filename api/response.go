@@ -16,6 +16,7 @@ type HTTPErrorResp struct {
 
 type HTTPAuthorizeResp struct {
 	Token   string `json:"token" example:"YOUR_AUTHENTICATION_TOKEN"`
+	Role    string `json:"role" example:"author"`
 	Message string `json:"message" example:"Response message"`
 }
 
