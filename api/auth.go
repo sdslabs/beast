@@ -8,6 +8,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
 )
 
@@ -215,6 +216,49 @@ func register(c *gin.Context) {
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User created successfully",
+	})
+	return
+}
+
+// ResetPasswordHandler
+// @Summary Resets password for the user
+// @Description Resets password for the user
+// @Tags auth
+// @Produce json
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /auth/reset-password [post]
+func resetPasswordHandler(c *gin.Context) {
+	newPass := c.PostForm("new_pass")
+
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: "Unauthorized user",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: "Unauthorized user",
+		})
+	}
+
+	authModel := auth.CreateModel(username, newPass, user.Role)
+
+	err = database.UpdateUser(&user, map[string]interface{}{"Password": authModel.Password, "Salt": authModel.Salt})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Password changed successfully",
 	})
 	return
 }
