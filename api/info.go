@@ -393,7 +393,8 @@ func userInfoHandler(c *gin.Context) {
 	for _, challenge := range challenges {
 		challNameString = append(challNameString, challenge.Name)
 	}
-	var userChallenges []ChallengeSolveResp
+
+	userChallenges := make([]ChallengeSolveResp, len(challenges))
 	for _, challenge := range challenges {
 		challResp := ChallengeSolveResp{
 			Id:       challenge.ID,
