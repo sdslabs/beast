@@ -74,7 +74,7 @@ func challengeInfoHandler(c *gin.Context) {
 		var challengeUser []UserSolveResp
 
 		for _, user := range users {
-			if user.Role != "author" {
+			if user.Role == core.USER_ROLES["contestant"] {
 				userResp := UserSolveResp{
 					UserID:   user.ID,
 					Username: user.Username,
@@ -141,7 +141,7 @@ func availableChallengeInfoHandler(c *gin.Context) {
 			var challengeUser []UserSolveResp
 
 			for _, user := range users {
-				if user.Role != "author" {
+				if user.Role == core.USER_ROLES["contestant"] {
 					userResp := UserSolveResp{
 						UserID:   user.ID,
 						Username: user.Username,
@@ -393,7 +393,8 @@ func userInfoHandler(c *gin.Context) {
 	for _, challenge := range challenges {
 		challNameString = append(challNameString, challenge.Name)
 	}
-	var userChallenges []ChallengeSolveResp
+
+	userChallenges := make([]ChallengeSolveResp, len(challenges))
 	for _, challenge := range challenges {
 		challResp := ChallengeSolveResp{
 			Id:       challenge.ID,
@@ -480,7 +481,7 @@ func submissionsHandler(c *gin.Context) {
 			return
 		}
 
-		if user.Role != "author" {
+		if user.Role == core.USER_ROLES["contestant"] {
 			challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, HTTPPlainResp{
