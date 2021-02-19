@@ -148,14 +148,14 @@ func login(c *gin.Context) {
 	userEntry, err := database.QueryFirstUserEntry("username", username)
 
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: err.Error(),
 		})
 		return
 	}
 
 	if userEntry.Status == 1 {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+		c.JSON(http.StatusForbidden, HTTPPlainResp{
 			Message: "The user has been banned from this competition. Please contact competition admin for more information",
 		})
 		return
