@@ -357,7 +357,7 @@ func copyAdditionalContextToStaging(fileCtx map[string]string, stagingDir string
 }
 
 // TODO: Refactor this.
-func updateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
+func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
 	// Challenge is nil, which means the challenge entry does not exist
 	// So create a new challenge entry on the basis of the fields provided
 	// in the config file for the challenge.
@@ -675,4 +675,60 @@ func CopyDir(src string, dst string) error {
 		}
 	}
 	return nil
+}
+
+func UpdateChallenges() {
+	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
+
+	for _, gitRemote := range cfg.Cfg.GitRemotes {
+		if gitRemote.Active != true {
+			continue
+		}
+
+		challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+		dirs := utils.GetAllDirectoriesName(challengeDir)
+		for _, dir := range dirs {
+
+			configFile := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
+			var config cfg.BeastChallengeConfig
+			_, err := toml.DecodeFile(configFile, &config)
+			if err != nil {
+				log.Errorf("Error while decoding challenge config file")
+				continue
+			}
+			challengeName := config.Challenge.Metadata.Name
+
+			err = config.ValidateRequiredFields(dir)
+			if err != nil {
+				log.Errorf("Error while validating required fields in the challenge directory %s : %s", challengeName, err)
+				continue
+			}
+
+			// Validate challenge directory name with the name of the challenge
+			// provided in the config file for the beast. There should be no
+			// conflict in the name.
+			if challengeName != config.Challenge.Metadata.Name {
+				log.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)",
+					challengeName,
+					config.Challenge.Metadata.Name)
+				continue
+			}
+
+			challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
+			if err != nil {
+				log.Errorf("Error while querying challenge %s : %s", config.Challenge.Metadata.Name, err)
+				continue
+			}
+
+			// Using the challenge dir we got, update the database entries for the challenge.
+			err = UpdateOrCreateChallengeDbEntry(&challenge, config)
+			if err != nil {
+				log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
+				log.Errorf("Db error : %s", err)
+				continue
+			}
+
+		}
+	}
+	log.Debugf("Challenges updated in Db")
 }
