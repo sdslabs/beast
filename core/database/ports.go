@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -31,15 +30,10 @@ func PortEntryGetOrCreate(port Port) (Port, error) {
 		return Port{}, fmt.Errorf("Error while starting transaction : %s", tx.Error)
 	}
 
-	err := tx.Where("port_no = ?", port.PortNo).First(&portEntry)
-
-	if !errors.Is(err.Error, gorm.ErrRecordNotFound) {
-		if err := tx.Create(&port).Error; err != nil {
-			tx.Rollback()
-			return Port{}, err
-		}
-
-		return port, tx.Commit().Error
+	err := tx.Where("port_no = ?", port.PortNo).FirstOrCreate(&portEntry).Error
+	if err != nil {
+		tx.Rollback()
+		return Port{}, err
 	}
 
 	if tx.Error != nil {
