@@ -69,7 +69,7 @@ func SyncBeastRemote() error {
 	}
 	log.Info("Beast git base synced with remote")
 	go config.UpdateUsedPortList()
-	UpdateChallenges()
+	go UpdateChallenges()
 	return fmt.Errorf(strings.Join(errStrings, "\n"))
 }
 
