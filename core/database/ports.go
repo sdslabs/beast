@@ -28,10 +28,14 @@ func PortEntryGetOrCreate(port *Port) (Port, error) {
 		return Port{}, fmt.Errorf("Error while starting transaction : %s", tx.Error)
 	}
 
-	err := tx.FirstOrCreate(port, *port).Error
+	err := tx.Where("port_no = ?", port.PortNo).FirstOrCreate(&portEntry).Error
 	if err != nil {
 		tx.Rollback()
 		return Port{}, err
+	}
+
+	if tx.Error != nil {
+		return Port{}, fmt.Errorf("Error while port get for check : %s", tx.Error)
 	}
 
 	return *port, tx.Commit().Error
