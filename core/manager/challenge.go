@@ -534,18 +534,21 @@ func undeployChallenge(challengeName string, purge bool) error {
 }
 
 func StartUndeployChallenge(challengeName string, purge bool) error {
+	var sendNotificationError error
 	err := undeployChallenge(challengeName, purge)
 	if err != nil {
 		msg := fmt.Sprintf("UNDEPLOY ERROR: %s : %s", challengeName, err)
 		log.Error(msg)
-		notify.SendNotification(notify.Error, msg)
+		sendNotificationError = notify.SendNotification(notify.Error, msg)
 	} else {
 		msg := fmt.Sprintf("UNDEPLOY SUCCESSFUL: %s", challengeName)
 		log.Info(msg)
-		notify.SendNotification(notify.Success, msg)
+		sendNotificationError = notify.SendNotification(notify.Success, msg)
 	}
 
-	log.Info("Notification for the event sent.")
+	if sendNotificationError == nil {
+		log.Info("Notification for the event sent.")
+	}
 	return err
 }
 

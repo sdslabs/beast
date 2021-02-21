@@ -466,7 +466,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			PortNo:      port,
 		}
 
-		gotPort, err := database.PortEntryGetOrCreate(portEntry)
+		gotPort, err := database.PortEntryGetOrCreate(&portEntry)
 		if err != nil {
 			return err
 		}
