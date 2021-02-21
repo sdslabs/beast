@@ -127,7 +127,7 @@ func emptyFunction(config *BeastBareDockerfile) {
 
 func getCommandAndModifierForWebChall(language, framework, webRoot, port string) (string, func(*BeastBareDockerfile)) {
 	commands := make([]string, 0)
-	commands = append(commands, fmt.Sprintf("cd %s", filepath.Join("/challenge", webRoot)))
+	commands = append(commands, fmt.Sprintf("cd %s", filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, webRoot)))
 
 	modifier := emptyFunction
 
@@ -137,7 +137,7 @@ func getCommandAndModifierForWebChall(language, framework, webRoot, port string)
 		case "apache":
 			modifier = func(config *BeastBareDockerfile) {
 				if _, ok := config.EnvironmentVariables["APACHE_DOCUMENT_ROOT"]; !ok {
-					config.EnvironmentVariables["APACHE_DOCUMENT_ROOT"] = filepath.Join("/challenge", webRoot)
+					config.EnvironmentVariables["APACHE_DOCUMENT_ROOT"] = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, webRoot)
 				}
 				setupCommands := make([]string, 0)
 				setupCommands = append(setupCommands, fmt.Sprintf("sed -ri -e 's!80!%v!g' /etc/apache2/ports.conf", port))
@@ -148,6 +148,26 @@ func getCommandAndModifierForWebChall(language, framework, webRoot, port string)
 				config.RunRoot = true
 			}
 			commands = append(commands, "docker-php-entrypoint apache2-foreground")
+		case "nginx":
+			modifier = func(config *BeastBareDockerfile) {
+				setupCommands := make([]string, 0)
+				setupCommands = append(setupCommands, "cp /usr/local/etc/php/php.ini-production /usr/local/etc/php/php.ini")
+				setupCommands = append(setupCommands, "sed -i -e 's!listen = 9000!listen = /var/run/php-fpm.sock!g' /usr/local/etc/php-fpm.d/zz-docker.conf")
+				setupCommands = append(setupCommands, "echo 'listen.mode = 0666' >> /usr/local/etc/php-fpm.d/zz-docker.conf")
+				setupCommands = append(setupCommands, fmt.Sprintf("sed -i -e 's!listen 80 default_server;!listen %v;!g' /etc/nginx/sites-available/default", port))
+				setupCommands = append(setupCommands, fmt.Sprintf("sed -i -e 's!listen [::]:80 default_server;!listen [::]:%v;!g' /etc/nginx/sites-available/default", port))
+				setupCommands = append(setupCommands, fmt.Sprintf("sed -i -e 's!root /var/www/html;!root %v;!g' /etc/nginx/sites-available/default", filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, webRoot)))
+				setupCommands = append(setupCommands, "sed -i -e 's!index index.html!index index.php index.html!g' /etc/nginx/sites-available/default")
+				setupCommands = append(setupCommands, `sed -i -e 's!#location ~ \\\\\\.php$ {!location ~ \\\\\\.php$ {include snippets/fastcgi-php.conf;fastcgi_pass unix:/var/run/php-fpm.sock;}!g' /etc/nginx/sites-available/default`)
+
+				config.SetupCommand = strings.Join(setupCommands, " && ")
+				config.AptDeps = config.AptDeps + " nginx"
+				config.RunRoot = true
+			}
+			commands = append(commands, "php-fpm -D")
+			commands = append(commands, "/etc/init.d/nginx start")
+			commands = append(commands, "exec tail -f /var/log/nginx/*")
+
 		default:
 			commands = append(commands, fmt.Sprintf("php -S 0.0.0.0:%v", port))
 		}
@@ -245,7 +265,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		baseImage = core.DEFAULT_BASE_IMAGE
 	}
 
-	log.Debugf("Command type inside root[true/false] %s", xinetdService)
+	log.Debugf("Command type inside root[true/false] %v", xinetdService)
 
 	if entrypoint != "" {
 		entrypoint = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, entrypoint)
@@ -266,8 +286,6 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	}
 
 	modifier(&data)
-
-	log.Error(data)
 
 	var dockerfile bytes.Buffer
 	log.Debugf("Preparing dockerfile template")

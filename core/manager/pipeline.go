@@ -130,9 +130,9 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	// Create logs directory for the challenge in staging directory.
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
 	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
-	if err != nil || buff == nil {
+	if err != nil {
 		log.Errorf("Could not create challenge logs directory : %s : %s", challengeStagingLogsDir, err)
-	} else {
+	} else if buff != nil {
 		logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
 		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 		if err != nil {

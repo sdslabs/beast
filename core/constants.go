@@ -137,12 +137,14 @@ var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 			"cli":     "php:7.1-cli",
 			"apache":  "php:7.1-apache",
 			"fpm":     "php:7.1-fpm",
+			"nginx":   "php:7.1-fpm",
 			"default": "php:7.1-cli",
 		},
 		"5.6": {
 			"cli":     "php:5.6-cli",
 			"apache":  "php:5.6-apache",
 			"fpm":     "php:5.6-fpm",
+			"nginx":   "php:5.6-fpm",
 			"default": "php:5.6-cli",
 		},
 		"default": {
