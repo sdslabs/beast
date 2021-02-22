@@ -470,7 +470,7 @@ func submissionsHandler(c *gin.Context) {
 		})
 		return
 	}
-	var submissionsResp []SubmissionResp
+	submissionsResp := make([]SubmissionResp, 0)
 
 	for _, submission := range submissions {
 		user, err := database.QueryUserById(submission.UserID)
