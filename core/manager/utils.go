@@ -687,6 +687,9 @@ func UpdateChallenges() {
 
 		challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
 		dirs := utils.GetAllDirectoriesName(challengeDir)
+		uploadedChalls := utils.GetAllDirectoriesName(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR))
+		dirs = append(dirs, uploadedChalls...)
+
 		for _, dir := range dirs {
 
 			configFile := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
