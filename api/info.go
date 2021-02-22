@@ -138,7 +138,7 @@ func availableChallengeInfoHandler(c *gin.Context) {
 			}
 
 			var challSolves int
-			var challengeUser []UserSolveResp
+			challengeUser := make([]UserSolveResp, 0)
 
 			for _, user := range users {
 				if user.Role == core.USER_ROLES["contestant"] {
