@@ -71,7 +71,12 @@ func challengeInfoHandler(c *gin.Context) {
 		}
 
 		var challSolves int
-		var challengeUser []UserSolveResp
+		challengeUser := make([]UserSolveResp, 0)
+
+		challengePorts := challenge.Ports
+		if len(challenge.Ports) == 0 {
+			challengePorts = make([]database.Port, 0)
+		}
 
 		for _, user := range users {
 			if user.Role == core.USER_ROLES["contestant"] {
@@ -91,7 +96,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Category:     challenge.Type,
 			CreatedAt:    challenge.CreatedAt,
 			Status:       challenge.Status,
-			Ports:        challenge.Ports,
+			Ports:        challengePorts,
 			Hints:        challenge.Hints,
 			Desc:         challenge.Description,
 			Points:       challenge.Points,
@@ -137,6 +142,11 @@ func availableChallengeInfoHandler(c *gin.Context) {
 				return
 			}
 
+			challengePorts := challenge.Ports
+			if len(challenge.Ports) == 0 {
+				challengePorts = make([]database.Port, 0)
+			}
+
 			var challSolves int
 			challengeUser := make([]UserSolveResp, 0)
 
@@ -158,7 +168,7 @@ func availableChallengeInfoHandler(c *gin.Context) {
 				Category:     challenge.Type,
 				CreatedAt:    challenge.CreatedAt,
 				Status:       challenge.Status,
-				Ports:        challenge.Ports,
+				Ports:        challengePorts,
 				Hints:        challenge.Hints,
 				Desc:         challenge.Description,
 				Points:       challenge.Points,

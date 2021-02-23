@@ -436,7 +436,7 @@ func manageUploadHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, ChallengePreviewResp{
 		Name:     config.Challenge.Metadata.Name,
-		Category: config.Challenge.Metadata.Tags,
+		Category: config.Challenge.Metadata.Type,
 		Ports:    config.Challenge.Env.Ports,
 		Hints:    config.Challenge.Metadata.Hints,
 		Desc:     config.Challenge.Metadata.Description,

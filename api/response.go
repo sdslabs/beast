@@ -110,7 +110,7 @@ type ChallengeInfoResp struct {
 
 type ChallengePreviewResp struct {
 	Name     string   `json:"name" example:"Web Challenge"`
-	Category []string `json:"category" example:"web"`
+	Category string   `json:"category" example:"web"`
 	Ports    []uint32 `json:"ports" example:[3001, 3002]`
 	Hints    []string `json:"hints" example:Try robots`
 	Desc     string   `json:"description" example:A simple web challenge`
