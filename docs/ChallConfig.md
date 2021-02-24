@@ -162,6 +162,25 @@ If you want to checkout some example challenge configuration, checkout `_example
 root of the repository. It has a bunch of challenge templates example to get started with. Pick one from 
 there and start building your own challenge.
 
+### Competition Info (required only for competition hosting purpose)
+
+This section contains information about the competition to be hosted
+
+Structure of the sections with the acceptable fields are:
+
+```toml
+# Required Fields
+name = "" # Name of the competition
+about = "" # About the competition
+starting_time = "" # Starting time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
+ending_time = "" # Ending time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
+timezone = "" # Time zone for reference in `Asia/Calcutta: UTC +05:30` format
+
+# Optional fields.
+prizes = "" # Prizes for the competition winners
+logo_url = "" # Absolute path of logo file. Default logo dir is in the "BEAST_GLOBAL_DIR/assets/"
+```
+
 ## Note
 
 We currently don't do automatic port management for challenge, it is mostly due to historic
