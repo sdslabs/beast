@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -378,6 +379,14 @@ func manageUploadHandler(c *gin.Context) {
 			Message: fmt.Sprintf("No file received from user"),
 		})
 		return
+	}
+
+	if err = utils.ValidateDirExists(core.BEAST_TEMP_DIR); err != nil {
+		if err := os.MkdirAll(core.BEAST_TEMP_DIR, 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("Could not create dir %s: %s", core.BEAST_TEMP_DIR, err),
+			})
+		}
 	}
 
 	tarContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
