@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,8 @@ func reloadBeastConfig(c *gin.Context) {
 }
 
 func updateCompetitionInfoHandler(c *gin.Context) {
+	var logoFilePath string
+
 	name := c.PostForm("name")
 	about := c.PostForm("about")
 	prizes := c.PostForm("prizes")
@@ -45,17 +48,40 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 	timezone := c.PostForm("timezone")
 	logo, err := c.FormFile("logo")
 
-	logoFilePath := ""
-
 	// The file cannot be received.
 	if err != nil {
 		log.Info("No file recieved from the user")
 	} else {
-		logoFilePath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, logo.Filename)
+		logoFilePath = filepath.Join(
+			core.BEAST_GLOBAL_DIR,
+			core.BEAST_ASSETS_DIR,
+			core.BEAST_LOGO_DIR,
+			logo.Filename,
+		)
+
+		competitionInfo, err := config.GetCompetitionInfo()
+		if err != nil {
+			log.Info("Unable to load previous config")
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("Unable to load previous config: %s", err),
+			})
+			return
+		}
+
+		// Delete previously uploaded logo file
+		if competitionInfo.LogoURL != "" {
+			if err := os.Remove(competitionInfo.LogoURL); err != nil {
+				log.Info("Unable to delete previous logo file")
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("Unable to delete previous logo file: %s", err),
+				})
+				return
+			}
+		}
 
 		// The file is received, save it
 		if err := c.SaveUploadedFile(logo, logoFilePath); err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: fmt.Sprintf("Unable to save file: %s", err),
 			})
 			return
