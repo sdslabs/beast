@@ -2,10 +2,13 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core"
 )
 
 func dummyHandler(c *gin.Context) {
@@ -35,6 +38,10 @@ func initGinRouter() *gin.Engine {
 	}
 
 	// For serving static files
+	router.Use(static.Serve("/api/info/logo", static.LocalFile(
+		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, core.BEAST_LOGO_DIR),
+		false)),
+	)
 	router.StaticFile("/api/info/logo", getLogoPath())
 	router.GET("/api/info/competition-info", competitionInfoHandler)
 

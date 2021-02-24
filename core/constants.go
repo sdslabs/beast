@@ -42,6 +42,7 @@ const ( //paths
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
 	BEAST_UPLOADS_DIR              string = "uploads"
 	BEAST_ASSETS_DIR               string = "assets"
+	BEAST_LOGO_DIR                 string = "logo"
 )
 
 const ( //chall types
