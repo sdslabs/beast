@@ -42,7 +42,7 @@ func usedPortsInfoHandler(c *gin.Context) {
 // @Success 200 {object} api.ChallengeInfoResp
 // @Router /api/info/challenge/info [post]
 func challengeInfoHandler(c *gin.Context) {
-	name := c.PostForm("name")
+	name := c.Param("name")
 	if name == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: fmt.Sprintf("Challenge name cannot be empty"),
@@ -119,7 +119,7 @@ func challengeInfoHandler(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.ChallengeInfoResp
-// @Router /api/info/available [post]
+// @Router /api/info/challenges [get]
 func availableChallengeInfoHandler(c *gin.Context) {
 	challenges, err := database.QueryAllChallenges()
 	if err != nil {
@@ -351,7 +351,7 @@ func availableChallengeHandler(c *gin.Context) {
 // @Router /api/info/user [post]
 func userInfoHandler(c *gin.Context) {
 	userId := c.PostForm("user_id")
-	username := c.PostForm("username")
+	username := c.Param("username")
 	if userId == "" && username == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: fmt.Sprintf("Both User Id and Username cannot be empty"),
