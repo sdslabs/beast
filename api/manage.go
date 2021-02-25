@@ -361,7 +361,8 @@ func manageScheduledAction(c *gin.Context) {
 
 // Prepare challenge info from .tar file.
 // @Summary Untar and fetch info from beast.toml file in challenge
-// @Description Handles the challenge management from a challenge in tar file
+// @Description Handles the challenge management from a challenge in tar file. Currently prepare the tar file
+// by running `tar cvf chall_dir.tar .` inside the chall_dir.
 // @Tags manage
 // @Accept  json
 // @Produce json
