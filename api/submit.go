@@ -16,8 +16,8 @@ import (
 // @Tags status
 // @Accept  json
 // @Produce json
-// @Param chall formData string "Name of challenge"
-// @Param flag formData string "Flag for the challenge"
+// @Param chall formData string true "Name of challenge"
+// @Param flag formData string true "Flag for the challenge"
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 401 {object} api.HTTPPlainResp
