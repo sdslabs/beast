@@ -3,7 +3,9 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
@@ -588,7 +590,7 @@ func competitionInfoHandler(c *gin.Context) {
 		StartingTime: competitionInfo.StartingTime,
 		EndingTime:   competitionInfo.EndingTime,
 		TimeZone:     competitionInfo.TimeZone,
-		LogoURL:      "/api/info/logo",
+		LogoURL:      strings.ReplaceAll(competitionInfo.LogoURL, filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, core.BEAST_LOGO_DIR), ""),
 	})
 	return
 }
