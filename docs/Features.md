@@ -17,7 +17,8 @@ We use containers as the atomic source of handle for each of our challenge. They
 environment for the challenges.
 
 * Currently only docker based container runtime support is available but we are extending to create a generalized
-container runtime interface implementation to support multiple providers similar to what kubernetes does.
+container runtime interface imThis also means your documentation can now easily stand on its own, without always
+plementation to support multiple providers similar to what kubernetes does.
 
 * Optionally security or sandboxing capabilities can be further enhanced by using more secure runtime like `runsc` in place
 of runc.
@@ -34,7 +35,7 @@ due to simplicity of configuration that the author goes through during challenge
 Configuration is even less of a pain due to great sensible defaults provided beast which works for most of the cases but are of
 course configurable.
 
-To know more about configuration parameters provided by beast move to [this section](ChallConfig)
+To know more about configuration parameters provided by beast move to [this section](ChallConfig.md)
 
 ### Testing Support
 

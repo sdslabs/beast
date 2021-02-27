@@ -9,7 +9,7 @@ of the environment in which the challenges are being deployed, docker provides u
 sandboxing we need with minimum overhead. There are more secure runtime like `runsc`(gVisor) which can 
 be used to improve the sandboxing capabilities of the containers.
 
-There are a lot of features that comes embedded with beast, take a look [here](Features)
+There are a lot of features that comes embedded with beast, take a look [here](Features.md)
 
 Beast comes in with an embedded web server which can be used as an interface for interacting with beast.
 The web server is built with gin framework and is very performant, to run the server with debugging mode on
@@ -21,7 +21,7 @@ beast run -v -p 3333
 
 To interact with beast you need to first authenticate yourself, currently this process is a little bit tedious since we
 don't currently have a strict database storing the details of our users. To check out how the authentication
-flow works for beast take a look [here](APIAuth)
+flow works for beast take a look [here](APIAuth.md)
 
 Once you have the authentication token with you all you need to do is Embed the token in Headers of your request as
 `Authorization: Bearer <token>`.
@@ -145,8 +145,8 @@ And that's it, we have our challenge ready to be deployed by beast.
 
 ## Deployment using beast
 
-We have our challenge ready with the required configuration. To deploy the challenge check out the Deployment flow [here](Deployment).
+We have our challenge ready with the required configuration. To deploy the challenge check out the Deployment flow [here](Deployment.md).
 
 ## Note
 
-* To know more about the environment configuration possiblities with beast head out to [this section](ChallConfig).
+* To know more about the environment configuration possiblities with beast head out to [this section](ChallConfig.md).
