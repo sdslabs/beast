@@ -382,7 +382,7 @@ func manageUploadHandler(c *gin.Context) {
 		return
 	}
 
-	if err = utils.ValidateDirExists(core.BEAST_TEMP_DIR); err != nil {
+	if err = utils.CreateIfNotExistDir(core.BEAST_TEMP_DIR); err != nil {
 		if err := os.MkdirAll(core.BEAST_TEMP_DIR, 0755); err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: fmt.Sprintf("Could not create dir %s: %s", core.BEAST_TEMP_DIR, err),
