@@ -18,6 +18,8 @@ Requests for beast API are split across five namespaces
 * **status**: Challenge status related APIs. Ex. Challenge status
 * **remote**: Beast remote repository related APIs. Ex. SyncRemote
 * **config**: Beast global configuration related APIs. Ex. Reload Config
+* **notification**: Competition notification related APIs. Ex. Add Notifications
+* **admin**: Competition related APIs requiring admin prevalages. Ex. Competition Stastics
 
 ### Manager
 

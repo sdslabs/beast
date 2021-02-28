@@ -19,6 +19,7 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "sample"
 flag = "CTF{sample_flag}"
 type = "service"
+points = 40
 
 [challenge.env]
 apt_deps = ["gcc", "socat"]
@@ -56,6 +57,7 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "docker-type"
 flag = "CTF{sample_flag}"
 type = "docker"
+points = 50
 
 [challenge.env]
 docker_context = "Dockerfile"
@@ -96,6 +98,7 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "static-challenge"
 flag = "CTF{sample_flag}"
 type = "static"
+points = 100
 ```
 
 In the above case all the files that are present in the challenge root are available for the player to download.

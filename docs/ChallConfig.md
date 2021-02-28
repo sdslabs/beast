@@ -75,6 +75,7 @@ description = "" # Descritption for the challenge.
 tags = ["", ""] # Tags that the challenge might belong to, used to do bulk query and handling eg. binary, misc etc.
 hints = ["", ""]
 sidecar = "" # Name of the sidecar if any used by the challenge.
+points = 0 # Points given to the player for correct flag submission. Default value is 0, if not mentioned in the challenge config file 
 ```
 
 ### Challenge Environment
@@ -162,28 +163,9 @@ If you want to checkout some example challenge configuration, checkout `_example
 root of the repository. It has a bunch of challenge templates example to get started with. Pick one from 
 there and start building your own challenge.
 
-### Competition Info (required only for competition hosting purpose)
-
-This section contains information about the competition to be hosted
-
-Structure of the sections with the acceptable fields are:
-
-```toml
-# Required Fields
-name = "" # Name of the competition
-about = "" # About the competition
-starting_time = "" # Starting time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
-ending_time = "" # Ending time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
-timezone = "" # Time zone for reference in `Asia/Calcutta: UTC +05:30` format
-
-# Optional fields.
-prizes = "" # Prizes for the competition winners
-logo_url = "" # Absolute path of logo file. Default logo dir is in the "BEAST_GLOBAL_DIR/assets/"
-```
-
 ## Note
 
 We currently don't do automatic port management for challenge, it is mostly due to historic
-reasons. Beast still handles challenge deployment for backdoor.sdslabs.co which has a different database
+reasons. Beast still handles challenge deployment for [Backdoor](https://backdoor.sdslabs.co/) which has a different database
 as that of beast and to have the port synced among these two database is not easy so for the initial
 milestone of beast we targatted static ports.

@@ -36,7 +36,6 @@ Once the public key is registered in the database, the user can get a JWT token 
     "challenge"	:	"Challenge String",
     "message"	:	"<solve message>"
 }
-
 ```
 
 * The challenge must be decrypted using *ssh private key* and then a POST request has to be made on URL: `/auth/<username>`along with POST form data: `decrmess=<decrypted message>`
@@ -44,9 +43,9 @@ Once the public key is registered in the database, the user can get a JWT token 
 ``` JSON
 {
     "token"    :	"YOUR_AUTHENTICATION_TOKEN",
+    "role"     :	"<User Role>",
     "message"  :	"<Usage message>"
 }
-
 ```
 
 * Now to access any restricted route you need to add this JWT token in the HTTP header as :

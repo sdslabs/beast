@@ -126,17 +126,33 @@ ssh_key = "/home/fristonio/.beast/secrets/key.priv"
 active = true
 
 # The following fields are required only while hosting a competition on beast
+# This section contains information about the competition to be hosted
+# Structure of the sections with the acceptable fields are:
+
+# Required Fields
 
 # Name of the competition
-name = "" # Name of the competition
+name = ""
 
-# Some information about the competition
-about = "" # About the competition
+# About the competition
+about = ""
 
-# Information about the timings of starting and ending of competition
-starting_time = "" # Starting time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
-ending_time = "" # Ending time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
-timezone = "" # Time zone for reference in `Asia/Calcutta: UTC +05:30` format
+# Starting time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
+starting_time = ""
+
+# Ending time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
+ending_time = ""
+
+# Time zone for reference in `Asia/Calcutta: UTC +05:30` format
+timezone = ""
+
+# Optional fields
+
+# Prizes for the competition winners
+prizes = ""
+
+# Absolute path of logo file. Default logo dir is in the "BEAST_GLOBAL_DIR/assets/"
+logo_url = ""
 ```
 
 Along with this configuration file we also need one more configuration file which is used by beast static content provider
@@ -190,7 +206,7 @@ The configuration directory structure of beast(`$HOME/.beast`) look something as
 ```
 
 ### Configuring frontend for competition hosting
- 
+
 Clone the [frontend repository](https://github.com/sdslabs/beast-frontend) and follow the setup instructions mentioned in its `README.md` file.
 
 ## Run
