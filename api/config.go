@@ -37,6 +37,23 @@ func reloadBeastConfig(c *gin.Context) {
 	})
 }
 
+// This updates competition info in the beast global configuration
+// @Summary Updates competition info in the beast global configuration, located at ~/.beast/config.toml.
+// @Description Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
+// @Tags config
+// @Accept  json
+// @Produce json
+// @Param name query string true "Competition Name"
+// @Param about query string true "Some information about competition"
+// @Param prizes query string false "Competitions Prizes for the winners"
+// @Param starting_time query string true "Competition's starting time"
+// @Param ending_time query string true "Competition's ending time"
+// @Param timezone query string true "Competition's timezone"
+// @Param logo query string false "Competition's logo"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/config/competition-info [post]
 func updateCompetitionInfoHandler(c *gin.Context) {
 	var logoFilePath string
 
