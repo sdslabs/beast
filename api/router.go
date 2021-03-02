@@ -42,7 +42,6 @@ func initGinRouter() *gin.Engine {
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, core.BEAST_LOGO_DIR),
 		false)),
 	)
-	router.StaticFile("/api/info/logo", getLogoPath())
 	router.GET("/api/info/competition-info", competitionInfoHandler)
 
 	// API routes group
