@@ -1,0 +1,1573 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Beast the automatic deployment tool for backdoor",
+        "title": "Beast API",
+        "contact": {
+            "name": "SDSLabs",
+            "url": "https://chat.sdslabs.co",
+            "email": "contact.sdslabs.co.in"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "beast.sdslabs.co",
+    "basePath": "/",
+    "paths": {
+        "/api/admin/statistics": {
+            "get": {
+                "description": "returns various information about the competition which are used to control competition",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "returns competition info",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CompetitionInfoResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "returns statistics of users in competition (currently limited to ban/unban status of users)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "statistics of users in competition",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.UserResp"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/:action/:id": {
+            "post": {
+                "description": "Ban/unban a user based on his user id. This operation can only be done by admins",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Ban/Unban a user based on his id and the action provided.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Action to perform ban/unban",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Id of user",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ChallengeStatusResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/config/reload/": {
+            "patch": {
+                "description": "Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "config"
+                ],
+                "summary": "Reloads any changes in beast global configuration, located at ~/.beast/config.toml.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/available": {
+            "post": {
+                "description": "Returns information about all the challenges present in the database.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Returns information about all challenges.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ChallengeInfoResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/challenge/info": {
+            "post": {
+                "description": "Returns all information about the challenges by the challenge name.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Returns all information about the challenges.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ChallengeInfoResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/challenges": {
+            "get": {
+                "description": "Returns all challenges available in the in the database that has a particular parameter same",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Gives all challenges available in the database that has a particular parameter same",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ChallengesResp"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/challenges/available": {
+            "get": {
+                "description": "Returns all challenges available in the in the remote directory",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Gives all challenges available in the remote directory",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ChallengesResp"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/images/available": {
+            "get": {
+                "description": "Returns all the available base images  which can be used for challenge creation as the base OS for challenge.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Gives all the base images that can be used while creating a beast challenge, this is a constant specified in beast global config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.AvailableImagesResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/logs": {
+            "get": {
+                "description": "Gives container logs for a particular challenge, useful for debugging purposes.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Handles route related to logs handling of container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "The name of the challenge to get the logs for.",
+                        "name": "challenge",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.LogsInfoResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/ports/used": {
+            "get": {
+                "description": "Returns the ports in use by beast, which cannot be used in creating a new challenge..",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Returns ports in use by beast by looking in the hack git repository, also returns min and max value of port allowed while specifying in beast challenge config.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.PortsInUseResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/user": {
+            "post": {
+                "description": "Returns user info based on userId",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Returns user info",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.UserResp"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/info/user/available": {
+            "get": {
+                "description": "Returns all available user's info",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Returns all user's info",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.UserResp"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/challenge/": {
+            "post": {
+                "description": "Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Handles challenge management actions.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the challenge to be managed, here name is the unique identifier for challenge",
+                        "name": "name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Action for the challenge",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/challenge/upload": {
+            "post": {
+                "description": "Handles the challenge management from a challenge in tar file. Currently prepare the tar file",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Untar and fetch info from beast.toml file in challenge",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": ".tar file to be uploaded to fetch challenge info",
+                        "name": "fileTar",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ChallengePreviewResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPErrorResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPErrorResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/commit/": {
+            "post": {
+                "description": "Validates challenge configuration for deployment.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Validates the configuration of the challenge and tells if challenge can be deployed or not.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the challenge to verify the deployment configuration for.",
+                        "name": "challenge",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPErrorResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/deploy/local": {
+            "post": {
+                "description": "Handles deployment of a challenge using the absolute directory path",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Deploy a local challenge using the path provided in the post parameter",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Challenge Directory",
+                        "name": "challenge_dir",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "406": {
+                        "description": "Not Acceptable",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/multiple/:action": {
+            "post": {
+                "description": "Handles challenge management routes for multiple the challenges with actions which includes - DEPLOY, UNDEPLOY.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Handles challenge management actions for multiple challenges.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Action for the challenge",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tag for a group of challenges",
+                        "name": "tag",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/schedule/:action": {
+            "post": {
+                "description": "Handles scheduleing of challenge action to executed at some later point of time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Schedule an action(deploy, undeploy, purge etc.) on a particular challenge",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Action for the underlying challenge in context",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "The name of the challenge to schedule the action for.",
+                        "name": "challenge",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tag corresponding to challenges in context, optional if challenge name is provided",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Timestamp at which the challenge should be scheduled should be a unix timestamp string.",
+                        "name": "at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Time after which the action on the selector should be executed should be of duration format as in '1m20s' etc.",
+                        "name": "after",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manage/static/:action": {
+            "post": {
+                "description": "Handles beast static content serving container routes.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manage"
+                ],
+                "summary": "Handles route related to beast static content serving container, takes action as route parameter and perform that action",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Action to apply on the beast static content provider",
+                        "name": "action",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/notification/add": {
+            "post": {
+                "description": "Adds notifications",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notification"
+                ],
+                "summary": "Adds notifications",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Title of notification to be added",
+                        "name": "title",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Description for the notification to be added",
+                        "name": "desc",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/notification/available": {
+            "post": {
+                "description": "Fetch all the notifications from database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notification"
+                ],
+                "summary": "Fetch available notifications",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/notification/delete": {
+            "post": {
+                "description": "Removes notifications",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notification"
+                ],
+                "summary": "Removes notifications",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Title of notification",
+                        "name": "title",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/notification/update": {
+            "post": {
+                "description": "Updates any changes in the notifications",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notification"
+                ],
+                "summary": "Updates notifications",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Title of notification",
+                        "name": "title",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Description for the notification to be changed",
+                        "name": "description",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/remote/reset/": {
+            "post": {
+                "description": "Resets local copy of remote git directory, it first deletes the existing directory and then clone from the remote again.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Resets beast local copy of remote git repository.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/remote/sync/": {
+            "post": {
+                "description": "Syncs beasts local challenges database with the remote git repository(hack) the local copy of the challenge database is located at $HOME/.beast/remote/$REMOTE_NAME.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Syncs beast's local copy of remote git repository for challenges.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/status/all/:filter": {
+            "get": {
+                "description": "This returns the challenges in the status provided, along with their name and last updated time.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Returns challenge deployment status from the beast database for the challenges which matches the stauts according to filter.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Status type to filter with, if none specified then all",
+                        "name": "filter",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ChallengeStatusResp"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/status/challenge/:name": {
+            "get": {
+                "description": "Returns challenge deployment status from the beast database, for those challenges which are not present a status value NA is returned.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Returns challenge deployment status from the beast database.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the challenge",
+                        "name": "name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ChallengeStatusResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/submit/challenge": {
+            "post": {
+                "description": "Returns success or error response based on the flag submitted. Also, the flag will not be submitted if it was previously submitted",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Verifies and creates an entry in the database for successful submission of flag for a challenge.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of challenge",
+                        "name": "chall",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Flag for the challenge",
+                        "name": "flag",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ChallengeStatusResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "JWT can be received by signing in",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Handles signin and token production",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPAuthorizeResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "description": "Signup route for the user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Signup for the user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "406": {
+                        "description": "Not Acceptable",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/reset-password": {
+            "post": {
+                "description": "Resets password for the user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Resets password for the user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.HTTPPlainResp"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.AvailableImagesResp": {
+            "type": "object",
+            "properties": {
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['ubuntu16.04'",
+                        " 'ubuntu18.04']"
+                    ]
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Available Base images."
+                }
+            }
+        },
+        "api.ChallengeInfoResp": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "example": "web"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "hints": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Web Challenge"
+                },
+                "points": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "solves": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.UserSolveResp"
+                    }
+                },
+                "solvesNumber": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "status": {
+                    "type": "string",
+                    "example": "deployed"
+                }
+            }
+        },
+        "api.ChallengePreviewResp": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "example": "web"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "hints": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Web Challenge"
+                },
+                "points": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "api.ChallengeSolveResp": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "example": "web"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Web Challenge"
+                },
+                "points": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "solvedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ChallengeStatusResp": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "Web Challenge"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "deployed"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2018-12-31T22:20:08.948096189+05:30"
+                }
+            }
+        },
+        "api.ChallengesResp": {
+            "type": "object",
+            "properties": {
+                "challenges": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.CompetitionInfoResp": {
+            "type": "object",
+            "properties": {
+                "about": {
+                    "type": "string",
+                    "example": "This is a CTF competition"
+                },
+                "ending_time": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "fristonio"
+                },
+                "prizes": {
+                    "type": "string",
+                    "example": "1st and 2nd place winners will get $10K"
+                },
+                "starting_time": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.HTTPAuthorizeResp": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Response message"
+                },
+                "role": {
+                    "type": "string",
+                    "example": "author"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "YOUR_AUTHENTICATION_TOKEN"
+                }
+            }
+        },
+        "api.HTTPErrorResp": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Error occured while veifying the challenge."
+                }
+            }
+        },
+        "api.HTTPPlainResp": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Messsage in response to your request"
+                }
+            }
+        },
+        "api.LogsInfoResp": {
+            "type": "object",
+            "properties": {
+                "stderr": {
+                    "type": "string",
+                    "example": "[ERROR] Challenge deployment failed."
+                },
+                "stdout": {
+                    "type": "string",
+                    "example": "[INFO] Challenge is starting to deploy"
+                }
+            }
+        },
+        "api.PortsInUseResp": {
+            "type": "object",
+            "properties": {
+                "port_max_value": {
+                    "type": "integer",
+                    "example": 20000
+                },
+                "port_min_value": {
+                    "type": "integer",
+                    "example": 10000
+                },
+                "ports_in_use": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "api.UserResp": {
+            "type": "object",
+            "properties": {
+                "challenges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ChallengeSolveResp"
+                    }
+                },
+                "email": {
+                    "type": "string",
+                    "example": "fristonio@gmail.com"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "rank": {
+                    "type": "integer",
+                    "example": 15
+                },
+                "role": {
+                    "type": "string",
+                    "example": "author"
+                },
+                "score": {
+                    "type": "integer",
+                    "example": 750
+                },
+                "status": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "username": {
+                    "type": "string",
+                    "example": "CTF is live now!"
+                }
+            }
+        },
+        "api.UserSolveResp": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "solvedAt": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "fristonio"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

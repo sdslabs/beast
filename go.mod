@@ -6,6 +6,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/alcortesm/tgz v0.0.0-20161220082320-9c5fe88206d7 // indirect
+	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 // indirect
 	github.com/containerd/containerd v1.3.4 // indirect
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect

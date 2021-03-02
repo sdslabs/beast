@@ -1,0 +1,1080 @@
+basePath: /
+definitions:
+  api.AvailableImagesResp:
+    properties:
+      images:
+        example:
+        - '[''ubuntu16.04'''
+        - ' ''ubuntu18.04'']'
+        items:
+          type: string
+        type: array
+      message:
+        example: Available Base images.
+        type: string
+    type: object
+  api.ChallengeInfoResp:
+    properties:
+      category:
+        example: web
+        type: string
+      createdAt:
+        type: string
+      description:
+        type: string
+      hints:
+        type: string
+      id:
+        type: integer
+      name:
+        example: Web Challenge
+        type: string
+      points:
+        example: 50
+        type: integer
+      ports:
+        items:
+          type: integer
+        type: array
+      solves:
+        items:
+          $ref: '#/definitions/api.UserSolveResp'
+        type: array
+      solvesNumber:
+        example: 100
+        type: integer
+      status:
+        example: deployed
+        type: string
+    type: object
+  api.ChallengePreviewResp:
+    properties:
+      category:
+        example: web
+        type: string
+      description:
+        type: string
+      hints:
+        items:
+          type: string
+        type: array
+      name:
+        example: Web Challenge
+        type: string
+      points:
+        example: 50
+        type: integer
+      ports:
+        items:
+          type: integer
+        type: array
+    type: object
+  api.ChallengeSolveResp:
+    properties:
+      category:
+        example: web
+        type: string
+      id:
+        example: 4
+        type: integer
+      name:
+        example: Web Challenge
+        type: string
+      points:
+        example: 50
+        type: integer
+      solvedAt:
+        type: string
+    type: object
+  api.ChallengeStatusResp:
+    properties:
+      name:
+        example: Web Challenge
+        type: string
+      status:
+        example: deployed
+        type: string
+      updated_at:
+        example: "2018-12-31T22:20:08.948096189+05:30"
+        type: string
+    type: object
+  api.ChallengesResp:
+    properties:
+      challenges:
+        items:
+          type: string
+        type: array
+      message:
+        type: string
+    type: object
+  api.CompetitionInfoResp:
+    properties:
+      about:
+        example: This is a CTF competition
+        type: string
+      ending_time:
+        type: string
+      logo_url:
+        type: string
+      name:
+        example: fristonio
+        type: string
+      prizes:
+        example: 1st and 2nd place winners will get $10K
+        type: string
+      starting_time:
+        type: string
+      timezone:
+        type: string
+    type: object
+  api.HTTPAuthorizeResp:
+    properties:
+      message:
+        example: Response message
+        type: string
+      role:
+        example: author
+        type: string
+      token:
+        example: YOUR_AUTHENTICATION_TOKEN
+        type: string
+    type: object
+  api.HTTPErrorResp:
+    properties:
+      error:
+        example: Error occured while veifying the challenge.
+        type: string
+    type: object
+  api.HTTPPlainResp:
+    properties:
+      message:
+        example: Messsage in response to your request
+        type: string
+    type: object
+  api.LogsInfoResp:
+    properties:
+      stderr:
+        example: '[ERROR] Challenge deployment failed.'
+        type: string
+      stdout:
+        example: '[INFO] Challenge is starting to deploy'
+        type: string
+    type: object
+  api.PortsInUseResp:
+    properties:
+      port_max_value:
+        example: 20000
+        type: integer
+      port_min_value:
+        example: 10000
+        type: integer
+      ports_in_use:
+        items:
+          type: integer
+        type: array
+    type: object
+  api.UserResp:
+    properties:
+      challenges:
+        items:
+          $ref: '#/definitions/api.ChallengeSolveResp'
+        type: array
+      email:
+        example: fristonio@gmail.com
+        type: string
+      id:
+        example: 5
+        type: integer
+      rank:
+        example: 15
+        type: integer
+      role:
+        example: author
+        type: string
+      score:
+        example: 750
+        type: integer
+      status:
+        example: 0
+        type: integer
+      username:
+        example: CTF is live now!
+        type: string
+    type: object
+  api.UserSolveResp:
+    properties:
+      id:
+        example: 5
+        type: integer
+      solvedAt:
+        type: string
+      username:
+        example: fristonio
+        type: string
+    type: object
+host: beast.sdslabs.co
+info:
+  contact:
+    email: contact.sdslabs.co.in
+    name: SDSLabs
+    url: https://chat.sdslabs.co
+  description: Beast the automatic deployment tool for backdoor
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Beast API
+  version: "1.0"
+paths:
+  /api/admin/statistics:
+    get:
+      consumes:
+      - application/json
+      description: returns various information about the competition which are used
+        to control competition
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CompetitionInfoResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: returns competition info
+      tags:
+      - info
+    post:
+      consumes:
+      - application/json
+      description: returns statistics of users in competition (currently limited to
+        ban/unban status of users)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.UserResp'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: statistics of users in competition
+      tags:
+      - info
+  /api/admin/users/:action/:id:
+    post:
+      consumes:
+      - application/json
+      description: Ban/unban a user based on his user id. This operation can only
+        be done by admins
+      parameters:
+      - description: Action to perform ban/unban
+        in: query
+        name: action
+        required: true
+        type: string
+      - description: Id of user
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengeStatusResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Ban/Unban a user based on his id and the action provided.
+      tags:
+      - status
+  /api/config/reload/:
+    patch:
+      consumes:
+      - application/json
+      description: Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
+      tags:
+      - config
+  /api/info/available:
+    post:
+      consumes:
+      - application/json
+      description: Returns information about all the challenges present in the database.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengeInfoResp'
+      summary: Returns information about all challenges.
+      tags:
+      - info
+  /api/info/challenge/info:
+    post:
+      consumes:
+      - application/json
+      description: Returns all information about the challenges by the challenge name.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengeInfoResp'
+      summary: Returns all information about the challenges.
+      tags:
+      - info
+  /api/info/challenges:
+    get:
+      consumes:
+      - application/json
+      description: Returns all challenges available in the in the database that has
+        a particular parameter same
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengesResp'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Gives all challenges available in the database that has a particular
+        parameter same
+      tags:
+      - info
+  /api/info/challenges/available:
+    get:
+      consumes:
+      - application/json
+      description: Returns all challenges available in the in the remote directory
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengesResp'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Gives all challenges available in the remote directory
+      tags:
+      - info
+  /api/info/images/available:
+    get:
+      consumes:
+      - application/json
+      description: Returns all the available base images  which can be used for challenge
+        creation as the base OS for challenge.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.AvailableImagesResp'
+      summary: Gives all the base images that can be used while creating a beast challenge,
+        this is a constant specified in beast global config
+      tags:
+      - info
+  /api/info/logs:
+    get:
+      consumes:
+      - application/json
+      description: Gives container logs for a particular challenge, useful for debugging
+        purposes.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: The name of the challenge to get the logs for.
+        in: query
+        name: challenge
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LogsInfoResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Handles route related to logs handling of container
+      tags:
+      - info
+  /api/info/ports/used:
+    get:
+      consumes:
+      - application/json
+      description: Returns the ports in use by beast, which cannot be used in creating
+        a new challenge..
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.PortsInUseResp'
+      summary: Returns ports in use by beast by looking in the hack git repository,
+        also returns min and max value of port allowed while specifying in beast challenge
+        config.
+      tags:
+      - info
+  /api/info/user:
+    post:
+      consumes:
+      - application/json
+      description: Returns user info based on userId
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.UserResp'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Returns user info
+      tags:
+      - info
+  /api/info/user/available:
+    get:
+      consumes:
+      - application/json
+      description: Returns all available user's info
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.UserResp'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Returns all user's info
+      tags:
+      - info
+  /api/manage/challenge/:
+    post:
+      consumes:
+      - application/json
+      description: Handles challenge management routes with actions which includes
+        - DEPLOY, UNDEPLOY, PURGE.
+      parameters:
+      - description: Name of the challenge to be managed, here name is the unique
+          identifier for challenge
+        in: query
+        name: name
+        required: true
+        type: string
+      - description: Action for the challenge
+        in: query
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Handles challenge management actions.
+      tags:
+      - manage
+  /api/manage/challenge/upload:
+    post:
+      consumes:
+      - application/json
+      description: Handles the challenge management from a challenge in tar file.
+        Currently prepare the tar file
+      parameters:
+      - description: .tar file to be uploaded to fetch challenge info
+        in: formData
+        name: fileTar
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengePreviewResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Untar and fetch info from beast.toml file in challenge
+      tags:
+      - manage
+  /api/manage/commit/:
+    post:
+      consumes:
+      - application/json
+      description: Validates challenge configuration for deployment.
+      parameters:
+      - description: Name of the challenge to verify the deployment configuration
+          for.
+        in: query
+        name: challenge
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Validates the configuration of the challenge and tells if challenge
+        can be deployed or not.
+      tags:
+      - manage
+  /api/manage/deploy/local:
+    post:
+      consumes:
+      - application/json
+      description: Handles deployment of a challenge using the absolute directory
+        path
+      parameters:
+      - description: Challenge Directory
+        in: query
+        name: challenge_dir
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Deploy a local challenge using the path provided in the post parameter
+      tags:
+      - manage
+  /api/manage/multiple/:action:
+    post:
+      consumes:
+      - application/json
+      description: Handles challenge management routes for multiple the challenges
+        with actions which includes - DEPLOY, UNDEPLOY.
+      parameters:
+      - description: Action for the challenge
+        in: query
+        name: action
+        required: true
+        type: string
+      - description: Tag for a group of challenges
+        in: query
+        name: tag
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Handles challenge management actions for multiple challenges.
+      tags:
+      - manage
+  /api/manage/schedule/:action:
+    post:
+      consumes:
+      - application/json
+      description: Handles scheduleing of challenge action to executed at some later
+        point of time
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Action for the underlying challenge in context
+        in: query
+        name: action
+        required: true
+        type: string
+      - description: The name of the challenge to schedule the action for.
+        in: query
+        name: challenge
+        type: string
+      - description: Tag corresponding to challenges in context, optional if challenge
+          name is provided
+        in: query
+        name: tags
+        type: string
+      - description: Timestamp at which the challenge should be scheduled should be
+          a unix timestamp string.
+        in: query
+        name: at
+        type: string
+      - description: Time after which the action on the selector should be executed
+          should be of duration format as in '1m20s' etc.
+        in: query
+        name: after
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Schedule an action(deploy, undeploy, purge etc.) on a particular challenge
+      tags:
+      - manage
+  /api/manage/static/:action:
+    post:
+      consumes:
+      - application/json
+      description: Handles beast static content serving container routes.
+      parameters:
+      - description: Action to apply on the beast static content provider
+        in: query
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Handles route related to beast static content serving container, takes
+        action as route parameter and perform that action
+      tags:
+      - manage
+  /api/notification/add:
+    post:
+      consumes:
+      - application/json
+      description: Adds notifications
+      parameters:
+      - description: Title of notification to be added
+        in: query
+        name: title
+        required: true
+        type: string
+      - description: Description for the notification to be added
+        in: query
+        name: desc
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Adds notifications
+      tags:
+      - notification
+  /api/notification/available:
+    post:
+      consumes:
+      - application/json
+      description: Fetch all the notifications from database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Fetch available notifications
+      tags:
+      - notification
+  /api/notification/delete:
+    post:
+      consumes:
+      - application/json
+      description: Removes notifications
+      parameters:
+      - description: Title of notification
+        in: query
+        name: title
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Removes notifications
+      tags:
+      - notification
+  /api/notification/update:
+    post:
+      consumes:
+      - application/json
+      description: Updates any changes in the notifications
+      parameters:
+      - description: Title of notification
+        in: query
+        name: title
+        required: true
+        type: string
+      - description: Description for the notification to be changed
+        in: query
+        name: description
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Updates notifications
+      tags:
+      - notification
+  /api/remote/reset/:
+    post:
+      consumes:
+      - application/json
+      description: Resets local copy of remote git directory, it first deletes the
+        existing directory and then clone from the remote again.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Resets beast local copy of remote git repository.
+  /api/remote/sync/:
+    post:
+      consumes:
+      - application/json
+      description: Syncs beasts local challenges database with the remote git repository(hack)
+        the local copy of the challenge database is located at $HOME/.beast/remote/$REMOTE_NAME.
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Syncs beast's local copy of remote git repository for challenges.
+  /api/status/all/:filter:
+    get:
+      consumes:
+      - application/json
+      description: This returns the challenges in the status provided, along with
+        their name and last updated time.
+      parameters:
+      - description: Status type to filter with, if none specified then all
+        in: query
+        name: filter
+        required: true
+        type: string
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ChallengeStatusResp'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Returns challenge deployment status from the beast database for the
+        challenges which matches the stauts according to filter.
+      tags:
+      - status
+  /api/status/challenge/:name:
+    get:
+      consumes:
+      - application/json
+      description: Returns challenge deployment status from the beast database, for
+        those challenges which are not present a status value NA is returned.
+      parameters:
+      - description: Name of the challenge
+        in: query
+        name: name
+        required: true
+        type: string
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengeStatusResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Returns challenge deployment status from the beast database.
+      tags:
+      - status
+  /api/submit/challenge:
+    post:
+      consumes:
+      - application/json
+      description: Returns success or error response based on the flag submitted.
+        Also, the flag will not be submitted if it was previously submitted
+      parameters:
+      - description: Name of challenge
+        in: formData
+        name: chall
+        required: true
+        type: string
+      - description: Flag for the challenge
+        in: formData
+        name: flag
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengeStatusResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Verifies and creates an entry in the database for successful submission
+        of flag for a challenge.
+      tags:
+      - status
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: JWT can be received by signing in
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPAuthorizeResp'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Handles signin and token production
+      tags:
+      - auth
+  /auth/register:
+    post:
+      description: Signup route for the user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Signup for the user
+      tags:
+      - auth
+  /auth/reset-password:
+    post:
+      description: Resets password for the user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Resets password for the user
+      tags:
+      - auth
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
