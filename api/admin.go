@@ -16,8 +16,8 @@ import (
 // @Tags status
 // @Accept  json
 // @Produce json
-// @Param action param "Action to perform (ban/unban)"
-// @Param id param "Id of user"
+// @Param action query string true "Action to perform ban/unban"
+// @Param id query string true "Id of user"
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp

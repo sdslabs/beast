@@ -26,7 +26,7 @@ type AvailableImagesResp struct {
 type PortsInUseResp struct {
 	MinPortValue uint32   `json:"port_min_value" example:"10000"`
 	MaxPortValue uint32   `json:"port_max_value" example:"20000"`
-	PortsInUse   []uint32 `json:"ports_in_use" example:"[10000, 100001, 100003, 10010]"`
+	PortsInUse   []uint32 `json:"ports_in_use" example:[100001, 100003, 10010]`
 }
 
 type ChallengeStatusResp struct {

@@ -4,17 +4,17 @@ This directory contains documentation related to beast and will guide you throug
 
 ## Index
 
-* [Usage](Usage)
-* [Setup](Setup)
-* [Getting Started](GettingStarted)
-* [Features](Features)
-* [Architecture](Architecture)
-* [Authentication Flow](APIAuth)
-* [Challenge Types](ChallTypes)
-* [Challenge Configuration](ChallConfig)
-* [Sample Challenges](SampleChallenges)
-* [Deployment](Deployment)
-* [Sidecars](Sidecars)
+* [Usage](Usage.md)
+* [Setup](Setup.md)
+* [Getting Started](GettingStarted.md)
+* [Features](Features.md)
+* [Architecture](Architecture.md)
+* [Authentication Flow](APIAuth.md)
+* [Challenge Types](ChallTypes.md)
+* [Challenge Configuration](ChallConfig.md)
+* [Sample Challenges](SampleChallenges.md)
+* [Deployment](Deployment.md)
+* [Sidecars](Sidecars.md)
 
 
 ## Intro

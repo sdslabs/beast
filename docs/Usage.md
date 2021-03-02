@@ -28,7 +28,7 @@ $ beast run -v -n
 
 To interact with beast API server you can look at the swagger API documentation hosted on beast itself. Navigate to http://localhost:5005/api/docs/index.html to get a detail of available endpoints.
 
-To be able to interact with the REST API interface you should be authorized by beast, go to [Authentication Section](/APIAuth) to know about the flow of authentication.
+To be able to interact with the REST API interface you should be authorized by beast, go to [Authentication Section](/APIAuth.md) to know about the flow of authentication.
 
 ## Examples
 

@@ -6,12 +6,12 @@ Move over to any of the below pages to know more about beast.
 
 ## Index
 
-* [Usage](/Usage)
-* [Setup](/Setup)
-* [Getting Started](/GettingStarted)
-* [Features](/Features)
-* [Architecture](/Architecture)
-* [Authentication Flow](/APIAuth)
-* [Challenge Configuration](/ChallConfig)
-* [Deployment](/Deployment)
-* [Sidecars](/Sidecars)
+* [Usage](/Usage.md)
+* [Setup](/Setup.md)
+* [Getting Started](/GettingStarted.md)
+* [Features](/Features.md)
+* [Architecture](/Architecture.md)
+* [Authentication Flow](/APIAuth.md)
+* [Challenge Configuration](/ChallConfig.md)
+* [Deployment](/Deployment.md)
+* [Sidecars](/Sidecars.md)

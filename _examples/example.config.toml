@@ -18,7 +18,6 @@
 # Make sure key.pub is added to the deployed keys of the beast remote repo
 
 # scripts_dir = "/home/vsts/.beast/scripts"
-# slack_webhook = ""
 available_sidecars = ["mysql"]
 jwt_secret = "beast"
 allowed_base_images = ["ubuntu:16.04", "php:7.1-cli"]

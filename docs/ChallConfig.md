@@ -75,6 +75,7 @@ description = "" # Descritption for the challenge.
 tags = ["", ""] # Tags that the challenge might belong to, used to do bulk query and handling eg. binary, misc etc.
 hints = ["", ""]
 sidecar = "" # Name of the sidecar if any used by the challenge.
+points = 0 # Points given to the player for correct flag submission. Default value is 0, if not mentioned in the challenge config file 
 ```
 
 ### Challenge Environment
@@ -165,6 +166,6 @@ there and start building your own challenge.
 ## Note
 
 We currently don't do automatic port management for challenge, it is mostly due to historic
-reasons. Beast still handles challenge deployment for backdoor.sdslabs.co which has a different database
+reasons. Beast still handles challenge deployment for [Backdoor](https://backdoor.sdslabs.co/) which has a different database
 as that of beast and to have the port synced among these two database is not easy so for the initial
 milestone of beast we targatted static ports.

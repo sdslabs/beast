@@ -6,10 +6,10 @@ Beast compiles to a single Golang binary which can be used anywhere.
 
 To build beast from source follow the instruction below
 
-* Make sure you have docker and golang installed in your system and have it in `$PATH`
+- Make sure you have docker and golang installed in your system and have it in `$PATH`
 
 ```bash
-$ mkdir -p $GOPATH/src/github.com/sdslabs/ 
+$ mkdir -p $GOPATH/src/github.com/sdslabs/
 
 $ git clone https://github.com/sdslabs/beastv4 $GOPATH/src/github.com/sdslabs/beastv4
 
@@ -19,7 +19,7 @@ $ cd $GOPATH/src/github.com/sdslabs/beastv4
 $ make build
 
 # Build additional tooling required with beast.
-$ make tools 
+$ make tools
 ```
 
 Building beast with above method will copy the beast binary to `$GOBIN` so make sure that it is in your `$PATH`
@@ -84,11 +84,11 @@ url = ""
 # The service name to be used. It can be `discord` and `slack`
 service_name = "discord"
 
-# Status of webhook URL to be used. 
+# Status of webhook URL to be used.
 # If it is false then notification will not be sent on this URL
 active = true
 
-# The sidecar that we support with beast, currently we only support two MySQL and 
+# The sidecar that we support with beast, currently we only support two MySQL and
 # MongoDB.
 available_sidecars = ["mysql", "mongodb"]
 
@@ -98,7 +98,7 @@ available_sidecars = ["mysql", "mongodb"]
 ticker_frequency = 3000
 
 
-# Container default resource limits for each challenge, this can be 
+# Container default resource limits for each challenge, this can be
 # Overridden by challenge configuration beast.toml file.
 default_cpu_shares = 1024
 default_memory_limit = 1024
@@ -124,12 +124,41 @@ ssh_key = "/home/fristonio/.beast/secrets/key.priv"
 # Status of remote git repository URL to be used
 # If it is set to false then that remote git repository will not be used
 active = true
+
+# The following fields are required only while hosting a competition on beast
+# This section contains information about the competition to be hosted
+# Structure of the sections with the acceptable fields are:
+
+# Required Fields
+
+# Name of the competition
+name = ""
+
+# About the competition
+about = ""
+
+# Starting time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
+starting_time = ""
+
+# Ending time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
+ending_time = ""
+
+# Time zone for reference in `Asia/Calcutta: UTC +05:30` format
+timezone = ""
+
+# Optional fields
+
+# Prizes for the competition winners
+prizes = ""
+
+# Absolute path of logo file. Default logo dir is in the "BEAST_GLOBAL_DIR/assets/"
+logo_url = ""
 ```
 
 Along with this configuration file we also need one more configuration file which is used by beast static content provider
 and protects some routes for the same.
 
-The file is located at `$HOME/.beast/.static.beast.htpasswd` and is generated using `htpasswd` utility. To generate this file 
+The file is located at `$HOME/.beast/.static.beast.htpasswd` and is generated using `htpasswd` utility. To generate this file
 use the below command.
 
 ```bash
@@ -142,32 +171,43 @@ New Password: <Type the password>
 The configuration directory structure of beast(`$HOME/.beast`) look something as below:
 
 ```
-.beast/                                                                                         
-├── authorized_keys_file                                                                                           
-├── beast.db                                                                                
-├── config.toml                                                                                 
-├── hack-secrets                                                                                
-│   ├── id_rsa                                                                            
-│   └── id_rsa.pub                                                                               
-├── remote                                                                           
-│   └── hack-test                                          
-│       └── challenges                                     
-│           └── MIGHTY-PHP                                 
+.beast/
+├── assets
+│   └── logo.png
+├── authorized_keys_file
+├── beast.db
+├── config.toml
+├── hack-secrets
+│   ├── id_rsa
+│   └── id_rsa.pub
+├── remote
+│   └── hack-test
+│       └── challenges
+│           └── MIGHTY-PHP
 │               ├── beast.toml
-│               └── challenge                              
+│               └── challenge
 │                   └── flag.php
 ├── scripts
 │   └── 043a6aa3658c08c85d64321d986afbf69cb7ad345f16fe8aa0368ee6478f6e24
 ├
-└── staging
-    └── MIGHTY-PHP
-        ├── beast.toml
-        ├── Dockerfile
-        ├── logs
-        │   └── MIGHTY-PHP.20190609173618.log
-        ├── MIGHTY-PHP.tar.gz
-        └── static
+├── staging
+│   └── MIGHTY-PHP
+│       ├── beast.toml
+│       ├── Dockerfile
+│       ├── logs
+│       │   └── MIGHTY-PHP.20190609173618.log
+│       ├── MIGHTY-PHP.tar.gz
+│       └── static
+├── uploads
+│   └── MIGHTY-GO
+│       ├── beast.toml
+│       └── challenge
+│           └── flag.go
 ```
+
+### Configuring frontend for competition hosting
+
+Clone the [frontend repository](https://github.com/sdslabs/beast-frontend) and follow the setup instructions mentioned in its `README.md` file.
 
 ## Run
 
@@ -182,5 +222,5 @@ The whole swagger API documentation for the REST API can be found at the `http:/
 
 ## Note
 
-* Make sure all the secrets/passwords you are using are strong enough. Also, make sure that the static content provider endpoint
-is HTTPS protected.
+- Make sure all the secrets/passwords you are using are strong enough. Also, make sure that the static content provider endpoint
+  is HTTPS protected.
