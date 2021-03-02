@@ -64,8 +64,6 @@ environments.
 
 - Support for various notification channels like slack, discord.
 
-- Compatibility with Linux, Windows, MacOS, FreeBSD and OpenBSD
-
 - Everything embedded to a single go binary which can be easily used anywhere.
 
 - Extensible and flexible structure for easier development and feature introduction, some features we are exploring to support

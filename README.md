@@ -23,7 +23,6 @@ Beast is a service that runs on your host(maybe a bare metal server or a cloud i
   static content through a single interface.
 - Use of sidecar mechanism for stateful workloads which can be shared by multiple challenges at once, MySQL for example.
 - Support for various notification channels like slack, discord.
-- Compatibility with Linux, Windows, MacOS, FreeBSD and OpenBSD.
 - Everything embedded to a single go binary which can be easily used anywhere.
 
 For more details on the features, refer to [Features](./docs/Features.md)
@@ -138,7 +137,7 @@ The design documentation for the new Beast can be found [here](https://docs.goog
 We are always open for contributions. If you find any feature missing, or just want to report a bug, feel free to open an issue and/or submit a pull request regarding the same.
 
 For more information on contribution, check out our
-[docs](https://kiwi.sdslabs.co/docs/contribution-guide.html).
+[docs](./docs/contribution.md).
 
 ## Contact
 
