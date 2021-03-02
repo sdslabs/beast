@@ -2,21 +2,21 @@
 
 ![Beast Logo](./docs/res/beast-logo.png)
 
-> An automatic deployment and management tool for CTF challenges
+> Jeopardy-style CTF challenge deployment and management tool.
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/bea0e0b4-30e1-4830-ba98-e484b51e4036/deploy-status)](https://app.netlify.com/sites/beast-docs-sdslabs/deploys) [![Build Status](https://dev.azure.com/deepshpathak/deepshpathak/_apis/build/status/sdslabs.beastv4?branchName=master)](https://dev.azure.com/deepshpathak/deepshpathak/_build/latest?definitionId=1&branchName=master) [![Apache License](https://img.shields.io/badge/license-Apache-blue.svg)](https://github.com/sdslabs/beastv4/blob/master/LICENSE.md)
 
 ## Overview
 
-Beast is a service that runs on your host(may be a bare metal server or a cloud instance) and helps in the mangement of deployment, lifecycle and health check of CTF challenges. Beast is created to automate and ease the deployment procedure of challenges for a Jeopardy style CTF competition.
+Beast is a service that runs on your host(maybe a bare metal server or a cloud instance) and helps manage deployment, lifecycle, and health check of CTF challenges. It can also be used to host Jeopardy-style CTF competition.
 
 ## Features
 
 - Git based source of truth.
 - Container based isolation
 - Easy configuration
-- Testing and SSH support for challenge instances
-- Web and command line interface to perform actions and host competitions
+- SSH support for challenge instances
+- Command line interface to perform actions and host competitions
 - REST API interface for the entire ecosystem
 - An optional automated health check service to periodically check the status of challenges and report if there is some sort of problem with one.
 - Single source of truth for all the static content related to all the challenges making it easy to debug, monitor and manage
