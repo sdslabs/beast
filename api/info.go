@@ -583,6 +583,7 @@ func competitionInfoHandler(c *gin.Context) {
 		return
 	}
 
+	logoPath := strings.ReplaceAll(competitionInfo.LogoURL, filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, core.BEAST_LOGO_DIR), "")
 	c.JSON(http.StatusOK, CompetitionInfoResp{
 		Name:         competitionInfo.Name,
 		About:        competitionInfo.About,
@@ -590,7 +591,7 @@ func competitionInfoHandler(c *gin.Context) {
 		StartingTime: competitionInfo.StartingTime,
 		EndingTime:   competitionInfo.EndingTime,
 		TimeZone:     competitionInfo.TimeZone,
-		LogoURL:      strings.ReplaceAll(competitionInfo.LogoURL, filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, core.BEAST_LOGO_DIR), ""),
+		LogoURL:      strings.Trim(logoPath, "/"),
 	})
 	return
 }
