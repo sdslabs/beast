@@ -10,7 +10,6 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
-	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -40,7 +39,7 @@ func usedPortsInfoHandler(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.ChallengeInfoResp
-// @Router /api/info/challenge/info [post]
+// @Router /api/info/challenge/info [get]
 func challengeInfoHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
@@ -111,72 +110,107 @@ func challengeInfoHandler(c *gin.Context) {
 	return
 }
 
-// Returns information about all challenges
-// @Summary Returns information about all challenges.
-// @Description Returns information about all the challenges present in the database.
+// Returns information about all challenges with and without filters
+// @Summary Returns information about all challenges with and without filters.
+// @Description Returns information about all the challenges present in the database with and without filters.
 // @Tags info
+// @Param filter query string false "Filter parameter by which challenges are filtered"
+// @Param value query string false "Value of filtered parameter"
 // @Accept  json
 // @Produce json
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.ChallengeInfoResp
 // @Router /api/info/challenges [get]
-func availableChallengeInfoHandler(c *gin.Context) {
-	challenges, err := database.QueryAllChallenges()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
-		})
-		return
+func challengesInfoHandler(c *gin.Context) {
+	filter := c.Query("filter")
+	value := c.Query("value")
+
+	var challenges []database.Challenge
+	var err error
+	if value == "" || filter == "" {
+		challenges, err = database.QueryAllChallenges()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: err.Error(),
+			})
+			return
+		}
+		if challenges == nil {
+			c.JSON(http.StatusOK, HTTPPlainResp{
+				Message: "No challenges currently in the database",
+			})
+			return
+		}
 	}
+
+	if filter == "name" || filter == "author" || filter == "score" {
+		challenges, err = database.QueryChallengeEntries(filter, value)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+		}
+	}
+
+	if filter == "tag" {
+		tag := database.Tag{
+			TagName: value,
+		}
+		challenges, err = database.QueryRelatedChallenges(&tag)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+		}
+	}
+
 	availableChallenges := make([]ChallengeInfoResp, len(challenges))
-	if len(challenges) > 0 {
-		for index, challenge := range challenges {
 
-			users, err := database.GetRelatedUsers(&challenge)
-			if err != nil {
-				log.Error(err)
-				c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-					Message: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
+	for index, challenge := range challenges {
+		users, err := database.GetRelatedUsers(&challenge)
+		if err != nil {
+			log.Error(err)
+			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+				Message: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
 
-			challengePorts := make([]uint32, len(challenge.Ports))
-			for index, port := range challenge.Ports {
-				challengePorts[index] = port.PortNo
-			}
+		challengePorts := make([]uint32, len(challenge.Ports))
+		for index, port := range challenge.Ports {
+			challengePorts[index] = port.PortNo
+		}
 
-			var challSolves int
-			challengeUser := make([]UserSolveResp, 0)
+		var challSolves int
+		challengeUser := make([]UserSolveResp, 0)
 
-			for _, user := range users {
-				if user.Role == core.USER_ROLES["contestant"] {
-					userResp := UserSolveResp{
-						UserID:   user.ID,
-						Username: user.Username,
-						SolvedAt: user.CreatedAt,
-					}
-					challengeUser = append(challengeUser, userResp)
-					challSolves++
+		for _, user := range users {
+			if user.Role == core.USER_ROLES["contestant"] {
+				userResp := UserSolveResp{
+					UserID:   user.ID,
+					Username: user.Username,
+					SolvedAt: user.CreatedAt,
 				}
-			}
-
-			availableChallenges[index] = ChallengeInfoResp{
-				Name:         challenge.Name,
-				ChallId:      challenge.ID,
-				Category:     challenge.Type,
-				CreatedAt:    challenge.CreatedAt,
-				Status:       challenge.Status,
-				Ports:        challengePorts,
-				Hints:        challenge.Hints,
-				Desc:         challenge.Description,
-				Points:       challenge.Points,
-				SolvesNumber: challSolves,
-				Solves:       challengeUser,
+				challengeUser = append(challengeUser, userResp)
+				challSolves++
 			}
 		}
 
+		availableChallenges[index] = ChallengeInfoResp{
+			Name:         challenge.Name,
+			ChallId:      challenge.ID,
+			Category:     challenge.Type,
+			CreatedAt:    challenge.CreatedAt,
+			Status:       challenge.Status,
+			Ports:        challengePorts,
+			Hints:        challenge.Hints,
+			Desc:         challenge.Description,
+			Points:       challenge.Points,
+			SolvesNumber: challSolves,
+			Solves:       challengeUser,
+		}
 	}
+
 	c.JSON(http.StatusOK, availableChallenges)
 	return
 }
@@ -227,115 +261,6 @@ func challengeLogsHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, LogsInfoResp{
 			Stdout: logs.Stdout,
 			Stderr: logs.Stderr,
-		})
-	}
-}
-
-// Returns available challenges from the database by filter
-// @Summary Gives all challenges available in the database that has a particular parameter same
-// @Description Returns all challenges available in the in the database that has a particular parameter same
-// @Tags info
-// @Accept json
-// @Produce json
-// @Success 200 {object} api.ChallengesResp
-// @Failure 402 {object} api.HTTPPlainResp
-// @Router /api/info/challenges [get]
-func challengesInfoHandler(c *gin.Context) {
-	filter := c.Query("filter")
-	value := c.Query("value")
-
-	if value == "" || filter == "" {
-		challenges, err := database.QueryAllChallenges()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, HTTPPlainResp{
-				Message: err.Error(),
-			})
-			return
-		} else if challenges == nil {
-			c.JSON(http.StatusOK, HTTPPlainResp{
-				Message: "No challenges currently in the database",
-			})
-			return
-		} else {
-			var challNameString []string
-			for _, challenge := range challenges {
-				challNameString = append(challNameString, challenge.Name)
-			}
-			c.JSON(http.StatusOK, ChallengesResp{
-				Message:    "All Challenges",
-				Challenges: challNameString,
-			})
-			return
-		}
-	}
-
-	var challenges []database.Challenge
-	var err error
-	if filter == "name" || filter == "author" || filter == "score" {
-		challenges, err = database.QueryChallengeEntries(filter, value)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while processing the request.",
-			})
-		} else {
-			var challNameString []string
-			for _, challenge := range challenges {
-				challNameString = append(challNameString, challenge.Name)
-			}
-			c.JSON(http.StatusOK, ChallengesResp{
-				Message:    "Challenges with " + filter + " = " + value,
-				Challenges: challNameString,
-			})
-		}
-	}
-
-	if filter == "tag" {
-		tag := database.Tag{
-			TagName: value,
-		}
-		challenges, err = database.QueryRelatedChallenges(&tag)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while processing the request.",
-			})
-		} else {
-			var challNameString []string
-			for _, challenge := range challenges {
-				challNameString = append(challNameString, challenge.Name)
-			}
-			c.JSON(http.StatusOK, ChallengesResp{
-				Message:    "Challenges with " + filter + " = " + value,
-				Challenges: challNameString,
-			})
-		}
-	}
-}
-
-// Returns available challenges from the remote directory
-// @Summary Gives all challenges available in the remote directory
-// @Description Returns all challenges available in the in the remote directory
-// @Tags info
-// @Accept json
-// @Produce json
-// @Success 200 {object} api.ChallengesResp
-// @Failure 402 {object} api.HTTPPlainResp
-// @Router /api/info/challenges/available [get]
-func availableChallengeHandler(c *gin.Context) {
-	challenges, err := manager.GetAvailableChallenges()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: err.Error(),
-		})
-		return
-	} else if challenges == nil {
-		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "No challenges currently in the database",
-		})
-		return
-	} else {
-		c.JSON(http.StatusOK, ChallengesResp{
-			Message:    "All Challenges",
-			Challenges: challenges,
 		})
 	}
 }
