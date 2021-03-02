@@ -471,6 +471,15 @@ func getAllUsersInfoHandler(c *gin.Context) {
 	return
 }
 
+// Handles submissions made by the user
+// @Summary Handles submissions made by the user
+// @Description Handles submissions made by the user
+// @Tags submissions
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.SubmissionResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /api/info/submissions [post]
 func submissionsHandler(c *gin.Context) {
 	submissions, err := database.QueryAllSubmissions()
 	if err != nil {
