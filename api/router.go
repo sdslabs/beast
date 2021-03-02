@@ -65,26 +65,24 @@ func initGinRouter() *gin.Engine {
 		// Info route group
 		infoGroup := apiGroup.Group("/info")
 		{
-			infoGroup.POST("/challenge/info", challengeInfoHandler)
-			infoGroup.POST("/available", availableChallengeInfoHandler)
+			infoGroup.GET("/challenge/:name", challengeInfoHandler)
+			infoGroup.GET("/challenges", challengesInfoHandler)
 			infoGroup.GET("/images/available", availableImagesHandler)
 			infoGroup.GET("/ports/used", usedPortsInfoHandler)
 			infoGroup.GET("/logs", challengeLogsHandler)
-			infoGroup.GET("/challenges", challengesInfoHandler)
-			infoGroup.GET("/challenges/available", availableChallengeHandler)
-			infoGroup.POST("/user", userInfoHandler)
-			infoGroup.GET("/user/available", getAllUsersInfoHandler)
-			infoGroup.POST("/submissions", submissionsHandler)
+			infoGroup.GET("/user/:username", userInfoHandler)
+			infoGroup.GET("/users", getAllUsersInfoHandler)
+			infoGroup.GET("/submissions", submissionsHandler)
 		}
 
 		// Notification route group
-		notificationGroup := apiGroup.Group("/notification")
+		notificationGroup := apiGroup.Group("/notification", adminAuthorize)
 		{
-			notificationGroup.POST("/add", adminAuthorize, addNotification)
-			notificationGroup.POST("/delete", adminAuthorize, removeNotification)
-			notificationGroup.POST("/update", adminAuthorize, updateNotifications)
-			notificationGroup.POST("/available", availableNotificationHandler)
+			notificationGroup.POST("/add", addNotification)
+			notificationGroup.PUT("/update", updateNotifications)
+			notificationGroup.DELETE("/delete", removeNotification)
 		}
+		notificationGroup.GET("/available", availableNotificationHandler)
 
 		remoteGroup := apiGroup.Group("/remote", adminAuthorize)
 		{
@@ -106,7 +104,7 @@ func initGinRouter() *gin.Engine {
 		adminPanelGroup := apiGroup.Group("/admin", adminAuthorize)
 		{
 			adminPanelGroup.POST("/users/:action/:id", banUserHandler)
-			adminPanelGroup.POST("/statistics", getUsersStatisticsHandler)
+			adminPanelGroup.GET("/statistics", getUsersStatisticsHandler)
 		}
 	}
 
