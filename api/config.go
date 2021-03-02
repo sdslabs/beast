@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +37,26 @@ func reloadBeastConfig(c *gin.Context) {
 	})
 }
 
+// This updates competition info in the beast global configuration
+// @Summary Updates competition info in the beast global configuration, located at ~/.beast/config.toml.
+// @Description Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
+// @Tags config
+// @Accept  json
+// @Produce json
+// @Param name query string true "Competition Name"
+// @Param about query string true "Some information about competition"
+// @Param prizes query string false "Competitions Prizes for the winners"
+// @Param starting_time query string true "Competition's starting time"
+// @Param ending_time query string true "Competition's ending time"
+// @Param timezone query string true "Competition's timezone"
+// @Param logo query string false "Competition's logo"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/config/competition-info [post]
 func updateCompetitionInfoHandler(c *gin.Context) {
+	var logoFilePath string
+
 	name := c.PostForm("name")
 	about := c.PostForm("about")
 	prizes := c.PostForm("prizes")
@@ -45,17 +65,40 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 	timezone := c.PostForm("timezone")
 	logo, err := c.FormFile("logo")
 
-	logoFilePath := ""
-
 	// The file cannot be received.
 	if err != nil {
 		log.Info("No file recieved from the user")
 	} else {
-		logoFilePath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, logo.Filename)
+		logoFilePath = filepath.Join(
+			core.BEAST_GLOBAL_DIR,
+			core.BEAST_ASSETS_DIR,
+			core.BEAST_LOGO_DIR,
+			logo.Filename,
+		)
+
+		competitionInfo, err := config.GetCompetitionInfo()
+		if err != nil {
+			log.Info("Unable to load previous config")
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("Unable to load previous config: %s", err),
+			})
+			return
+		}
+
+		// Delete previously uploaded logo file
+		if competitionInfo.LogoURL != "" {
+			if err := os.Remove(competitionInfo.LogoURL); err != nil {
+				log.Info("Unable to delete previous logo file")
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("Unable to delete previous logo file: %s", err),
+				})
+				return
+			}
+		}
 
 		// The file is received, save it
 		if err := c.SaveUploadedFile(logo, logoFilePath); err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: fmt.Sprintf("Unable to save file: %s", err),
 			})
 			return
