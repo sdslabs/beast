@@ -25,7 +25,7 @@ func GetUser(authHeader string) (string, error) {
 		return "", fmt.Errorf("Not a valid JWT token in authorization header: %s", jwtToken)
 	}
 
-	sDec, err := b64.StdEncoding.DecodeString(userInfoEncr[1])
+	sDec, err := b64.StdEncoding.WithPadding(b64.NoPadding).DecodeString(userInfoEncr[1])
 	if err != nil {
 		return "", fmt.Errorf("Error in decrypting JWT token: %s", err)
 	}

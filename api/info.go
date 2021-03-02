@@ -70,9 +70,13 @@ func challengeInfoHandler(c *gin.Context) {
 			return
 		}
 
-		var challSolves int
-		var challengeUser []UserSolveResp
+		challengePorts := make([]uint32, len(challenge.Ports))
+		for index, port := range challenge.Ports {
+			challengePorts[index] = port.PortNo
+		}
 
+		var challSolves int
+		challengeUser := make([]UserSolveResp, 0)
 		for _, user := range users {
 			if user.Role == core.USER_ROLES["contestant"] {
 				userResp := UserSolveResp{
@@ -91,7 +95,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Category:     challenge.Type,
 			CreatedAt:    challenge.CreatedAt,
 			Status:       challenge.Status,
-			Ports:        challenge.Ports,
+			Ports:        challengePorts,
 			Hints:        challenge.Hints,
 			Desc:         challenge.Description,
 			Points:       challenge.Points,
@@ -137,8 +141,13 @@ func availableChallengeInfoHandler(c *gin.Context) {
 				return
 			}
 
+			challengePorts := make([]uint32, len(challenge.Ports))
+			for index, port := range challenge.Ports {
+				challengePorts[index] = port.PortNo
+			}
+
 			var challSolves int
-			var challengeUser []UserSolveResp
+			challengeUser := make([]UserSolveResp, 0)
 
 			for _, user := range users {
 				if user.Role == core.USER_ROLES["contestant"] {
@@ -158,7 +167,7 @@ func availableChallengeInfoHandler(c *gin.Context) {
 				Category:     challenge.Type,
 				CreatedAt:    challenge.CreatedAt,
 				Status:       challenge.Status,
-				Ports:        challenge.Ports,
+				Ports:        challengePorts,
 				Hints:        challenge.Hints,
 				Desc:         challenge.Description,
 				Points:       challenge.Points,
@@ -395,7 +404,7 @@ func userInfoHandler(c *gin.Context) {
 	}
 
 	userChallenges := make([]ChallengeSolveResp, len(challenges))
-	for _, challenge := range challenges {
+	for index, challenge := range challenges {
 		challResp := ChallengeSolveResp{
 			Id:       challenge.ID,
 			Name:     challenge.Name,
@@ -403,7 +412,7 @@ func userInfoHandler(c *gin.Context) {
 			SolvedAt: challenge.CreatedAt,
 			Points:   challenge.Points,
 		}
-		userChallenges = append(userChallenges, challResp)
+		userChallenges[index] = challResp
 	}
 
 	rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
@@ -470,7 +479,7 @@ func submissionsHandler(c *gin.Context) {
 		})
 		return
 	}
-	var submissionsResp []SubmissionResp
+	submissionsResp := make([]SubmissionResp, 0)
 
 	for _, submission := range submissions {
 		user, err := database.QueryUserById(submission.UserID)

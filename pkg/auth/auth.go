@@ -19,7 +19,7 @@ var (
 )
 
 type AuthModel struct {
-	Username string `gorm:"not null";unique`
+	Username string `gorm:"not null;unique"`
 	Password []byte `gorm:"non null"`
 	Role     string `gorm:"non null"`
 	Salt     []byte

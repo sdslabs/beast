@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -360,7 +361,8 @@ func manageScheduledAction(c *gin.Context) {
 
 // Prepare challenge info from .tar file.
 // @Summary Untar and fetch info from beast.toml file in challenge
-// @Description Handles the challenge management from a challenge in tar file
+// @Description Handles the challenge management from a challenge in tar file. Currently prepare the tar file
+// by running `tar cvf chall_dir.tar .` inside the chall_dir.
 // @Tags manage
 // @Accept  json
 // @Produce json
@@ -378,6 +380,14 @@ func manageUploadHandler(c *gin.Context) {
 			Message: fmt.Sprintf("No file received from user"),
 		})
 		return
+	}
+
+	if err = utils.CreateIfNotExistDir(core.BEAST_TEMP_DIR); err != nil {
+		if err := os.MkdirAll(core.BEAST_TEMP_DIR, 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("Could not create dir %s: %s", core.BEAST_TEMP_DIR, err),
+			})
+		}
 	}
 
 	tarContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
@@ -436,7 +446,7 @@ func manageUploadHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, ChallengePreviewResp{
 		Name:     config.Challenge.Metadata.Name,
-		Category: config.Challenge.Metadata.Tags,
+		Category: config.Challenge.Metadata.Type,
 		Ports:    config.Challenge.Env.Ports,
 		Hints:    config.Challenge.Metadata.Hints,
 		Desc:     config.Challenge.Metadata.Description,

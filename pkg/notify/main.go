@@ -95,7 +95,7 @@ func SendNotification(nType NotificationType, message string) error {
 
 			url, err := url.ParseRequestURI(webhook.URL)
 			if url == nil || err != nil {
-				log.Error("Invalid notification webhook URL")
+				log.Info("Invalid notification webhook URL")
 				errs = append(errs, fmt.Sprintf("Invalid URL for notifier webhook %s", webhook.URL))
 				continue
 			}

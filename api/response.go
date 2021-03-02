@@ -2,8 +2,6 @@ package api
 
 import (
 	"time"
-
-	"github.com/sdslabs/beastv4/core/database"
 )
 
 type HTTPPlainResp struct {
@@ -100,7 +98,7 @@ type ChallengeInfoResp struct {
 	Category     string          `json:"category" example:"web"`
 	CreatedAt    time.Time       `json:"createdAt"`
 	Status       string          `json:"status" example:"deployed"`
-	Ports        []database.Port `json:"ports" example:[3001, 3002]`
+	Ports        []uint32        `json:"ports" example:[3001, 3002]`
 	Hints        string          `json:"hints" example:Try robots`
 	Desc         string          `json:"description" example:A simple web challenge`
 	Points       uint            `json:"points" example:"50"`
@@ -110,7 +108,7 @@ type ChallengeInfoResp struct {
 
 type ChallengePreviewResp struct {
 	Name     string   `json:"name" example:"Web Challenge"`
-	Category []string `json:"category" example:"web"`
+	Category string   `json:"category" example:"web"`
 	Ports    []uint32 `json:"ports" example:[3001, 3002]`
 	Hints    []string `json:"hints" example:Try robots`
 	Desc     string   `json:"description" example:A simple web challenge`

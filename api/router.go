@@ -34,6 +34,10 @@ func initGinRouter() *gin.Engine {
 		authGroup.POST("/reset-password", authorize, resetPasswordHandler)
 	}
 
+	// For serving static files
+	router.StaticFile("/api/info/logo", getLogoPath())
+	router.GET("/api/info/competition-info", competitionInfoHandler)
+
 	// API routes group
 	apiGroup := router.Group("/api", authorize)
 	{
@@ -71,9 +75,6 @@ func initGinRouter() *gin.Engine {
 			infoGroup.POST("/user", userInfoHandler)
 			infoGroup.GET("/user/available", getAllUsersInfoHandler)
 			infoGroup.POST("/submissions", submissionsHandler)
-			infoGroup.GET("/competition-info", competitionInfoHandler)
-			// For serving static files
-			infoGroup.StaticFile("/logo", getLogoPath())
 		}
 
 		// Notification route group
