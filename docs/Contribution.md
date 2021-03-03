@@ -5,11 +5,12 @@
 - [Coding Style Guide](#coding-style-guide)
 - [Pre-Commit](#pre-commit)
 - [Git Commit Message Format](#git-commit-message-format)
+- [Maintenance](#maintenance)
 
 ## Coding Style Guide
 
 Beast uses `logrus` for logging purposes and follows standard effective go guidelines. You can refer to [this guide](https://github.com/golang/go/wiki/CodeReviewComments)
-for more information. 
+for more information.
 
 ## Pre-Commit
 
@@ -61,3 +62,19 @@ The subject contains succinct description of the change:
 
 Just as in the **subject**, use the imperative, present tense: "change" not "changed" nor "changes"
 The body should include the motivation for the change, contrast this with previous behavior and testing steps.
+
+## Maintenance
+
+### Opening an Issue
+
+- Bug - Link the exact line where you found the bug or a way to reproduce the bug
+- Crash Bug - Provide the stack trace at the point where the crash happens
+- Convention Violation - Nomenclature inconsistency, class design inconsistency, unnecessary includes in headers
+- Maintenance - Issues related to maintenance practices
+- Proposal - State at least these 3 exact things in your proposal: Usage of feature, frequency of usage, and which part of codebase it goes in (helps in reviewing)
+
+### Opening a PR
+
+- 1 PR solves 1 issue (Not true in initial steps of any system but this will be valid eventually)
+- Github will tag the exact directories where you have made a change. Verify those
+- PRs should be reviewed in PR meetings only
