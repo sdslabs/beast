@@ -8,8 +8,8 @@
 
 - Automatic deployment of challenges by using a triggering pipeline in conjunction with beast web server, this can
   be configured in many ways:
-  - Execute a dry run on the challenge using beast.
-  - Using github webhook trigger deploy on beast when a challenge in pushed.
+    - Execute a dry run on the challenge using beast.
+    - Using github webhook trigger deploy on beast when a challenge in pushed.
 
 ### Container based Isolation
 
@@ -68,6 +68,6 @@ environments.
 
 - Extensible and flexible structure for easier development and feature introduction, some features we are exploring to support
   with beast are:
-  - Kubernetes(k8s or k3s) based control plane to manage the lifecycle of challenges.
-  - Multi server support.
-  - Dry run support to help locally support development of challenges.
+    - Kubernetes(k8s or k3s) based control plane to manage the lifecycle of challenges.
+    - Multi server support.
+    - Dry run support to help locally support development of challenges.
