@@ -98,15 +98,6 @@ definitions:
         example: "2018-12-31T22:20:08.948096189+05:30"
         type: string
     type: object
-  api.ChallengesResp:
-    properties:
-      challenges:
-        items:
-          type: string
-        type: array
-      message:
-        type: string
-    type: object
   api.CompetitionInfoResp:
     properties:
       about:
@@ -173,6 +164,29 @@ definitions:
           type: integer
         type: array
     type: object
+  api.SubmissionResp:
+    properties:
+      category:
+        example: web
+        type: string
+      chall_id:
+        example: 3
+        type: integer
+      name:
+        example: Web Challenge
+        type: string
+      points:
+        example: 50
+        type: integer
+      solvedAt:
+        type: string
+      user_id:
+        example: 3
+        type: integer
+      username:
+        example: fristonio
+        type: string
+    type: object
   api.UserResp:
     properties:
       challenges:
@@ -212,6 +226,16 @@ definitions:
         example: fristonio
         type: string
     type: object
+  api.UsersStatisticsResp:
+    properties:
+      banned_users:
+        type: integer
+      total_registered_users:
+        example: 120
+        type: integer
+      unbanned_users:
+        type: integer
+    type: object
 host: beast.sdslabs.co
 info:
   contact:
@@ -231,6 +255,12 @@ paths:
       - application/json
       description: returns various information about the competition which are used
         to control competition
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -241,31 +271,8 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
+            $ref: '#/definitions/api.HTTPErrorResp'
       summary: returns competition info
-      tags:
-      - info
-    post:
-      consumes:
-      - application/json
-      description: returns statistics of users in competition (currently limited to
-        ban/unban status of users)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.UserResp'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-      summary: statistics of users in competition
       tags:
       - info
   /api/admin/users/:action/:id:
@@ -303,6 +310,64 @@ paths:
       summary: Ban/Unban a user based on his id and the action provided.
       tags:
       - status
+  /api/config/competition-info:
+    post:
+      consumes:
+      - application/json
+      description: Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
+      parameters:
+      - description: Competition Name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Some information about competition
+        in: formData
+        name: about
+        required: true
+        type: string
+      - description: Competitions Prizes for the winners
+        in: formData
+        name: prizes
+        type: string
+      - description: Competition's starting time
+        in: formData
+        name: starting_time
+        required: true
+        type: string
+      - description: Competition's ending time
+        in: formData
+        name: ending_time
+        required: true
+        type: string
+      - description: Competition's timezone
+        in: formData
+        name: timezone
+        required: true
+        type: string
+      - description: Competition's logo
+        in: formData
+        name: logo
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Updates competition info in the beast global configuration, located
+        at ~/.beast/config.toml.
+      tags:
+      - config
   /api/config/reload/:
     patch:
       consumes:
@@ -328,29 +393,8 @@ paths:
       summary: Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
       tags:
       - config
-  /api/info/available:
-    post:
-      consumes:
-      - application/json
-      description: Returns information about all the challenges present in the database.
-      parameters:
-      - description: Bearer
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.ChallengeInfoResp'
-      summary: Returns information about all challenges.
-      tags:
-      - info
   /api/info/challenge/info:
-    post:
+    get:
       consumes:
       - application/json
       description: Returns all information about the challenges by the challenge name.
@@ -360,6 +404,11 @@ paths:
         name: Authorization
         required: true
         type: string
+      - description: Name of challenge
+        in: query
+        name: name
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -367,6 +416,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.ChallengeInfoResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
       summary: Returns all information about the challenges.
       tags:
       - info
@@ -374,40 +435,38 @@ paths:
     get:
       consumes:
       - application/json
-      description: Returns all challenges available in the in the database that has
-        a particular parameter same
+      description: Returns information about all the challenges present in the database
+        with and without filters.
+      parameters:
+      - description: Filter parameter by which challenges are filtered
+        in: query
+        name: filter
+        type: string
+      - description: Value of filtered parameter
+        in: query
+        name: value
+        type: string
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.ChallengesResp'
-        "402":
-          description: Payment Required
+            $ref: '#/definitions/api.ChallengeInfoResp'
+        "400":
+          description: Bad Request
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-      summary: Gives all challenges available in the database that has a particular
-        parameter same
-      tags:
-      - info
-  /api/info/challenges/available:
-    get:
-      consumes:
-      - application/json
-      description: Returns all challenges available in the in the remote directory
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ChallengesResp'
-        "402":
-          description: Payment Required
-          schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-      summary: Gives all challenges available in the remote directory
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Returns information about all challenges with and without filters.
       tags:
       - info
   /api/info/images/available:
@@ -491,11 +550,50 @@ paths:
         config.
       tags:
       - info
+  /api/info/submissions:
+    get:
+      consumes:
+      - application/json
+      description: Handles submissions made by the user
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SubmissionResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Handles submissions made by the user
+      tags:
+      - submissions
   /api/info/user:
-    post:
+    get:
       consumes:
       - application/json
       description: Returns user info based on userId
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: User's id
+        in: formData
+        name: value
+        type: string
+      - description: username
+        in: query
+        name: value
+        type: string
       produces:
       - application/json
       responses:
@@ -503,10 +601,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.UserResp'
-        "402":
-          description: Payment Required
+        "400":
+          description: Bad Request
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
       summary: Returns user info
       tags:
       - info
@@ -515,6 +617,12 @@ paths:
       consumes:
       - application/json
       description: Returns all available user's info
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -522,10 +630,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.UserResp'
-        "402":
-          description: Payment Required
+        "404":
+          description: Not Found
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
       summary: Returns all user's info
       tags:
       - info
@@ -570,7 +682,7 @@ paths:
       parameters:
       - description: .tar file to be uploaded to fetch challenge info
         in: formData
-        name: fileTar
+        name: file
         required: true
         type: file
       produces:
@@ -757,12 +869,12 @@ paths:
       description: Adds notifications
       parameters:
       - description: Title of notification to be added
-        in: query
+        in: formData
         name: title
         required: true
         type: string
       - description: Description for the notification to be added
-        in: query
+        in: formData
         name: desc
         required: true
         type: string
@@ -776,7 +888,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
       summary: Adds notifications
       tags:
       - notification
@@ -792,10 +908,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-        "400":
-          description: Bad Request
+        "500":
+          description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
+            $ref: '#/definitions/api.HTTPErrorResp'
       summary: Fetch available notifications
       tags:
       - notification
@@ -806,8 +922,8 @@ paths:
       description: Removes notifications
       parameters:
       - description: Title of notification
-        in: query
-        name: title
+        in: formData
+        name: id
         required: true
         type: string
       produces:
@@ -820,7 +936,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
       summary: Removes notifications
       tags:
       - notification
@@ -831,13 +951,18 @@ paths:
       description: Updates any changes in the notifications
       parameters:
       - description: Title of notification
-        in: query
+        in: formData
+        name: id
+        required: true
+        type: string
+      - description: Title of notification
+        in: formData
         name: title
         required: true
         type: string
       - description: Description for the notification to be changed
-        in: query
-        name: description
+        in: formData
+        name: desc
         required: true
         type: string
       produces:
@@ -850,7 +975,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
       summary: Updates notifications
       tags:
       - notification
@@ -984,7 +1113,7 @@ paths:
       parameters:
       - description: Name of challenge
         in: formData
-        name: chall
+        name: chall_id
         required: true
         type: string
       - description: Flag for the challenge
@@ -1020,6 +1149,17 @@ paths:
       consumes:
       - application/json
       description: JWT can be received by signing in
+      parameters:
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1027,8 +1167,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPAuthorizeResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
       summary: Handles signin and token production
@@ -1037,11 +1185,39 @@ paths:
   /auth/register:
     post:
       description: Signup route for the user
+      parameters:
+      - description: User's name
+        in: formData
+        name: name
+        type: string
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: User's email id
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: User's ssh-key
+        in: formData
+        name: ssh-key
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
         "406":
@@ -1054,6 +1230,12 @@ paths:
   /auth/reset-password:
     post:
       description: Resets password for the user
+      parameters:
+      - description: New Password
+        in: formData
+        name: new_pass
+        required: true
+        type: string
       produces:
       - application/json
       responses:
