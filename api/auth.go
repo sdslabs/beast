@@ -187,7 +187,6 @@ func login(c *gin.Context) {
 // @Failure 406 {object} api.HTTPPlainResp
 // @Router /auth/register [post]
 func register(c *gin.Context) {
-
 	name := c.PostForm("name")
 	username := c.PostForm("username")
 	password := c.PostForm("password")
