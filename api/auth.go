@@ -132,8 +132,12 @@ func adminAuthorize(c *gin.Context) {
 // @Tags auth
 // @Accept json
 // @Produce json
+// @Param username formData string true "Username"
+// @Param password formData string true "Password"
 // @Success 200 {object} api.HTTPAuthorizeResp
+// @Failure 400 {object} api.HTTPPlainResp
 // @Failure 401 {object} api.HTTPPlainResp
+// @Failure 403 {object} api.HTTPPlainResp
 // @Router /auth/login [post]
 func login(c *gin.Context) {
 	username := c.PostForm("username")
@@ -183,11 +187,16 @@ func login(c *gin.Context) {
 // @Description Signup route for the user
 // @Tags auth
 // @Produce json
+// @Param name formData string false "User's name"
+// @Param username formData string true "Username"
+// @Param password formData string true "Password"
+// @Param email formData string true "User's email id"
+// @Param ssh-key formData string false "User's ssh-key"
 // @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
 // @Router /auth/register [post]
 func register(c *gin.Context) {
-
 	name := c.PostForm("name")
 	username := c.PostForm("username")
 	password := c.PostForm("password")
@@ -228,6 +237,7 @@ func register(c *gin.Context) {
 // @Description Resets password for the user
 // @Tags auth
 // @Produce json
+// @Param new_pass formData string true "New Password"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 401 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp

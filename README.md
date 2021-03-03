@@ -1,14 +1,27 @@
-# Beast
-
-![Beast Logo](./docs/res/beast-logo.png)
+<p align="center">
+  <img src="./docs/res/beast-logo.png" alt="Beast Logo">
+</p>
 
 > Jeopardy-style CTF challenge deployment and management tool.
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/bea0e0b4-30e1-4830-ba98-e484b51e4036/deploy-status)](https://app.netlify.com/sites/beast-docs-sdslabs/deploys) [![Build Status](https://dev.azure.com/deepshpathak/deepshpathak/_apis/build/status/sdslabs.beastv4?branchName=master)](https://dev.azure.com/deepshpathak/deepshpathak/_build/latest?definitionId=1&branchName=master) [![Apache License](https://img.shields.io/badge/license-Apache-blue.svg)](https://github.com/sdslabs/beastv4/blob/master/LICENSE.md)
 
+## Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Supported Challenge](#supported-challenges)
+- [Download](#download)
+- [Tech Stack](#tech-stack)
+- [Development](#development)
+- [Contributing](#contributing)
+- [Contact](#contact)
+
 ## Overview
 
 Beast is a service that runs on your host(maybe a bare metal server or a cloud instance) and helps manage deployment, lifecycle, and health check of CTF challenges. It can also be used to host Jeopardy-style CTF competition.
+
+Visit [beast-docs-sdslabs.netlify.app](https://beast-docs-sdslabs.netlify.app/) for the more details and documentation
 
 ## Features
 
@@ -27,7 +40,7 @@ Beast is a service that runs on your host(maybe a bare metal server or a cloud i
 
 For more details on the features, refer to [Features](./docs/Features.md)
 
-## Supported Challenge's Types
+## Supported Challenges
 
 As of now beast support the following type of challenges:
 
@@ -37,11 +50,36 @@ As of now beast support the following type of challenges:
 - Bare - Highly customisable challenges.
 - Docker - Challenges which are provided with their own docker file.
 
+## Download
+
+Assuming you have the [docker](https://www.docker.com/) installed, head over to Beast's [releases](https://github.com/sdslabs/beast/releases) page and grab the latest binary and `setup.sh` script.
+
+Run the `setup.sh` script once. It will setup the required folders and configuration files for you.
+
+Run the downloaded binary with
+
+```bash
+$ ./beast run -v
+```
+
+## Tech Stack
+
+Beast is written completely in Golang and comes with a clean REST API interface to trigger actions or interact with underlying functionalities.
+The REST API server is implemented using `gin` go library and uses JWT as an authentication mechanism. Being written in go, Beast is compiled into
+a single binary which can run on any linux distribution.
+
+Beast uses Docker as a container runtimes to run challenges in a sandboxed environment. Note that container does not provide a very strong isolation, but our host is safe as long as there is no 0-day in linux kernel itself. Even though container provide a security layer for the challenges, we follow some practices to harden those security measures.
+
+We use Swagger for automatic generation of API documentation and you can find the docs at `/api/docs/index.html` from beast server root.
+
+To save the state of the deployments and challenges beast uses SQLite as a database, all the information ranging from challenge deployment state to allocated ports and author information is stored in this database. This database is created automatically in the root of your beast configuration directory.
+
 ## Development
 
 Beast go version is under development; follow the below instructions to get started.
 
-- Install go 1.13 or above
+- Make sure you have docker up and running.
+- Install go [1.13.X](https://golang.org/dl/) or above
 - Make sure that `GO111MODULES` environment variable should be set to `on`, or do `export GO111MODULES=on`
 - Clone the repository.
 - Jump to `$GOPATH/src/github.com/sdslabs/beastv4/` and start hacking.
@@ -110,7 +148,7 @@ $ nc localhost 10001
 choice > 4
 ```
 
-### Documentation
+### Building documentation
 
 The documentation for the project lies in [/docs](/docs). We use `mkdocs` to automatically generate documentation from markdown. The configuration file for the same can be found at [mkdocs.yml](/mkdocs.yml). To view the documentation locally, create a virtual environment locally and install [requirements](/requirements-dev.txt).
 
@@ -124,20 +162,12 @@ $ mkdocs serve
 Serving on http://127.0.0.1:8000
 ```
 
-### Development notes
-
-Beast uses `logrus` for logging purposes and follows standard effective go guidelines, so anytime you are writing a code, keep in mind to add necessary logs and documentation. Also, format the code before committing using `gofmt`. Or simply run the make command `make test`
-
-For any API routes, you add to the beast API, do write Swagger API documentation.
-
-The design documentation for the new Beast can be found [here](https://docs.google.com/document/d/1BlRes900aFS2s8jicrSx2W7b1t1FnYZhx70jGQu__HE/edit)
-
 ## Contributing
 
 We are always open for contributions. If you find any feature missing, or just want to report a bug, feel free to open an issue and/or submit a pull request regarding the same.
 
 For more information on contribution, check out our
-[docs](./docs/contribution.md).
+[docs](./docs/Contribution.md).
 
 ## Contact
 
@@ -147,4 +177,4 @@ free to visit [chat.sdslabs.co](https://chat.sdslabs.co) or drop a mail at
 
 ---
 
-Made by [SDSLabs](https://sdslabs.co)
+Made with :heart: by [SDSLabs](https://sdslabs.co)

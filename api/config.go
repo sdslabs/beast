@@ -43,13 +43,13 @@ func reloadBeastConfig(c *gin.Context) {
 // @Tags config
 // @Accept  json
 // @Produce json
-// @Param name query string true "Competition Name"
-// @Param about query string true "Some information about competition"
-// @Param prizes query string false "Competitions Prizes for the winners"
-// @Param starting_time query string true "Competition's starting time"
-// @Param ending_time query string true "Competition's ending time"
-// @Param timezone query string true "Competition's timezone"
-// @Param logo query string false "Competition's logo"
+// @Param name formData string true "Competition Name"
+// @Param about formData string true "Some information about competition"
+// @Param prizes formData string false "Competitions Prizes for the winners"
+// @Param starting_time formData string true "Competition's starting time"
+// @Param ending_time formData string true "Competition's ending time"
+// @Param timezone formData string true "Competition's timezone"
+// @Param logo formData file false "Competition's logo"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp

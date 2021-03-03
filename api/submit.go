@@ -13,10 +13,10 @@ import (
 // Verifies and creates an entry in the database for successful submission of flag for a challenge.
 // @Summary Verifies and creates an entry in the database for successful submission of flag for a challenge.
 // @Description Returns success or error response based on the flag submitted. Also, the flag will not be submitted if it was previously submitted
-// @Tags status
+// @Tags Submit
 // @Accept  json
 // @Produce json
-// @Param chall formData string true "Name of challenge"
+// @Param chall_id formData string true "Name of challenge"
 // @Param flag formData string true "Flag for the challenge"
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 400 {object} api.HTTPPlainResp
@@ -29,22 +29,22 @@ func submitFlagHandler(c *gin.Context) {
 
 	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-			Message: "Unauthorized user",
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
 		})
 		return
 	}
 
 	if challId == "" {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Id of the challenge is a required parameter to process request.",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Id of the challenge is a required parameter to process request.",
 		})
 		return
 	}
 
 	if flag == "" {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Flag for the challenge is a required parameter to process request.",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Flag for the challenge is a required parameter to process request.",
 		})
 		return
 	}
@@ -53,8 +53,8 @@ func submitFlagHandler(c *gin.Context) {
 
 	chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
@@ -71,15 +71,15 @@ func submitFlagHandler(c *gin.Context) {
 
 	user, err := database.QueryFirstUserEntry("username", username)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-			Message: "Unauthorized user",
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
 		})
 	}
 
 	solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
@@ -94,8 +94,8 @@ func submitFlagHandler(c *gin.Context) {
 
 	err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challenge.Points})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
@@ -108,8 +108,8 @@ func submitFlagHandler(c *gin.Context) {
 
 	err = database.SaveFlagSubmission(&UserChallengesEntry)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
