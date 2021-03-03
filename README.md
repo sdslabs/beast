@@ -21,6 +21,8 @@
 
 Beast is a service that runs on your host(maybe a bare metal server or a cloud instance) and helps manage deployment, lifecycle, and health check of CTF challenges. It can also be used to host Jeopardy-style CTF competition.
 
+Visit [beast-docs-sdslabs.netlify.app](https://beast-docs-sdslabs.netlify.app/) for the more details and documentation
+
 ## Features
 
 - Git based source of truth.
