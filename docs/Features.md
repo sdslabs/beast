@@ -37,7 +37,7 @@ course configurable.
 
 To know more about configuration parameters provided by beast move to [this section](ChallConfig.md)
 
-### Testing Support and SSH support for challenge instances
+### SSH support for challenge instances
 
 Beast provides challenge author access to each instance of all the challenges so that these challenges can be
 debugged on the fly in case there is a need for. This also means that challenge author can test/debug the challenges before publishing them.
