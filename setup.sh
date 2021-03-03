@@ -9,9 +9,24 @@ mkdir -p "/home/$USER/.beast" "/home/$USER/.beast/assets/logo" "/home/$USER/.bea
 echo -e "auth_keys" >/home/$USER/.beast/authorized_keys
 echo -e "auth_keys" >/home/$USER/.beast/secret.key
 
-mv ./_examples/example.config.toml ~/.beast/config.toml
+BEAST_GLOBAL_CONFIG=~/.beast/config.toml
+EXAMPLE_CONFIG_FILE=./_examples/example.config.toml
 
-sed -i "s/vsts/$USER/g" ~/.beast/config.toml
+if [ -f "$BEAST_GLOBAL_CONFIG" ]; then
+    echo -e "Found $BEAST_GLOBAL_CONFIG"
+else
+    if [ -f "$EXAMPLE_CONFIG_FILE" ]; then
+        echo -e "Copying example config file"
+        mv ./_examples/example.config.toml $BEAST_GLOBAL_CONFIG
+    else
+        echo -e '\e[93mCould not find example.config.toml'
+        echo -e 'Downloading example.config.toml'
+        wget https://raw.githubusercontent.com/sdslabs/beast/master/_examples/example.config.toml
+        mv ./example.config.toml $BEAST_GLOBAL_CONFIG
+        exit
+    fi
+    sed -i "s/vsts/$USER/g" $BEAST_GLOBAL_CONFIG
+fi
 
 echo -e "Created .beast folder..."
 
