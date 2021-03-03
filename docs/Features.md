@@ -8,8 +8,8 @@
 
 - Automatic deployment of challenges by using a triggering pipeline in conjunction with beast web server, this can
   be configured in many ways:
-  _ Execute a dry run on the challenge using beast.
-  _ Using github webhook trigger deploy on beast when a challenge in pushed.
+  - Execute a dry run on the challenge using beast.
+  - Using github webhook trigger deploy on beast when a challenge in pushed.
 
 ### Container based Isolation
 
@@ -17,7 +17,7 @@ We use containers as the atomic source of handle for each of our challenge. They
 environment for the challenges.
 
 - Currently only docker based container runtime support is available but we are extending to create a generalized
-  container runtime interface imThis also means your documentation can now easily stand on its own, without always
+  container runtime interface. This also means your documentation can now easily stand on its own, without always
   plementation to support multiple providers similar to what kubernetes does.
 
 - Optionally security or sandboxing capabilities can be further enhanced by using more secure runtime like `runsc` in place

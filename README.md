@@ -2,9 +2,19 @@
   <img src="./docs/res/beast-logo.png" alt="Beast Logo">
 </p>
 
-> Jeopardy-style CTF challenge deployment and management tool.
+<h3 align="center">Jeopardy-style CTF challenge deployment and management tool.</h3>
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/bea0e0b4-30e1-4830-ba98-e484b51e4036/deploy-status)](https://app.netlify.com/sites/beast-docs-sdslabs/deploys) [![Build Status](https://dev.azure.com/deepshpathak/deepshpathak/_apis/build/status/sdslabs.beastv4?branchName=master)](https://dev.azure.com/deepshpathak/deepshpathak/_build/latest?definitionId=1&branchName=master) [![Apache License](https://img.shields.io/badge/license-Apache-blue.svg)](https://github.com/sdslabs/beastv4/blob/master/LICENSE.md)
+<p align="center">
+ <a href="https://app.netlify.com/sites/beast-docs-sdslabs/deploys">
+    <img src="https://api.netlify.com/api/v1/badges/bea0e0b4-30e1-4830-ba98-e484b51e4036/deploy-status" alt="Netlify Status" />
+  </a>
+ <a href="https://dev.azure.com/deepshpathak/deepshpathak/_build/latest?definitionId=1&branchName=master">
+    <img src="https://dev.azure.com/deepshpathak/deepshpathak/_apis/build/status/sdslabs.beastv4?branchName=master" alt="Build Status" />
+  </a>
+ <a href="https://github.com/sdslabs/beastv4/blob/master/LICENSE.md">
+    <img src="https://img.shields.io/badge/license-Apache-blue.svg" alt="Apache License" />
+  </a>
+</p>
 
 ## Contents
 
