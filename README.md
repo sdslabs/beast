@@ -15,7 +15,6 @@
 - [Tech Stack](#tech-stack)
 - [Development](#development)
 - [Contributing](#contributing)
-- [Meet the A-Team](#meet-the-a-team)
 - [Contact](#contact)
 
 ## Overview
@@ -167,14 +166,6 @@ We are always open for contributions. If you find any feature missing, or just w
 
 For more information on contribution, check out our
 [docs](./docs/Contribution.md).
-
-## Meet the A-Team
-
-- Deepesh Pathak [@fristonio](https://github.com/fristonio)
-- Piyush Sethia [@kokil87](https://github.com/kokil87)
-- Shubham Gupta [@shubhamgupta2956](https://github.com/shubhamgupta2956)
-
-You can find the entire list of contributors [here](https://github.com/sdslabs/beastv4/graphs/contributors)
 
 ## Contact
 
