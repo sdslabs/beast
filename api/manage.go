@@ -366,7 +366,7 @@ func manageScheduledAction(c *gin.Context) {
 // @Tags manage
 // @Accept  json
 // @Produce json
-// @Param fileTar formData file true ".tar file to be uploaded to fetch challenge info"
+// @Param file formData file true ".tar file to be uploaded to fetch challenge info"
 // @Success 200 {object} api.ChallengePreviewResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp

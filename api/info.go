@@ -40,21 +40,25 @@ func usedPortsInfoHandler(c *gin.Context) {
 // @Accept  json
 // @Produce json
 // @Param Authorization header string true "Bearer"
+// @Param name query string true "Name of challenge"
 // @Success 200 {object} api.ChallengeInfoResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/challenge/info [get]
 func challengeInfoHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Challenge name cannot be empty"),
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: fmt.Sprintf("Challenge name cannot be empty"),
 		})
 		return
 	}
 
 	challenges, err := database.QueryChallengeEntries("name", name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
@@ -65,8 +69,8 @@ func challengeInfoHandler(c *gin.Context) {
 		users, err := database.GetRelatedUsers(&challenge)
 		if err != nil {
 			log.Error(err)
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while processing the request.",
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
@@ -116,12 +120,14 @@ func challengeInfoHandler(c *gin.Context) {
 // @Summary Returns information about all challenges with and without filters.
 // @Description Returns information about all the challenges present in the database with and without filters.
 // @Tags info
-// @Param filter query string false "Filter parameter by which challenges are filtered"
-// @Param value query string false "Value of filtered parameter"
 // @Accept  json
 // @Produce json
+// @Param filter query string false "Filter parameter by which challenges are filtered"
+// @Param value query string false "Value of filtered parameter"
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.ChallengeInfoResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/challenges [get]
 func challengesInfoHandler(c *gin.Context) {
 	filter := c.Query("filter")
@@ -132,8 +138,8 @@ func challengesInfoHandler(c *gin.Context) {
 	if value == "" || filter == "" {
 		challenges, err = database.QueryAllChallenges()
 		if err != nil {
-			c.JSON(http.StatusBadRequest, HTTPPlainResp{
-				Message: err.Error(),
+			c.JSON(http.StatusBadRequest, HTTPErrorResp{
+				Error: err.Error(),
 			})
 			return
 		}
@@ -148,8 +154,8 @@ func challengesInfoHandler(c *gin.Context) {
 	if filter == "name" || filter == "author" || filter == "score" {
 		challenges, err = database.QueryChallengeEntries(filter, value)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while processing the request.",
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
 			})
 		}
 	}
@@ -160,8 +166,8 @@ func challengesInfoHandler(c *gin.Context) {
 		}
 		challenges, err = database.QueryRelatedChallenges(&tag)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while processing the request.",
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
 			})
 		}
 	}
@@ -172,8 +178,8 @@ func challengesInfoHandler(c *gin.Context) {
 		users, err := database.GetRelatedUsers(&challenge)
 		if err != nil {
 			log.Error(err)
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while processing the request.",
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
@@ -273,15 +279,19 @@ func challengeLogsHandler(c *gin.Context) {
 // @Tags info
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param value formData string false "User's id"
+// @Param value query string false "username"
 // @Success 200 {object} api.UserResp
-// @Failure 402 {object} api.HTTPPlainResp
-// @Router /api/info/user [post]
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/user [get]
 func userInfoHandler(c *gin.Context) {
 	userId := c.PostForm("user_id")
 	username := c.Param("username")
 	if userId == "" && username == "" {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Both User Id and Username cannot be empty"),
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: fmt.Sprintf("Both User Id and Username cannot be empty"),
 		})
 		return
 	}
@@ -291,8 +301,8 @@ func userInfoHandler(c *gin.Context) {
 	if userId != "" {
 		id, err := strconv.ParseUint(userId, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, HTTPPlainResp{
-				Message: fmt.Sprintf("Could not parse User Id or invalid User Id"),
+			c.JSON(http.StatusBadRequest, HTTPErrorResp{
+				Error: fmt.Sprintf("Could not parse User Id or invalid User Id"),
 			})
 			return
 		}
@@ -300,16 +310,16 @@ func userInfoHandler(c *gin.Context) {
 
 		user, err = database.QueryUserById(parsedUserId)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while processing the request.",
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
 	} else {
 		user, err = database.QueryFirstUserEntry("username", username)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while processing the request.",
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
@@ -318,8 +328,8 @@ func userInfoHandler(c *gin.Context) {
 	challenges, err := database.GetRelatedChallenges(&user)
 	if err != nil {
 		log.Error(err)
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
@@ -364,14 +374,16 @@ func userInfoHandler(c *gin.Context) {
 // @Tags info
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.UserResp
-// @Failure 402 {object} api.HTTPPlainResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/user/available [get]
 func getAllUsersInfoHandler(c *gin.Context) {
 	users, err := database.QueryAllUsers()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
@@ -404,14 +416,15 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Tags submissions
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.SubmissionResp
-// @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/info/submissions [post]
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/submissions [get]
 func submissionsHandler(c *gin.Context) {
 	submissions, err := database.QueryAllSubmissions()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
@@ -420,8 +433,8 @@ func submissionsHandler(c *gin.Context) {
 	for _, submission := range submissions {
 		user, err := database.QueryUserById(submission.UserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-				Message: "DATABASE ERROR while fetching user details.",
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while fetching user details.",
 			})
 			return
 		}
@@ -429,8 +442,8 @@ func submissionsHandler(c *gin.Context) {
 		if user.Role == core.USER_ROLES["contestant"] {
 			challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-					Message: "DATABASE ERROR while fetching user details.",
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while fetching user details.",
 				})
 				return
 			}
@@ -459,15 +472,16 @@ func submissionsHandler(c *gin.Context) {
 // @Tags info
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.UserResp
-// @Failure 404 {object} api.HTTPPlainResp
-// @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/admin/statistics [post]
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.UsersStatisticsResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/admin/statistics [get]
 func getUsersStatisticsHandler(c *gin.Context) {
 	users, err := database.QueryAllUsers()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
 		})
 		return
 	}
@@ -505,14 +519,15 @@ func getUsersStatisticsHandler(c *gin.Context) {
 // @Tags info
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.CompetitionInfoResp
-// @Failure 400 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPErrorResp
 // @Router /api/admin/statistics [get]
 func competitionInfoHandler(c *gin.Context) {
 	competitionInfo, err := config.GetCompetitionInfo()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: err.Error(),
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: err.Error(),
 		})
 		return
 	}
