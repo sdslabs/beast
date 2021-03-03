@@ -1,6 +1,6 @@
-# Beast
-
-![Beast Logo](./docs/res/beast-logo.png)
+<p align="center">
+  <img src="./docs/res/beast-logo.png" alt="Beast Logo">
+</p>
 
 > Jeopardy-style CTF challenge deployment and management tool.
 
