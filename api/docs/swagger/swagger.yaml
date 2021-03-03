@@ -1,17 +1,5 @@
 basePath: /
 definitions:
-  api.AuthorizationChallengeResp:
-    properties:
-      challenge:
-        example:
-        - Challenge String
-        items:
-          type: byte
-        type: array
-      message:
-        example: Response message
-        type: string
-    type: object
   api.AvailableImagesResp:
     properties:
       images:
@@ -23,6 +11,79 @@ definitions:
         type: array
       message:
         example: Available Base images.
+        type: string
+    type: object
+  api.ChallengeInfoResp:
+    properties:
+      category:
+        example: web
+        type: string
+      createdAt:
+        type: string
+      description:
+        type: string
+      hints:
+        type: string
+      id:
+        type: integer
+      name:
+        example: Web Challenge
+        type: string
+      points:
+        example: 50
+        type: integer
+      ports:
+        items:
+          type: integer
+        type: array
+      solves:
+        items:
+          $ref: '#/definitions/api.UserSolveResp'
+        type: array
+      solvesNumber:
+        example: 100
+        type: integer
+      status:
+        example: deployed
+        type: string
+    type: object
+  api.ChallengePreviewResp:
+    properties:
+      category:
+        example: web
+        type: string
+      description:
+        type: string
+      hints:
+        items:
+          type: string
+        type: array
+      name:
+        example: Web Challenge
+        type: string
+      points:
+        example: 50
+        type: integer
+      ports:
+        items:
+          type: integer
+        type: array
+    type: object
+  api.ChallengeSolveResp:
+    properties:
+      category:
+        example: web
+        type: string
+      id:
+        example: 4
+        type: integer
+      name:
+        example: Web Challenge
+        type: string
+      points:
+        example: 50
+        type: integer
+      solvedAt:
         type: string
     type: object
   api.ChallengeStatusResp:
@@ -37,19 +98,33 @@ definitions:
         example: "2018-12-31T22:20:08.948096189+05:30"
         type: string
     type: object
-  api.ChallengesResp:
+  api.CompetitionInfoResp:
     properties:
-      challenges:
-        items:
-          type: string
-        type: array
-      message:
+      about:
+        example: This is a CTF competition
+        type: string
+      ending_time:
+        type: string
+      logo_url:
+        type: string
+      name:
+        example: fristonio
+        type: string
+      prizes:
+        example: 1st and 2nd place winners will get $10K
+        type: string
+      starting_time:
+        type: string
+      timezone:
         type: string
     type: object
   api.HTTPAuthorizeResp:
     properties:
       message:
         example: Response message
+        type: string
+      role:
+        example: author
         type: string
       token:
         example: YOUR_AUTHENTICATION_TOKEN
@@ -85,14 +160,81 @@ definitions:
         example: 10000
         type: integer
       ports_in_use:
-        example:
-        - '[10000'
-        - ' 100001'
-        - ' 100003'
-        - ' 10010]'
         items:
-          type: uint32
+          type: integer
         type: array
+    type: object
+  api.SubmissionResp:
+    properties:
+      category:
+        example: web
+        type: string
+      chall_id:
+        example: 3
+        type: integer
+      name:
+        example: Web Challenge
+        type: string
+      points:
+        example: 50
+        type: integer
+      solvedAt:
+        type: string
+      user_id:
+        example: 3
+        type: integer
+      username:
+        example: fristonio
+        type: string
+    type: object
+  api.UserResp:
+    properties:
+      challenges:
+        items:
+          $ref: '#/definitions/api.ChallengeSolveResp'
+        type: array
+      email:
+        example: fristonio@gmail.com
+        type: string
+      id:
+        example: 5
+        type: integer
+      rank:
+        example: 15
+        type: integer
+      role:
+        example: author
+        type: string
+      score:
+        example: 750
+        type: integer
+      status:
+        example: 0
+        type: integer
+      username:
+        example: CTF is live now!
+        type: string
+    type: object
+  api.UserSolveResp:
+    properties:
+      id:
+        example: 5
+        type: integer
+      solvedAt:
+        type: string
+      username:
+        example: fristonio
+        type: string
+    type: object
+  api.UsersStatisticsResp:
+    properties:
+      banned_users:
+        type: integer
+      total_registered_users:
+        example: 120
+        type: integer
+      unbanned_users:
+        type: integer
     type: object
 host: beast.sdslabs.co
 info:
@@ -107,6 +249,125 @@ info:
   title: Beast API
   version: "1.0"
 paths:
+  /api/admin/statistics:
+    get:
+      consumes:
+      - application/json
+      description: returns various information about the competition which are used
+        to control competition
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CompetitionInfoResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: returns competition info
+      tags:
+      - info
+  /api/admin/users/:action/:id:
+    post:
+      consumes:
+      - application/json
+      description: Ban/unban a user based on his user id. This operation can only
+        be done by admins
+      parameters:
+      - description: Action to perform ban/unban
+        in: query
+        name: action
+        required: true
+        type: string
+      - description: Id of user
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengeStatusResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Ban/Unban a user based on his id and the action provided.
+      tags:
+      - admin
+  /api/config/competition-info:
+    post:
+      consumes:
+      - application/json
+      description: Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
+      parameters:
+      - description: Competition Name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Some information about competition
+        in: formData
+        name: about
+        required: true
+        type: string
+      - description: Competitions Prizes for the winners
+        in: formData
+        name: prizes
+        type: string
+      - description: Competition's starting time
+        in: formData
+        name: starting_time
+        required: true
+        type: string
+      - description: Competition's ending time
+        in: formData
+        name: ending_time
+        required: true
+        type: string
+      - description: Competition's timezone
+        in: formData
+        name: timezone
+        required: true
+        type: string
+      - description: Competition's logo
+        in: formData
+        name: logo
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Updates competition info in the beast global configuration, located
+        at ~/.beast/config.toml.
+      tags:
+      - config
   /api/config/reload/:
     patch:
       consumes:
@@ -125,21 +386,66 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
       tags:
       - config
-  /api/info/challenges/available:
+  /api/info/challenge/info:
     get:
       consumes:
       - application/json
-      description: Returns all challenges available in the in the database
+      description: Returns all information about the challenges by the challenge name.
       parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Name of challenge
+        in: query
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengeInfoResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Returns all information about the challenges.
+      tags:
+      - info
+  /api/info/challenges:
+    get:
+      consumes:
+      - application/json
+      description: Returns information about all the challenges present in the database
+        with and without filters.
+      parameters:
+      - description: Filter parameter by which challenges are filtered
+        in: query
+        name: filter
+        type: string
+      - description: Value of filtered parameter
+        in: query
+        name: value
+        type: string
       - description: Bearer
         in: header
         name: Authorization
@@ -151,14 +457,16 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.ChallengesResp'
-            type: object
-        "402":
-          description: Payment Required
+            $ref: '#/definitions/api.ChallengeInfoResp'
+        "400":
+          description: Bad Request
           schema:
-            $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
-      summary: Gives all challenges available in the in the database
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Returns information about all challenges with and without filters.
       tags:
       - info
   /api/info/images/available:
@@ -180,12 +488,11 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.AvailableImagesResp'
-            type: object
       summary: Gives all the base images that can be used while creating a beast challenge,
         this is a constant specified in beast global config
       tags:
       - info
-  /api/info/logs/:
+  /api/info/logs:
     get:
       consumes:
       - application/json
@@ -208,17 +515,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.LogsInfoResp'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Handles route related to logs handling of container
       tags:
       - info
@@ -241,10 +545,100 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.PortsInUseResp'
-            type: object
       summary: Returns ports in use by beast by looking in the hack git repository,
         also returns min and max value of port allowed while specifying in beast challenge
         config.
+      tags:
+      - info
+  /api/info/submissions:
+    get:
+      consumes:
+      - application/json
+      description: Handles submissions made by the user
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SubmissionResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Handles submissions made by the user
+      tags:
+      - info
+  /api/info/user:
+    get:
+      consumes:
+      - application/json
+      description: Returns user info based on userId
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: User's id
+        in: formData
+        name: value
+        type: string
+      - description: username
+        in: query
+        name: value
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.UserResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Returns user info
+      tags:
+      - info
+  /api/info/user/available:
+    get:
+      consumes:
+      - application/json
+      description: Returns all available user's info
+      parameters:
+      - description: Bearer
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.UserResp'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Returns all user's info
       tags:
       - info
   /api/manage/challenge/:
@@ -272,13 +666,41 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Handles challenge management actions.
+      tags:
+      - manage
+  /api/manage/challenge/upload:
+    post:
+      consumes:
+      - application/json
+      description: Handles the challenge management from a challenge in tar file.
+        Currently prepare the tar file
+      parameters:
+      - description: .tar file to be uploaded to fetch challenge info
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChallengePreviewResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Untar and fetch info from beast.toml file in challenge
       tags:
       - manage
   /api/manage/commit/:
@@ -300,7 +722,6 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPErrorResp'
-            type: object
       summary: Validates the configuration of the challenge and tells if challenge
         can be deployed or not.
       tags:
@@ -324,21 +745,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "406":
           description: Not Acceptable
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Deploy a local challenge using the path provided in the post parameter
       tags:
       - manage
-  /api/manage/multiple/:
+  /api/manage/multiple/:action:
     post:
       consumes:
       - application/json
@@ -361,16 +779,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Handles challenge management actions for multiple challenges.
       tags:
       - manage
-  /api/manage/schedule/:
+  /api/manage/schedule/:action:
     post:
       consumes:
       - application/json
@@ -413,16 +829,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Schedule an action(deploy, undeploy, purge etc.) on a particular challenge
       tags:
       - manage
-  /api/manage/static/:
+  /api/manage/static/:action:
     post:
       consumes:
       - application/json
@@ -440,16 +854,135 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Handles route related to beast static content serving container, takes
         action as route parameter and perform that action
       tags:
       - manage
+  /api/notification/add:
+    post:
+      consumes:
+      - application/json
+      description: Adds notifications
+      parameters:
+      - description: Title of notification to be added
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Description for the notification to be added
+        in: formData
+        name: desc
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Adds notifications
+      tags:
+      - notification
+  /api/notification/available:
+    post:
+      consumes:
+      - application/json
+      description: Fetch all the notifications from database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Fetch available notifications
+      tags:
+      - notification
+  /api/notification/delete:
+    post:
+      consumes:
+      - application/json
+      description: Removes notifications
+      parameters:
+      - description: Title of notification
+        in: formData
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Removes notifications
+      tags:
+      - notification
+  /api/notification/update:
+    post:
+      consumes:
+      - application/json
+      description: Updates any changes in the notifications
+      parameters:
+      - description: Title of notification
+        in: formData
+        name: id
+        required: true
+        type: string
+      - description: Title of notification
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Description for the notification to be changed
+        in: formData
+        name: desc
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPErrorResp'
+      summary: Updates notifications
+      tags:
+      - notification
   /api/remote/reset/:
     post:
       consumes:
@@ -469,13 +1002,13 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Resets beast local copy of remote git repository.
+      tags:
+      - remote
   /api/remote/sync/:
     post:
       consumes:
@@ -495,14 +1028,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Syncs beast's local copy of remote git repository for challenges.
-  /api/status/all/:
+      tags:
+      - remote
+  /api/status/all/:filter:
     get:
       consumes:
       - application/json
@@ -532,17 +1065,15 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Returns challenge deployment status from the beast database for the
         challenges which matches the stauts according to filter.
       tags:
       - status
-  /api/status/challenge/:
+  /api/status/challenge/:name:
     get:
       consumes:
       - application/json
@@ -566,43 +1097,73 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.ChallengeStatusResp'
-            type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
       summary: Returns challenge deployment status from the beast database.
       tags:
       - status
-  /auth/:
-    get:
-      description: Sends challenge for authorization of user
+  /api/submit/challenge:
+    post:
+      consumes:
+      - application/json
+      description: Returns success or error response based on the flag submitted.
+        Also, the flag will not be submitted if it was previously submitted
+      parameters:
+      - description: Name of challenge
+        in: formData
+        name: chall_id
+        required: true
+        type: string
+      - description: Flag for the challenge
+        in: formData
+        name: flag
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.AuthorizationChallengeResp'
-            type: object
-        "406":
-          description: Not Acceptable
+            $ref: '#/definitions/api.ChallengeStatusResp'
+        "400":
+          description: Bad Request
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
-      summary: Handles challenge generation
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Verifies and creates an entry in the database for successful submission
+        of flag for a challenge.
       tags:
-      - auth
+      - Submit
+  /auth/login:
     post:
       consumes:
       - application/json
-      description: JWT can be received by sending back correct answer to challenge
+      description: JWT can be received by signing in
+      parameters:
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -610,13 +1171,91 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.HTTPAuthorizeResp'
-            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
-            type: object
-      summary: Handles solution check and token production
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Handles signin and token production
+      tags:
+      - auth
+  /auth/register:
+    post:
+      description: Signup route for the user
+      parameters:
+      - description: User's name
+        in: formData
+        name: name
+        type: string
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: User's email id
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: User's ssh-key
+        in: formData
+        name: ssh-key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Signup for the user
+      tags:
+      - auth
+  /auth/reset-password:
+    post:
+      description: Resets password for the user
+      parameters:
+      - description: New Password
+        in: formData
+        name: new_pass
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.HTTPPlainResp'
+      summary: Resets password for the user
       tags:
       - auth
 securityDefinitions:
