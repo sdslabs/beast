@@ -413,7 +413,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // Handles submissions made by the user
 // @Summary Handles submissions made by the user
 // @Description Handles submissions made by the user
-// @Tags submissions
+// @Tags info
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer"

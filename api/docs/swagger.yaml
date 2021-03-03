@@ -309,7 +309,7 @@ paths:
             $ref: '#/definitions/api.HTTPPlainResp'
       summary: Ban/Unban a user based on his id and the action provided.
       tags:
-      - status
+      - admin
   /api/config/competition-info:
     post:
       consumes:
@@ -574,7 +574,7 @@ paths:
             $ref: '#/definitions/api.HTTPErrorResp'
       summary: Handles submissions made by the user
       tags:
-      - submissions
+      - info
   /api/info/user:
     get:
       consumes:
@@ -1007,6 +1007,8 @@ paths:
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
       summary: Resets beast local copy of remote git repository.
+      tags:
+      - remote
   /api/remote/sync/:
     post:
       consumes:
@@ -1031,6 +1033,8 @@ paths:
           schema:
             $ref: '#/definitions/api.HTTPPlainResp'
       summary: Syncs beast's local copy of remote git repository for challenges.
+      tags:
+      - remote
   /api/status/all/:filter:
     get:
       consumes:
@@ -1143,7 +1147,7 @@ paths:
       summary: Verifies and creates an entry in the database for successful submission
         of flag for a challenge.
       tags:
-      - status
+      - Submit
   /auth/login:
     post:
       consumes:

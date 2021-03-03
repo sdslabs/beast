@@ -80,7 +80,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "status"
+                    "admin"
                 ],
                 "summary": "Ban/Unban a user based on his id and the action provided.",
                 "parameters": [
@@ -480,7 +480,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "submissions"
+                    "info"
                 ],
                 "summary": "Handles submissions made by the user",
                 "parameters": [
@@ -1115,6 +1115,9 @@ var doc = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "remote"
+                ],
                 "summary": "Resets beast local copy of remote git repository.",
                 "parameters": [
                     {
@@ -1149,6 +1152,9 @@ var doc = `{
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "remote"
                 ],
                 "summary": "Syncs beast's local copy of remote git repository for challenges.",
                 "parameters": [
@@ -1291,7 +1297,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "status"
+                    "Submit"
                 ],
                 "summary": "Verifies and creates an entry in the database for successful submission of flag for a challenge.",
                 "parameters": [

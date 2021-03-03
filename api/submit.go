@@ -13,7 +13,7 @@ import (
 // Verifies and creates an entry in the database for successful submission of flag for a challenge.
 // @Summary Verifies and creates an entry in the database for successful submission of flag for a challenge.
 // @Description Returns success or error response based on the flag submitted. Also, the flag will not be submitted if it was previously submitted
-// @Tags status
+// @Tags Submit
 // @Accept  json
 // @Produce json
 // @Param chall_id formData string true "Name of challenge"

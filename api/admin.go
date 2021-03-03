@@ -13,7 +13,7 @@ import (
 // Ban/Unban a user based on his id and the action provided.
 // @Summary Ban/Unban a user based on his id and the action provided.
 // @Description Ban/unban a user based on his user id. This operation can only be done by admins
-// @Tags status
+// @Tags admin
 // @Accept  json
 // @Produce json
 // @Param action query string true "Action to perform ban/unban"
