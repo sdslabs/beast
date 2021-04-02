@@ -82,13 +82,13 @@ func initGinRouter() *gin.Engine {
 		}
 
 		// Notification route group
-		notificationGroup := apiGroup.Group("/notification", adminAuthorize)
+		notificationGroup := apiGroup.Group("/notification")
 		{
-			notificationGroup.POST("/add", addNotification)
-			notificationGroup.PUT("/update", updateNotifications)
-			notificationGroup.DELETE("/delete", removeNotification)
+			notificationGroup.GET("/available", availableNotificationHandler)
+			notificationGroup.POST("/add", adminAuthorize, addNotification)
+			notificationGroup.PUT("/update", adminAuthorize, updateNotifications)
+			notificationGroup.DELETE("/delete", adminAuthorize, removeNotification)
 		}
-		notificationGroup.GET("/available", availableNotificationHandler)
 
 		remoteGroup := apiGroup.Group("/remote", adminAuthorize)
 		{
