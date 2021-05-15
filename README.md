@@ -92,7 +92,7 @@ Beast go version is under development; follow the below instructions to get star
 - Install go [1.13.X](https://golang.org/dl/) or above
 - Make sure that `GO111MODULES` environment variable should be set to `on`, or do `export GO111MODULES=on`
 - Clone the repository.
-- Jump to `$GOPATH/src/github.com/sdslabs/beastv4/` and start hacking.
+- Jump to `$GOPATH/src/github.com/sdslabs/beast/` and start hacking.
 
 ```bash
 $ go version
@@ -100,9 +100,9 @@ go version go1.13 linux/amd64
 
 $ export GO111MODULES=on
 
-$ git clone git@github.com:sdslabs/beastv4.git
+$ git clone git@github.com:sdslabs/beast.git
 
-$ cd beastv4 && make help
+$ cd beast && make help
 BEAST: An automated challenge deployment tool for backdoor
 
 * build: Build Beast and copy binary to PATH set for go build binaries.
