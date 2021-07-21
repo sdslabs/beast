@@ -429,6 +429,19 @@ func HandleAll(action string, user string) []string {
 	return handleMultipleChallenges(challsNameList, action)
 }
 
+// Auto deploy challenges on server start
+// Assumes that the git remote has already been synced
+func InitialAutoDeploy() {
+	log.Infof("Starting to auto deploy all challenges")
+
+	challsNameList, err := GetAvailableChallenges()
+	if err != nil || len(challsNameList) == 0 {
+		log.Warnf("No challenge available")
+	}
+
+	handleMultipleChallenges(challsNameList, core.MANAGE_ACTION_DEPLOY)
+}
+
 // Unstage a challenge based on the challenge name.
 // This simply removes the staging directory for the challenge from the staging area.
 func unstageChallenge(challengeName string) error {

@@ -47,7 +47,7 @@ func runBeastApiBootsteps() error {
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
+func RunBeastApiServer(port string, autoDeploy bool, healthProbe, periodicSync bool) {
 	log.Info("Bootstrapping Beast API server")
 
 	config.InitConfig()
@@ -95,6 +95,10 @@ func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
 
 	if healthProbe {
 		go manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
+	}
+
+	if autoDeploy {
+		manager.InitialAutoDeploy()
 	}
 
 	router.Run(port)
