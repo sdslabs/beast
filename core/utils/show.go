@@ -7,9 +7,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/alexeyco/simpletable"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/utils"
+	"github.com/spf13/cobra"
 )
 
 const maxShowLen int = 20
@@ -133,4 +135,82 @@ func PrintTableHeader(w *tabwriter.Writer) {
 	fmt.Fprintln(w, "Name\tContainerId\tImageId\tStatus\tPorts")
 	w.Flush()
 	fmt.Println(line)
+}
+
+func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
+
+	challenges, err := database.QueryAllChallenges()
+	Status, _ := cmd.Flags().GetString("status")
+	Status = strings.ToLower(Status)
+
+	if err != nil {
+		return fmt.Errorf("DATABASE ERROR while processing the request :%v", err)
+	}
+
+	if len(challenges) > 0 {
+
+		var portNumber string
+		for _, challenge := range challenges {
+			for _, port := range challenge.Ports {
+				portNumber = portNumber + fmt.Sprint(port.PortNo) + " "
+			}
+		}
+
+		var tagName string
+		for _, challenge := range challenges {
+			for _, tag := range challenge.Tags {
+				tagName = tagName + fmt.Sprint(tag.TagName) + " "
+			}
+		}
+
+		table := simpletable.New()
+
+		table.Header = &simpletable.Header{
+			Cells: []*simpletable.Cell{
+				{Align: simpletable.AlignCenter, Text: "Chall Name"},
+				{Align: simpletable.AlignCenter, Text: "Chall Type"},
+				{Align: simpletable.AlignCenter, Text: "Chall Container ID"},
+				{Align: simpletable.AlignCenter, Text: "Chall Image ID"},
+				{Align: simpletable.AlignCenter, Text: "Chall Status"},
+				{Align: simpletable.AlignCenter, Text: "Chall Tagname"},
+				{Align: simpletable.AlignCenter, Text: "Chall healthcheck"},
+				{Align: simpletable.AlignCenter, Text: "Chall Ports"},
+			},
+		}
+
+		for _, challenge := range challenges {
+
+			if Status == "deployed" && challenge.Status != "Deployed" {
+				continue
+			}
+			if Status == "undeployed" && challenge.Status != "Undeployed" {
+				continue
+			}
+			if Status == "queued" && challenge.Status != "Queued" {
+				continue
+			}
+
+			r := []*simpletable.Cell{
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.Name)},
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.Type)},
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.ContainerId[0:15])},
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.ImageId[0:15])},
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.Status)},
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", tagName)},
+				{Align: simpletable.AlignCenter, Text: fmt.Sprintf("%d", challenge.HealthCheck)},
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", portNumber)},
+			}
+
+			table.Body.Cells = append(table.Body.Cells, r)
+
+		}
+
+		table.SetStyle(simpletable.StyleCompactLite)
+		fmt.Println(table.String())
+
+	} else {
+		fmt.Println("No challenges present.")
+	}
+
+	return nil
 }
