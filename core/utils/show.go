@@ -140,28 +140,18 @@ func PrintTableHeader(w *tabwriter.Writer) {
 func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 
 	challenges, err := database.QueryAllChallenges()
+
 	Status, _ := cmd.Flags().GetString("status")
 	Status = strings.ToLower(Status)
+
+	tags, _ := cmd.Flags().GetString("tags")
+	tags = strings.ToLower(Status)
 
 	if err != nil {
 		return fmt.Errorf("DATABASE ERROR while processing the request :%v", err)
 	}
 
 	if len(challenges) > 0 {
-
-		var portNumber string
-		for _, challenge := range challenges {
-			for _, port := range challenge.Ports {
-				portNumber = portNumber + fmt.Sprint(port.PortNo) + " "
-			}
-		}
-
-		var tagName string
-		for _, challenge := range challenges {
-			for _, tag := range challenge.Tags {
-				tagName = tagName + fmt.Sprint(tag.TagName) + " "
-			}
-		}
 
 		table := simpletable.New()
 
@@ -180,13 +170,11 @@ func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 
 		for _, challenge := range challenges {
 
-			if Status == "deployed" && challenge.Status != "Deployed" {
-				continue
-			}
-			if Status == "undeployed" && challenge.Status != "Undeployed" {
-				continue
-			}
-			if Status == "queued" && challenge.Status != "Queued" {
+			var status1 bool = (Status == "deployed" && challenge.Status != "Deployed")
+			var status2 bool = (Status == "undeployed" && challenge.Status != "Undeployed")
+			var status3 bool = (Status == "queued" && challenge.Status != "Queued")
+
+			if status1 || status2 || status3 {
 				continue
 			}
 
@@ -196,9 +184,9 @@ func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.ContainerId[0:15])},
 				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.ImageId[0:15])},
 				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.Status)},
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", tagName)},
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", tagNameData(&challenge, tags))},
 				{Align: simpletable.AlignCenter, Text: fmt.Sprintf("%d", challenge.HealthCheck)},
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", portNumber)},
+				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", portNumberData(&challenge))},
 			}
 
 			table.Body.Cells = append(table.Body.Cells, r)
@@ -209,8 +197,36 @@ func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 		fmt.Println(table.String())
 
 	} else {
-		fmt.Println("No challenges present.")
+		fmt.Println("No challenges found")
 	}
 
 	return nil
+}
+
+func portNumberData(challenge *database.Challenge) string {
+	var portNumber string
+	for _, port := range challenge.Ports {
+		portNumber = portNumber + fmt.Sprint(port.PortNo) + " "
+	}
+	return portNumber
+}
+
+func tagNameData(challenge *database.Challenge, tags string) string {
+	var tagName string
+
+	for _, tag := range challenge.Tags {
+
+		var tag1 bool = (tags == "pwn" && strings.ToLower(tag.TagName) != "pwn")
+		var tag2 bool = (tags == "web" && strings.ToLower(tag.TagName) != "web")
+		var tag3 bool = (tags == "docker" && strings.ToLower(tag.TagName) != "docker")
+		var tag4 bool = (tags == "image" && strings.ToLower(tag.TagName) != "image")
+
+		if tag1 || tag2 || tag3 || tag4 {
+			continue
+		}
+
+		tagName = tagName + fmt.Sprint(tag.TagName) + " "
+
+	}
+	return tagName
 }
