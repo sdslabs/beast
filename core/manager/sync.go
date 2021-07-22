@@ -95,6 +95,105 @@ func ResetBeastRemote() error {
 	return fmt.Errorf(errors)
 }
 
+// IsAlreadySynced checks if the local repository is already synced
+func IsAlreadySynced() bool {
+	for _, gitRemote := range config.Cfg.GitRemotes {
+		if gitRemote.Active == true {
+			gitDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName)
+			err := utils.ValidateDirExists(gitDir)
+			if err != nil {
+				return false
+			}
+
+			synced, err := git.IsAlreadyUpToDate(gitDir, gitRemote.Secret, gitRemote.Branch, core.GIT_DEFAULT_REMOTE)
+			if err != nil {
+				log.Errorf("Error while checking if local repo already synced: %s", err)
+				return false
+			}
+			if !synced {
+				return false
+			}
+		}
+	}
+
+	log.Info("Local challenge repository already synced")
+	return true
+}
+
+// SyncAndGetChangesFromRemote gets changes from remote since the last sync
+// Returns an array of names of challenges which were modified
+func SyncAndGetChangesFromRemote() []string {
+	log.Info("Syncing local challenge repository with remote.")
+	var modifiedChallsNameList []string
+
+	alreadySynced := IsAlreadySynced()
+	if alreadySynced {
+		return modifiedChallsNameList
+	}
+
+	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
+	gitRemoteDirSet := utils.EmptySet()
+	for _, gitRemote := range config.Cfg.GitRemotes {
+		if gitRemote.Active == true {
+			remote := filepath.Join(beastRemoteDir, gitRemote.RemoteName)
+			if !gitRemoteDirSet.Contains(remote) {
+				gitRemoteDirSet.Add(remote)
+			} else {
+				log.Errorf("Directory already in use for another remote")
+				continue
+			}
+
+			err := utils.ValidateDirExists(remote)
+			log.Debugf("Remote: %s, Branch: %s", remote, gitRemote.Branch)
+
+			if err != nil {
+				log.Warnf("Directory for the remote(%s) does not exist", remote)
+				log.Infof("Performing initial repository clone, this may take a while...")
+
+				err = git.Clone(remote, gitRemote.Secret, gitRemote.Url, gitRemote.Branch, core.GIT_DEFAULT_REMOTE)
+				if err != nil {
+					log.Errorf("Error while cloning repository: %s", err)
+					continue
+				}
+
+				challengesDirRoot := filepath.Join(remote, core.BEAST_REMOTE_CHALLENGE_DIR)
+				err, challenges := utils.GetDirsInDir(challengesDirRoot)
+				if err != nil {
+					log.Errorf("Error while getting available challenges for the remote(%s): %s", remote, err)
+					continue
+				}
+
+				modifiedChallsNameList = append(modifiedChallsNameList, challenges...)
+			}
+
+			log.Debugf("Pulling latest changes from the remote.")
+
+			err = utils.ValidateFileExists(gitRemote.Secret)
+			if err != nil {
+				log.Errorf("Error while validating file location: %s: %s", gitRemote.Secret, err)
+				continue
+			}
+
+			filesChanged, err := git.PullAndGetChanges(remote, gitRemote.Secret, gitRemote.Branch, core.GIT_DEFAULT_REMOTE)
+			if err != nil {
+				if !strings.Contains(err.Error(), "already up-to-date") {
+					log.Errorf("Error while syncing beast with git remote: %s", err)
+					continue
+				}
+				log.Infof("GIT remote already synced")
+			}
+
+			challenges := ExtractChallengeNamesFromFileNames(filesChanged)
+			modifiedChallsNameList = append(modifiedChallsNameList, challenges...)
+		}
+	}
+	log.Info("Beast git base synced with remote")
+	go config.UpdateUsedPortList()
+	UpdateChallenges()
+
+	return modifiedChallsNameList
+}
+
 func RunBeastBootsetps() error {
 	log.Info("Syncing beast git challenge dir with remote....")
 

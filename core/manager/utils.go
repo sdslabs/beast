@@ -619,6 +619,24 @@ func GetAvailableChallenges() ([]string, error) {
 	return challsNameList, nil
 }
 
+// ExtractChallengeNamesFromFileNames extracts names of challenges from an array of filenames (git style file paths)
+func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
+	var challengeNames []string
+	set := utils.EmptySet() // A set to help avoid duplicate entries
+	for _, fileName := range fileNames {
+		filePathArr := strings.Split(fileName, "/")
+		if len(filePathArr) > 2 && filePathArr[0] == core.BEAST_REMOTE_CHALLENGE_DIR {
+			challengeName := filePathArr[1]
+			if !set.Contains(challengeName) {
+				challengeNames = append(challengeNames, challengeName)
+				set.Add(challengeName)
+			}
+		} 
+	}
+	
+	return challengeNames
+}
+
 //UnTars challenge folder in a destination directory
 func UnTarChallengeFolder(tarContextPath, dstPath string) (string, error) {
 	baseFileName := filepath.Base(tarContextPath)
@@ -740,7 +758,7 @@ func UpdateChallenges() {
 			var config cfg.BeastChallengeConfig
 			_, err := toml.DecodeFile(configFile, &config)
 			if err != nil {
-				log.Errorf("Error while decoding challenge config file")
+				log.Errorf("Error while decoding challenge config file: %s", err.Error())
 				continue
 			}
 			challengeName := config.Challenge.Metadata.Name
