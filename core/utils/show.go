@@ -170,23 +170,33 @@ func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 
 		for _, challenge := range challenges {
 
-			var status1 bool = (Status == "deployed" && challenge.Status != "Deployed")
-			var status2 bool = (Status == "undeployed" && challenge.Status != "Undeployed")
-			var status3 bool = (Status == "queued" && challenge.Status != "Queued")
+			var statusCheck bool
+			var tagName string = tagNameData(&challenge, tags)
 
-			if status1 || status2 || status3 {
+			statvals := [3]string{"deployed", "undeployed", "queued"}
+			for _, status := range statvals {
+				if Status == status && strings.ToLower(challenge.Status) != status {
+					statusCheck = true
+					break
+				}
+			}
+
+			if statusCheck {
+				continue
+			}
+			if tagName == "" {
 				continue
 			}
 
 			r := []*simpletable.Cell{
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.Name)},
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.Type)},
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.ContainerId[0:15])},
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.ImageId[0:15])},
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", challenge.Status)},
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", tagNameData(&challenge, tags))},
+				{Align: simpletable.AlignLeft, Text: challenge.Name},
+				{Align: simpletable.AlignLeft, Text: challenge.Type},
+				{Align: simpletable.AlignLeft, Text: challenge.ContainerId[0:15]},
+				{Align: simpletable.AlignLeft, Text: challenge.ImageId[0:15]},
+				{Align: simpletable.AlignLeft, Text: challenge.Status},
+				{Align: simpletable.AlignLeft, Text: tagName},
 				{Align: simpletable.AlignCenter, Text: fmt.Sprintf("%d", challenge.HealthCheck)},
-				{Align: simpletable.AlignLeft, Text: fmt.Sprintf("%s", portNumberData(&challenge))},
+				{Align: simpletable.AlignLeft, Text: portNumberData(&challenge)},
 			}
 
 			table.Body.Cells = append(table.Body.Cells, r)
@@ -212,20 +222,45 @@ func portNumberData(challenge *database.Challenge) string {
 }
 
 func tagNameData(challenge *database.Challenge, tags string) string {
-	var tagName string
 
-	for _, tag := range challenge.Tags {
+	tagsData, err := database.GetRelatedTags(challenge)
 
-		var tag1 bool = (tags == "pwn" && strings.ToLower(tag.TagName) != "pwn")
-		var tag2 bool = (tags == "web" && strings.ToLower(tag.TagName) != "web")
-		var tag3 bool = (tags == "docker" && strings.ToLower(tag.TagName) != "docker")
-		var tag4 bool = (tags == "image" && strings.ToLower(tag.TagName) != "image")
+	if err != nil {
+		fmt.Errorf("DATABASE ERROR while processing the Tag request :%v", err)
+	}
 
-		if tag1 || tag2 || tag3 || tag4 {
-			continue
+	var tagName string = ""
+	var check bool
+
+	if tags == "all" {
+		for _, tag := range tagsData {
+
+			tagName = tagName + fmt.Sprint(tag.TagName) + " "
+		}
+		return tagName
+	}
+
+	for _, tag := range tagsData {
+
+		input := strings.Split(tags, ",")
+		details := strings.Split(tag.TagName, ",")
+
+		for _, input := range input {
+			for _, details := range details {
+				if details == input {
+					check = true
+					break
+				}
+			}
 		}
 
-		tagName = tagName + fmt.Sprint(tag.TagName) + " "
+		if check {
+			for _, tag := range challenge.Tags {
+
+				tagName = tagName + fmt.Sprint(tag.TagName) + " "
+			}
+
+		}
 
 	}
 	return tagName
