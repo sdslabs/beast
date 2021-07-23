@@ -168,8 +168,8 @@ func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 		for _, challenge := range challenges {
 
 			var statusCheck bool
-			var tagName string = tagNameData(&challenge, tags)
-			var portNumber string = portNumberData(&challenge)
+			var tagName string = TagNameData(&challenge, tags)
+			var portNumber string = PortNumberData(&challenge)
 
 			statVals := [3]string{"deployed", "undeployed", "queued"}
 			for _, statVals := range statVals {
@@ -208,7 +208,7 @@ func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func portNumberData(challenge *database.Challenge) string {
+func PortNumberData(challenge *database.Challenge) string {
 	var portNumber string
 	for _, port := range challenge.Ports {
 		portNumber = portNumber + fmt.Sprint(port.PortNo) + " "
@@ -216,7 +216,7 @@ func portNumberData(challenge *database.Challenge) string {
 	return portNumber
 }
 
-func tagNameData(challenge *database.Challenge, tags string) string {
+func TagNameData(challenge *database.Challenge, tags string) string {
 	tagName := ""
 	var check bool
 
