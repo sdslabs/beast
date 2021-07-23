@@ -138,17 +138,14 @@ func PrintTableHeader(w *tabwriter.Writer) {
 }
 
 func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
-
 	challenges, err := database.QueryAllChallenges()
-
-	Status, _ := cmd.Flags().GetString("status")
-	Status = strings.ToLower(Status)
+	status, _ := cmd.Flags().GetString("status")
 
 	tags, _ := cmd.Flags().GetString("tags")
-	tags = strings.ToLower(Status)
+	tags = strings.ToLower(tags)
 
 	if err != nil {
-		return fmt.Errorf("DATABASE ERROR while processing the request :%v", err)
+		return fmt.Errorf("Database query error : %v", err)
 	}
 
 	if len(challenges) > 0 {
@@ -172,19 +169,17 @@ func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 
 			var statusCheck bool
 			var tagName string = tagNameData(&challenge, tags)
+			var portNumber string = portNumberData(&challenge)
 
-			statvals := [3]string{"deployed", "undeployed", "queued"}
-			for _, status := range statvals {
-				if Status == status && strings.ToLower(challenge.Status) != status {
+			statVals := [3]string{"deployed", "undeployed", "queued"}
+			for _, statVals := range statVals {
+				if strings.ToLower(status) == statVals && strings.ToLower(challenge.Status) != statVals {
 					statusCheck = true
 					break
 				}
 			}
 
-			if statusCheck {
-				continue
-			}
-			if tagName == "" {
+			if statusCheck || tagName == "" {
 				continue
 			}
 
@@ -196,7 +191,7 @@ func ShowChallengeInfo(cmd *cobra.Command, args []string) error {
 				{Align: simpletable.AlignLeft, Text: challenge.Status},
 				{Align: simpletable.AlignLeft, Text: tagName},
 				{Align: simpletable.AlignCenter, Text: fmt.Sprintf("%d", challenge.HealthCheck)},
-				{Align: simpletable.AlignLeft, Text: portNumberData(&challenge)},
+				{Align: simpletable.AlignLeft, Text: portNumber},
 			}
 
 			table.Body.Cells = append(table.Body.Cells, r)
@@ -222,26 +217,17 @@ func portNumberData(challenge *database.Challenge) string {
 }
 
 func tagNameData(challenge *database.Challenge, tags string) string {
-
-	tagsData, err := database.GetRelatedTags(challenge)
-
-	if err != nil {
-		fmt.Errorf("DATABASE ERROR while processing the Tag request :%v", err)
-	}
-
-	var tagName string = ""
+	tagName := ""
 	var check bool
 
 	if tags == "all" {
-		for _, tag := range tagsData {
-
-			tagName = tagName + fmt.Sprint(tag.TagName) + " "
+		for _, tag := range challenge.Tags {
+			tagName = tagName + tag.TagName + " "
 		}
 		return tagName
 	}
 
-	for _, tag := range tagsData {
-
+	for _, tag := range challenge.Tags {
 		input := strings.Split(tags, ",")
 		details := strings.Split(tag.TagName, ",")
 
@@ -256,12 +242,10 @@ func tagNameData(challenge *database.Challenge, tags string) string {
 
 		if check {
 			for _, tag := range challenge.Tags {
-
-				tagName = tagName + fmt.Sprint(tag.TagName) + " "
+				tagName = tagName + tag.TagName + " "
 			}
-
+			break
 		}
-
 	}
 	return tagName
 }
