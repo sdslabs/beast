@@ -24,6 +24,13 @@ var challengeCmd = &cobra.Command{
 		// Since action is already verfied to exist it does not make sense to check
 		// its existence here therefore we directly parse the action from the command.
 		action := args[0]
+		rebuild, _ := cmd.Flags().GetBool("rebuild-image")
+		if rebuild && core.MANAGE_ACTION_DEPLOY == args[0] {
+			action = "forcerebuild"
+		} else if rebuild {
+			log.Errorf("Rebuild flag is available only for \"deploy\" action")
+			os.Exit(1)
+		}
 
 		if action == core.MANAGE_ACTION_SHOW {
 

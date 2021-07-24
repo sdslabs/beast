@@ -34,10 +34,11 @@ type Worker struct {
 }
 
 var ChallengeActionHandlers = map[string]func(string) error{
-	core.MANAGE_ACTION_DEPLOY:   DeployChallenge,
-	core.MANAGE_ACTION_UNDEPLOY: UndeployChallenge,
-	core.MANAGE_ACTION_REDEPLOY: RedeployChallenge,
-	core.MANAGE_ACTION_PURGE:    PurgeChallenge,
+	core.MANAGE_ACTION_DEPLOY:       DeployChallenge,
+	core.MANAGE_ACTION_UNDEPLOY:     UndeployChallenge,
+	core.MANAGE_ACTION_REDEPLOY:     RedeployChallenge,
+	core.MANAGE_ACTION_PURGE:        PurgeChallenge,
+	core.MANAGE_ACTION_FORCEREBUILD: ForceReuildChallenge,
 }
 
 // Function which commits the deployed challenge provided
@@ -73,6 +74,9 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 	info := w.Info.(TaskInfo)
 	switch info.Action {
 	case core.MANAGE_ACTION_DEPLOY:
+		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit)
+
+	case core.MANAGE_ACTION_FORCEREBUILD:
 		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit)
 
 	case core.MANAGE_ACTION_UNDEPLOY:
@@ -619,4 +623,38 @@ func RedeployChallenge(challengeName string) error {
 		Info: TaskInfo{Action: core.MANAGE_ACTION_REDEPLOY},
 		ID:   challengeName,
 	})
+}
+
+func ForceReuildChallenge(challengeName string) error {
+	chall, err := database.QueryFirstChallengeEntry("name", challengeName)
+	if err != nil {
+		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		return err
+	}
+	if chall.Name != "" {
+		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+	}
+	log.Infof("Rebuilding challenge %s ", challengeName)
+	challengeDir := coreUtils.GetChallengeDir(challengeName)
+	if challengeDir == "" {
+		log.Errorf("Challenge does not exist")
+		return fmt.Errorf("challenge does not exist")
+	}
+	if err := ValidateChallengeDir(challengeDir); err != nil {
+		log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
+		return fmt.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
+	}
+	log.Debugf("Rebuilding previously built challenge")
+
+	info := TaskInfo{
+		Action:     core.MANAGE_ACTION_FORCEREBUILD,
+		ChallDir:   challengeDir,
+		SkipStage:  false,
+		SkipCommit: false,
+	}
+	return Q.Push(wpool.Task{
+		ID:   challengeName,
+		Info: info,
+	})
+
 }
