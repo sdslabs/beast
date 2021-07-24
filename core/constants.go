@@ -53,11 +53,12 @@ const ( //chall types
 )
 
 const ( // chall actions
-	MANAGE_ACTION_UNDEPLOY string = "undeploy"
-	MANAGE_ACTION_DEPLOY   string = "deploy"
-	MANAGE_ACTION_PURGE    string = "purge"
-	MANAGE_ACTION_REDEPLOY string = "redeploy"
-	MANAGE_ACTION_SHOW     string = "show"
+	MANAGE_ACTION_UNDEPLOY     string = "undeploy"
+	MANAGE_ACTION_DEPLOY       string = "deploy"
+	MANAGE_ACTION_PURGE        string = "purge"
+	MANAGE_ACTION_REDEPLOY     string = "redeploy"
+	MANAGE_ACTION_SHOW         string = "show"
+	MANAGE_ACTION_FORCEREBUILD string = "forcerebuild"
 )
 
 const ( // chall env
