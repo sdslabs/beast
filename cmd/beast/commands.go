@@ -28,6 +28,7 @@ var (
 	RefDirectory      string
 	Status            string
 	Tags              string
+	RebuildImage      bool
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -89,6 +90,7 @@ func init() {
 	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")
 	challengeCmd.PersistentFlags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Deploys challenge from local directory")
 	challengeCmd.PersistentFlags().BoolVarP(&DeleteEntry, "delete-entry", "d", false, "Deletes db entry related to this challenge")
+	challengeCmd.PersistentFlags().BoolVarP(&RebuildImage, "rebuild-image", "c", false, "Rebuilds image of a previously deployed challenge")
 
 	cmdRef.PersistentFlags().StringVarP(&RefDirectory, "reference-directory", "r", "", "Generate beast command reference files in reference directory")
 
