@@ -11,6 +11,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
@@ -93,6 +94,10 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
+
+	if config.RebuildImage && core.MANAGE_ACTION_DEPLOY == action {
+		action = "forcerebuild"
+	}
 	authorization := c.GetHeader("Authorization")
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)

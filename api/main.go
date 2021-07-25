@@ -97,5 +97,9 @@ func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
 		go manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
 	}
 
+	if config.RebuildImage {
+		log.Infof("Starting Beast server in rebuild mode. Any deployment will ocurr with new image only")
+	}
+	
 	router.Run(port)
 }

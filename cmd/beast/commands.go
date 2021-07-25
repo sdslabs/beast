@@ -49,6 +49,11 @@ var rootCmd = &cobra.Command{
 		} else {
 			config.SkipAuthorization = false
 		}
+		if RebuildImage {
+			config.RebuildImage = true
+		} else {
+			config.RebuildImage = false
+		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
@@ -75,6 +80,7 @@ func init() {
 	runCmd.PersistentFlags().BoolVarP(&HealthProbe, "health-probe", "k", false, "Run health check service for beast deployed challenges")
 	runCmd.PersistentFlags().BoolVarP(&PeriodicSync, "periodic-sync", "s", false, "Periodically sync remote with beast.")
 	runCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
+	runCmd.PersistentFlags().BoolVarP(&RebuildImage, "rebuild-image", "c", false, "Rebuilds image of a previously deployed challenge")
 
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
 	getAuthCmd.PersistentFlags().StringVarP(&Password, "password", "p", "", "Password")
