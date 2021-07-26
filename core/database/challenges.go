@@ -94,7 +94,7 @@ func QueryAllChallenges() ([]Challenge, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Preload("Ports").Find(&challenges)
+	tx := Db.Preload("Ports").Preload("Tags").Find(&challenges)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
