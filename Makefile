@@ -13,7 +13,7 @@ help:
 	@echo ""
 
 # Build beast
-build: tools
+build:
 	@./scripts/build/build.sh
 
 cmdref: build
@@ -55,7 +55,7 @@ tools:
 
 	@if ! test -x "`which importenv 2>&1;true`"; then \
 	  echo 'Warn: importenv is not installed, building....' >&2 ; \
-	  sudo gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
+	  sudo gcc-11 -o "/usr/bin/importenv" ./scripts/importenv.c ; \
 	fi
 
 requirements:

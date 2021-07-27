@@ -30,7 +30,7 @@ import (
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/multiple/:action [post]
-func manageMultipleChallengeHandler(c *gin.Context) {
+func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// If no tags are provided we by default we apply the action to all
 	// the challenges.
 	action := c.Param("action")
@@ -89,7 +89,7 @@ func manageMultipleChallengeHandler(c *gin.Context) {
 // @Param action query string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/challenge/ [post]
+// @Router /api/manage/challenge/multiple [post]
 func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
@@ -123,6 +123,55 @@ func manageChallengeHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: respStr,
 	})
+}
+
+// Handles route related to managing multiple challenges.
+// @Summary Handles multiple challenge management actions.
+// @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.
+// @Tags manage
+// @Accept  json
+// @Produce json
+// @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
+// @Param action query string true "Action for the challenge"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/manage/challenge/ [post]
+func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
+	identifier := c.PostForm("name")
+	action := c.PostForm("action")
+	authorization := c.GetHeader("Authorization")
+	names := strings.Split(identifier, ",")
+
+	for _, name := range names {
+		log.Infof("Trying %s for challenge with identifier : %s", action, name)
+		if msgs := manager.LogTransaction(name, action, authorization); msgs != nil {
+			log.Info("error while getting details")
+		}
+
+		challAction, ok := manager.ChallengeActionHandlers[action]
+		if !ok {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Invalid Action : %s", action),
+			})
+			return
+		}
+
+		log.Infof("Trying %s for challenge with identifier : %s", action, name)
+
+		err := challAction(name)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: err.Error(),
+			})
+			return
+		}
+
+		respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: respStr,
+		})
+	}
 }
 
 // Deploy local challenge
