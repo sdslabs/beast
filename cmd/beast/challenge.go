@@ -8,6 +8,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -20,8 +21,9 @@ var challengeCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		config.InitConfig()
-
-		// Since action is already verfied to exist it does not make sense to check
+		noCache, _ := cmd.Flags().GetBool("no-cache")
+		cr.IsNoCache = noCache
+		// Since action is already verified to exist it does not make sense to check
 		// its existence here therefore we directly parse the action from the command.
 		action := args[0]
 
@@ -113,6 +115,9 @@ var challengeCmd = &cobra.Command{
 				log.Errorf("The action was not performed due to error : %s", err.Error())
 				os.Exit(1)
 			} else {
+				if noCache {
+					log.Info("Force Rebuilding images without using cache")
+				}
 				log.Info("The action will be performed")
 			}
 		}

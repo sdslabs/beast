@@ -13,6 +13,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+var IsNoCache bool
+
 func RemoveImage(imageId string) error {
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -71,11 +73,11 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 		return nil, "", fmt.Errorf("Error while opening staged file :: %s", tarContextPath)
 	}
 	defer builderContext.Close()
-
 	buildOptions := types.ImageBuildOptions{
 		Tags:       []string{challengeTag},
 		Remove:     true,
 		Dockerfile: dockerCtxFile,
+		NoCache:    IsNoCache,
 	}
 
 	dockerClient, err := client.NewEnvClient()
