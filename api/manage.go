@@ -131,7 +131,7 @@ func manageChallengeHandler(c *gin.Context) {
 // @Tags manage
 // @Accept  json
 // @Produce json
-// @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
+// @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenges seperated by a comma"
 // @Param action query string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
