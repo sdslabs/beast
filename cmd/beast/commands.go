@@ -27,6 +27,8 @@ var (
 	LocalDirectory    string
 	DeleteEntry       bool
 	RefDirectory      string
+	Status            string
+	Tags              string
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -92,6 +94,9 @@ func init() {
 
 	cmdRef.PersistentFlags().StringVarP(&RefDirectory, "reference-directory", "r", "", "Generate beast command reference files in reference directory")
 
+	challDetailsCmd.PersistentFlags().StringVarP(&Status, "status", "s", "all", "Filter by status : deployed / undeployed / queued")
+	challDetailsCmd.PersistentFlags().StringVarP(&Tags, "tags", "t", "", "Filter by tagname : pwn / web / image / docker")
+
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(runCmd)
@@ -104,4 +109,5 @@ func init() {
 	rootCmd.AddCommand(disableUserSSH)
 	rootCmd.AddCommand(cmdRef)
 	rootCmd.AddCommand(generateTemplateCmd)
+	rootCmd.AddCommand(challDetailsCmd)
 }
