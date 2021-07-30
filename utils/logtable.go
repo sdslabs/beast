@@ -12,13 +12,7 @@ type TableConfigs struct {
 	TableBorder tablewriter.Border
 }
 
-type TableBorder struct {
-	Seperator   string
-	TableHeader []string
-	TableBorder tablewriter.Border
-}
-
-// logTable logs table with given configs and data
+// LogTable logs table with given configs and data
 func LogTable(configs TableConfigs, data [][]string) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader(configs.TableHeader)
@@ -28,6 +22,7 @@ func LogTable(configs TableConfigs, data [][]string) {
 	table.Render()
 }
 
+// CreateTableConfigs creates and returns an object of the type TableConfigs
 func CreateTableConfigs(border tablewriter.Border, header []string, seperator string) TableConfigs {
 	return TableConfigs{
 		TableBorder: border,
@@ -36,6 +31,7 @@ func CreateTableConfigs(border tablewriter.Border, header []string, seperator st
 	}
 }
 
+// CreateBorder creates and returns an object of the type tablewriter.Border
 func CreateBorder(left bool, right bool, top bool, bottom bool) tablewriter.Border {
 	return tablewriter.Border{
 		Left:   left,

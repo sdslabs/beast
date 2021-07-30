@@ -95,7 +95,7 @@ func init() {
 	cmdRef.PersistentFlags().StringVarP(&RefDirectory, "reference-directory", "r", "", "Generate beast command reference files in reference directory")
 
 	challDetailsCmd.PersistentFlags().StringVarP(&Status, "status", "s", "all", "Filter by status : deployed / undeployed / queued")
-	challDetailsCmd.PersistentFlags().StringVarP(&Tags, "tags", "t", "all", "Filter by tagname : pwn / web / image / docker")
+	challDetailsCmd.PersistentFlags().StringVarP(&Tags, "tags", "t", "", "Filter by tagname : pwn / web / image / docker")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)

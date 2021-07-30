@@ -136,51 +136,37 @@ func PrintTableHeader(w *tabwriter.Writer) {
 	fmt.Println(line)
 }
 
-// ShowChallengesInfo logs information about all the challenges present in the database
-func ShowChallengesInfo(cmd *cobra.Command, args []string) error {
+// ShowFilteredChallengesInfo logs info of challenges filtered by provided status and tags
+func ShowFilteredChallengesInfo(cmd *cobra.Command, args []string) error {
+
 	challenges, err := database.QueryAllChallenges()
 	if err != nil {
 		return fmt.Errorf("Database query error : %v", err)
 	}
+
 	var filteredChallenges []database.Challenge
+
 	if len(challenges) > 0 {
 		status, _ := cmd.Flags().GetString("status")
 		status = strings.ToLower(status)
 		tags, _ := cmd.Flags().GetString("tags")
 		tags = strings.ToLower(tags)
-		tagArray := strings.Split(tags, ",")
-
-		for _, challenge := range challenges {
-			var includeChallenge bool
-			if status == "all" && tags == "all" {
-				includeChallenge = true
-			} else if status == "all" {
-				if tagsIntersection(tagArray, &challenge) {
-					includeChallenge = true
-				}
-			} else if tags == "all" {
-				if status == strings.ToLower(challenge.Status) {
-					includeChallenge = true
-				}
-			} else if status == strings.ToLower(challenge.Status) && tagsIntersection(tagArray, &challenge) {
-				includeChallenge = true
-			}
-
-			if includeChallenge {
-				filteredChallenges = append(filteredChallenges, challenge)
-			}
+		var tagsArray []string
+		if len(tags) > 0 {
+			tagsArray = strings.Split(tags, ",")
 		}
+		filteredChallenges = filterChallenges(challenges, status, tagsArray)
 	} else {
 		fmt.Errorf("No challenges present in the database.")
 		return nil
 	}
 
 	if len(filteredChallenges) > 0 {
-		header := []string{"Name", "Type", "Container ID", "Image ID", "Status", "Tagname", "healthcheck", "Ports"}
+		header := []string{"Name", "Type", "Container ID", "Image ID", "Status", "Tagname", "Health Check", "Ports"}
 		border := utils.CreateBorder(true, false, true, false)
-		tableConfigs := utils.CreateTableConfigs(border, header, "|")
-		data := challengesData(filteredChallenges)
-		utils.LogTable(tableConfigs, data)
+		tConfigs := utils.CreateTableConfigs(border, header, "|")
+		tData := getTableDataFromChallenges(filteredChallenges)
+		utils.LogTable(tConfigs, tData)
 	} else {
 		fmt.Errorf("No challenges found for the provided filters.")
 	}
@@ -190,9 +176,9 @@ func ShowChallengesInfo(cmd *cobra.Command, args []string) error {
 
 // tagsIntersection returns true if there exists an intersection between tags passed
 // by the user and tags of the challenge, else returns false
-func tagsIntersection(tagsInput []string, challenge *database.Challenge) bool {
+func tagsIntersection(tagsInput []string, tags []*database.Tag) bool {
 	for _, tagIn := range tagsInput {
-		for _, tag := range challenge.Tags {
+		for _, tag := range tags {
 			if strings.ToLower(tagIn) == strings.ToLower(tag.TagName) {
 				return true
 			}
@@ -220,8 +206,33 @@ func concatenateAllTags(tags []*database.Tag) string {
 	return tagName
 }
 
-// challengeData returns a 2D array of data of queried challenges
-func challengesData(challenges []database.Challenge) [][]string {
+// filterChallenges returns an array of challenges filtered by status and tags
+func filterChallenges(challenges []database.Challenge, status string, tags []string) []database.Challenge {
+	var filteredChallenges []database.Challenge
+
+	for _, challenge := range challenges {
+		var includeChallenge bool
+
+		if status == "all" && len(tags) == 0 {
+			includeChallenge = true
+		} else if status == "all" {
+			includeChallenge = tagsIntersection(tags, challenge.Tags)
+		} else if len(tags) == 0 {
+			includeChallenge = status == strings.ToLower(challenge.Status)
+		} else if status == strings.ToLower(challenge.Status) && tagsIntersection(tags, challenge.Tags) {
+			includeChallenge = true
+		}
+
+		if includeChallenge {
+			filteredChallenges = append(filteredChallenges, challenge)
+		}
+	}
+
+	return filteredChallenges
+}
+
+// getTableDataFromChallenges returns data of provided challenges in tablewriter compatible format
+func getTableDataFromChallenges(challenges []database.Challenge) [][]string {
 	data := [][]string{}
 	for _, challenge := range challenges {
 		var tagName string = concatenateAllTags(challenge.Tags)
