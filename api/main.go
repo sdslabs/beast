@@ -47,7 +47,7 @@ func runBeastApiBootsteps() error {
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
+func RunBeastApiServer(port string, autoDeploy, healthProbe, periodicSync bool) {
 	log.Info("Bootstrapping Beast API server")
 
 	config.InitConfig()
@@ -89,12 +89,16 @@ func RunBeastApiServer(port string, healthProbe, periodicSync bool) {
 	BeastScheduler.Start()
 
 	if periodicSync {
-		log.Infof("Scheduling periodic remote sync for beast with period: %v", config.Cfg.RemoteSyncPeriod)
-		BeastScheduler.ScheduleEvery(config.Cfg.RemoteSyncPeriod, manager.SyncBeastRemote)
+		log.Infof("Scheduling periodic remote sync and auto update for beast with period: %v", config.Cfg.RemoteSyncPeriod)
+		BeastScheduler.ScheduleEvery(config.Cfg.RemoteSyncPeriod, manager.AutoUpdate)
 	}
 
 	if healthProbe {
 		go manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
+	}
+
+	if autoDeploy {
+		manager.InitialAutoDeploy()
 	}
 
 	router.Run(port)

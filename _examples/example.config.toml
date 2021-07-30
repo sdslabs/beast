@@ -22,6 +22,7 @@ available_sidecars = ["mysql"]
 jwt_secret = "beast"
 allowed_base_images = ["ubuntu:16.04", "php:7.1-cli"]
 authorized_keys_file = "/home/vsts/.beast/authorized_keys"
+remote_sync_period = "0h2m0s"
 
 [[remote]]
 ssh_key = "/home/vsts/.beast/secret.key"

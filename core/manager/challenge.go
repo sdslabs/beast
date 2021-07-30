@@ -429,6 +429,115 @@ func HandleAll(action string, user string) []string {
 	return handleMultipleChallenges(challsNameList, action)
 }
 
+// InitialAutoDeploy deploys challenges on server start
+// Assumes that the git remote has already been synced
+func InitialAutoDeploy() {
+	log.Infof("Starting to auto deploy all challenges")
+
+	synced := IsAlreadySynced()
+	if !synced {
+		log.Errorf("Git remote not synced")
+		return
+	}
+
+	challsNameList, err := GetAvailableChallenges()
+	if err != nil {
+		log.Errorf("Error while getting available challenges: %s", err.Error())
+		return
+	}
+	if len(challsNameList) == 0 {
+		log.Warnf("No challenge available")
+		return
+	}
+
+	handleMultipleChallenges(challsNameList, core.MANAGE_ACTION_DEPLOY)
+}
+
+// AutoUpdate deploys/updates challenges (without an explicit request)
+// Rules:
+//   - If a new challenge is added to the remote repo then it is deployed
+//   - If an existing challenge is modified in the remote repo then it is redeployed
+//   - If an existing challenge is deleted in the remote repo then it is purged
+// Note:
+//   If an existing challenge was undeployed manually then it will
+//   remain undeployed even if it is modified in the remote remo, but
+//   it will be purged if it is deleted in the remote repo
+func AutoUpdate() {
+	log.Infof("Checking for updates in remote repository")
+
+	oldChalls, err := GetAvailableChallenges()
+	if err != nil {
+		log.Errorf("Error getting challenges present in local repo: %s", err.Error())
+		return
+	}
+	oldChallsSet := utils.SetFromArray(oldChalls)
+
+	modifiedChalls := SyncAndGetChangesFromRemote()
+	if len(modifiedChalls) > 0 {
+		log.Infof("Detected changes in challenge(s): %v", modifiedChalls)
+	} else {
+		log.Infof("No changes detected since last sync")
+		return
+	}
+
+	newChalls, err := GetAvailableChallenges()
+	if err != nil {
+		log.Warnf("Error getting challenges present in local repo: %s", err.Error())
+		return
+	}
+	newChallsSet := utils.SetFromArray(newChalls)
+
+	undeployedChalls, err := database.QueryChallengeEntriesMap(map[string]interface{}{
+		"Status": core.DEPLOY_STATUS["undeployed"],
+	})
+	if err != nil {
+		log.Warnf("Error getting undeployed challenges: %s", err.Error())
+		return
+	}
+	undeployedChallsSet := utils.EmptySet()
+	for _, undeployedChall := range undeployedChalls {
+		undeployedChallsSet.Add(undeployedChall.Name)
+	}
+
+	var (
+		challsToDeploy   []string
+		challsToRedeploy []string
+		challsToPurge    []string
+	)
+
+	for _, modifiedChall := range modifiedChalls {
+		presentInOldChalls := oldChallsSet.Contains(modifiedChall)
+		presentInNewChalls := newChallsSet.Contains(modifiedChall)
+		presentInUndeployedChalls := undeployedChallsSet.Contains(modifiedChall)
+
+		if presentInUndeployedChalls && presentInOldChalls {
+			log.Warnf("Changes detected in undeployed challenge %s, ignoring them", modifiedChall)
+			continue
+		}
+
+		if !presentInOldChalls && presentInNewChalls {
+			challsToDeploy = append(challsToDeploy, modifiedChall)
+		} else if presentInOldChalls && presentInNewChalls {
+			challsToRedeploy = append(challsToRedeploy, modifiedChall)
+		} else if presentInOldChalls && !presentInNewChalls {
+			challsToPurge = append(challsToPurge, modifiedChall)
+		}
+	}
+
+	if len(challsToDeploy) > 0 {
+		log.Infof("Deploying challenge(s): %v", challsToDeploy)
+		handleMultipleChallenges(challsToDeploy, core.MANAGE_ACTION_DEPLOY)
+	}
+	if len(challsToRedeploy) > 0 {
+		log.Infof("Redeploying challenge(s): %v", challsToRedeploy)
+		handleMultipleChallenges(challsToRedeploy, core.MANAGE_ACTION_REDEPLOY)
+	}
+	if len(challsToPurge) > 0 {
+		log.Infof("Purging challenge(s): %v", challsToPurge)
+		handleMultipleChallenges(challsToPurge, core.MANAGE_ACTION_PURGE)
+	}
+}
+
 // Unstage a challenge based on the challenge name.
 // This simply removes the staging directory for the challenge from the staging area.
 func unstageChallenge(challengeName string) error {
