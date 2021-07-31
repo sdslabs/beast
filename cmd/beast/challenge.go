@@ -24,6 +24,13 @@ var challengeCmd = &cobra.Command{
 		// Since action is already verfied to exist it does not make sense to check
 		// its existence here therefore we directly parse the action from the command.
 		action := args[0]
+		noCache, _ := cmd.Flags().GetBool("no-cache")
+		if noCache && action == core.MANAGE_ACTION_DEPLOY {
+			config.NoCache = noCache
+		} else if noCache {
+			log.Errorf("no-cache flag is available only for \"deploy\" action")
+			os.Exit(1)
+		}
 
 		if action == core.MANAGE_ACTION_SHOW {
 
@@ -78,7 +85,7 @@ var challengeCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			manager.StartDeployPipeline(LocalDirectory, false, false)
+			manager.StartDeployPipeline(LocalDirectory, false, false, false)
 			return
 		}
 

@@ -108,7 +108,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 // if it exists then first the new image is created and then the old image is removed.
 //
 // stagedPath is the complete path to the tar file for the challenge in the staging dir
-func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig, stagedPath string) error {
+func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig, stagedPath string, noCache bool) error {
 	challengeName := config.Challenge.Metadata.Name
 	challengeStagingDir := filepath.Dir(stagedPath)
 
@@ -125,7 +125,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	challengeTag := coreUtils.EncodeID(challengeName)
-	buff, imageId, buildErr := cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx)
+	buff, imageId, buildErr := cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
 
 	// Create logs directory for the challenge in staging directory.
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
@@ -278,7 +278,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 //
 // During the staging steup if any error occurs, then the state of the challenge
 // in the database is set to undeployed.
-func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) error {
+func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) error {
 	log.Debug("Loading Beast config")
 
 	// If we are skipping commit step then we are automatically skipping
@@ -386,7 +386,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	if !skipCommit {
 		database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["committing"]})
 
-		err = commitChallenge(&challenge, config, stagedChallengePath)
+		err = commitChallenge(&challenge, config, stagedChallengePath, noCache)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"DEPLOY_ERROR": "COMMIT :: " + challengeName,
@@ -425,11 +425,11 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 
 // This is just a decorator function over bootstrapDeployPipeline and generate
 // notifications to slack on the basis of the result of the deploy pipeline.
-func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool) {
+func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) {
 	challengeName := filepath.Base(challengeDir)
 	var sendNotificationError error
 
-	err := bootstrapDeployPipeline(challengeDir, skipStage, skipCommit)
+	err := bootstrapDeployPipeline(challengeDir, skipStage, skipCommit, noCache)
 	if err != nil {
 		sendNotificationError = notify.SendNotification(notify.Error, err.Error())
 	} else {
