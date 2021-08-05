@@ -25,6 +25,7 @@ type TaskInfo struct {
 	SkipStage  bool
 	SkipCommit bool
 	Purge      bool
+	NoCache    bool
 }
 
 var Q *wpool.Queue
@@ -73,7 +74,7 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 	info := w.Info.(TaskInfo)
 	switch info.Action {
 	case core.MANAGE_ACTION_DEPLOY:
-		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit)
+		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit, info.NoCache)
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		err := StartUndeployChallenge(w.ID, false)
@@ -135,6 +136,7 @@ func DeployChallengePipeline(challengeDir string) error {
 		ChallDir:   challengeDir,
 		SkipStage:  false,
 		SkipCommit: false,
+		NoCache:    false,
 	}
 
 	//TODO: add status queued
@@ -190,6 +192,24 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	}
 
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	challengeDir := coreUtils.GetChallengeDir(challengeName)
+	if config.NoCache {
+		// no-cache flag is set true. so we need to rebuild the image of the challenge
+		log.Infof("Rebuilding image without cache for challenge: %s", challengeName)
+		log.Debugf("Pushing the task of building image of previously deployed challenge in the queue.")
+
+		info := TaskInfo{
+			Action:     core.MANAGE_ACTION_DEPLOY,
+			ChallDir:   challengeDir,
+			SkipStage:  false,
+			SkipCommit: false,
+			NoCache:    true,
+		}
+		return &wpool.Task{
+			ID:   challengeName,
+			Info: info,
+		}, nil
+	}
 
 	if coreUtils.IsImageIdValid(challenge.ImageId) {
 		imageExist, err := cr.CheckIfImageExists(challenge.ImageId)
@@ -209,6 +229,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 				ChallDir:   challengeStagingDir,
 				SkipStage:  true,
 				SkipCommit: true,
+				NoCache:    false,
 			}
 			return &wpool.Task{
 				ID:   challengeName,
@@ -235,7 +256,6 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	err = utils.ValidateFileExists(stagedFileName)
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
-		challengeDir := coreUtils.GetChallengeDir(challengeName)
 		if challengeDir == "" {
 			log.Errorf("Challenge does not exist")
 			return nil, fmt.Errorf("challenge does not exist")
@@ -253,6 +273,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			ChallDir:   challengeDir,
 			SkipStage:  false,
 			SkipCommit: false,
+			NoCache:    false,
 		}
 		return &wpool.Task{
 			ID:   challengeName,
@@ -270,6 +291,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			ChallDir:   challengeStagingDir,
 			SkipStage:  true,
 			SkipCommit: false,
+			NoCache:    false,
 		}
 		return &wpool.Task{
 			ID:   challengeName,

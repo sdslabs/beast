@@ -349,6 +349,7 @@ func UpdateUsedPortList() {
 
 var Cfg *BeastConfig
 var SkipAuthorization bool
+var NoCache bool
 var USED_PORTS_LIST []uint32
 
 // InitConfig loads the config from the global config file and populate

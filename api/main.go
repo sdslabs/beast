@@ -47,7 +47,7 @@ func runBeastApiBootsteps() error {
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port string, autoDeploy, healthProbe, periodicSync bool) {
+func RunBeastApiServer(port string, autoDeploy, healthProbe, periodicSync bool, noCache bool) {
 	log.Info("Bootstrapping Beast API server")
 
 	config.InitConfig()
@@ -101,5 +101,8 @@ func RunBeastApiServer(port string, autoDeploy, healthProbe, periodicSync bool) 
 		manager.InitialAutoDeploy()
 	}
 
+	if noCache {
+		log.Infof("Starting Beast server in no cache mode")
+	}
 	router.Run(port)
 }

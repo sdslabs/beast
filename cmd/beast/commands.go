@@ -29,6 +29,7 @@ var (
 	RefDirectory      string
 	Status            string
 	Tags              string
+	NoCache           bool
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -49,6 +50,8 @@ var rootCmd = &cobra.Command{
 		} else {
 			config.SkipAuthorization = false
 		}
+				
+		config.NoCache = NoCache
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
@@ -76,6 +79,7 @@ func init() {
 	runCmd.PersistentFlags().BoolVarP(&HealthProbe, "health-probe", "k", false, "Run health check service for beast deployed challenges")
 	runCmd.PersistentFlags().BoolVarP(&PeriodicSync, "periodic-sync", "s", false, "Periodically sync remote with beast and auto update challenges.")
 	runCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
+	runCmd.PersistentFlags().BoolVarP(&NoCache, "no-cache", "c", false, "Build image of challenge without using cache")
 
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
 	getAuthCmd.PersistentFlags().StringVarP(&Password, "password", "p", "", "Password")
@@ -91,6 +95,7 @@ func init() {
 	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")
 	challengeCmd.PersistentFlags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Deploys challenge from local directory")
 	challengeCmd.PersistentFlags().BoolVarP(&DeleteEntry, "delete-entry", "d", false, "Deletes db entry related to this challenge")
+	challengeCmd.PersistentFlags().BoolVarP(&NoCache, "no-cache", "c", false, "Build image of challenge without using cache")
 
 	cmdRef.PersistentFlags().StringVarP(&RefDirectory, "reference-directory", "r", "", "Generate beast command reference files in reference directory")
 
