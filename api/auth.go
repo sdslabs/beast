@@ -199,8 +199,10 @@ func login(c *gin.Context) {
 func register(c *gin.Context) {
 	name := c.PostForm("name")
 	username := c.PostForm("username")
+	college := c.PostForm("college")
 	password := c.PostForm("password")
 	email := c.PostForm("email")
+	subscribe := c.PostForm("subscribe")
 	sshKey := c.PostForm("ssh-key")
 
 	if username == "" || password == "" || email == "" {
@@ -214,16 +216,30 @@ func register(c *gin.Context) {
 		Name:      name,
 		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["contestant"]),
 		Email:     email,
+		College:   college,
+		Subscribe: subscribe,
 		SshKey:    sshKey,
 	}
 
 	err := database.CreateUserEntry(&userEntry)
-
+	
 	if err != nil {
-		c.JSON(http.StatusNotAcceptable, HTTPPlainResp{
-			Message: err.Error(),
-		})
-		return
+		if(strings.Contains(err.Error(),"email")) {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: "Email is already in use",
+			})
+			return
+		} else if(strings.Contains(err.Error(),"username")) {
+			c.JSON(http.StatusNotAcceptable, HTTPPlainResp{
+				Message: "Username is already in use",
+			})
+			return
+		} else {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: "Something went wrong",
+			})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainResp{

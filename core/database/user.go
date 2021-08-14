@@ -29,6 +29,8 @@ type User struct {
 	Challenges []*Challenge `gorm:"many2many:user_challenges;"`
 	Name       string       `gorm:"not null"`
 	Email      string       `gorm:"non null;unique"`
+	College    string
+	Subscribe  string
 	SshKey     string
 	Status     uint `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score      uint `gorm:"default:0"`
