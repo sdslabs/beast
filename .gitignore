@@ -2,3 +2,5 @@
 beast.log
 venv/
 site/
+.vagrant/
+.gnupg/
