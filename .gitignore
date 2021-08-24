@@ -2,3 +2,6 @@
 beast.log
 venv/
 site/
+.vagrant/
+.gnupg/
+ubuntu-bionic-18.04-cloudimg-console.log
