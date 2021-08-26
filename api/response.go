@@ -100,6 +100,7 @@ type ChallengeInfoResp struct {
 	Status       string          `json:"status" example:"deployed"`
 	Ports        []uint32        `json:"ports" example:[3001, 3002]`
 	Hints        string          `json:"hints" example:Try robots`
+	Assets       string          `json:"assets" example:["image.png"]`
 	Desc         string          `json:"description" example:A simple web challenge`
 	Points       uint            `json:"points" example:"50"`
 	SolvesNumber int             `json:"solvesNumber" example:"100"`
@@ -111,6 +112,7 @@ type ChallengePreviewResp struct {
 	Category string   `json:"category" example:"web"`
 	Ports    []uint32 `json:"ports" example:[3001, 3002]`
 	Hints    []string `json:"hints" example:Try robots`
+	Assets   []string `json:"assets" example:image.png`
 	Desc     string   `json:"description" example:A simple web challenge`
 	Points   uint     `json:"points" example:"50"`
 }

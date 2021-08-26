@@ -46,6 +46,7 @@ type Challenge struct {
 	Type        string `gorm:"type:varchar(64)"`
 	Sidecar     string `gorm:"type:varchar(64)"`
 	Hints       string `gorm:"type:text"`
+	Assets      string `gorm:"type:text"`
 	Description string `gorm:"type:text"`
 	Format      string `gorm:"not null"`
 	ContainerId string `gorm:"size:64;unique"`

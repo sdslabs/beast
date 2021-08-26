@@ -74,6 +74,7 @@ description = "" # Descritption for the challenge.
 # Optional fields.
 tags = ["", ""] # Tags that the challenge might belong to, used to do bulk query and handling eg. binary, misc etc.
 hints = ["", ""]
+Assets = ["", ""]
 sidecar = "" # Name of the sidecar if any used by the challenge.
 points = 0 # Points given to the player for correct flag submission. Default value is 0, if not mentioned in the challenge config file 
 ```

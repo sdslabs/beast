@@ -49,6 +49,7 @@ type ChallengePreview struct {
 	Category string
 	Ports    []database.Port
 	Hints    string
+	Assets   string
 	Desc     string
 	Points   uint
 }
@@ -459,6 +460,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Sidecar:     config.Challenge.Metadata.Sidecar,
 			Description: config.Challenge.Metadata.Description,
 			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
+			Assets:      strings.Join(config.Challenge.Metadata.Assets, core.DELIMITER),
 			Points:      config.Challenge.Metadata.Points,
 		}
 
@@ -631,9 +633,9 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 				challengeNames = append(challengeNames, challengeName)
 				set.Add(challengeName)
 			}
-		} 
+		}
 	}
-	
+
 	return challengeNames
 }
 

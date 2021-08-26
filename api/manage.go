@@ -449,6 +449,7 @@ func manageUploadHandler(c *gin.Context) {
 		Category: config.Challenge.Metadata.Type,
 		Ports:    config.Challenge.Env.Ports,
 		Hints:    config.Challenge.Metadata.Hints,
+		Assets:   config.Challenge.Metadata.Assets,
 		Desc:     config.Challenge.Metadata.Description,
 		Points:   config.Challenge.Metadata.Points,
 	})

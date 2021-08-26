@@ -106,6 +106,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Points:       challenge.Points,
 			SolvesNumber: challSolves,
 			Solves:       challengeUser,
+			Assets:       challenge.Assets,
 		})
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
@@ -216,6 +217,7 @@ func challengesInfoHandler(c *gin.Context) {
 			Points:       challenge.Points,
 			SolvesNumber: challSolves,
 			Solves:       challengeUser,
+			Assets:       challenge.Assets,
 		}
 	}
 
