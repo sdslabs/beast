@@ -82,6 +82,7 @@ type ChallengeSolveResp struct {
 	Id       uint      `json:"id" example:"4"`
 	Name     string    `json:"name" example:"Web Challenge"`
 	Category string    `json:"category" example:"web"`
+	Tags     string    `json:"tag" example:"pwn"`
 	SolvedAt time.Time `json:"solvedAt"`
 	Points   uint      `json:"points" example:"50"`
 }
@@ -95,7 +96,8 @@ type UserSolveResp struct {
 type ChallengeInfoResp struct {
 	Name         string          `json:"name" example:"Web Challenge"`
 	ChallId      uint            `json:"id" example: 0`
-	Category     string          `json:"category" example:"web"`
+	Category     string          `json:"category" example:"bare"`
+	Tags         string          `json:"tag" example:"pwn"`
 	CreatedAt    time.Time       `json:"createdAt"`
 	Status       string          `json:"status" example:"deployed"`
 	Ports        []uint32        `json:"ports" example:[3001, 3002]`
@@ -110,6 +112,7 @@ type ChallengeInfoResp struct {
 type ChallengePreviewResp struct {
 	Name     string   `json:"name" example:"Web Challenge"`
 	Category string   `json:"category" example:"web"`
+	Tags     string   `json:"tag" example:"pwn"`
 	Ports    []uint32 `json:"ports" example:[3001, 3002]`
 	Hints    []string `json:"hints" example:Try robots`
 	Assets   []string `json:"assets" example:image.png`
@@ -123,6 +126,7 @@ type SubmissionResp struct {
 	ChallId   uint      `json:"chall_id" example:"3"`
 	ChallName string    `json:"name" example:"Web Challenge"`
 	Category  string    `json:"category" example:"web"`
+	Tags      string    `json:"tag" example:"pwn"`
 	Points    uint      `json:"points" example:"50"`
 	SolvedAt  time.Time `json:"solvedAt"`
 }

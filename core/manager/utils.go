@@ -47,6 +47,7 @@ type BeastXinetdConf struct {
 type ChallengePreview struct {
 	Name     string
 	Category string
+	Tags     string
 	Ports    []database.Port
 	Hints    string
 	Assets   string

@@ -98,6 +98,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Name:         name,
 			ChallId:      challenge.ID,
 			Category:     challenge.Type,
+			Tags:         challenge.Type,
 			CreatedAt:    challenge.CreatedAt,
 			Status:       challenge.Status,
 			Ports:        challengePorts,
@@ -209,6 +210,7 @@ func challengesInfoHandler(c *gin.Context) {
 			Name:         challenge.Name,
 			ChallId:      challenge.ID,
 			Category:     challenge.Type,
+			Tags:         challenge.Tags[0].TagName,
 			CreatedAt:    challenge.CreatedAt,
 			Status:       challenge.Status,
 			Ports:        challengePorts,
@@ -348,6 +350,7 @@ func userInfoHandler(c *gin.Context) {
 			Id:       challenge.ID,
 			Name:     challenge.Name,
 			Category: challenge.Type,
+			Tags:     challenge.Tags[0].TagName,
 			SolvedAt: challenge.CreatedAt,
 			Points:   challenge.Points,
 		}
@@ -458,6 +461,7 @@ func submissionsHandler(c *gin.Context) {
 				ChallId:   challenge[0].ID,
 				ChallName: challenge[0].Name,
 				Category:  challenge[0].Type,
+				Tags:      challenge[0].Tags[0].TagName,
 				Points:    challenge[0].Points,
 				SolvedAt:  submission.CreatedAt,
 			}
