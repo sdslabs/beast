@@ -206,7 +206,7 @@ func challengesInfoHandler(c *gin.Context) {
 			}
 		}
 		tag := ""
-		if len(challenge.Tags) == 0 {
+		if len(challenge.Tags) != 0 {
 			tag = challenge.Tags[0].TagName
 		}
 		availableChallenges[index] = ChallengeInfoResp{
@@ -350,7 +350,7 @@ func userInfoHandler(c *gin.Context) {
 	userChallenges := make([]ChallengeSolveResp, len(challenges))
 	for index, challenge := range challenges {
 		tag := ""
-		if len(challenge.Tags) == 0 {
+		if len(challenge.Tags) != 0 {
 			tag = challenge.Tags[0].TagName
 		}
 		challResp := ChallengeSolveResp{
@@ -463,7 +463,7 @@ func submissionsHandler(c *gin.Context) {
 				continue
 			}
 			tag := ""
-			if len(challenge[0].Tags) == 0 {
+			if len(challenge[0].Tags) != 0 {
 				tag = challenge[0].Tags[0].TagName
 			}
 			singleSubmissionResp := SubmissionResp{
