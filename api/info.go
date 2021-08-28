@@ -205,12 +205,15 @@ func challengesInfoHandler(c *gin.Context) {
 				challSolves++
 			}
 		}
-
+		tag := ""
+		if len(challenge.Tags) == 0 {
+			tag = challenge.Tags[0].TagName
+		}
 		availableChallenges[index] = ChallengeInfoResp{
 			Name:         challenge.Name,
 			ChallId:      challenge.ID,
 			Category:     challenge.Type,
-			Tags:         challenge.Tags[0].TagName,
+			Tags:         tag,
 			CreatedAt:    challenge.CreatedAt,
 			Status:       challenge.Status,
 			Ports:        challengePorts,
@@ -346,11 +349,15 @@ func userInfoHandler(c *gin.Context) {
 
 	userChallenges := make([]ChallengeSolveResp, len(challenges))
 	for index, challenge := range challenges {
+		tag := ""
+		if len(challenge.Tags) == 0 {
+			tag = challenge.Tags[0].TagName
+		}
 		challResp := ChallengeSolveResp{
 			Id:       challenge.ID,
 			Name:     challenge.Name,
 			Category: challenge.Type,
-			Tags:     challenge.Tags[0].TagName,
+			Tags:     tag,
 			SolvedAt: challenge.CreatedAt,
 			Points:   challenge.Points,
 		}
@@ -455,13 +462,17 @@ func submissionsHandler(c *gin.Context) {
 			if len(challenge) == 0 {
 				continue
 			}
+			tag := ""
+			if len(challenge[0].Tags) == 0 {
+				tag = challenge[0].Tags[0].TagName
+			}
 			singleSubmissionResp := SubmissionResp{
 				UserId:    user.ID,
 				Username:  user.Username,
 				ChallId:   challenge[0].ID,
 				ChallName: challenge[0].Name,
 				Category:  challenge[0].Type,
-				Tags:      challenge[0].Tags[0].TagName,
+				Tags:      tag,
 				Points:    challenge[0].Points,
 				SolvedAt:  submission.CreatedAt,
 			}
