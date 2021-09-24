@@ -26,7 +26,7 @@ type AvailableImagesResp struct {
 type PortsInUseResp struct {
 	MinPortValue uint32   `json:"port_min_value" example:"10000"`
 	MaxPortValue uint32   `json:"port_max_value" example:"20000"`
-	PortsInUse   []uint32 `json:"ports_in_use" example:[100001, 100003, 10010]`
+	PortsInUse   []uint32 `json:"ports_in_use" example:"[100001, 100003, 10010]"`
 }
 
 type ChallengeStatusResp struct {
@@ -81,7 +81,8 @@ type UsersResp struct {
 type ChallengeSolveResp struct {
 	Id       uint      `json:"id" example:"4"`
 	Name     string    `json:"name" example:"Web Challenge"`
-	Category string    `json:"category" example:"web"`
+	Category string    `json:"category" example:"bare"`
+	Tags     []string  `json:"tags" example:"['pwn','misc']"`
 	SolvedAt time.Time `json:"solvedAt"`
 	Points   uint      `json:"points" example:"50"`
 }
@@ -94,13 +95,13 @@ type UserSolveResp struct {
 
 type ChallengeInfoResp struct {
 	Name         string          `json:"name" example:"Web Challenge"`
-	ChallId      uint            `json:"id" example: 0`
-	Category     string          `json:"category" example:"web"`
+	ChallId      uint            `json:"id" example:"0"`
+	Category     string          `json:"category" example:"bare"`
 	CreatedAt    time.Time       `json:"createdAt"`
 	Status       string          `json:"status" example:"deployed"`
-	Ports        []uint32        `json:"ports" example:[3001, 3002]`
-	Hints        string          `json:"hints" example:Try robots`
-	Desc         string          `json:"description" example:A simple web challenge`
+	Ports        []uint32        `json:"ports" example:"[3001, 3002]"`
+	Hints        string          `json:"hints" example:"Try robots"`
+	Desc         string          `json:"description" example:"A simple web challenge"`
 	Points       uint            `json:"points" example:"50"`
 	SolvesNumber int             `json:"solvesNumber" example:"100"`
 	Solves       []UserSolveResp `json:"solves"`
@@ -109,9 +110,9 @@ type ChallengeInfoResp struct {
 type ChallengePreviewResp struct {
 	Name     string   `json:"name" example:"Web Challenge"`
 	Category string   `json:"category" example:"web"`
-	Ports    []uint32 `json:"ports" example:[3001, 3002]`
-	Hints    []string `json:"hints" example:Try robots`
-	Desc     string   `json:"description" example:A simple web challenge`
+	Ports    []uint32 `json:"ports" example:"[3001, 3002]"`
+	Hints    []string `json:"hints" example:"Try robots"`
+	Desc     string   `json:"description" example:"A simple web challenge"`
 	Points   uint     `json:"points" example:"50"`
 }
 
@@ -127,21 +128,21 @@ type SubmissionResp struct {
 
 type FlagSubmitResp struct {
 	Message string `json:"message" example:"Your answer is correct"`
-	Success bool   `json:"success" example:true`
+	Success bool   `json:"success" example:"true"`
 }
 
 type UsersStatisticsResp struct {
 	TotalRegisteredUsers uint `json:"total_registered_users" example:"120"`
-	BannedUsers          uint `json:"banned_users" example:"60`
-	UnbannedUsers        uint `json:"unbanned_users" example:"60`
+	BannedUsers          uint `json:"banned_users" example:"60"`
+	UnbannedUsers        uint `json:"unbanned_users" example:"60"`
 }
 
 type CompetitionInfoResp struct {
 	Name         string `json:"name" example:"fristonio"`
 	About        string `json:"about" example:"This is a CTF competition"`
 	Prizes       string `json:"prizes" example:"1st and 2nd place winners will get $10K"`
-	StartingTime string `json:"starting_time" example:`
-	EndingTime   string `json:"ending_time" example:`
-	TimeZone     string `json:"timezone" example:`
-	LogoURL      string `json:"logo_url" example:`
+	StartingTime string `json:"starting_time"`
+	EndingTime   string `json:"ending_time"`
+	TimeZone     string `json:"timezone" example:"Asia/Calcutta: UTC +05:30"`
+	LogoURL      string `json:"logo_url"`
 }

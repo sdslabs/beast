@@ -353,6 +353,13 @@ func userInfoHandler(c *gin.Context) {
 	}
 
 	rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+	if err != nil {
+		log.Error(err)
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
 
 	resp = UserResp{
 		Username:   user.Username,
