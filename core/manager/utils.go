@@ -47,6 +47,7 @@ type BeastXinetdConf struct {
 type ChallengePreview struct {
 	Name     string
 	Category string
+	Tags     []string
 	Ports    []database.Port
 	Hints    string
 	Desc     string
@@ -631,9 +632,9 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 				challengeNames = append(challengeNames, challengeName)
 				set.Add(challengeName)
 			}
-		} 
+		}
 	}
-	
+
 	return challengeNames
 }
 
