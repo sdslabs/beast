@@ -94,15 +94,23 @@ func challengeInfoHandler(c *gin.Context) {
 			}
 		}
 
+		challengeTags := make([]string, len(challenge.Tags))
+
+		for index, tags := range challenge.Tags {
+			challengeTags[index] = tags.TagName
+		}
+
 		c.JSON(http.StatusOK, ChallengeInfoResp{
 			Name:         name,
 			ChallId:      challenge.ID,
 			Category:     challenge.Type,
 			CreatedAt:    challenge.CreatedAt,
+			Tags:         challengeTags,
 			Status:       challenge.Status,
 			Ports:        challengePorts,
 			Hints:        challenge.Hints,
 			Desc:         challenge.Description,
+			Assets:       strings.Split(challenge.Assets, core.DELIMITER),
 			Points:       challenge.Points,
 			SolvesNumber: challSolves,
 			Solves:       challengeUser,
@@ -221,6 +229,7 @@ func challengesInfoHandler(c *gin.Context) {
 			Hints:        challenge.Hints,
 			Desc:         challenge.Description,
 			Points:       challenge.Points,
+			Assets:       strings.Split(challenge.Assets, core.DELIMITER),
 			SolvesNumber: challSolves,
 			Solves:       challengeUser,
 		}

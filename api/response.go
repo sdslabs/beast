@@ -98,6 +98,7 @@ type ChallengeInfoResp struct {
 	ChallId      uint            `json:"id" example:"0"`
 	Category     string          `json:"category" example:"bare"`
 	Tags         []string        `json:"tags" example:"['pwn','misc']"`
+	Assets       []string        `json:"assets" example:"['image1.png', 'zippy.zip']"`
 	CreatedAt    time.Time       `json:"createdAt"`
 	Status       string          `json:"status" example:"deployed"`
 	Ports        []uint32        `json:"ports" example:"[3001, 3002]"`
@@ -112,6 +113,7 @@ type ChallengePreviewResp struct {
 	Name     string   `json:"name" example:"Web Challenge"`
 	Category string   `json:"category" example:"web"`
 	Tags     []string `json:"tags" example:"['pwn','misc']"`
+	Assets   []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
 	Ports    []uint32 `json:"ports" example:"[3001, 3002]"`
 	Hints    []string `json:"hints" example:"Try robots"`
 	Desc     string   `json:"description" example:"A simple web challenge"`
