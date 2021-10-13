@@ -101,6 +101,7 @@ func initGinRouter() *gin.Engine {
 		{
 			configGroup.PATCH("/reload", reloadBeastConfig)
 			configGroup.POST("/competition-info", updateCompetitionInfoHandler)
+			configGroup.POST("/challenge-info", updateChallengeInfoHandler)
 		}
 
 		submitGroup := apiGroup.Group("/submit")

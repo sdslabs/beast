@@ -5,10 +5,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -125,6 +127,76 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "Competition information updated successfully",
+	})
+	return
+}
+
+// This updates challenge info in the respective challenge configuration
+// @Summary Updates challenge info in the database, located at ~/.beast/beast.db.
+// @Description Updates challenge info in the database, located at ~/.beast/beast.db.
+// @Tags config
+// @Accept  json
+// @Produce json
+// @Param name formData string true "Challenge Name"
+// @Param hints formData string true "Challenge's hints"
+// @Param desc formData string false "Challenge's description"
+// @Param points formData string true "Challenge's points"
+// @Param flag formData string true "Challenge's flag"
+// @Param tags formData string true "Challenge's tags"
+// @Param ports formData file false "Challenge's ports"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/config/challenge-info [post]
+func updateChallengeInfoHandler(c *gin.Context) {
+	name := c.PostForm("name")
+	ports := c.PostForm("ports")
+
+	configInfo := map[string]interface{}{
+		"Name":        c.PostForm("name"),
+		"Hints":       c.PostForm("hints"),
+		"Description": c.PostForm("desc"),
+		"Points":      c.PostForm("points"),
+		"Flag":        c.PostForm("flag"),
+	}
+
+	log.Debug(fmt.Sprintf("Starting to update the challenge : %s", name))
+	chall, err := database.QueryFirstChallengeEntry("name", name)
+	if err != nil {
+		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("DB_ACCESS_ERROR : %s", err.Error()),
+		})
+		return
+	}	
+
+	// Update challenge
+	if e := database.UpdateChallenge(&chall, configInfo); e != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Error while updating challenge info: %s", err.Error()),
+		})
+		return
+	}
+
+	// Update ports
+	existingPort := chall.Ports
+	u64, err := strconv.ParseUint(ports, 10, 32)
+	newPort := database.Port{ChallengeID: chall.ID, PortNo: uint32(u64)}
+	if e := database.DeleteRelatedPorts(existingPort); e != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
+		})
+		return
+	}
+	if _,e := database.PortEntryGetOrCreate(&newPort); e != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: fmt.Sprintf("Succesfully updated challenge: %s", name),
 	})
 	return
 }
