@@ -292,6 +292,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 
 	var config cfg.BeastChallengeConfig
 	_, err := toml.DecodeFile(configFile, &config)
+	
 	if err != nil {
 		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
 		return fmt.Errorf("CONFIG ERROR: %s : %s", challengeName, err)
