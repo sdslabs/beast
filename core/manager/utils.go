@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -63,7 +64,7 @@ type ChallengePreview struct {
 func ValidateChallengeConfig(challengeDir string) error {
 	configFile := filepath.Join(challengeDir, core.CHALLENGE_CONFIG_FILE_NAME)
 
-	log.Debug("Checking beast.toml file existance validity")
+	log.Debug("Checking beast.toml file existence validity")
 	err := utils.ValidateFileExists(configFile)
 	if err != nil {
 		return err
@@ -449,6 +450,15 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		users[len(config.Maintainers)] = &userEntry
 
+		var assetsURL = make([]string, len(config.Challenge.Metadata.Assets))
+
+		for index, asset := range config.Challenge.Metadata.Assets {
+			beastStaticAssetUrl, _ := url.Parse(cfg.Cfg.BeastStaticUrl)
+			beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, core.BEAST_STATIC_FOLDER,
+				config.Challenge.Metadata.Name, asset)
+			assetsURL[index] = beastStaticAssetUrl.String()
+		}
+
 		*challEntry = database.Challenge{
 			Name:        config.Challenge.Metadata.Name,
 			AuthorID:    userEntry.ID,
@@ -461,7 +471,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Sidecar:     config.Challenge.Metadata.Sidecar,
 			Description: config.Challenge.Metadata.Description,
 			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
-			Assets:      strings.Join(config.Challenge.Metadata.Assets, core.DELIMITER),
+			Assets:      strings.Join(assetsURL, core.DELIMITER),
 			Points:      config.Challenge.Metadata.Points,
 		}
 

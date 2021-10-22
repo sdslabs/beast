@@ -4,6 +4,8 @@ set -euxo pipefail
 
 CWD=$PWD
 
+BEAST_STATIC_PORT=8034
+
 echo -e "\nBuilding static content server for beast...\n"
 cd "${CWD}/extras/static-content"
 
@@ -16,7 +18,7 @@ fi
 if docker ps -a | grep -q 'beast-static'; then
 	echo "Container for static-content already exists."
 else
-	docker run -d -p 80:80 \
+	docker run -d -p $BEAST_STATIC_PORT:80 \
 		-v ~/.beast/staging:/beast \
 		-v ~/.beast/.static.beast.htpasswd:/.static.beast.htpasswd \
 		beast-static

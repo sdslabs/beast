@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,6 +35,12 @@ import (
 //
 // # Base OS image that beast allows the challenges to use.
 // allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
+//
+//
+// # Beast static URL refers to the host used by beast for serving static content
+// # of the challenges, whenever required. It follows the URL pattern like
+// # [beast_static_url]/static/[chall_dir]/[file_name]
+// beast_static_url = "http://hack.sdslabs.co:8034"
 //
 //
 // # For authentication purposes beast uses JWT based authentication, this is the
@@ -88,6 +95,7 @@ type BeastConfig struct {
 	JWTSecret            string                `toml:"jwt_secret"`
 	NotificationWebhooks []NotificationWebhook `toml:"notification_webhooks"`
 	CompetitionInfo      CompetitionInfo       `toml:"competition_info"`
+	BeastStaticUrl       string                `toml:"beast_static_url"`
 	TickerFrequency      int                   `toml:"ticker_frequency"`
 
 	RemoteSyncPeriod time.Duration `toml:"-"`
@@ -127,6 +135,12 @@ func (config *BeastConfig) ValidateConfig() error {
 			log.Error("Error while creating beast scripts directory")
 			return err
 		}
+	}
+
+	_, err := url.Parse(config.BeastStaticUrl)
+
+	if err != nil {
+		return fmt.Errorf("Invalid beast static URL provided : %s", config.BeastStaticUrl)
 	}
 
 	if !utils.StringInSlice(core.DEFAULT_BASE_IMAGE, config.AllowedBaseImages) {
