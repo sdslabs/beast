@@ -94,15 +94,23 @@ func challengeInfoHandler(c *gin.Context) {
 			}
 		}
 
+		challengeTags := make([]string, len(challenge.Tags))
+
+		for index, tags := range challenge.Tags {
+			challengeTags[index] = tags.TagName
+		}
+
 		c.JSON(http.StatusOK, ChallengeInfoResp{
 			Name:         name,
 			ChallId:      challenge.ID,
 			Category:     challenge.Type,
 			CreatedAt:    challenge.CreatedAt,
+			Tags:         challengeTags,
 			Status:       challenge.Status,
 			Ports:        challengePorts,
 			Hints:        challenge.Hints,
 			Desc:         challenge.Description,
+			Assets:       strings.Split(challenge.Assets, core.DELIMITER),
 			Points:       challenge.Points,
 			SolvesNumber: challSolves,
 			Solves:       challengeUser,
@@ -204,16 +212,24 @@ func challengesInfoHandler(c *gin.Context) {
 			}
 		}
 
+		challengeTags := make([]string, len(challenge.Tags))
+
+		for index, tags := range challenge.Tags {
+			challengeTags[index] = tags.TagName
+		}
+
 		availableChallenges[index] = ChallengeInfoResp{
 			Name:         challenge.Name,
 			ChallId:      challenge.ID,
 			Category:     challenge.Type,
+			Tags:         challengeTags,
 			CreatedAt:    challenge.CreatedAt,
 			Status:       challenge.Status,
 			Ports:        challengePorts,
 			Hints:        challenge.Hints,
 			Desc:         challenge.Description,
 			Points:       challenge.Points,
+			Assets:       strings.Split(challenge.Assets, core.DELIMITER),
 			SolvesNumber: challSolves,
 			Solves:       challengeUser,
 		}
@@ -342,9 +358,17 @@ func userInfoHandler(c *gin.Context) {
 
 	userChallenges := make([]ChallengeSolveResp, len(challenges))
 	for index, challenge := range challenges {
+
+		challengeTags := make([]string, len(challenge.Tags))
+
+		for index, tags := range challenge.Tags {
+			challengeTags[index] = tags.TagName
+		}
+
 		challResp := ChallengeSolveResp{
 			Id:       challenge.ID,
 			Name:     challenge.Name,
+			Tags:     challengeTags,
 			Category: challenge.Type,
 			SolvedAt: challenge.CreatedAt,
 			Points:   challenge.Points,
@@ -353,6 +377,13 @@ func userInfoHandler(c *gin.Context) {
 	}
 
 	rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+	if err != nil {
+		log.Error(err)
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
 
 	resp = UserResp{
 		Username:   user.Username,
@@ -450,12 +481,20 @@ func submissionsHandler(c *gin.Context) {
 			if len(challenge) == 0 {
 				continue
 			}
+
+			challengeTags := make([]string, len(challenge[0].Tags))
+
+			for index, tags := range challenge[0].Tags {
+				challengeTags[index] = tags.TagName
+			}
+
 			singleSubmissionResp := SubmissionResp{
 				UserId:    user.ID,
 				Username:  user.Username,
 				ChallId:   challenge[0].ID,
 				ChallName: challenge[0].Name,
 				Category:  challenge[0].Type,
+				Tags:      challengeTags,
 				Points:    challenge[0].Points,
 				SolvedAt:  submission.CreatedAt,
 			}

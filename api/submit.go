@@ -50,7 +50,13 @@ func submitFlagHandler(c *gin.Context) {
 	}
 
 	parsedChallId, err := strconv.Atoi(challId)
-
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	
 	chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{

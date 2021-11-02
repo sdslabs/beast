@@ -24,7 +24,7 @@ const (
 var BeastScheduler scheduler.Scheduler = scheduler.NewScheduler()
 
 func runBeastApiBootsteps() error {
-	manager.RunBeastBootsetps()
+	manager.RunBeastBootsteps()
 
 	return nil
 }

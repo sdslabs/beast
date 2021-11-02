@@ -32,7 +32,7 @@ var generateTemplateCmd = &cobra.Command{
 		}
 
 		var config config.BeastChallengeConfig
-		config.PopulateDefualtValues()
+		config.PopulateDefaultValues()
 
 		var configfile bytes.Buffer
 		log.Debugf("Preparing Config template")

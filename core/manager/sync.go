@@ -194,7 +194,7 @@ func SyncAndGetChangesFromRemote() []string {
 	return modifiedChallsNameList
 }
 
-func RunBeastBootsetps() error {
+func RunBeastBootsteps() error {
 	log.Info("Syncing beast git challenge dir with remote....")
 
 	_ = SyncBeastRemote()
