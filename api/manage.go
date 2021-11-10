@@ -141,19 +141,18 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	action := c.PostForm("action")
 	authorization := c.GetHeader("Authorization")
 	names := strings.Split(identifier, ",")
-
+	flag := true
 	for _, name := range names {
 		log.Infof("Trying %s for challenge with identifier : %s", action, name)
 		if msgs := manager.LogTransaction(name, action, authorization); msgs != nil {
 			log.Info("error while getting details")
 		}
-
 		challAction, ok := manager.ChallengeActionHandlers[action]
 		if !ok {
 			c.JSON(http.StatusBadRequest, HTTPPlainResp{
 				Message: fmt.Sprintf("Invalid Action : %s", action),
 			})
-			return
+			flag = false
 		}
 
 		log.Infof("Trying %s for challenge with identifier : %s", action, name)
@@ -164,13 +163,15 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, HTTPPlainResp{
 				Message: err.Error(),
 			})
-			return
+			flag = false
 		}
-
-		respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
-		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: respStr,
-		})
+		if flag {
+			respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
+			c.JSON(http.StatusOK, HTTPPlainResp{
+				Message: respStr,
+			})
+		}
+		flag = true
 	}
 }
 
