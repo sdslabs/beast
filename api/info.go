@@ -174,6 +174,7 @@ func challengesInfoHandler(c *gin.Context) {
 		}
 		challenges, err = database.QueryRelatedChallenges(&tag)
 		if err != nil {
+			log.Error(err)
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})

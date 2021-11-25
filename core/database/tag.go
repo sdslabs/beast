@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -36,11 +37,14 @@ func QueryOrCreateTagEntry(tag *Tag) error {
 // Query Related Challenges
 func QueryRelatedChallenges(tag *Tag) ([]Challenge, error) {
 	var challenges []Challenge
+	var tagName Tag
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(tag).Association("Challenges").Error; err != nil {
+	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
+
+	if err := Db.Preload("Tags").Preload("Ports").Model(&tagName).Association("Challenges").Find(&challenges); err != nil {
 		return challenges, err
 	}
 
