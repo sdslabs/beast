@@ -8,6 +8,10 @@ type HTTPPlainResp struct {
 	Message string `json:"message" example:"Messsage in response to your request"`
 }
 
+type HTTPPlainSpliceResp struct {
+	Message []string `json:"message" example:"Messsage in response to your request"`
+}
+
 type HTTPErrorResp struct {
 	Error string `json:"error" example:"Error occured while veifying the challenge."`
 }

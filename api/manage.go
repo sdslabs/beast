@@ -141,7 +141,9 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	action := c.PostForm("action")
 	authorization := c.GetHeader("Authorization")
 	names := strings.Split(identifier, ",")
+	var messages []string
 	flag := true
+	var respStr string
 	for _, name := range names {
 		log.Infof("Trying %s for challenge with identifier : %s", action, name)
 		if msgs := manager.LogTransaction(name, action, authorization); msgs != nil {
@@ -153,6 +155,8 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 				Message: fmt.Sprintf("Invalid Action : %s", action),
 			})
 			flag = false
+			respStr = fmt.Sprintf("Invalid Action : %s", action)
+			messages = append(messages, respStr)
 		}
 
 		log.Infof("Trying %s for challenge with identifier : %s", action, name)
@@ -160,19 +164,19 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 		err := challAction(name)
 
 		if err != nil {
-			c.JSON(http.StatusBadRequest, HTTPPlainResp{
-				Message: err.Error(),
-			})
+			respStr = err.Error()
+			messages = append(messages, respStr)
 			flag = false
 		}
 		if flag {
 			respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
-			c.JSON(http.StatusOK, HTTPPlainResp{
-				Message: respStr,
-			})
+			messages = append(messages, respStr)
 		}
 		flag = true
 	}
+	c.JSON(http.StatusOK, HTTPPlainSpliceResp{
+		Message: messages,
+	})
 }
 
 // Deploy local challenge
