@@ -413,9 +413,9 @@ func userInfoHandler(c *gin.Context) {
 // @Success 200 {object} api.UserResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/user/available [get]
+// @Router /api/info/users [get]
 func getAllUsersInfoHandler(c *gin.Context) {
-	users, err := database.QueryAllUsers()
+	users, err := database.QueryUserEntries("role", "contestant")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "DATABASE ERROR while processing the request.",
@@ -435,6 +435,26 @@ func getAllUsersInfoHandler(c *gin.Context) {
 				Email:    user.Email,
 			}
 		}
+
+		format := c.Query("format")
+
+		if format == "csv" {
+			buff := &bytes.Buffer{}
+			w := struct2csv.NewWriter(buff)
+
+			if err := w.WriteStructs(availableUsers); err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "CSV ERROR while processing the request.",
+				})
+				return
+			}
+
+			c.Header("Content-Description", "File Transfer")
+			c.Header("Content-Disposition", "attachment; filename=users.csv")
+			c.Data(http.StatusOK, "text/csv", buff.Bytes())
+			return
+		}
+
 		c.JSON(http.StatusOK, availableUsers)
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
@@ -511,7 +531,7 @@ func submissionsHandler(c *gin.Context) {
 	if format == "csv" {
 		buff := &bytes.Buffer{}
 		w := struct2csv.NewWriter(buff)
-		
+
 		if err := w.WriteStructs(submissionsResp); err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "CSV ERROR while processing the request.",
