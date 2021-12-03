@@ -9,7 +9,7 @@ type HTTPPlainResp struct {
 }
 
 type HTTPPlainSpliceResp struct {
-	Message []string `json:"message" example:"Messsage in response to your request"`
+	Messages []string `json:"messages" example:"[message1],[message2]"`
 }
 
 type HTTPErrorResp struct {

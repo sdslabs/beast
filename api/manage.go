@@ -137,26 +137,26 @@ func manageChallengeHandler(c *gin.Context) {
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/challenge/multiple/ [post]
 func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
-	identifier := c.PostForm("name")
+	identifier := c.PostForm("names")
 	action := c.PostForm("action")
 	authorization := c.GetHeader("Authorization")
+
+	challAction, ok := manager.ChallengeActionHandlers[action]
+	if !ok {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Invalid Action : %s", action),
+		})
+		return
+	}
+
 	names := strings.Split(identifier, ",")
 	var messages []string
-	flag := true
 	var respStr string
+
 	for _, name := range names {
 		log.Infof("Trying %s for challenge with identifier : %s", action, name)
 		if msgs := manager.LogTransaction(name, action, authorization); msgs != nil {
 			log.Info("error while getting details")
-		}
-		challAction, ok := manager.ChallengeActionHandlers[action]
-		if !ok {
-			c.JSON(http.StatusBadRequest, HTTPPlainResp{
-				Message: fmt.Sprintf("Invalid Action : %s", action),
-			})
-			flag = false
-			respStr = fmt.Sprintf("Invalid Action : %s", action)
-			messages = append(messages, respStr)
 		}
 
 		log.Infof("Trying %s for challenge with identifier : %s", action, name)
@@ -166,16 +166,14 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 		if err != nil {
 			respStr = err.Error()
 			messages = append(messages, respStr)
-			flag = false
-		}
-		if flag {
-			respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
+		} else {
+			respStr = fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
 			messages = append(messages, respStr)
 		}
-		flag = true
 	}
+
 	c.JSON(http.StatusOK, HTTPPlainSpliceResp{
-		Message: messages,
+		Messages: messages,
 	})
 }
 
