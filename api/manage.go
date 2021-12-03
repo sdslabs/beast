@@ -89,7 +89,7 @@ func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 // @Param action query string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/challenge/multiple [post]
+// @Router /api/manage/challenge/ [post]
 func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
@@ -135,7 +135,7 @@ func manageChallengeHandler(c *gin.Context) {
 // @Param action query string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/challenge/ [post]
+// @Router /api/manage/challenge/multiple/ [post]
 func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
