@@ -8,8 +8,8 @@ type HTTPPlainResp struct {
 	Message string `json:"message" example:"Messsage in response to your request"`
 }
 
-type HTTPPlainSpliceResp struct {
-	Messages []string `json:"messages" example:"[message1],[message2]"`
+type HTTPPlainMapResp struct {
+	Messages map[string]string `json:"messages" example:"["name1": "message1"],["name2": "message2"]"`
 }
 
 type HTTPErrorResp struct {

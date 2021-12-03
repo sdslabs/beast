@@ -150,29 +150,33 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	}
 
 	names := strings.Split(identifier, ",")
-	var messages []string
+	messages := make(map[string]string)
 	var respStr string
+	doesExist := make(map[string]bool)
 
 	for _, name := range names {
-		log.Infof("Trying %s for challenge with identifier : %s", action, name)
-		if msgs := manager.LogTransaction(name, action, authorization); msgs != nil {
-			log.Info("error while getting details")
-		}
+		if !doesExist[name] {
+			log.Infof("Trying %s for challenge with identifier : %s", action, name)
+			if msgs := manager.LogTransaction(name, action, authorization); msgs != nil {
+				log.Info("error while getting details")
+			}
 
-		log.Infof("Trying %s for challenge with identifier : %s", action, name)
+			log.Infof("Trying %s for challenge with identifier : %s", action, name)
 
-		err := challAction(name)
+			err := challAction(name)
 
-		if err != nil {
-			respStr = err.Error()
-			messages = append(messages, respStr)
-		} else {
-			respStr = fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
-			messages = append(messages, respStr)
+			if err != nil {
+				respStr = err.Error()
+				messages[name] = respStr
+			} else {
+				respStr = fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
+				messages[name] = respStr
+			}
+			doesExist[name] = true
 		}
 	}
 
-	c.JSON(http.StatusOK, HTTPPlainSpliceResp{
+	c.JSON(http.StatusOK, HTTPPlainMapResp{
 		Messages: messages,
 	})
 }
