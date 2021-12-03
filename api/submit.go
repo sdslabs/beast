@@ -92,7 +92,7 @@ func submitFlagHandler(c *gin.Context) {
 
 	if solved {
 		c.JSON(http.StatusOK, FlagSubmitResp{
-			Message: "Question has already been answered.",
+			Message: "Challenge has already been solved.",
 			Success: false,
 		})
 		return

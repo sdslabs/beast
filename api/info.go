@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -13,6 +14,8 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
+
+	"github.com/mohae/struct2csv"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -453,6 +456,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/submissions [get]
 func submissionsHandler(c *gin.Context) {
+
 	submissions, err := database.QueryAllSubmissions()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -502,6 +506,25 @@ func submissionsHandler(c *gin.Context) {
 			submissionsResp = append(submissionsResp, singleSubmissionResp)
 		}
 	}
+
+	format := c.Query("format")
+	if format == "csv" {
+		buff := &bytes.Buffer{}
+		w := struct2csv.NewWriter(buff)
+		
+		if err := w.WriteStructs(submissionsResp); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "CSV ERROR while processing the request.",
+			})
+			return
+		}
+
+		c.Header("Content-Description", "File Transfer")
+		c.Header("Content-Disposition", "attachment; filename=submissions.csv")
+		c.Data(http.StatusOK, "text/csv", buff.Bytes())
+		return
+	}
+
 	c.JSON(http.StatusOK, submissionsResp)
 	return
 }
