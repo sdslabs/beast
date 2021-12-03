@@ -30,7 +30,7 @@ import (
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/multiple/:action [post]
-func manageMultipleChallengeHandler(c *gin.Context) {
+func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// If no tags are provided we by default we apply the action to all
 	// the challenges.
 	action := c.Param("action")
@@ -122,6 +122,62 @@ func manageChallengeHandler(c *gin.Context) {
 	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: respStr,
+	})
+}
+
+// Handles route related to managing multiple challenges.
+// @Summary Handles multiple challenge management actions.
+// @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE of multiple challenges.
+// @NameBased manage
+// @Accept  json
+// @Produce json
+// @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenges seperated by a comma"
+// @Param action query string true "Action for the challenge"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/manage/challenge/multiple/ [post]
+func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
+	identifier := c.PostForm("names")
+	action := c.PostForm("action")
+	authorization := c.GetHeader("Authorization")
+
+	challAction, ok := manager.ChallengeActionHandlers[action]
+	if !ok {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Invalid Action : %s", action),
+		})
+		return
+	}
+
+	names := strings.Split(identifier, ",")
+	messages := make(map[string]string)
+	var respStr string
+	doesExist := make(map[string]bool)
+
+	for _, name := range names {
+		if !doesExist[name] {
+			log.Infof("Trying %s for challenge with identifier : %s", action, name)
+			if msgs := manager.LogTransaction(name, action, authorization); msgs != nil {
+				log.Info("error while getting details")
+			}
+
+			log.Infof("Trying %s for challenge with identifier : %s", action, name)
+
+			err := challAction(name)
+
+			if err != nil {
+				respStr = err.Error()
+				messages[name] = respStr
+			} else {
+				respStr = fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, name)
+				messages[name] = respStr
+			}
+			doesExist[name] = true
+		}
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainMapResp{
+		Messages: messages,
 	})
 }
 
