@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -15,7 +14,6 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
 
-	"github.com/mohae/struct2csv"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -439,18 +437,15 @@ func getAllUsersInfoHandler(c *gin.Context) {
 		format := c.Query("format")
 
 		if format == "csv" {
-			buff := &bytes.Buffer{}
-			w := struct2csv.NewWriter(buff)
+			buff, err := utils.StructToCSV(c, availableUsers, "users.csv")
 
-			if err := w.WriteStructs(availableUsers); err != nil {
+			if err != nil {
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 					Error: "CSV ERROR while processing the request.",
 				})
 				return
 			}
 
-			c.Header("Content-Description", "File Transfer")
-			c.Header("Content-Disposition", "attachment; filename=users.csv")
 			c.Data(http.StatusOK, "text/csv", buff.Bytes())
 			return
 		}
@@ -529,18 +524,15 @@ func submissionsHandler(c *gin.Context) {
 
 	format := c.Query("format")
 	if format == "csv" {
-		buff := &bytes.Buffer{}
-		w := struct2csv.NewWriter(buff)
+		buff, err := utils.StructToCSV(c, submissionsResp, "submissions.csv")
 
-		if err := w.WriteStructs(submissionsResp); err != nil {
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "CSV ERROR while processing the request.",
 			})
 			return
 		}
 
-		c.Header("Content-Description", "File Transfer")
-		c.Header("Content-Disposition", "attachment; filename=submissions.csv")
 		c.Data(http.StatusOK, "text/csv", buff.Bytes())
 		return
 	}
