@@ -167,7 +167,7 @@ func UpdateChallenge(chall *Challenge, m map[string]interface{}) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	return Db.Omit(clause.Associations).Model(chall).Updates(m).Error
+	return Db.Omit(clause.Associations).Where("id = ?", chall.ID).Model(chall).Updates(m).Error
 }
 
 // This function updates a challenge entry in the database, whereMap is the map

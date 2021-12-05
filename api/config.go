@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
@@ -149,15 +150,33 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/config/challenge-info [post]
 func updateChallengeInfoHandler(c *gin.Context) {
-	name := c.PostForm("name")
-	ports := c.PostForm("ports")
+	name, exist := c.GetPostForm("name")
+	if !exist {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: fmt.Sprintf("Can't edit challenge without challenge name"),
+		})
+		return
+	}
 
 	configInfo := map[string]interface{}{
-		"Name":        c.PostForm("name"),
-		"Hints":       c.PostForm("hints"),
-		"Description": c.PostForm("desc"),
-		"Points":      c.PostForm("points"),
-		"Flag":        c.PostForm("flag"),
+		"Name": c.PostForm("name"),
+	}
+
+	hints, exist := c.GetPostForm("hints")
+	if exist {
+		configInfo["Hints"] = hints
+	}
+	desc, exist := c.GetPostForm("desc")
+	if exist {
+		configInfo["Description"] = desc
+	}
+	points, exist := c.GetPostForm("points")
+	if exist {
+		configInfo["Points"] = points
+	}
+	flag, exist := c.GetPostForm("flag")
+	if exist {
+		configInfo["Flag"] = flag
 	}
 
 	log.Debug(fmt.Sprintf("Starting to update the challenge : %s", name))
@@ -168,7 +187,7 @@ func updateChallengeInfoHandler(c *gin.Context) {
 			Error: fmt.Sprintf("DB_ACCESS_ERROR : %s", err.Error()),
 		})
 		return
-	}	
+	}
 
 	// Update challenge
 	if e := database.UpdateChallenge(&chall, configInfo); e != nil {
@@ -179,20 +198,53 @@ func updateChallengeInfoHandler(c *gin.Context) {
 	}
 
 	// Update ports
-	existingPort := chall.Ports
-	u64, err := strconv.ParseUint(ports, 10, 32)
-	newPort := database.Port{ChallengeID: chall.ID, PortNo: uint32(u64)}
-	if e := database.DeleteRelatedPorts(existingPort); e != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
-		})
-		return
+	ports, exist := c.GetPostForm("ports")
+	if exist {
+		if err := database.UpdatePorts(&chall); err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Error: %s", err.Error()),
+			})
+			return
+		}
+
+		portsArray := strings.Split(ports, " ")
+		for _, port := range portsArray {
+			u64, err := strconv.ParseUint(port, 10, 32)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, HTTPPlainResp{
+					Message: fmt.Sprintf("Error: %s", err.Error()),
+				})
+				return
+			}
+
+			newPort := database.Port{ChallengeID: chall.ID, PortNo: uint32(u64)}
+			_, err = database.PortEntryGetOrCreate(&newPort)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, HTTPPlainResp{
+					Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
+				})
+				return
+			}
+		}
 	}
-	if _,e := database.PortEntryGetOrCreate(&newPort); e != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
-		})
-		return
+
+	// Update Tags
+	tags, exist := c.GetPostForm("tags")
+	if exist {
+		tagsArray := strings.Split(tags, " ")
+		tagArr := make([]*database.Tag, len(tagsArray))
+
+		for index, tag := range tagsArray {
+			tagArr[index] = &database.Tag{
+				TagName: tag,
+			}
+		}
+
+		if err = database.UpdateTags(tagArr, &chall); err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Error while updating tags: %s", err.Error()),
+			})
+		}
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
