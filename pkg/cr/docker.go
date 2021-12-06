@@ -22,6 +22,16 @@ type DockerClient struct {
 	client *client.Client
 }
 
+func NewDockerClient() (Runtime, error) {
+	client, err := client.NewEnvClient()
+	if err != nil {
+		return nil, err
+	}
+	return &DockerClient{
+		client: client,
+	}, nil
+}
+
 func (self *DockerClient) ContainerList(ctx context.Context, options ContainerListOptions) ([]Container, error) {
 	filterArgs := filters.NewArgs()
 	for key, val := range options.Filters {

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-
-	"github.com/docker/docker/client"
 )
 
 type Container struct {
@@ -101,11 +99,9 @@ type Runtime interface {
 }
 
 func NewClient() (Runtime, error) {
-	client, err := client.NewEnvClient()
+	client, err := NewDockerClient()
 	if err != nil {
 		return nil, err
 	}
-	return &DockerClient{
-		client: client,
-	}, nil
+	return client, nil
 }
