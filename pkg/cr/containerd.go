@@ -4,9 +4,16 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"syscall"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/images"
+	"github.com/moby/buildkit/client"
 )
+
+var LogBuffers map[string]*cio.Creator
+var TaskMaps map[string]*containerd.Task
 
 type ContainerdClient struct {
 	client *containerd.Client
@@ -26,6 +33,7 @@ func NewContainerdClient() (Runtime, error) {
 
 func (self *ContainerdClient) ContainerList(ctx context.Context, options ContainerListOptions) ([]Container, error) {
 	var filters string
+	// TODO: handle filters
 	list, err := self.client.Containers(ctx, filters)
 	if err != nil {
 		return []Container{}, err
@@ -45,7 +53,16 @@ func (self *ContainerdClient) ContainerList(ctx context.Context, options Contain
 }
 
 func (self *ContainerdClient) ContainerStop(ctx context.Context, containerId string) error {
-	// TODO: kill all running tasks
+	task := *TaskMaps[containerId]
+
+	if err := task.Kill(ctx, syscall.SIGTERM); err != nil {
+		return err
+	}
+
+	_, err := task.Delete(ctx)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -70,11 +87,39 @@ func (self *ContainerdClient) ContainerCreate(ctx context.Context, config *Creat
 }
 
 func (self *ContainerdClient) ContainerStart(ctx context.Context, containerId string) error {
-	// TODO: start a task
+	container, err := self.client.LoadContainer(ctx, containerId)
+	if err != nil {
+		return err
+	}
+
+	cio := cio.NewCreator(cio.WithStdio)
+	task, err := container.NewTask(ctx, cio)
+	if err != nil {
+		return err
+	}
+
+	TaskMaps[containerId] = &task
+	LogBuffers[containerId] = &cio
+
+	_, err = task.Wait(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := task.Start(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (self *ContainerdClient) ContainerLogs(ctx context.Context, containerId string, options ContainerLogsOptions) (string, error) {
+	cio := *LogBuffers[containerId]
+	io, err := cio(containerId)
+	if err != nil {
+		return "", nil
+	}
+
+	config := io.Config()
 	// TODO: persist IO from container task and output logs here
 	return "", nil
 }
@@ -94,17 +139,56 @@ func (self *ContainerdClient) ContainerCommit(ctx context.Context, containerId s
 
 // TODO: add buildkit and handle image related operations
 func (self *ContainerdClient) ImageBuild(ctx context.Context, builderContext io.Reader, options ImageBuildOptions) (*bytes.Buffer, error) {
-	return nil, nil
+	var image images.Image
+
+	builder, err := client.New(ctx, "//TODO: buildkit daemon address", client.WithFailFast())
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan *client.SolveStatus)
+	_, err = builder.Build(ctx, *solveOpt, "", dockerfile.Build, ch)
+
+	imageStore := self.client.ImageService()
+	image, err = imageStore.Create(ctx, image)
+	return nil, err
 }
 
 func (self *ContainerdClient) ImageRemove(ctx context.Context, imageId string, options ImageRemoveOptions) error {
-	return nil
+	imageStore := self.client.ImageService()
+	err := imageStore.Delete(ctx, imageId, images.SynchronousDelete())
+	return err
 }
 
 func (self *ContainerdClient) ImageInspect(ctx context.Context, imageId string) (Image, error) {
-	return Image{}, nil
+	imageStore := self.client.ImageService()
+	inspectVal, err := imageStore.Get(ctx, imageId)
+	if err != nil {
+		return Image{}, err
+	}
+
+	image := Image{
+		ID: inspectVal.Name,
+	}
+	return image, nil
 }
 
 func (self *ContainerdClient) ImageList(ctx context.Context, options ImageListOptions) ([]Image, error) {
-	return []Image{}, nil
+	var filters string
+	imageStore := self.client.ImageService()
+	list, err := imageStore.List(ctx, filters)
+	if err != nil {
+		return []Image{}, err
+	}
+
+	images := make([]Image, len(list))
+	for index, image := range list {
+		images[index] = Image{
+			Created: image.CreatedAt.Unix(),
+			ID:      image.Name,
+			Labels:  image.Labels,
+			Size:    image.Target.Size,
+		}
+	}
+	return images, err
 }
