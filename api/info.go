@@ -437,6 +437,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 
 		// sort the availableUsers according to the given params
 		sortParam := c.Query("sort")
+		orderParam := c.Query("order")
 
 		if sortParam == "username" {
 			sort.Slice(availableUsers, func(i, j int) bool {
@@ -444,7 +445,10 @@ func getAllUsersInfoHandler(c *gin.Context) {
 			})
 		} else if sortParam == "score" {
 			sort.Slice(availableUsers, func(i, j int) bool {
-				return availableUsers[i].Score < availableUsers[j].Score
+				if orderParam == "asc" {
+					return availableUsers[i].Score < availableUsers[j].Score
+				}
+				return availableUsers[i].Score > availableUsers[j].Score
 			})
 		}
 
