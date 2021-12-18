@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -434,10 +435,45 @@ func getAllUsersInfoHandler(c *gin.Context) {
 			}
 		}
 
+		// sort the availableUsers according to the given params
+		sortParam := c.Query("sort")
+
+		if sortParam == "username" {
+			sort.Slice(availableUsers, func(i, j int) bool {
+				return availableUsers[i].Username < availableUsers[j].Username
+			})
+		} else if sortParam == "score" {
+			sort.Slice(availableUsers, func(i, j int) bool {
+				return availableUsers[i].Score < availableUsers[j].Score
+			})
+		}
+
+		// filter the availableUsers according to the given params
+		filterParam := c.Query("filter")
+
+		var filteredUsers []UsersResp
+
+		if filterParam == "banned" {
+			for _, user := range availableUsers {
+				if user.Status == 1 {
+					filteredUsers = append(filteredUsers, user)
+				}
+			}
+		} else if filterParam == "active" {
+			for _, user := range availableUsers {
+				if user.Status == 0 {
+					filteredUsers = append(filteredUsers, user)
+				}
+			}
+		} else {
+			filteredUsers = make([]UsersResp, len(availableUsers))
+			copy(filteredUsers, availableUsers)
+		}
+
 		format := c.Query("format")
 
 		if format == "csv" {
-			buff, err := utils.StructToCSV(c, availableUsers, "users.csv")
+			buff, err := utils.StructToCSV(c, filteredUsers, "users.csv")
 
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -450,7 +486,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 			return
 		}
 
-		c.JSON(http.StatusOK, availableUsers)
+		c.JSON(http.StatusOK, filteredUsers)
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No users found in the database",
