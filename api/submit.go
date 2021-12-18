@@ -1,11 +1,13 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 )
@@ -26,6 +28,36 @@ import (
 func submitFlagHandler(c *gin.Context) {
 	challId := c.PostForm("chall_id")
 	flag := c.PostForm("flag")
+
+
+	competitionInfo, err := config.GetCompetitionInfo()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to load previous config: %s", err),
+		})
+		return
+	}
+	compEndTime := competitionInfo.EndingTime
+	loc, _ := time.LoadLocation(competitionInfo.TimeZone)
+	
+	layout := "15:04:00 2 January 2006"
+	endTime, err := time.Parse(layout, compEndTime)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "Error in parsing competition end time",
+		})
+		return
+	}
+
+	currentTime := time.Now().In(loc)
+
+	if currentTime.After(endTime) {
+		c.JSON(http.StatusOK, FlagSubmitResp{
+			Message: "Competition has ended",
+			Success: false,
+		})
+		return
+	}
 
 	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
