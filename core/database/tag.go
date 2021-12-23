@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"gorm.io/gorm"
 )
 
 type Tag struct {
@@ -22,7 +22,7 @@ func QueryOrCreateTagEntry(tag *Tag) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction", tx.Error)
+		return fmt.Errorf("error while starting transaction: %s", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(tag, *tag).Error; err != nil {
@@ -67,4 +67,32 @@ func QueryTags(whereMap map[string]interface{}) ([]*Tag, error) {
 	}
 
 	return tags, nil
+}
+
+// Update tags
+func UpdateTags(tag []*Tag, chall *Challenge) error {
+	var tags []Tag
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	// Delete existing tags
+	Db.Model(&chall).Association("Tags").Find(&tags)
+	tx := Db.Begin()
+	if err := tx.Model(&chall).Association("Tags").Delete(tags); err != nil {
+		return err
+	}
+
+	// Create tags
+	for _, tagEntry := range tag {
+		if err := tx.FirstOrCreate(tagEntry, *tagEntry).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+		if err := tx.Model(&chall).Association("Tags").Append(tagEntry); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit().Error
 }
