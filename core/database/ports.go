@@ -59,7 +59,6 @@ func UpdatePorts(challenge *Challenge) (error) {
 	tx := Db.Begin()
 
 	if err := tx.Model(&challenge).Association("Ports").Find(&ports); err != nil {
-		tx.Rollback()
 		return fmt.Errorf("error while searching port for challenge : %s", err)
 	}
 	tx.Commit()

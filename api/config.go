@@ -159,21 +159,24 @@ func updateChallengeInfoHandler(c *gin.Context) {
 	}
 
 	configInfo := map[string]interface{}{
-		"Name": c.PostForm("name"),
+		"Name": name,
 	}
 
 	hints, exist := c.GetPostForm("hints")
 	if exist {
 		configInfo["Hints"] = hints
 	}
+
 	desc, exist := c.GetPostForm("desc")
 	if exist {
 		configInfo["Description"] = desc
 	}
+
 	points, exist := c.GetPostForm("points")
 	if exist {
 		configInfo["Points"] = points
 	}
+
 	flag, exist := c.GetPostForm("flag")
 	if exist {
 		configInfo["Flag"] = flag
@@ -231,7 +234,7 @@ func updateChallengeInfoHandler(c *gin.Context) {
 	// Update Tags
 	tags, exist := c.GetPostForm("tags")
 	if exist {
-		tagsArray := strings.Split(tags, " ")
+		tagsArray := strings.Split(tags, core.DELIMITER)
 		tagArr := make([]*database.Tag, len(tagsArray))
 
 		for index, tag := range tagsArray {
