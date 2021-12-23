@@ -114,7 +114,7 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Preload("Ports").Where(queryKey, value).Find(&challenges)
+	tx := Db.Preload("Tags").Preload("Ports").Where(queryKey, value).Find(&challenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -174,6 +176,7 @@ func challengesInfoHandler(c *gin.Context) {
 		}
 		challenges, err = database.QueryRelatedChallenges(&tag)
 		if err != nil {
+			log.Error(err)
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
@@ -409,9 +412,9 @@ func userInfoHandler(c *gin.Context) {
 // @Success 200 {object} api.UserResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/user/available [get]
+// @Router /api/info/users [get]
 func getAllUsersInfoHandler(c *gin.Context) {
-	users, err := database.QueryAllUsers()
+	users, err := database.QueryUserEntries("role", "contestant")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "DATABASE ERROR while processing the request.",
@@ -431,7 +434,63 @@ func getAllUsersInfoHandler(c *gin.Context) {
 				Email:    user.Email,
 			}
 		}
-		c.JSON(http.StatusOK, availableUsers)
+
+		// sort the availableUsers according to the given params
+		sortParam := c.Query("sort")
+		orderParam := c.Query("order")
+
+		if sortParam == "username" {
+			sort.Slice(availableUsers, func(i, j int) bool {
+				return availableUsers[i].Username < availableUsers[j].Username
+			})
+		} else if sortParam == "score" {
+			sort.Slice(availableUsers, func(i, j int) bool {
+				if orderParam == "asc" {
+					return availableUsers[i].Score < availableUsers[j].Score
+				}
+				return availableUsers[i].Score > availableUsers[j].Score
+			})
+		}
+
+		// filter the availableUsers according to the given params
+		filterParam := c.Query("filter")
+
+		var filteredUsers []UsersResp
+
+		if filterParam == "banned" {
+			for _, user := range availableUsers {
+				if user.Status == 1 {
+					filteredUsers = append(filteredUsers, user)
+				}
+			}
+		} else if filterParam == "active" {
+			for _, user := range availableUsers {
+				if user.Status == 0 {
+					filteredUsers = append(filteredUsers, user)
+				}
+			}
+		} else {
+			filteredUsers = make([]UsersResp, len(availableUsers))
+			copy(filteredUsers, availableUsers)
+		}
+
+		format := c.Query("format")
+
+		if format == "csv" {
+			buff, err := utils.StructToCSV(c, filteredUsers, "users.csv")
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "CSV ERROR while processing the request.",
+				})
+				return
+			}
+
+			c.Data(http.StatusOK, "text/csv", buff.Bytes())
+			return
+		}
+
+		c.JSON(http.StatusOK, filteredUsers)
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No users found in the database",
@@ -452,6 +511,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/submissions [get]
 func submissionsHandler(c *gin.Context) {
+
 	submissions, err := database.QueryAllSubmissions()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -501,6 +561,22 @@ func submissionsHandler(c *gin.Context) {
 			submissionsResp = append(submissionsResp, singleSubmissionResp)
 		}
 	}
+
+	format := c.Query("format")
+	if format == "csv" {
+		buff, err := utils.StructToCSV(c, submissionsResp, "submissions.csv")
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "CSV ERROR while processing the request.",
+			})
+			return
+		}
+
+		c.Data(http.StatusOK, "text/csv", buff.Bytes())
+		return
+	}
+
 	c.JSON(http.StatusOK, submissionsResp)
 	return
 }
