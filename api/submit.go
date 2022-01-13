@@ -1,14 +1,13 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/core/utils"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 )
 
@@ -29,133 +28,124 @@ func submitFlagHandler(c *gin.Context) {
 	challId := c.PostForm("chall_id")
 	flag := c.PostForm("flag")
 
-
-	competitionInfo, err := config.GetCompetitionInfo()
+	err, state := utils.CheckTime()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: fmt.Sprintf("Unable to load previous config: %s", err),
-		})
-		return
-	}
-	compEndTime := competitionInfo.EndingTime
-	loc, _ := time.LoadLocation(competitionInfo.TimeZone)
-	
-	layout := "15:04:00 2 January 2006"
-	endTime, err := time.Parse(layout, compEndTime)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "Error in parsing competition end time",
-		})
-		return
-	}
-
-	currentTime := time.Now().In(loc)
-
-	if currentTime.After(endTime) {
-		c.JSON(http.StatusOK, FlagSubmitResp{
-			Message: "Competition has ended",
-			Success: false,
-		})
-		return
-	}
-
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-			Error: "Unauthorized user",
-		})
-		return
-	}
-
-	if challId == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Id of the challenge is a required parameter to process request.",
+			Error: err.Error(),
 		})
 		return
 	}
-
-	if flag == "" {
+	if state == 0 {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Flag for the challenge is a required parameter to process request.",
+			Error: "Competition is yet to start",
 		})
 		return
 	}
-
-	parsedChallId, err := strconv.Atoi(challId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
+	if state == 2 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Competition has ended",
 		})
 		return
 	}
-	
-	chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
+	if state == 1 {
+		username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Unauthorized user",
+			})
+			return
+		}
 
-	challenge := chall[0]
+		if challId == "" {
+			c.JSON(http.StatusBadRequest, HTTPErrorResp{
+				Error: "Id of the challenge is a required parameter to process request.",
+			})
+			return
+		}
 
-	if challenge.Flag != flag {
+		if flag == "" {
+			c.JSON(http.StatusBadRequest, HTTPErrorResp{
+				Error: "Flag for the challenge is a required parameter to process request.",
+			})
+			return
+		}
+
+		parsedChallId, err := strconv.Atoi(challId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		challenge := chall[0]
+
+		if challenge.Flag != flag {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Your flag is incorrect",
+				Success: false,
+			})
+			return
+		}
+
+		user, err := database.QueryFirstUserEntry("username", username)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Unauthorized user",
+			})
+		}
+
+		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		if solved {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Challenge has already been solved.",
+				Success: false,
+			})
+			return
+		}
+
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challenge.Points})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		UserChallengesEntry := database.UserChallenges{
+			CreatedAt:   time.Time{},
+			UserID:      user.ID,
+			ChallengeID: challenge.ID,
+		}
+
+		err = database.SaveFlagSubmission(&UserChallengesEntry)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
 		c.JSON(http.StatusOK, FlagSubmitResp{
-			Message: "Your flag is incorrect",
-			Success: false,
+			Message: "Your flag is correct",
+			Success: true,
 		})
+
 		return
 	}
-
-	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-			Error: "Unauthorized user",
-		})
-	}
-
-	solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-
-	if solved {
-		c.JSON(http.StatusOK, FlagSubmitResp{
-			Message: "Challenge has already been solved.",
-			Success: false,
-		})
-		return
-	}
-
-	err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challenge.Points})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-
-	UserChallengesEntry := database.UserChallenges{
-		CreatedAt:   time.Time{},
-		UserID:      user.ID,
-		ChallengeID: challenge.ID,
-	}
-
-	err = database.SaveFlagSubmission(&UserChallengesEntry)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, FlagSubmitResp{
-		Message: "Your flag is correct",
-		Success: true,
-	})
-
-	return
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/mohae/struct2csv"
 )
 
-// StructToCSV returns buffer stream from a struct to be disposed 
+// StructToCSV returns buffer stream from a struct to be disposed
 // as a CSV file in the HTTP response
 func StructToCSV(c *gin.Context, st interface{}, filename string) (bytes.Buffer, error) {
 	buff := &bytes.Buffer{}

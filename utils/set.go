@@ -12,7 +12,7 @@ func (s *Set) Add(element string) {
 
 func (s *Set) Contains(element string) bool {
 	_, isPresent := s.Map[element]
-	return isPresent 
+	return isPresent
 }
 
 func EmptySet() *Set {
