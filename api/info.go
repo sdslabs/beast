@@ -15,7 +15,6 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -103,20 +102,56 @@ func challengeInfoHandler(c *gin.Context) {
 			challengeTags[index] = tags.TagName
 		}
 
+		authHeader := c.GetHeader("Authorization")
+
+		values := strings.Split(authHeader, " ")
+
+		if len(values) < 2 || values[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+				Message: "No Token Provided",
+			})
+			c.Abort()
+			return
+		}
+
+		autherr := auth.Authorize(values[1], core.ADMIN)
+
+		if autherr != nil {
+			c.JSON(http.StatusOK, ChallengeInfoResp{
+				Name:            name,
+				ChallId:         challenge.ID,
+				Category:        challenge.Type,
+				CreatedAt:       challenge.CreatedAt,
+				Tags:            challengeTags,
+				Status:          challenge.Status,
+				Ports:           challengePorts,
+				Hints:           challenge.Hints,
+				Desc:            challenge.Description,
+				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
+				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+				Points:          challenge.Points,
+				SolvesNumber:    challSolves,
+				Solves:          challengeUser,
+			})
+			return
+		}
+
 		c.JSON(http.StatusOK, ChallengeInfoResp{
-			Name:         name,
-			ChallId:      challenge.ID,
-			Category:     challenge.Type,
-			CreatedAt:    challenge.CreatedAt,
-			Tags:         challengeTags,
-			Status:       challenge.Status,
-			Ports:        challengePorts,
-			Hints:        challenge.Hints,
-			Desc:         challenge.Description,
-			Assets:       strings.Split(challenge.Assets, core.DELIMITER),
-			Points:       challenge.Points,
-			SolvesNumber: challSolves,
-			Solves:       challengeUser,
+			Name:            name,
+			ChallId:         challenge.ID,
+			Category:        challenge.Type,
+			Flag:            challenge.Flag,
+			CreatedAt:       challenge.CreatedAt,
+			Tags:            challengeTags,
+			Status:          challenge.Status,
+			Ports:           challengePorts,
+			Hints:           challenge.Hints,
+			Desc:            challenge.Description,
+			Assets:          strings.Split(challenge.Assets, core.DELIMITER),
+			AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+			Points:          challenge.Points,
+			SolvesNumber:    challSolves,
+			Solves:          challengeUser,
 		})
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
@@ -262,19 +297,20 @@ func challengesInfoHandler(c *gin.Context) {
 			}
 
 			availableChallenges[index] = ChallengeInfoResp{
-				Name:         challenge.Name,
-				ChallId:      challenge.ID,
-				Category:     challenge.Type,
-				Tags:         challengeTags,
-				CreatedAt:    challenge.CreatedAt,
-				Status:       challenge.Status,
-				Ports:        challengePorts,
-				Hints:        challenge.Hints,
-				Desc:         challenge.Description,
-				Points:       challenge.Points,
-				Assets:       strings.Split(challenge.Assets, core.DELIMITER),
-				SolvesNumber: challSolves,
-				Solves:       challengeUser,
+				Name:            challenge.Name,
+				ChallId:         challenge.ID,
+				Category:        challenge.Type,
+				Tags:            challengeTags,
+				CreatedAt:       challenge.CreatedAt,
+				Status:          challenge.Status,
+				Ports:           challengePorts,
+				Hints:           challenge.Hints,
+				Desc:            challenge.Description,
+				Points:          challenge.Points,
+				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
+				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+				SolvesNumber:    challSolves,
+				Solves:          challengeUser,
 			}
 		}
 

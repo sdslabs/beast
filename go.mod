@@ -34,7 +34,7 @@ require (
 	github.com/mitchellh/go-homedir v1.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae // indirect
+	github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/gomega v1.4.2 // indirect
 	github.com/pelletier/go-buffruneio v0.2.0 // indirect

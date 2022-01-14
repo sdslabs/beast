@@ -98,30 +98,33 @@ type UserSolveResp struct {
 }
 
 type ChallengeInfoResp struct {
-	Name         string          `json:"name" example:"Web Challenge"`
-	ChallId      uint            `json:"id" example:"0"`
-	Category     string          `json:"category" example:"bare"`
-	Tags         []string        `json:"tags" example:"['pwn','misc']"`
-	Assets       []string        `json:"assets" example:"['image1.png', 'zippy.zip']"`
-	CreatedAt    time.Time       `json:"createdAt"`
-	Status       string          `json:"status" example:"deployed"`
-	Ports        []uint32        `json:"ports" example:"[3001, 3002]"`
-	Hints        string          `json:"hints" example:"Try robots"`
-	Desc         string          `json:"description" example:"A simple web challenge"`
-	Points       uint            `json:"points" example:"50"`
-	SolvesNumber int             `json:"solvesNumber" example:"100"`
-	Solves       []UserSolveResp `json:"solves"`
+	Name            string          `json:"name" example:"Web Challenge"`
+	ChallId         uint            `json:"id" example:"0"`
+	Category        string          `json:"category" example:"bare"`
+	Tags            []string        `json:"tags" example:"['pwn','misc']"`
+	Assets          []string        `json:"assets" example:"['image1.png', 'zippy.zip']"`
+	AdditionalLinks []string        `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
+	CreatedAt       time.Time       `json:"createdAt"`
+	Status          string          `json:"status" example:"deployed"`
+	Ports           []uint32        `json:"ports" example:"[3001, 3002]"`
+	Hints           string          `json:"hints" example:"Try robots"`
+	Desc            string          `json:"description" example:"A simple web challenge"`
+	Points          uint            `json:"points" example:"50"`
+	SolvesNumber    int             `json:"solvesNumber" example:"100"`
+	Solves          []UserSolveResp `json:"solves"`
+	Flag            string          `json:"flag"`
 }
 
 type ChallengePreviewResp struct {
-	Name     string   `json:"name" example:"Web Challenge"`
-	Category string   `json:"category" example:"web"`
-	Tags     []string `json:"tags" example:"['pwn','misc']"`
-	Assets   []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
-	Ports    []uint32 `json:"ports" example:"[3001, 3002]"`
-	Hints    []string `json:"hints" example:"Try robots"`
-	Desc     string   `json:"description" example:"A simple web challenge"`
-	Points   uint     `json:"points" example:"50"`
+	Name            string   `json:"name" example:"Web Challenge"`
+	Category        string   `json:"category" example:"web"`
+	Tags            []string `json:"tags" example:"['pwn','misc']"`
+	Assets          []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
+	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
+	Ports           []uint32 `json:"ports" example:"[3001, 3002]"`
+	Hints           []string `json:"hints" example:"Try robots"`
+	Desc            string   `json:"description" example:"A simple web challenge"`
+	Points          uint     `json:"points" example:"50"`
 }
 
 type SubmissionResp struct {

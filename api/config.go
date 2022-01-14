@@ -182,6 +182,16 @@ func updateChallengeInfoHandler(c *gin.Context) {
 		configInfo["Flag"] = flag
 	}
 
+	assets, exist := c.GetPostForm("assets")
+	if exist {
+		configInfo["Assets"] = assets
+	}
+
+	additionalLinks, exist := c.GetPostForm("additionalLinks")
+	if exist {
+		configInfo["AdditionalLinks"] = additionalLinks
+	}
+
 	log.Debug(fmt.Sprintf("Starting to update the challenge : %s", name))
 	chall, err := database.QueryFirstChallengeEntry("name", name)
 	if err != nil {
@@ -209,8 +219,8 @@ func updateChallengeInfoHandler(c *gin.Context) {
 			})
 			return
 		}
-
-		portsArray := strings.Split(ports, " ")
+		ports = strings.ReplaceAll(ports, " ", "")
+		portsArray := strings.Split(ports, ",")
 		for _, port := range portsArray {
 			u64, err := strconv.ParseUint(port, 10, 32)
 			if err != nil {

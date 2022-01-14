@@ -41,23 +41,24 @@ import (
 type Challenge struct {
 	gorm.Model
 
-	Name        string `gorm:"not null;type:varchar(64);unique"`
-	Flag        string `gorm:"not null;type:text"`
-	Type        string `gorm:"type:varchar(64)"`
-	Sidecar     string `gorm:"type:varchar(64)"`
-	Hints       string `gorm:"type:text"`
-	Assets      string `gorm:"type:text"`
-	Description string `gorm:"type:text"`
-	Format      string `gorm:"not null"`
-	ContainerId string `gorm:"size:64;unique"`
-	ImageId     string `gorm:"size:64;unique"`
-	Status      string `gorm:"not null;default:'Undeployed'"`
-	AuthorID    uint   `gorm:"not null"`
-	HealthCheck uint   `gorm:"not null;default:1"`
-	Points      uint   `gorm:"default:0"`
-	Ports       []Port
-	Tags        []*Tag  `gorm:"many2many:tag_challenges;"`
-	Users       []*User `gorm:"many2many:user_challenges;"`
+	Name            string `gorm:"not null;type:varchar(64);unique"`
+	Flag            string `gorm:"not null;type:text"`
+	Type            string `gorm:"type:varchar(64)"`
+	Sidecar         string `gorm:"type:varchar(64)"`
+	Hints           string `gorm:"type:text"`
+	Assets          string `gorm:"type:text"`
+	AdditionalLinks string `gorm:"type:text"`
+	Description     string `gorm:"type:text"`
+	Format          string `gorm:"not null"`
+	ContainerId     string `gorm:"size:64;unique"`
+	ImageId         string `gorm:"size:64;unique"`
+	Status          string `gorm:"not null;default:'Undeployed'"`
+	AuthorID        uint   `gorm:"not null"`
+	HealthCheck     uint   `gorm:"not null;default:1"`
+	Points          uint   `gorm:"default:0"`
+	Ports           []Port
+	Tags            []*Tag  `gorm:"many2many:tag_challenges;"`
+	Users           []*User `gorm:"many2many:user_challenges;"`
 }
 
 type UserChallenges struct {

@@ -46,14 +46,15 @@ type BeastXinetdConf struct {
 }
 
 type ChallengePreview struct {
-	Name     string
-	Category string
-	Tags     []string
-	Ports    []database.Port
-	Hints    string
-	Assets   []string
-	Desc     string
-	Points   uint
+	Name            string
+	Category        string
+	Tags            []string
+	Ports           []database.Port
+	Hints           string
+	Assets          []string
+	AdditionalLinks []string
+	Desc            string
+	Points          uint
 }
 
 // This if the function which validates the challenge directory
