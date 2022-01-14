@@ -50,7 +50,7 @@ func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 	return ports, nil
 }
 
-func UpdatePorts(challenge *Challenge) (error) {
+func UpdatePorts(challenge *Challenge) error {
 	var ports []Port
 
 	DBMux.Lock()

@@ -50,7 +50,7 @@ var rootCmd = &cobra.Command{
 		} else {
 			config.SkipAuthorization = false
 		}
-				
+
 		config.NoCache = NoCache
 	},
 	Run: func(cmd *cobra.Command, args []string) {
