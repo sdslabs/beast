@@ -455,8 +455,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		for index, asset := range config.Challenge.Metadata.Assets {
 			beastStaticAssetUrl, _ := url.Parse(cfg.Cfg.BeastStaticUrl)
-			beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, core.BEAST_STATIC_FOLDER,
-				config.Challenge.Metadata.Name, asset)
+			beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER, asset)
 			assetsURL[index] = beastStaticAssetUrl.String()
 		}
 
