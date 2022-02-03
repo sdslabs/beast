@@ -80,6 +80,7 @@ type UsersResp struct {
 	Status   uint   `json:"status" example:"0"`
 	Score    uint   `json:"score" example:"750"`
 	Email    string `json:"email" example:"fristonio@gmail.com"`
+	Rank     int64  `json:"rank" example:"15"`
 }
 
 type ChallengeSolveResp struct {

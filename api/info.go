@@ -502,6 +502,18 @@ func getAllUsersInfoHandler(c *gin.Context) {
 	if len(users) > 0 {
 		availableUsers := make([]UsersResp, len(users))
 		for index, user := range users {
+
+			parsedUserId := uint(user.ID)
+			
+			rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
 			availableUsers[index] = UsersResp{
 				Username: user.Username,
 				Id:       user.ID,
@@ -509,6 +521,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 				Status:   user.Status,
 				Score:    user.Score,
 				Email:    user.Email,
+				Rank:     rank,
 			}
 		}
 
