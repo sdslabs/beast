@@ -1,0 +1,10 @@
+[Unit]
+Description=Beast server
+After=network.target
+
+[Service]
+User=vagrant
+ExecStart=/home/vagrant/go/bin/beast run -v
+
+[Install]
+WantedBy=multi-user.target

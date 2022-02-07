@@ -76,5 +76,6 @@ Vagrant.configure(VAGRANTFILE_VERSION) do |config|
   config.vm.provision "docker"
   config.vm.provision "env", type: "shell", path: "scripts/installenv.sh", privileged: false
   config.vm.provision "setup", type: "shell", after: "env", path: "scripts/provision/setup.sh", privileged: false
+  config.vm.provision "build", type: "shell", after: "setup", path: "scripts/deploy.sh", privileged: false
 
 end
