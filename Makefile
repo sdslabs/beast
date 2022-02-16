@@ -58,6 +58,10 @@ tools:
 	  sudo gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
 	fi
 
+	@if ! test -x "`which shellcheck 2>&1;true`"; then \
+	  echo 'Error: shellcheck is not installed, Install it first' >&2 ; \
+	fi
+
 requirements:
 	@echo ">>> Building beast extras..."
 	@./scripts/build/extras.sh
