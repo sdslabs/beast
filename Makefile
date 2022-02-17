@@ -67,7 +67,8 @@ tools:
 	fi
 
 	@if ! test -x "`which shellcheck 2>&1;true`"; then \
-	  echo 'Error: shellcheck is not installed, Install it first' >&2 ; \
+	  echo 'Error: shellcheck is not installed, Installing shellcheck' >&2 ; \
+	  ./scripts/tools/install_shellcheck.sh ; \
 	fi
 
 requirements:

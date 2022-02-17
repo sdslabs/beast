@@ -108,6 +108,11 @@ func ValidateChallengeDir(challengeDir string) error {
 		return err
 	}
 
+	err = utils.ShellCheck(challengeDir)
+	if err != nil {
+		return err
+	}
+
 	log.Infof("Challenge directory validated")
 	return nil
 }
