@@ -106,8 +106,10 @@ $ cd beast && make help
 BEAST: An automated challenge deployment tool for backdoor
 
 * build: Build Beast and copy binary to PATH set for go build binaries.
+* dev: Run development environment with hot-reloading enabled
 * check_format: Check for formatting errors using gofmt
 * format: format the go files using go_fmt in the project directory.
+* requirements: Build beast extra artifacts requirements
 * test: Run tests for beast
 * tools: Set up required tools for Beast which includes - docker-enter, importenv
 ```
@@ -123,6 +125,17 @@ To build Beast from Source use the Makefile provided.
 This will build Beast and place the binary in `$GOPATH/bin/` and copy the necessery tools to the desired place. To build this in production make sure you also have built the static-content docker image in `/extras/static-content`
 
 To run the API server for Beast, use the command `beast run -v`
+
+### Hot reloading support
+
+- run the following command to install `air` (hot reload support)
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+```
+- modify `full_bin` in `.air.toml` for changing the arguments to run beast, default being `beast run -nv`
+
+- run `make dev` to start `beast` in development mode
 
 ### Testing
 

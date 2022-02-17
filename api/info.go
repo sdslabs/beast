@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/pkg/auth"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -100,20 +102,56 @@ func challengeInfoHandler(c *gin.Context) {
 			challengeTags[index] = tags.TagName
 		}
 
+		authHeader := c.GetHeader("Authorization")
+
+		values := strings.Split(authHeader, " ")
+
+		if len(values) < 2 || values[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+				Message: "No Token Provided",
+			})
+			c.Abort()
+			return
+		}
+
+		autherr := auth.Authorize(values[1], core.ADMIN)
+
+		if autherr != nil {
+			c.JSON(http.StatusOK, ChallengeInfoResp{
+				Name:            name,
+				ChallId:         challenge.ID,
+				Category:        challenge.Type,
+				CreatedAt:       challenge.CreatedAt,
+				Tags:            challengeTags,
+				Status:          challenge.Status,
+				Ports:           challengePorts,
+				Hints:           challenge.Hints,
+				Desc:            challenge.Description,
+				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
+				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+				Points:          challenge.Points,
+				SolvesNumber:    challSolves,
+				Solves:          challengeUser,
+			})
+			return
+		}
+
 		c.JSON(http.StatusOK, ChallengeInfoResp{
-			Name:         name,
-			ChallId:      challenge.ID,
-			Category:     challenge.Type,
-			CreatedAt:    challenge.CreatedAt,
-			Tags:         challengeTags,
-			Status:       challenge.Status,
-			Ports:        challengePorts,
-			Hints:        challenge.Hints,
-			Desc:         challenge.Description,
-			Assets:       strings.Split(challenge.Assets, core.DELIMITER),
-			Points:       challenge.Points,
-			SolvesNumber: challSolves,
-			Solves:       challengeUser,
+			Name:            name,
+			ChallId:         challenge.ID,
+			Category:        challenge.Type,
+			Flag:            challenge.Flag,
+			CreatedAt:       challenge.CreatedAt,
+			Tags:            challengeTags,
+			Status:          challenge.Status,
+			Ports:           challengePorts,
+			Hints:           challenge.Hints,
+			Desc:            challenge.Description,
+			Assets:          strings.Split(challenge.Assets, core.DELIMITER),
+			AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+			Points:          challenge.Points,
+			SolvesNumber:    challSolves,
+			Solves:          challengeUser,
 		})
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
@@ -143,100 +181,142 @@ func challengesInfoHandler(c *gin.Context) {
 
 	var challenges []database.Challenge
 	var err error
-	if value == "" || filter == "" {
-		challenges, err = database.QueryAllChallenges()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, HTTPErrorResp{
-				Error: err.Error(),
-			})
-			return
-		}
-		if challenges == nil {
-			c.JSON(http.StatusOK, HTTPPlainResp{
-				Message: "No challenges currently in the database",
-			})
-			return
-		}
+
+	err, state := utils.CheckTime()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: err.Error(),
+		})
+		return
 	}
 
-	if filter == "name" || filter == "author" || filter == "score" {
-		challenges, err = database.QueryChallengeEntries(filter, value)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-		}
+	authHeader := c.GetHeader("Authorization")
+
+	values := strings.Split(authHeader, " ")
+
+	if len(values) < 2 || values[0] != "Bearer" {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: "No Token Provided",
+		})
+		c.Abort()
+		return
 	}
 
-	if filter == "tag" {
-		tag := database.Tag{
-			TagName: value,
-		}
-		challenges, err = database.QueryRelatedChallenges(&tag)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-		}
+	autherr := auth.Authorize(values[1], core.ADMIN)
+
+	// If competition is yet to start returns 0
+	if state == 0 && autherr != nil {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "0",
+		})
+		return
 	}
-
-	availableChallenges := make([]ChallengeInfoResp, len(challenges))
-
-	for index, challenge := range challenges {
-		users, err := database.GetRelatedUsers(&challenge)
-		if err != nil {
-			log.Error(err)
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		challengePorts := make([]uint32, len(challenge.Ports))
-		for index, port := range challenge.Ports {
-			challengePorts[index] = port.PortNo
-		}
-
-		var challSolves int
-		challengeUser := make([]UserSolveResp, 0)
-
-		for _, user := range users {
-			if user.Role == core.USER_ROLES["contestant"] {
-				userResp := UserSolveResp{
-					UserID:   user.ID,
-					Username: user.Username,
-					SolvedAt: user.CreatedAt,
-				}
-				challengeUser = append(challengeUser, userResp)
-				challSolves++
+	// If competition has ended returns 2
+	if state == 2 && autherr != nil {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "2",
+		})
+		return
+	}
+	// If comp in ongoing
+	if state == 1 || autherr == nil {
+		if value == "" || filter == "" {
+			challenges, err = database.QueryAllChallenges()
+			if err != nil {
+				c.JSON(http.StatusBadRequest, HTTPErrorResp{
+					Error: err.Error(),
+				})
+				return
+			}
+			if challenges == nil {
+				c.JSON(http.StatusOK, HTTPPlainResp{
+					Message: "No challenges currently in the database",
+				})
+				return
 			}
 		}
 
-		challengeTags := make([]string, len(challenge.Tags))
-
-		for index, tags := range challenge.Tags {
-			challengeTags[index] = tags.TagName
+		if filter == "name" || filter == "author" || filter == "score" {
+			challenges, err = database.QueryChallengeEntries(filter, value)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+			}
 		}
 
-		availableChallenges[index] = ChallengeInfoResp{
-			Name:         challenge.Name,
-			ChallId:      challenge.ID,
-			Category:     challenge.Type,
-			Tags:         challengeTags,
-			CreatedAt:    challenge.CreatedAt,
-			Status:       challenge.Status,
-			Ports:        challengePorts,
-			Hints:        challenge.Hints,
-			Desc:         challenge.Description,
-			Points:       challenge.Points,
-			Assets:       strings.Split(challenge.Assets, core.DELIMITER),
-			SolvesNumber: challSolves,
-			Solves:       challengeUser,
+		if filter == "tag" {
+			tag := database.Tag{
+				TagName: value,
+			}
+			challenges, err = database.QueryRelatedChallenges(&tag)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+			}
 		}
+
+		availableChallenges := make([]ChallengeInfoResp, len(challenges))
+
+		for index, challenge := range challenges {
+			users, err := database.GetRelatedUsers(&challenge)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			challengePorts := make([]uint32, len(challenge.Ports))
+			for index, port := range challenge.Ports {
+				challengePorts[index] = port.PortNo
+			}
+
+			var challSolves int
+			challengeUser := make([]UserSolveResp, 0)
+
+			for _, user := range users {
+				if user.Role == core.USER_ROLES["contestant"] {
+					userResp := UserSolveResp{
+						UserID:   user.ID,
+						Username: user.Username,
+						SolvedAt: user.CreatedAt,
+					}
+					challengeUser = append(challengeUser, userResp)
+					challSolves++
+				}
+			}
+
+			challengeTags := make([]string, len(challenge.Tags))
+
+			for index, tags := range challenge.Tags {
+				challengeTags[index] = tags.TagName
+			}
+
+			availableChallenges[index] = ChallengeInfoResp{
+				Name:            challenge.Name,
+				ChallId:         challenge.ID,
+				Category:        challenge.Type,
+				Tags:            challengeTags,
+				CreatedAt:       challenge.CreatedAt,
+				Status:          challenge.Status,
+				Ports:           challengePorts,
+				Hints:           challenge.Hints,
+				Desc:            challenge.Description,
+				Points:          challenge.Points,
+				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
+				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+				SolvesNumber:    challSolves,
+				Solves:          challengeUser,
+			}
+		}
+
+		c.JSON(http.StatusOK, availableChallenges)
+		return
 	}
-
-	c.JSON(http.StatusOK, availableChallenges)
-	return
 }
 
 // Returns available base images.
@@ -409,9 +489,9 @@ func userInfoHandler(c *gin.Context) {
 // @Success 200 {object} api.UserResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/user/available [get]
+// @Router /api/info/users [get]
 func getAllUsersInfoHandler(c *gin.Context) {
-	users, err := database.QueryAllUsers()
+	users, err := database.QueryUserEntries("role", "contestant")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "DATABASE ERROR while processing the request.",
@@ -422,6 +502,18 @@ func getAllUsersInfoHandler(c *gin.Context) {
 	if len(users) > 0 {
 		availableUsers := make([]UsersResp, len(users))
 		for index, user := range users {
+
+			parsedUserId := uint(user.ID)
+			
+			rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
 			availableUsers[index] = UsersResp{
 				Username: user.Username,
 				Id:       user.ID,
@@ -429,9 +521,66 @@ func getAllUsersInfoHandler(c *gin.Context) {
 				Status:   user.Status,
 				Score:    user.Score,
 				Email:    user.Email,
+				Rank:     rank,
 			}
 		}
-		c.JSON(http.StatusOK, availableUsers)
+
+		// sort the availableUsers according to the given params
+		sortParam := c.Query("sort")
+		orderParam := c.Query("order")
+
+		if sortParam == "username" {
+			sort.Slice(availableUsers, func(i, j int) bool {
+				return availableUsers[i].Username < availableUsers[j].Username
+			})
+		} else if sortParam == "score" {
+			sort.Slice(availableUsers, func(i, j int) bool {
+				if orderParam == "asc" {
+					return availableUsers[i].Score < availableUsers[j].Score
+				}
+				return availableUsers[i].Score > availableUsers[j].Score
+			})
+		}
+
+		// filter the availableUsers according to the given params
+		filterParam := c.Query("filter")
+
+		var filteredUsers []UsersResp
+
+		if filterParam == "banned" {
+			for _, user := range availableUsers {
+				if user.Status == 1 {
+					filteredUsers = append(filteredUsers, user)
+				}
+			}
+		} else if filterParam == "active" {
+			for _, user := range availableUsers {
+				if user.Status == 0 {
+					filteredUsers = append(filteredUsers, user)
+				}
+			}
+		} else {
+			filteredUsers = make([]UsersResp, len(availableUsers))
+			copy(filteredUsers, availableUsers)
+		}
+
+		format := c.Query("format")
+
+		if format == "csv" {
+			buff, err := utils.StructToCSV(c, filteredUsers, "users.csv")
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "CSV ERROR while processing the request.",
+				})
+				return
+			}
+
+			c.Data(http.StatusOK, "text/csv", buff.Bytes())
+			return
+		}
+
+		c.JSON(http.StatusOK, filteredUsers)
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No users found in the database",
@@ -452,6 +601,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/submissions [get]
 func submissionsHandler(c *gin.Context) {
+
 	submissions, err := database.QueryAllSubmissions()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -501,6 +651,22 @@ func submissionsHandler(c *gin.Context) {
 			submissionsResp = append(submissionsResp, singleSubmissionResp)
 		}
 	}
+
+	format := c.Query("format")
+	if format == "csv" {
+		buff, err := utils.StructToCSV(c, submissionsResp, "submissions.csv")
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "CSV ERROR while processing the request.",
+			})
+			return
+		}
+
+		c.Data(http.StatusOK, "text/csv", buff.Bytes())
+		return
+	}
+
 	c.JSON(http.StatusOK, submissionsResp)
 	return
 }

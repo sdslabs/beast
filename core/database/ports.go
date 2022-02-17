@@ -43,13 +43,31 @@ func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	err := Db.Model(&challenge).Association("Ports").Error
-
-	if err != nil {
-		return nil, fmt.Errorf("Error while searching port for challenge : %s", err)
+	if err := Db.Model(&challenge).Association("Ports").Find(&ports); err != nil {
+		return nil, fmt.Errorf("error while searching port for challenge : %s", err)
 	}
 
 	return ports, nil
+}
+
+func UpdatePorts(challenge *Challenge) error {
+	var ports []Port
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+
+	if err := tx.Model(&challenge).Association("Ports").Find(&ports); err != nil {
+		return fmt.Errorf("error while searching port for challenge : %s", err)
+	}
+	tx.Commit()
+
+	if err := Db.Unscoped().Where("challenge_id = ?", challenge.ID).Delete(ports); err != nil {
+		return err.Error
+	}
+
+	return nil
 }
 
 func DeleteRelatedPorts(portList []Port) error {

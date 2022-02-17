@@ -1,10 +1,13 @@
 GO := go
+AIR := ${GOPATH}/bin/air	
+
 pkgs  = $(shell $(GO) list ./... | grep -v vendor)
 
 help:
 	@echo "BEAST: An automated challenge deployment tool for backdoor"
 	@echo ""
 	@echo "* build: Build beast and copy binary to PATH set for go build binaries."
+	@echo "* dev: Run development environment with hot-reloading enabled"
 	@echo "* requirements: Build beast extra artifacts requirements."
 	@echo "* check_format: Check for formatting errors using gofmt"
 	@echo "* format: format the go files using go_fmt in the project directory."
@@ -15,6 +18,11 @@ help:
 # Build beast
 build: tools
 	@./scripts/build/build.sh
+
+# Run development environment
+dev: 
+	@echo "Starting development server for beast..."
+	@$(AIR)
 
 cmdref: build
 	@${GOPATH}/bin/beast cmdref

@@ -52,7 +52,7 @@ func initGinRouter() *gin.Engine {
 		{
 			manageGroup.POST("/deploy/local/", deployLocalChallengeHandler)
 			manageGroup.POST("/challenge/", manageChallengeHandler)
-			manageGroup.POST("/challenge/multiple/",manageMultipleChallengeHandlerNameBased)
+			manageGroup.POST("/challenge/multiple/", manageMultipleChallengeHandlerNameBased)
 			manageGroup.POST("/multiple/:action", manageMultipleChallengeHandlerTagBased)
 			manageGroup.POST("/static/:action", beastStaticContentHandler)
 			manageGroup.POST("/commit/", commitChallenge)
@@ -101,6 +101,7 @@ func initGinRouter() *gin.Engine {
 		{
 			configGroup.PATCH("/reload", reloadBeastConfig)
 			configGroup.POST("/competition-info", updateCompetitionInfoHandler)
+			configGroup.POST("/challenge-info", updateChallengeInfoHandler)
 		}
 
 		submitGroup := apiGroup.Group("/submit")
