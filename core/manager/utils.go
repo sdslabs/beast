@@ -767,6 +767,11 @@ func UpdateChallenges() {
 
 		for _, dir := range dirs {
 
+			if(strings.Count(dir,"/") != 7) {
+				// log.Errorf("too deep")
+				continue
+			}
+
 			configFile := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
 			var config cfg.BeastChallengeConfig
 			_, err := toml.DecodeFile(configFile, &config)
