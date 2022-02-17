@@ -53,6 +53,9 @@ else
     exit
 fi
 
+echo -e "Installing air for live reloading"
+curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
 echo -e "Building beast..."
 make build
 if [ $? -eq 0 ]; then
