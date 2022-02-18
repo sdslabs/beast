@@ -760,21 +760,17 @@ func UpdateChallenges() {
 			continue
 		}
 
-		challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-		dirs := utils.GetAllDirectoriesName(challengeDir)
-		uploadedChalls := utils.GetAllDirectoriesName(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR))
+		challengesDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+		depthChall := strings.Count(challengesDir,string(os.PathSeparator))+1;
+		dirs := utils.GetAllDirectoriesNameTillDepth(challengesDir, depthChall)
+		
+		uploadsDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR)
+		depthUploads := strings.Count(uploadsDir,string(os.PathSeparator))+1
+		uploadedChalls := utils.GetAllDirectoriesNameTillDepth(uploadsDir, depthUploads)
+		
 		dirs = append(dirs, uploadedChalls...)
 
-		depthChall := strings.Count(challengeDir,"/")+1;
-		depthUploads := strings.Count(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR),"/")+1
-
 		for _, dir := range dirs {
-
-			depth := strings.Count(dir,"/")
-			if(depth != depthChall || depth != depthUploads) {
-				// log.Errorf("too deep")
-				continue
-			}
 
 			configFile := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
 			var config cfg.BeastChallengeConfig
