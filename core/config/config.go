@@ -249,6 +249,7 @@ type CompetitionInfo struct {
 	EndingTime   string `toml:"ending_time"`
 	TimeZone     string `toml:"timezone"`
 	LogoURL      string `toml:"logo_url"`
+	DynamicScore bool   `toml:"dynamic_score"`
 }
 
 func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {

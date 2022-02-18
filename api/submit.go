@@ -1,14 +1,16 @@
 package api
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
-	"github.com/sdslabs/beastv4/core/utils"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 // Verifies and creates an entry in the database for successful submission of flag for a challenge.
@@ -28,7 +30,7 @@ func submitFlagHandler(c *gin.Context) {
 	challId := c.PostForm("chall_id")
 	flag := c.PostForm("flag")
 
-	err, state := utils.CheckTime()
+	err, state := coreUtils.CheckTime()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: err.Error(),
@@ -118,8 +120,29 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+		challengePoints := challenge.Points
+		if config.Cfg.CompetitionInfo.DynamicScore {
+			submissions, err := database.QuerySubmissions(map[string]interface{}{
+				"ChallengeID": parsedChallId,
+			})
+			if err != nil {
+				log.Error(err)
+			}
+			solvers := len(submissions) + 1
+			newPoints := dynamicScore(challenge.MaxPoints, challenge.MinPoints, uint(solvers))
+			if newPoints != challengePoints {
+				database.UpdateChallenge(&challenge, map[string]interface{}{
+					"Points": challengePoints,
+				})
+				err = updatePointsOfSolvers(submissions, newPoints, challengePoints)
+				if err != nil {
+					log.Error(err)
+				}
+				challengePoints = newPoints
+			}
+		}
 
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challenge.Points})
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
@@ -148,4 +171,28 @@ func submitFlagHandler(c *gin.Context) {
 
 		return
 	}
+}
+
+// dynamicScore returns dynamic score of the challenge based on number of solves
+func dynamicScore(maxPoints, minPoints, solvers uint) uint {
+	if solvers == 0 || solvers == 1 {
+		return maxPoints
+	}
+	divisor := (1 + math.Pow((float64(solvers)-1)/11.92201, 1.206069))
+	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
+}
+
+// updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes
+func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve uint) error {
+	for _, submission := range submissions {
+		user, err := database.QueryUserById(submission.UserID)
+		if err != nil {
+			return err
+		}
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + newChallengePointsAfterSolve - oldChallengePointsBeforeSolve})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
