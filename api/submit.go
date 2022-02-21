@@ -103,6 +103,12 @@ func submitFlagHandler(c *gin.Context) {
 			})
 		}
 
+		if user.Status == 1 {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Banned user",
+			})
+		}
+
 		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
