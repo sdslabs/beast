@@ -70,6 +70,21 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		user, err := database.QueryFirstUserEntry("username", username)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Unauthorized user",
+			})
+			return
+		}
+
+		if user.Status == 1 {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Banned user",
+			})
+			return
+		}
+
 		parsedChallId, err := strconv.Atoi(challId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -94,19 +109,6 @@ func submitFlagHandler(c *gin.Context) {
 				Success: false,
 			})
 			return
-		}
-
-		user, err := database.QueryFirstUserEntry("username", username)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Unauthorized user",
-			})
-		}
-
-		if user.Status == 1 {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Banned user",
-			})
 		}
 
 		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
