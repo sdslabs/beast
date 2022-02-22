@@ -498,9 +498,8 @@ func getAllUsersInfoHandler(c *gin.Context) {
 		})
 		return
 	}
-
+	availableUsers := make([]UsersResp, len(users))
 	if len(users) > 0 {
-		availableUsers := make([]UsersResp, len(users))
 		for index, user := range users {
 
 			parsedUserId := uint(user.ID)
@@ -582,9 +581,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 
 		c.JSON(http.StatusOK, filteredUsers)
 	} else {
-		c.JSON(http.StatusNotFound, HTTPErrorResp{
-			Error: "No users found in the database",
-		})
+		c.JSON(http.StatusOK, availableUsers)
 	}
 
 	return
