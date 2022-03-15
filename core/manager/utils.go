@@ -760,8 +760,8 @@ func UpdateChallenges() {
 			continue
 		}
 
-		challengesDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-		depthChall := strings.Count(challengesDir,string(os.PathSeparator))+1;
+		challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
+		depthChall := strings.Count(challengeDir,string(os.PathSeparator))+1;
 		dirs := utils.GetAllDirectoriesNameTillDepth(challengesDir, depthChall)
 		
 		uploadsDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR)
