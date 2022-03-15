@@ -190,7 +190,7 @@ func GetAllDirectoriesName(dirPath string) []string {
 
 	_ = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 
 		if info.IsDir() {
@@ -211,7 +211,7 @@ func GetAllDirectoriesNameTillDepth(dirPath string, depth int) []string {
 
 	_ = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 
 		if info.IsDir() && strings.Count(dirPath, string(os.PathSeparator)) == depth {
