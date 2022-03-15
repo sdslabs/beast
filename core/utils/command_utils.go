@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func CreateAuthor(name, username, email, publicKeyPath, password string) {
+func CreateAdminOrAuthor(name, username, email, publicKeyPath, password, role string) {
 	var sshKey []byte
 	if publicKeyPath != "" {
 		err := utils.ValidateFileExists(publicKeyPath)
@@ -32,7 +32,7 @@ func CreateAuthor(name, username, email, publicKeyPath, password string) {
 
 	userEntry := database.User{
 		Name:      name,
-		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["author"]),
+		AuthModel: auth.CreateModel(username, password, core.USER_ROLES[role]),
 		Email:     email,
 		SshKey:    string(sshKey),
 	}
