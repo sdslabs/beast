@@ -47,7 +47,6 @@ func SyncBeastRemote() error {
 				errStrings = append(errStrings, errors.Error())
 				continue
 			}
-
 			err = git.Pull(remote, gitRemote.Secret, gitRemote.Branch, core.GIT_DEFAULT_REMOTE)
 			if err != nil {
 				if !strings.Contains(err.Error(), "already up-to-date") {
