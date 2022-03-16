@@ -210,6 +210,13 @@ func register(c *gin.Context) {
 		return
 	}
 
+	if len(username) > 12 {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Username cannot be greater than 12 characters",
+		})
+		return
+	}
+
 	userEntry := database.User{
 		Name:      name,
 		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["contestant"]),
