@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
@@ -104,7 +105,13 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		challenge := chall[0]
-
+		if challenge.Status != core.DEPLOY_STATUS["deployed"] {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Challenge is unavailable",
+				Success: false,
+			})
+			return
+		}
 		if challenge.Flag != flag {
 			c.JSON(http.StatusOK, FlagSubmitResp{
 				Message: "Your flag is incorrect",
