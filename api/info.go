@@ -503,7 +503,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 		for index, user := range users {
 
 			parsedUserId := uint(user.ID)
-			
+
 			rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
 			if err != nil {
 				log.Error(err)
