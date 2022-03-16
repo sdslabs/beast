@@ -137,6 +137,8 @@ type ChallengeMetadata struct {
 	Description     string   `toml:"description"`
 	Hints           []string `toml:"hints"`
 	Points          uint     `toml:"points"`
+	MaxPoints       uint     `toml:"maxPoints"`
+	MinPoints       uint     `toml:"minPoints"`
 	Assets          []string `toml:"assets"`
 	AdditionalLinks []string `toml:"additionalLinks"`
 }
