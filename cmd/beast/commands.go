@@ -19,6 +19,7 @@ var (
 	Email             string
 	Password          string
 	PublicKeyPath     string
+	CsvFile			  string
 	SkipAuthorization bool
 	AllChalls         bool
 	AutoDeploy        bool
@@ -96,6 +97,7 @@ func init() {
 	createAdminCmd.PersistentFlags().StringVarP(&Password, "password", "", "", "Password of the admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new admin")
 	createAdminCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new admin")
+	createMultipleAuthorCmd.PersistentFlags().StringVarP(&CsvFile, "csv", "", "", "CSV file containing details of author")
 
 	challengeCmd.PersistentFlags().BoolVarP(&AllChalls, "all", "a", false, "Performs action to all challs")
 	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")
@@ -114,6 +116,7 @@ func init() {
 	rootCmd.AddCommand(getAuthCmd)
 	rootCmd.AddCommand(createAuthorCmd)
 	rootCmd.AddCommand(createAdminCmd)
+	rootCmd.AddCommand(createMultipleAuthorCmd)
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(healthProbeCmd)
 	rootCmd.AddCommand(verifyCmd)
