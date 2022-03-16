@@ -182,9 +182,7 @@ func CopyDirectory(src, dst string) error {
 	return nil
 }
 
-// This is very flexible and will not report any error even though it is not able to
-// access the directory. It will return an empty list in such cases.  The caller must take
-// care of this.
+// Gets all directories recursively
 func GetAllDirectoriesName(dirPath string) []string {
 	var directories []string
 
@@ -203,9 +201,7 @@ func GetAllDirectoriesName(dirPath string) []string {
 	return directories
 }
 
-// This is very flexible and will not report any error even though it is not able to
-// access the directory. It will return an empty list in such cases.  The caller must take
-// care of this. Gets all directories at the entered depth only.
+// Gets all directories at the entered depth only.
 func GetAllDirectoriesNameTillDepth(dirPath string, depth int) []string {
 	var directories []string
 
@@ -214,7 +210,7 @@ func GetAllDirectoriesNameTillDepth(dirPath string, depth int) []string {
 			return err
 		}
 
-		if info.IsDir() && strings.Count(dirPath, string(os.PathSeparator)) == depth {
+		if info.IsDir() && strings.Count(path, string(os.PathSeparator)) == depth {
 			directories = append(directories, path)
 		}
 
