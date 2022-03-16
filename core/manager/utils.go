@@ -756,13 +756,18 @@ func UpdateChallenges() {
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
 
 	for _, gitRemote := range cfg.Cfg.GitRemotes {
-		if gitRemote.Active != true {
+		if !gitRemote.Active {
 			continue
 		}
 
 		challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-		dirs := utils.GetAllDirectoriesName(challengeDir)
-		uploadedChalls := utils.GetAllDirectoriesName(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR))
+		depthChall := strings.Count(challengeDir,string(os.PathSeparator))+1
+		dirs := utils.GetAllDirectoriesNameTillDepth(challengeDir, depthChall)
+		
+		uploadsDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR)
+		depthUploads := strings.Count(uploadsDir,string(os.PathSeparator))+2
+		uploadedChalls := utils.GetAllDirectoriesNameTillDepth(uploadsDir, depthUploads)
+		
 		dirs = append(dirs, uploadedChalls...)
 
 		for _, dir := range dirs {
