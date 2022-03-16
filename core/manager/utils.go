@@ -770,8 +770,6 @@ func UpdateChallenges() {
 		
 		dirs = append(dirs, uploadedChalls...)
 
-		// log.Debug(dirs)
-
 		for _, dir := range dirs {
 
 			configFile := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
