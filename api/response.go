@@ -159,3 +159,7 @@ type CompetitionInfoResp struct {
 	TimeZone     string `json:"timezone" example:"Asia/Calcutta: UTC +05:30"`
 	LogoURL      string `json:"logo_url"`
 }
+
+type TagInfoResp struct {
+	Tags []string `json:"tags"`
+}

@@ -80,6 +80,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/user/:username", userInfoHandler)
 			infoGroup.GET("/users", getAllUsersInfoHandler)
 			infoGroup.GET("/submissions", submissionsHandler)
+			infoGroup.GET("/tags", tagHandler)
 		}
 
 		// Notification route group
