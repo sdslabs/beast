@@ -92,12 +92,15 @@ func init() {
 	createAuthorCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new author")
 	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new author")
 
+	createMultipleAuthorCmd.PersistentFlags().StringVarP(&CsvFile, "csv", "", "", "CSV file containing details of author")
+
 	createAdminCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Username, "username", "", "", "Username of the new admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Password, "password", "", "", "Password of the admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new admin")
 	createAdminCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new admin")
-	createMultipleAuthorCmd.PersistentFlags().StringVarP(&CsvFile, "csv", "", "", "CSV file containing details of author")
+
+	createMultipleAdminCmd.PersistentFlags().StringVarP(&CsvFile, "csv", "", "", "CSV file containing details of author")
 
 	challengeCmd.PersistentFlags().BoolVarP(&AllChalls, "all", "a", false, "Performs action to all challs")
 	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")
@@ -117,6 +120,7 @@ func init() {
 	rootCmd.AddCommand(createAuthorCmd)
 	rootCmd.AddCommand(createAdminCmd)
 	rootCmd.AddCommand(createMultipleAuthorCmd)
+	rootCmd.AddCommand(createMultipleAdminCmd)
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(healthProbeCmd)
 	rootCmd.AddCommand(verifyCmd)
