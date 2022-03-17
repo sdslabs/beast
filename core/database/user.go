@@ -86,26 +86,22 @@ func QueryUserById(authorID uint) (User, error) {
 }
 
 func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, error error) {
-	var user []User
+	var users []User
 
-	// assigning max possible value to rank
-	// const MaxUint = ^uint(0)
 	rank = 1
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("id != ? AND score >= ? AND role == ? ", userID, userScore, core.USER_ROLES["contestant"]).Find(&user)
-	log.Debug(user)
-	
-	for _, us := range user {
-		if (us.Score > userScore) {
-			rank++;
-		} else if (us.UpdatedAt.Before(updatedAt)) {
-			rank++;
+	tx := Db.Where("id != ? AND score >= ? AND role == ? ", userID, userScore, core.USER_ROLES["contestant"]).Find(&users)
+
+	for _, user := range users {
+		if user.Score > userScore {
+			rank++
+		} else if user.UpdatedAt.Before(updatedAt) {
+			rank++
 		}
 	}
-	log.Debug(rank)
 
 	return rank, tx.Error
 }
