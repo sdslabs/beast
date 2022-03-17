@@ -456,7 +456,7 @@ func userInfoHandler(c *gin.Context) {
 		userChallenges[index] = challResp
 	}
 
-	rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+	rank, err := database.GetUserRank(parsedUserId, user.Score, user.LastSolved)
 	if err != nil {
 		log.Error(err)
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -504,7 +504,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 
 			parsedUserId := uint(user.ID)
 
-			rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+			rank, err := database.GetUserRank(parsedUserId, user.Score, user.LastSolved)
 			if err != nil {
 				log.Error(err)
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{

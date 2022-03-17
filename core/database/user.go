@@ -32,6 +32,7 @@ type User struct {
 	SshKey     string
 	Status     uint `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score      uint `gorm:"default:0"`
+	LastSolved time.Time
 }
 
 // Queries all the users entries where the column represented by key
@@ -98,7 +99,7 @@ func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, 
 	for _, user := range users {
 		if user.Score > userScore {
 			rank++
-		} else if user.UpdatedAt.Before(updatedAt) {
+		} else if user.LastSolved.Before(updatedAt) {
 			rank++
 		}
 	}

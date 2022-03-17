@@ -160,7 +160,7 @@ func submitFlagHandler(c *gin.Context) {
 			}
 		}
 
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints, "LastSolved": time.Now()})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
