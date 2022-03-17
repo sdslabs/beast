@@ -458,7 +458,17 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER, asset)
 			assetsURL[index] = beastStaticAssetUrl.String()
 		}
-
+		if config.Challenge.Metadata.MaxPoints > 0 {
+			log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
+			config.Challenge.Metadata.Points = config.Challenge.Metadata.MaxPoints
+		} else {
+			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
+			config.Challenge.Metadata.MaxPoints = config.Challenge.Metadata.Points
+		}
+		if config.Challenge.Metadata.MinPoints == 0 {
+			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
+			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
+		}
 		*challEntry = database.Challenge{
 			Name:        config.Challenge.Metadata.Name,
 			AuthorID:    userEntry.ID,
@@ -473,6 +483,8 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
 			Assets:      strings.Join(assetsURL, core.DELIMITER),
 			Points:      config.Challenge.Metadata.Points,
+			MinPoints:   config.Challenge.Metadata.MinPoints,
+			MaxPoints:   config.Challenge.Metadata.MaxPoints,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
@@ -776,14 +788,14 @@ func UpdateChallenges() {
 			var config cfg.BeastChallengeConfig
 			_, err := toml.DecodeFile(configFile, &config)
 			if err != nil {
-				log.Errorf("Error while decoding challenge config file: %s", err.Error())
+				log.Errorf("Error while decoding challenge config file for challenge dir %s: %s", dir, err.Error())
 				continue
 			}
 			challengeName := config.Challenge.Metadata.Name
 
 			err = config.ValidateRequiredFields(dir)
 			if err != nil {
-				log.Errorf("Error while validating required fields in the challenge directory %s : %s", challengeName, err)
+				log.Errorf("Error while validating required fields in the challenge directory %s : %s", dir, err)
 				continue
 			}
 

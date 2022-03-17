@@ -128,20 +128,23 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+
 		challengePoints := challenge.Points
+		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
 		if config.Cfg.CompetitionInfo.DynamicScore {
 			submissions, err := database.QuerySubmissions(map[string]interface{}{
-				"ChallengeID": parsedChallId,
+				"challenge_id": parsedChallId,
 			})
 			if err != nil {
 				log.Error(err)
 			}
-			solvers := len(submissions) + 1
+			solvers := len(submissions)
 			newPoints := dynamicScore(challenge.MaxPoints, challenge.MinPoints, uint(solvers))
 			if newPoints != challengePoints {
 				database.UpdateChallenge(&challenge, map[string]interface{}{
-					"Points": challengePoints,
+					"Points": newPoints,
 				})
+				log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challengePoints)
 				err = updatePointsOfSolvers(submissions, newPoints, challengePoints)
 				if err != nil {
 					log.Error(err)
@@ -197,9 +200,11 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 		if err != nil {
 			return err
 		}
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + newChallengePointsAfterSolve - oldChallengePointsBeforeSolve})
-		if err != nil {
-			return err
+		if user.Role == "contestant" {
+			err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
