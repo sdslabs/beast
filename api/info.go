@@ -503,7 +503,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 		for index, user := range users {
 
 			parsedUserId := uint(user.ID)
-			
+
 			rank, err := database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
 			if err != nil {
 				log.Error(err)
@@ -743,6 +743,38 @@ func competitionInfoHandler(c *gin.Context) {
 		EndingTime:   competitionInfo.EndingTime,
 		TimeZone:     competitionInfo.TimeZone,
 		LogoURL:      strings.Trim(logoPath, "/"),
+	})
+	return
+}
+
+// Returns allTags
+// @Summary returns all tags
+// @Description returns all unique tags
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.TagInfoResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Router /api/admin/statistics [get]
+func tagHandler(c *gin.Context) {
+	challenges, _ := database.QueryAllChallenges()
+	var tags []string
+	for _, challenge := range challenges {
+		for _, tag := range challenge.Tags {
+			tags = append(tags, tag.TagName)
+		}
+	}
+	keys := make(map[string]bool)
+	uniqueTags := []string{}
+	for _, entry := range tags {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			uniqueTags = append(uniqueTags, entry)
+		}
+	}
+	c.JSON(http.StatusOK, TagInfoResp{
+		Tags: uniqueTags,
 	})
 	return
 }
