@@ -7,6 +7,7 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/git"
 	"github.com/sdslabs/beastv4/utils"
 
@@ -15,6 +16,7 @@ import (
 
 // Sync the beast remote directory with the actual git repository.
 func SyncBeastRemote() error {
+	database.UpdateUserLastSolved()
 	log.Info("Syncing local challenge repository with remote.")
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
 	dirGitRemote := make(map[string]string)

@@ -86,6 +86,35 @@ func QueryUserById(authorID uint) (User, error) {
 	return user, tx.Error
 }
 
+func UpdateUserLastSolved() {
+	users, err := QueryAllUsers()
+	if err != nil {
+		log.Errorf("Error while fetching users from database: %s", err.Error())
+	}
+	for _, user := range users {
+		if user.Role == "contestant" && user.LastSolved.IsZero() {
+			submissions, err := QuerySubmissions(map[string]interface{}{
+				"user_id": user.ID,
+			})
+			if err != nil {
+				log.Errorf("Error while fetching submissions for user %s: %s", user.Name, err.Error())
+			}
+			lastSolvedChallengeTime := time.Time{}
+			for _, submission := range submissions {
+				if submission.CreatedAt.After(lastSolvedChallengeTime) {
+					lastSolvedChallengeTime = submission.CreatedAt
+				}
+			}
+			err = UpdateUser(&user, map[string]interface{}{"LastSolved": lastSolvedChallengeTime})
+			if err != nil {
+				log.Errorf("Error while updating last solved for user %s: %s", user.Name, err.Error())
+			} else {
+				log.Debugf("Last solved updated for user %s to %s", user.Name, lastSolvedChallengeTime.String())
+			}
+		}
+	}
+}
+
 func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, error error) {
 	var users []User
 
