@@ -93,7 +93,7 @@ func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("id != ? AND score >= ? AND role == ? ", userID, userScore, core.USER_ROLES["contestant"]).Find(&users)
+	tx := Db.Where("id != ? AND score >= ? AND role == ? AND status == ?", userID, userScore, core.USER_ROLES["contestant"], 0).Find(&users)
 
 	for _, user := range users {
 		if user.Score > userScore {
