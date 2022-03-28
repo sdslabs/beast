@@ -445,9 +445,10 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			}
 			log.Infof("User with the given email does not exist : %v, creating this user", config.Author.Email)
 			newUser := database.User{
-				Name:      config.Author.Email,
+				Name:      config.Author.Name,
 				AuthModel: auth.CreateModel(config.Author.Email, defaultauthorpassword, core.USER_ROLES["author"]),
 				Email:     config.Author.Email,
+				SshKey:    config.Author.SSHKey,
 			}
 			err = database.CreateUserEntry(&newUser)
 			if err != nil {
