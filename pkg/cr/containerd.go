@@ -9,7 +9,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/images"
-	"github.com/moby/buildkit/client"
 )
 
 var LogBuffers map[string]*cio.Creator
@@ -119,7 +118,7 @@ func (self *ContainerdClient) ContainerLogs(ctx context.Context, containerId str
 		return "", nil
 	}
 
-	config := io.Config()
+	_ = io.Config()
 	// TODO: persist IO from container task and output logs here
 	return "", nil
 }
@@ -139,19 +138,20 @@ func (self *ContainerdClient) ContainerCommit(ctx context.Context, containerId s
 
 // TODO: add buildkit and handle image related operations
 func (self *ContainerdClient) ImageBuild(ctx context.Context, builderContext io.Reader, options ImageBuildOptions) (*bytes.Buffer, error) {
-	var image images.Image
+	// var image images.Image
 
-	builder, err := client.New(ctx, "//TODO: buildkit daemon address", client.WithFailFast())
-	if err != nil {
-		return nil, err
-	}
+	// builder, err := client.New(ctx, "//TODO: buildkit daemon address", client.WithFailFast())
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	ch := make(chan *client.SolveStatus)
-	_, err = builder.Build(ctx, *solveOpt, "", dockerfile.Build, ch)
+	// ch := make(chan *client.SolveStatus)
+	// _, err = builder.Build(ctx, *solveOpt, "", dockerfile.Build, ch)
 
-	imageStore := self.client.ImageService()
-	image, err = imageStore.Create(ctx, image)
-	return nil, err
+	// imageStore := self.client.ImageService()
+	// image, err = imageStore.Create(ctx, image)
+	// return nil, err
+	return nil, nil
 }
 
 func (self *ContainerdClient) ImageRemove(ctx context.Context, imageId string, options ImageRemoveOptions) error {
