@@ -241,3 +241,9 @@ func GetDirsInDir(dirPath string) (error, []string) {
 
 	return nil, dirs
 }
+
+// GetRootDirectoryName returns the name of the current directory from the path
+func GetCurrentDirectoryName(path string) string {
+	directories := strings.Split(path, string(os.PathSeparator))
+	return directories[len(directories)-1]
+}

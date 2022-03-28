@@ -791,7 +791,7 @@ func UpdateChallenges() {
 				log.Errorf("Error while decoding challenge config file for challenge dir %s: %s", dir, err.Error())
 				continue
 			}
-			challengeName := config.Challenge.Metadata.Name
+			challengeName := utils.GetCurrentDirectoryName(dir)
 
 			err = config.ValidateRequiredFields(dir)
 			if err != nil {
