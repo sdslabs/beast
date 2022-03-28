@@ -20,7 +20,7 @@ import (
 // @Failure 500 {object} api.HTTPPlainResp
 // @Router /api/remote/sync/ [post]
 func syncBeastGitRemote(c *gin.Context) {
-	err := manager.SyncBeastRemote()
+	err := manager.SyncBeastRemote("")
 	if err != nil {
 		log.Errorf("Error while syncing beast remote....")
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
@@ -45,7 +45,7 @@ func syncBeastGitRemote(c *gin.Context) {
 // @Failure 500 {object} api.HTTPPlainResp
 // @Router /api/remote/reset/ [post]
 func resetBeastGitRemote(c *gin.Context) {
-	err := manager.ResetBeastRemote()
+	err := manager.ResetBeastRemote("")
 	if err != nil {
 		log.Errorf("Error while resetting beast remote....")
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{

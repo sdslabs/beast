@@ -14,7 +14,7 @@ import (
 )
 
 // Sync the beast remote directory with the actual git repository.
-func SyncBeastRemote() error {
+func SyncBeastRemote(defaultauthorpassword string) error {
 	log.Info("Syncing local challenge repository with remote.")
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
 	dirGitRemote := make(map[string]string)
@@ -68,11 +68,11 @@ func SyncBeastRemote() error {
 	}
 	log.Info("Beast git base synced with remote")
 	go config.UpdateUsedPortList()
-	UpdateChallenges()
+	UpdateChallenges(defaultauthorpassword)
 	return fmt.Errorf(strings.Join(errStrings, "\n"))
 }
 
-func ResetBeastRemote() error {
+func ResetBeastRemote(defaultauthorpassword string) error {
 	var errStrings []string
 	log.Debugf("Cleaning existing remote directories")
 	for _, gitRemote := range config.Cfg.GitRemotes {
@@ -86,7 +86,7 @@ func ResetBeastRemote() error {
 			}
 		}
 	}
-	err := SyncBeastRemote()
+	err := SyncBeastRemote(defaultauthorpassword)
 	if err != nil {
 		log.Errorf("Error while syncing remote after clean : %s", err)
 	}
@@ -121,7 +121,7 @@ func IsAlreadySynced() bool {
 
 // SyncAndGetChangesFromRemote gets changes from remote since the last sync
 // Returns an array of names of challenges which were modified
-func SyncAndGetChangesFromRemote() []string {
+func SyncAndGetChangesFromRemote(defaultauthorpassword string) []string {
 	log.Info("Syncing local challenge repository with remote.")
 	var modifiedChallsNameList []string
 
@@ -188,14 +188,14 @@ func SyncAndGetChangesFromRemote() []string {
 	}
 	log.Info("Beast git base synced with remote")
 	go config.UpdateUsedPortList()
-	UpdateChallenges()
+	UpdateChallenges(defaultauthorpassword)
 
 	return modifiedChallsNameList
 }
 
-func RunBeastBootsteps() error {
+func RunBeastBootsteps(defaultauthorpassword string) error {
 	log.Info("Syncing beast git challenge dir with remote....")
 
-	_ = SyncBeastRemote()
+	_ = SyncBeastRemote(defaultauthorpassword)
 	return nil
 }

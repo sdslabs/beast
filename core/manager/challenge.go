@@ -394,7 +394,7 @@ func HandleAll(action string, user string) []string {
 	log.Infof("Got request to %s ALL CHALLENGES", action)
 
 	if action == core.MANAGE_ACTION_DEPLOY {
-		err := SyncBeastRemote()
+		err := SyncBeastRemote("")
 		if err != nil {
 			// A hack for go-git which returns error when the git repo
 			// is up to date. This ignores this error.
@@ -494,7 +494,7 @@ func AutoUpdate() {
 	}
 	oldChallsSet := utils.SetFromArray(oldChalls)
 
-	modifiedChalls := SyncAndGetChangesFromRemote()
+	modifiedChalls := SyncAndGetChangesFromRemote("")
 	if len(modifiedChalls) > 0 {
 		log.Infof("Detected changes in challenge(s): %v", modifiedChalls)
 	} else {

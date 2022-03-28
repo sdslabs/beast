@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
+	"github.com/sdslabs/beastv4/pkg/auth"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -405,7 +406,7 @@ func copyAdditionalContextToStaging(fileCtx map[string]string, stagingDir string
 }
 
 // TODO: Refactor this.
-func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig) error {
+func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig, defaultauthorpassword string) error {
 	// Challenge is nil, which means the challenge entry does not exist
 	// So create a new challenge entry on the basis of the fields provided
 	// in the config file for the challenge.
@@ -439,7 +440,21 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 
 		if userEntry.Email == "" {
-			return fmt.Errorf("User with the given email does not exist : %v", config.Author.Email)
+			if defaultauthorpassword == "" {
+				return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
+			}
+			log.Infof("User with the given email does not exist : %v, creating this user", config.Author.Email)
+			newUser := database.User{
+				Name:      config.Author.Email,
+				AuthModel: auth.CreateModel(config.Author.Email, defaultauthorpassword, core.USER_ROLES["contestant"]),
+				Email:     config.Author.Email,
+			}
+			err = database.CreateUserEntry(&newUser)
+			if err != nil {
+				return err
+			}
+			log.Infof("Author with the email address %v is created", config.Author.Email)
+			return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
 				(userEntry.SshKey != config.Author.SSHKey || config.Author.SSHKey == "") &&
@@ -764,7 +779,7 @@ func CopyDir(src string, dst string) error {
 	return nil
 }
 
-func UpdateChallenges() {
+func UpdateChallenges(defaultauthorpassword string) {
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
 
 	for _, gitRemote := range cfg.Cfg.GitRemotes {
@@ -816,7 +831,7 @@ func UpdateChallenges() {
 			}
 
 			// Using the challenge dir we got, update the database entries for the challenge.
-			err = UpdateOrCreateChallengeDbEntry(&challenge, config)
+			err = UpdateOrCreateChallengeDbEntry(&challenge, config, defaultauthorpassword)
 			if err != nil {
 				log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
 				log.Errorf("Db error : %s", err)
