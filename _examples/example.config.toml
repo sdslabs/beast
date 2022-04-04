@@ -6,10 +6,10 @@
 # ├── config.toml
 # └── .static.beast.htpasswd
 # ├── remote/
-# │   └── hack-test
+# │   └── hack-test
 # ├── secrets/
-# │   ├── key.priv
-# │   └── key.pub
+# │   ├── key.priv
+# │   └── key.pub
 # └── staging/
 #
 # Sample snapshot of .beast directory.
