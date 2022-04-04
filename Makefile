@@ -68,6 +68,7 @@ tools:
 
 	@if ! test -x "`which shellcheck 2>&1;true`"; then \
 	  echo 'Error: shellcheck is not installed, Installing shellcheck' >&2 ; \
+	  sudo chmod +x scripts/tools/install_shellcheck.sh ; \
 	  ./scripts/tools/install_shellcheck.sh ; \
 	fi
 

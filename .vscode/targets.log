@@ -1,0 +1,438 @@
+make all --print-data-base --no-builtin-variables --no-builtin-rules --question
+# GNU Make 4.1
+# Built for x86_64-pc-linux-gnu
+# Copyright (C) 1988-2014 Free Software Foundation, Inc.
+# License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+# This is free software: you are free to change and redistribute it.
+# There is NO WARRANTY, to the extent permitted by law.
+
+# Make data base, printed on Mon Apr  4 22:41:49 2022
+
+# Variables
+
+# 'override' directive
+GNUMAKEFLAGS := 
+# automatic
+<D = $(patsubst %/,%,$(dir $<))
+# automatic
+?F = $(notdir $?)
+# environment
+DESKTOP_SESSION = ubuntu
+# default
+.SHELLFLAGS := -c
+# environment
+XDG_SESSION_TYPE = x11
+# environment
+VSCODE_LOG_NATIVE = false
+# environment
+NVM_INC = /home/levihackerman/.nvm/versions/node/v16.14.2/include/node
+# automatic
+?D = $(patsubst %/,%,$(dir $?))
+# environment
+IM_CONFIG_PHASE = 2
+# automatic
+@D = $(patsubst %/,%,$(dir $@))
+# environment
+XAUTHORITY = /run/user/1000/gdm/Xauthority
+# environment
+GDMSESSION = ubuntu
+# environment
+XMODIFIERS = @im=ibus
+# makefile
+CURDIR := /home/levihackerman/beast
+# makefile
+SHELL = /bin/sh
+# makefile (from 'Makefile', line 1)
+GO := go
+# environment
+VSCODE_NLS_CONFIG = {"locale":"en-gb","availableLanguages":{},"_languagePackSupport":true}
+# environment
+_ = /usr/share/code/code
+# environment
+XDG_CONFIG_DIRS = /etc/xdg/xdg-ubuntu:/etc/xdg
+# makefile (from 'Makefile', line 1)
+MAKEFILE_LIST :=  Makefile
+# environment
+JAVA_HOME = /usr/lib/jvm/java-11-openjdk-amd64/
+# automatic
+@F = $(notdir $@)
+# environment
+GIO_LAUNCHED_DESKTOP_FILE = /usr/share/applications/code.desktop
+# environment
+USERNAME = levihackerman
+# environment
+MANDATORY_PATH = /usr/share/gconf/ubuntu.mandatory.path
+# environment
+XDG_DATA_DIRS = /usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop
+# environment
+VSCODE_AMD_ENTRYPOINT = vs/workbench/api/node/extensionHostProcess
+# environment
+DBUS_SESSION_BUS_ADDRESS = unix:path=/run/user/1000/bus
+# environment
+VSCODE_VERBOSE_LOGGING = true
+# environment
+CLUTTER_IM_MODULE = xim
+# environment
+LESSOPEN = | /usr/bin/lesspipe %s
+# environment
+VSCODE_CWD = /home/levihackerman
+# environment
+GOPROXY = https://proxy.golang.org,direct
+# default
+MAKE_HOST := x86_64-pc-linux-gnu
+# environment
+PATH = /home/levihackerman/.nvm/versions/node/v16.14.2/bin:/home/levihackerman/.pyenv/plugins/pyenv-virtualenv/shims:/home/levihackerman/.pyenv/shims:/home/levihackerman/.pyenv/bin:/home/levihackerman/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/usr/local/go/bin:/usr/lib/jvm/java-11-openjdk-amd64//bin:/usr/local/go/bin:/usr/local/go/bin
+# environment
+GPG_AGENT_INFO = /run/user/1000/gnupg/S.gpg-agent:0:1
+# environment
+SESSION_MANAGER = local/anshul-lenovo-ideapad:@/tmp/.ICE-unix/3236,unix/anshul-lenovo-ideapad:/tmp/.ICE-unix/3236
+# environment
+XDG_RUNTIME_DIR = /run/user/1000
+# environment
+TEXTDOMAIN = im-config
+# makefile (from 'Makefile', line 4)
+pkgs = $(shell $(GO) list ./... | grep -v vendor)
+# environment
+GOPATH = /home/levihackerman/go
+# environment
+NVM_BIN = /home/levihackerman/.nvm/versions/node/v16.14.2/bin
+# environment
+XDG_MENU_PREFIX = gnome-
+# environment
+VSCODE_LOG_STACK = false
+# environment
+ELECTRON_RUN_AS_NODE = 1
+# environment
+PYENV_ROOT = /home/levihackerman/.pyenv
+# default
+.FEATURES := target-specific order-only second-expansion else-if shortest-stem undefine oneshell archives jobserver output-sync check-symlink load
+# environment
+LS_COLORS = 
+# environment
+XDG_SESSION_DESKTOP = ubuntu
+# environment
+SSH_AUTH_SOCK = /run/user/1000/keyring/ssh
+# environment
+GIO_LAUNCHED_DESKTOP_FILE_PID = 14688
+# automatic
+%F = $(notdir $%)
+# environment
+DISPLAY = :0
+# environment
+GTK_IM_MODULE = ibus
+# environment
+VSCODE_PIPE_LOGGING = true
+# environment
+PWD = /home/levihackerman/beast
+# environment
+XDG_SEAT = seat0
+# environment
+SSH_AGENT_PID = 3332
+# environment
+ORIGINAL_XDG_CURRENT_DESKTOP = ubuntu:GNOME
+# environment
+GTK_MODULES = gail:atk-bridge
+# environment
+GOMODCACHE = /home/levihackerman/go/pkg/mod
+# environment
+PYENV_SHELL = bash
+# environment
+HOME = /home/levihackerman
+# environment
+LESSCLOSE = /usr/bin/lesspipe %s %s
+# environment
+VSCODE_CODE_CACHE_PATH = /home/levihackerman/.config/Code/CachedData/e18005f0f1b33c29e81d732535d8c0e47cafb0b5
+# environment
+LOGNAME = levihackerman
+# environment
+APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = 1
+# environment
+NVM_CD_FLAGS = 
+# environment
+VSCODE_HANDLES_UNCAUGHT_ERRORS = true
+# default
+MAKE_VERSION := 4.1
+# environment
+GNOME_DESKTOP_SESSION_ID = this-is-deprecated
+# automatic
+^D = $(patsubst %/,%,$(dir $^))
+# environment
+XDG_VTNR = 2
+# environment
+MAKELEVEL := 0
+# default
+MAKE = $(MAKE_COMMAND)
+# default
+MAKECMDGOALS := all
+# environment
+QT_IM_MODULE = ibus
+# environment
+SHLVL = 1
+# environment
+GNOME_SHELL_SESSION_MODE = ubuntu
+# environment
+VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-3e50e27e-1c90-465c-a564-f6eab0382939.sock
+# environment
+XDG_SESSION_ID = 2
+# environment
+USER = levihackerman
+# makefile
+.DEFAULT_GOAL := help
+# environment
+XDG_CURRENT_DESKTOP = Unity
+# automatic
+%D = $(patsubst %/,%,$(dir $%))
+# default
+MAKE_COMMAND := make
+# default
+.VARIABLES := 
+# automatic
+*F = $(notdir $*)
+# environment
+LANGUAGE = en_IN:en
+# environment
+VSCODE_IPC_HOOK = /run/user/1000/vscode-6b4bf7be-1.66.0-main.sock
+# makefile
+MAKEFLAGS = pqrR
+# environment
+MFLAGS = -pqrR
+# automatic
+*D = $(patsubst %/,%,$(dir $*))
+# environment
+NVM_DIR = /home/levihackerman/.nvm
+# automatic
++D = $(patsubst %/,%,$(dir $+))
+# environment
+GDK_BACKEND = x11
+# automatic
++F = $(notdir $+)
+# environment
+QT_ACCESSIBILITY = 1
+# environment
+DEFAULTS_PATH = /usr/share/gconf/ubuntu.default.path
+# environment
+TEXTDOMAINDIR = /usr/share/locale/
+# default
+MAKEFILES := 
+# automatic
+<F = $(notdir $<)
+# environment
+LC_ALL = C
+# makefile (from 'Makefile', line 2)
+AIR := /home/levihackerman/go/bin/air	
+# environment
+QT4_IM_MODULE = xim
+# environment
+GJS_DEBUG_TOPICS = JS ERROR;JS LOG
+# automatic
+^F = $(notdir $^)
+# default
+SUFFIXES := 
+# environment
+CHROME_DESKTOP = code-url-handler.desktop
+# environment
+WINDOWPATH = 2
+# environment
+PYENV_VIRTUALENV_INIT = 1
+# default
+.INCLUDE_DIRS = /usr/include /usr/local/include /usr/include
+# environment
+GJS_DEBUG_OUTPUT = stderr
+# default
+.RECIPEPREFIX := 
+# environment
+LANG = C
+# environment
+VSCODE_PID = 14688
+# variable set hash-table stats:
+# Load=117/1024=11%, Rehash=0, Collisions=16/143=11%
+
+# Pattern-specific Variable Values
+
+# No pattern-specific variable values.
+
+# Directories
+
+# . (device 2051, inode 8540186): 33 files, no impossibilities.
+
+# 33 files, no impossibilities in 1 directories.
+
+# Implicit Rules
+
+# No implicit rules.
+
+# Files
+
+check_format:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 32):
+	@echo "[*] Checking for formatting errors using gofmt"
+	@./scripts/build/check_gofmt.sh
+
+cmdref: build
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 28):
+	@${GOPATH}/bin/beast cmdref
+
+# Not a target:
+all:
+#  Command line target.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has not been updated.
+ 
+make: *** No rule to make target 'all'.  Stop.
+
+
+.PHONY: build format test check_format tools docs installenv
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+installenv:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 86):
+	@echo 'Setting up environment for beast.'
+	@./scripts/installenv.sh
+
+format:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 42):
+	@echo "[*] Formatting code"
+	@$(GO) fmt $(pkgs)
+
+# Not a target:
+Makefile:
+#  Implicit rule search has been done.
+#  Last modified 2022-04-04 21:01:08.43563769
+#  File has been updated.
+#  Successfully updated.
+
+govet:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 47):
+	@echo "[*] Vetting code, checking for mistakes"
+	@$(GO) vet $(pkgs)
+
+test: check_format
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 37):
+	@echo "[*] Running tests for example challenges"
+	@./scripts/test/test_examples.sh
+
+build: tools
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 20):
+	@./scripts/build/build.sh
+
+help:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 7):
+	@echo "BEAST: An automated challenge deployment tool for backdoor"
+	@echo ""
+	@echo "* build: Build beast and copy binary to PATH set for go build binaries."
+	@echo "* dev: Run development environment with hot-reloading enabled"
+	@echo "* requirements: Build beast extra artifacts requirements."
+	@echo "* check_format: Check for formatting errors using gofmt"
+	@echo "* format: format the go files using go_fmt in the project directory."
+	@echo "* test: Run tests for beast"
+	@echo "* tools: Set up required tools for beast which includes - docker-enter, importenv"
+	@echo ""
+
+dev:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 24):
+	@echo "Starting development server for beast..."
+	@$(AIR)
+
+# Not a target:
+.DEFAULT:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+docs:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 80):
+	@rm -rf site/
+	@echo ">>> Building Documentation"
+	@mkdocs build
+	@python scripts/tools/swagger-docs.py
+
+requirements:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 76):
+	@echo ">>> Building beast extras..."
+	@./scripts/build/extras.sh
+
+tools:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 52):
+	@if ! test -x "`which nsenter 2>&1;true`"; then \
+	  echo 'Error: nsenter is not installed, Install it first' >&2 ; \
+	fi
+	@if ! test -x "`which docker-enter 2>&1;true`"; then \
+	  echo 'Warn: docker-enter is not installed, building....' >&2 ; \
+	  sudo cp ./scripts/docker-enter "/usr/bin/" ; \
+	  sudo cp ./scripts/docker_enter "/usr/bin/"; \
+	  sudo chown root "/usr/bin/docker_enter"; \
+	  sudo chmod u+s "/usr/bin/docker_enter"; \
+	fi
+	@if ! test -x "`which importenv 2>&1;true`"; then \
+	  echo 'Warn: importenv is not installed, building....' >&2 ; \
+	  sudo gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
+	fi
+	@if ! test -x "`which shellcheck 2>&1;true`"; then \
+	  echo 'Error: shellcheck is not installed, Installing shellcheck' >&2 ; \
+	  sudo chmod +x scripts/tools/install_shellcheck.sh ; \
+	  ./scripts/tools/install_shellcheck.sh ; \
+	fi
+
+# files hash-table stats:
+# Load=17/1024=2%, Rehash=0, Collisions=0/38=0%
+# VPATH Search Paths
+
+# No 'vpath' search paths.
+
+# No general ('VPATH' variable) search path.
+
+# strcache buffers: 1 (0) / strings = 50 / storage = 433 B / avg = 8 B
+# current buf: size = 8162 B / used = 433 B / count = 50 / avg = 8 B
+
+# strcache performance: lookups = 78 / hit rate = 35%
+# hash-table stats:
+# Load=50/8192=1%, Rehash=0, Collisions=1/78=1%
+# Finished Make data base on Mon Apr  4 22:41:49 2022
+
+ 
