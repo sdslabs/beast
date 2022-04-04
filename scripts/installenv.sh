@@ -54,6 +54,10 @@ function install_go() {
     /usr/local/go/bin/go version
 }
 
+function install_air(){
+  curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+}
+
 update
 upgrade
 
@@ -61,5 +65,6 @@ sudo apt-get install -y apt-transport-https libsqlite3-dev build-essential gcc g
 
 install_docker
 install_go
+install_air
 
 exit 0

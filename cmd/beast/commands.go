@@ -10,26 +10,27 @@ import (
 )
 
 var (
-	Verbose           bool
-	HealthProbe       bool
-	Port              string
-	Name              string
-	Host              string
-	Username          string
-	Email             string
-	Password          string
-	PublicKeyPath     string
-	SkipAuthorization bool
-	AllChalls         bool
-	AutoDeploy        bool
-	PeriodicSync      bool
-	Tag               string
-	LocalDirectory    string
-	DeleteEntry       bool
-	RefDirectory      string
-	Status            string
-	Tags              string
-	NoCache           bool
+	Verbose               bool
+	HealthProbe           bool
+	Port                  string
+	DefaultAuthorPassword string
+	Name                  string
+	Host                  string
+	Username              string
+	Email                 string
+	Password              string
+	PublicKeyPath         string
+	SkipAuthorization     bool
+	AllChalls             bool
+	AutoDeploy            bool
+	PeriodicSync          bool
+	Tag                   string
+	LocalDirectory        string
+	DeleteEntry           bool
+	RefDirectory          string
+	Status                string
+	Tags                  string
+	NoCache               bool
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -75,6 +76,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
 
 	runCmd.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to run the beast server on.")
+	runCmd.PersistentFlags().StringVarP(&DefaultAuthorPassword, "defaultauthorpassword", "q", "", "Default password for creating author, users are not created if value is empty string")
 	runCmd.PersistentFlags().BoolVarP(&AutoDeploy, "auto-deploy", "a", false, "Auto deploy all challenges from remote on server start.")
 	runCmd.PersistentFlags().BoolVarP(&HealthProbe, "health-probe", "k", false, "Run health check service for beast deployed challenges")
 	runCmd.PersistentFlags().BoolVarP(&PeriodicSync, "periodic-sync", "s", false, "Periodically sync remote with beast and auto update challenges.")
