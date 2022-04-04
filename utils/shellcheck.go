@@ -14,6 +14,8 @@ func ShellCheck(challengeDir string) error {
 	stdout, err := cmd.Output()
 
     if err != nil {
+		// Print the output and error
+		fmt.Println(string(stdout))
         fmt.Println(err.Error())
         return err
     }
