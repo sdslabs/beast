@@ -20,7 +20,6 @@ var (
 	Email                 string
 	Password              string
 	PublicKeyPath         string
-	CsvFile			  	  string
 	SkipAuthorization     bool
 	AllChalls             bool
 	AutoDeploy            bool
@@ -32,6 +31,7 @@ var (
 	Status                string
 	Tags                  string
 	NoCache               bool
+	CsvFile			  	  string
 )
 
 // Root command `beast` all commands are either a flag to this command
