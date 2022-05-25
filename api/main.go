@@ -23,8 +23,8 @@ const (
 
 var BeastScheduler scheduler.Scheduler = scheduler.NewScheduler()
 
-func runBeastApiBootsteps() error {
-	manager.RunBeastBootsteps()
+func runBeastApiBootsteps(defaultauthorpassword string) error {
+	manager.RunBeastBootsteps(defaultauthorpassword)
 
 	return nil
 }
@@ -47,7 +47,7 @@ func runBeastApiBootsteps() error {
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port string, autoDeploy, healthProbe, periodicSync bool, noCache bool) {
+func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) {
 	log.Info("Bootstrapping Beast API server")
 
 	config.InitConfig()
@@ -63,7 +63,7 @@ func RunBeastApiServer(port string, autoDeploy, healthProbe, periodicSync bool, 
 
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 
-	runBeastApiBootsteps()
+	runBeastApiBootsteps(defaultauthorpassword)
 
 	// Initialize Gin router.
 	router := initGinRouter()

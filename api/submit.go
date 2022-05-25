@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
@@ -104,7 +105,13 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		challenge := chall[0]
-
+		if challenge.Status != core.DEPLOY_STATUS["deployed"] {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Challenge is unavailable",
+				Success: false,
+			})
+			return
+		}
 		if challenge.Flag != flag {
 			c.JSON(http.StatusOK, FlagSubmitResp{
 				Message: "Your flag is incorrect",
@@ -128,20 +135,23 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+
 		challengePoints := challenge.Points
+		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
 		if config.Cfg.CompetitionInfo.DynamicScore {
 			submissions, err := database.QuerySubmissions(map[string]interface{}{
-				"ChallengeID": parsedChallId,
+				"challenge_id": parsedChallId,
 			})
 			if err != nil {
 				log.Error(err)
 			}
-			solvers := len(submissions) + 1
+			solvers := len(submissions)
 			newPoints := dynamicScore(challenge.MaxPoints, challenge.MinPoints, uint(solvers))
 			if newPoints != challengePoints {
 				database.UpdateChallenge(&challenge, map[string]interface{}{
-					"Points": challengePoints,
+					"Points": newPoints,
 				})
+				log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challengePoints)
 				err = updatePointsOfSolvers(submissions, newPoints, challengePoints)
 				if err != nil {
 					log.Error(err)
@@ -197,9 +207,11 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 		if err != nil {
 			return err
 		}
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + newChallengePointsAfterSolve - oldChallengePointsBeforeSolve})
-		if err != nil {
-			return err
+		if user.Role == "contestant" {
+			err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

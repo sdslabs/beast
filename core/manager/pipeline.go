@@ -321,7 +321,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	}
 
 	// Using the challenge dir we got, update the database entries for the challenge.
-	err = UpdateOrCreateChallengeDbEntry(&challenge, config)
+	err = UpdateOrCreateChallengeDbEntry(&challenge, config, "")
 	if err != nil {
 		log.Errorf("An error occured while creating db entry for challenge :: %s", challengeName)
 		log.Errorf("Db error : %s", err)

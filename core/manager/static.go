@@ -120,7 +120,7 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *datab
 		}
 	}
 
-	err = utils.CopyDirectory(challengeDir, challengeStagingDir)
+	err = utils.CopyDirectory(challengeDir, challengeStagingRoot)
 	if err != nil {
 		log.Errorf("Error while copying to the staging directory: %s", err)
 	} else {
