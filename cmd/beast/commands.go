@@ -88,13 +88,13 @@ func init() {
 	getAuthCmd.PersistentFlags().StringVarP(&Password, "password", "p", "", "Password")
 	getAuthCmd.PersistentFlags().StringVarP(&Host, "host", "H", "http://localhost:5005/", "Hostname or IP along with port where beast is hosted")
 
-	createAuthorCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new author")
-	createAuthorCmd.PersistentFlags().StringVarP(&Username, "username", "", "", "Username of the new author")
-	createAuthorCmd.PersistentFlags().StringVarP(&Password, "password", "", "", "Password of the author")
-	createAuthorCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new author")
-	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new author")
+	createAuthorCmd.PersistentFlags().StringVarP(&Name, "name", "n", "", "Name of the new author")
+	createAuthorCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username of the new author")
+	createAuthorCmd.PersistentFlags().StringVarP(&Password, "password", "p", "", "Password of the author")
+	createAuthorCmd.PersistentFlags().StringVarP(&Email, "email", "", "e", "Email of the new author")
+	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "k", "", "Public key file representing new author")
 
-	createMultipleAuthorCmd.PersistentFlags().StringVarP(&CsvFile, "csv", "", "", "CSV file containing details of author")
+	createMultipleAuthorCmd.PersistentFlags().StringVarP(&CsvFile, "csv", "c", "", "CSV file containing details of author")
 
 	createAdminCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Username, "username", "", "", "Username of the new admin")

@@ -49,9 +49,6 @@ var createAuthorCmd = &cobra.Command{
 	},
 
 	Run: func(cmd *cobra.Command, args []string) {
-		config.InitConfig()
-
-		auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 
 		utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "author")
 	},
@@ -87,9 +84,6 @@ var createAdminCmd = &cobra.Command{
 	},
 
 	Run: func(cmd *cobra.Command, args []string) {
-		config.InitConfig()
-
-		auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 
 		utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "admin")
 	},
@@ -106,12 +100,8 @@ var createMultipleAuthorCmd = &cobra.Command{
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		
 		csvFile := filepath.Join(BEAST_GLOBAL_DIR, CsvFile)
-
-		config.InitConfig()
-
-		auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
-
 
 		f, err := os.Open(csvFile)
 		if err != nil {
