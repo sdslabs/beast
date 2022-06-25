@@ -683,7 +683,33 @@ func StartUndeployChallenge(challengeName string, purge bool) error {
 	return err
 }
 
+func getDeployedChallengesCount() (int, error) {
+	challs, err := database.QueryAllChallenges()
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, chall := range challs {
+		if chall.Status == "Deployed" {
+			count += 1
+		}
+	}
+
+	return count, nil
+}
+
 func DeployChallenge(challengeName string) error {
+	alreadyDeployed, err := getDeployedChallengesCount()
+	if err != nil {
+		return err
+	}
+
+	if alreadyDeployed >= 10 {
+		log.Errorf("Attempting to deploy more than 10 challenges")
+		return fmt.Errorf("Maximum deployed challenges limit reached. 10 challenges already deployed!")
+	}
+
 	w, err := GetDeployWork(challengeName)
 	if err != nil {
 		return err
