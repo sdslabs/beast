@@ -415,14 +415,14 @@ func manageScheduledAction(c *gin.Context) {
 	})
 }
 
-// Prepare challenge info from .tar file.
-// @Summary Untar and fetch info from beast.toml file in challenge
-// @Description Handles the challenge management from a challenge in tar file. Currently prepare the tar file
-// by running `tar cvf chall_dir.tar .` inside the chall_dir.
+// Prepare challenge info from .zip file.
+// @Summary Unzip and fetch info from beast.toml file in challenge
+// @Description Handles the challenge management from a challenge in zip file. Currently prepare the zip file
+// by running `zip cvf chall_dir.zip *` inside the chall_dir.
 // @Tags manage
 // @Accept  json
 // @Produce json
-// @Param file formData file true ".tar file to be uploaded to fetch challenge info"
+// @Param file formData file true ".zip file to be uploaded to fetch challenge info"
 // @Success 200 {object} api.ChallengePreviewResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
@@ -446,23 +446,25 @@ func manageUploadHandler(c *gin.Context) {
 		}
 	}
 
-	tarContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
+	zipContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
 
 	// The file is received, save it
-	if err := c.SaveUploadedFile(file, tarContextPath); err != nil {
+	if err := c.SaveUploadedFile(file, zipContextPath); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: fmt.Sprintf("Unable to save file: %s", err),
 		})
 		return
 	}
 
-	// Extract and show from tar and return response
-	tempStageDir, err := manager.UnTarChallengeFolder(tarContextPath, core.BEAST_TEMP_DIR)
-
-	// The file cannot be successfully un-tar-ed or the resultant was a malformed directory
+	// Extract and show from zip and return response
+	tempStageDir, err := manager.UnzipChallengeFolder(zipContextPath, core.BEAST_TEMP_DIR)
+	
+	// log.Debug("The dir is ",tempStageDir)
+	
+	// The file cannot be successfully un-zipped or the resultant was a malformed directory
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: fmt.Sprintf("The un-TAR process failed or the TAR was unacceptable: %s", err),
+			Error: fmt.Sprintf("The unzip process failed or the ZIP was unacceptable: %s", err),
 		})
 		return
 	}
