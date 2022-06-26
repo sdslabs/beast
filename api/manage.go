@@ -418,7 +418,7 @@ func manageScheduledAction(c *gin.Context) {
 // Prepare challenge info from .zip file.
 // @Summary Unzip and fetch info from beast.toml file in challenge
 // @Description Handles the challenge management from a challenge in zip file. Currently prepare the zip file
-// by running `zip cvf chall_dir.zip *` inside the chall_dir.
+// by running `zip -r chall_dir.zip *` inside the chall_dir.
 // @Tags manage
 // @Accept  json
 // @Produce json

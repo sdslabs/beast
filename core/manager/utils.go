@@ -683,7 +683,6 @@ func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 
 	baseFileName := filepath.Base(zipContextPath)
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
-	log.Debugln(targetDir)
 
 	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
         log.Fatal(err)
@@ -692,21 +691,21 @@ func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 	// 1. Open the zip file
     reader, err := zip.OpenReader(zipContextPath)
     if err != nil {
-        return "",err
+        return "", err
     }
     defer reader.Close()
 
     // 2. Get the absolute destination path
     destination, err := filepath.Abs(targetDir)
     if err != nil {
-        return "",err
+        return "", err
     }
 
     // 3. Iterate over zip files inside the archive and unzip each of them
     for _, f := range reader.File {
         err := unzipFile(f, destination)
         if err != nil {
-            return "",err
+            return "", err
         }
     }
 
