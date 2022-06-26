@@ -1,7 +1,7 @@
 package manager
 
 import (
-	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"fmt"
 	"github.com/sdslabs/beastv4/pkg/auth"
@@ -678,46 +678,78 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 	return challengeNames
 }
 
-//UnTars challenge folder in a destination directory
-func UnTarChallengeFolder(tarContextPath, dstPath string) (string, error) {
-	baseFileName := filepath.Base(tarContextPath)
+//Unzips challenge folder in a destination directory
+func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
+
+	baseFileName := filepath.Base(zipContextPath)
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
-	reader, err := os.Open(tarContextPath)
-	if err != nil {
-		return "", err
-	}
-	defer reader.Close()
-	tarReader := tar.NewReader(reader)
+	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
+        log.Fatal(err)
+    }
 
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return "", err
-		}
+	// 1. Open the zip file
+    reader, err := zip.OpenReader(zipContextPath)
+    if err != nil {
+        return "", err
+    }
+    defer reader.Close()
 
-		path := filepath.Join(filepath.Join(targetDir), header.Name)
-		info := header.FileInfo()
-		if info.IsDir() {
-			if err = os.MkdirAll(path, info.Mode()); err != nil {
-				return "", err
-			}
-			continue
-		}
+    // 2. Get the absolute destination path
+    destination, err := filepath.Abs(targetDir)
+    if err != nil {
+        return "", err
+    }
 
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-		if err != nil {
-			return "", err
-		}
-		defer file.Close()
-		_, err = io.Copy(file, tarReader)
-		if err != nil {
-			return "", err
-		}
-	}
-	return targetDir, nil
+    // 3. Iterate over zip files inside the archive and unzip each of them
+    for _, f := range reader.File {
+        err := unzipFile(f, destination)
+        if err != nil {
+            return "", err
+        }
+    }
+
+    return targetDir, nil
+}
+
+
+func unzipFile(f *zip.File, destination string) error {
+    // 4. Check if file paths are not vulnerable to [Zip Slip](https://snyk.io/research/zip-slip-vulnerability)
+    filePath := filepath.Join(destination, f.Name)
+    if !strings.HasPrefix(filePath, filepath.Clean(destination)+string(os.PathSeparator)) {
+        return fmt.Errorf("invalid file path: %s", filePath)
+    }
+
+    // 5. Create directory tree
+    if f.FileInfo().IsDir() {
+        if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+            return err
+        }
+        return nil
+    }
+
+    if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+        return err
+    }
+
+    // 6. Create a destination file for unzipped content
+    destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+    if err != nil {
+        return err
+    }
+    defer destinationFile.Close()
+
+    // 7. Unzip the content of a file and copy it to the destination file
+    zippedFile, err := f.Open()
+    if err != nil {
+        return err
+    }
+    defer zippedFile.Close()
+
+    if _, err := io.Copy(destinationFile, zippedFile); err != nil {
+        return err
+    }
+    return nil
 }
 
 // File copies a single file from src to dst
