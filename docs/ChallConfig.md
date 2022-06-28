@@ -75,7 +75,9 @@ description = "" # Descritption for the challenge.
 tags = ["", ""] # Tags that the challenge might belong to, used to do bulk query and handling eg. binary, misc etc.
 hints = ["", ""]
 sidecar = "" # Name of the sidecar if any used by the challenge.
-points = 0 # Points given to the player for correct flag submission. Default value is 0, if not mentioned in the challenge config file 
+minPoints = 0 # Minimum points given to the player for correct flag submission. Beast has dynamic scoring, so a range of points is specified
+maxPoints = 0 # Maximum points given to the player for correct flag submission. Beast has dynamic scoring, so a range of points is specified
+assets = ["", ""] # Name of assets to be provided which are included in the ./static folder
 ```
 
 ### Challenge Environment
