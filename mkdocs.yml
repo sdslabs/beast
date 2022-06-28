@@ -6,7 +6,7 @@ nav:
   - Setup: Setup.md
   - Documentation: Documentation.md
   - Samples: SampleChallenges.md
-  - APIDocs: /apidocs.html
+  - APIDocs: /apiDocs
   - CmdRef: cmdref/beast.md
 
-theme: cosmo
+theme: mkdocs
