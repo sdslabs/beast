@@ -31,7 +31,7 @@ func runBeastApiBootsteps(defaultauthorpassword string) error {
 
 // @title Beast API
 // @version 1.0
-// @description Beast the automatic deployment tool for backdoor
+// @description Beast the automatic deployment tool for playCTF
 
 // @contact.name SDSLabs
 // @contact.url https://chat.sdslabs.co
@@ -40,7 +40,7 @@ func runBeastApiBootsteps(defaultauthorpassword string) error {
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host beast.sdslabs.co
+// @host playCTF.sdslabs.co
 // @BasePath /
 
 // @securityDefinitions.apikey ApiKeyAuth
