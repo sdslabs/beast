@@ -1,0 +1,14 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/levihackerman/beast'
+echo "BEAST: An automated challenge deployment tool for backdoor"
+echo ""
+echo "* build: Build beast and copy binary to PATH set for go build binaries."
+echo "* dev: Run development environment with hot-reloading enabled"
+echo "* requirements: Build beast extra artifacts requirements."
+echo "* check_format: Check for formatting errors using gofmt"
+echo "* format: format the go files using go_fmt in the project directory."
+echo "* test: Run tests for beast"
+echo "* tools: Set up required tools for beast which includes - docker-enter, importenv"
+echo ""
+make: Leaving directory '/home/levihackerman/beast'
+ 

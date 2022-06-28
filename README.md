@@ -33,6 +33,8 @@ Beast is a service that runs on your host(maybe a bare metal server or a cloud i
 
 Visit [beast-docs-sdslabs.netlify.app](https://beast-docs-sdslabs.netlify.app/) for the more details and documentation
 
+If you're looking for the source code of playCTF, the frontend powered by Beast, visit https://github.com/sdslabs/playCTF. 
+
 ## Features
 
 - Git based source of truth.
@@ -89,14 +91,14 @@ To save the state of the deployments and challenges beast uses SQLite as a datab
 Beast go version is under development; follow the below instructions to get started.
 
 - Make sure you have docker up and running.
-- Install go [1.13.X](https://golang.org/dl/) or above
+- Install go [1.18.X](https://golang.org/dl/) or above
 - Make sure that `GO111MODULES` environment variable should be set to `on`, or do `export GO111MODULES=on`
 - Clone the repository.
 - Jump to `$GOPATH/src/github.com/sdslabs/beast/` and start hacking.
 
 ```bash
 $ go version
-go version go1.13 linux/amd64
+go version go1.18 linux/amd64
 
 $ export GO111MODULES=on
 
@@ -114,7 +116,7 @@ BEAST: An automated challenge deployment tool for backdoor
 * tools: Set up required tools for Beast which includes - docker-enter, importenv
 ```
 
-**All the dependencies are already vendored with the project, so no need to install any dependencies**. The project uses go modules from go 1.13.X of dependency management. Make sure you vendor any library used using `go mod vendor`
+**All the dependencies are already vendored with the project, so no need to install any dependencies**. The project uses go modules from go 1.18.X of dependency management. Make sure you vendor any library used using `go mod vendor`
 
 ### Building
 
