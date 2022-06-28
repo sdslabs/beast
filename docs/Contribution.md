@@ -20,7 +20,7 @@ For any API routes, you add to the beast API, do write Swagger API documentation
 
 ## Git Commit Message Format
 
-Taken from https://github.com/angular/angular.js/blob/master/CONTRIBUTING.md and modified as required.
+Taken from [Airbnb JavaScript Style Guide](https://github.com/angular/angular.js/blob/master/CONTRIBUTING.md) and modified as required.
 Each commit message consists of a **header**, a **body** and a **footer**. The header has a special
 format that includes a **type**, a **scope** and a **subject**:
 
