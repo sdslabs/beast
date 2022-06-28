@@ -30,7 +30,7 @@ type AvailableImagesResp struct {
 type PortsInUseResp struct {
 	MinPortValue uint32   `json:"port_min_value" example:"10000"`
 	MaxPortValue uint32   `json:"port_max_value" example:"20000"`
-	PortsInUse   []uint32 `json:"ports_in_use" example:"[100001, 100003, 10010]"`
+	PortsInUse   []uint32 `json:"ports_in_use" example:[100001, 100003, 10010]`
 }
 
 type ChallengeStatusResp struct {
@@ -107,7 +107,7 @@ type ChallengeInfoResp struct {
 	AdditionalLinks []string        `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
 	CreatedAt       time.Time       `json:"createdAt"`
 	Status          string          `json:"status" example:"deployed"`
-	Ports           []uint32        `json:"ports" example:"[3001, 3002]"`
+	Ports           []uint32        `json:"ports" example:[3001, 3002]`
 	Hints           string          `json:"hints" example:"Try robots"`
 	Desc            string          `json:"description" example:"A simple web challenge"`
 	Points          uint            `json:"points" example:"50"`
@@ -122,7 +122,7 @@ type ChallengePreviewResp struct {
 	Tags            []string `json:"tags" example:"['pwn','misc']"`
 	Assets          []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
 	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
-	Ports           []uint32 `json:"ports" example:"[3001, 3002]"`
+	Ports           []uint32 `json:"ports" example:[3001, 3002]`
 	Hints           []string `json:"hints" example:"Try robots"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
