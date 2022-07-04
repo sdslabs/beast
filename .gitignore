@@ -6,3 +6,4 @@ site/
 .gnupg/
 ubuntu-bionic-18.04-cloudimg-console.log
 target/
+.vscode/
