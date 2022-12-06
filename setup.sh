@@ -47,6 +47,9 @@ DOCKER_PID_FILE=/var/run/docker.pid
 if [ -f "$DOCKER_PID_FILE" ]; then
     echo -e "Docker is running."
 else
+    DOCKER_PID_FILE=/var/run/docker-desktop-proxy.pid # for Docker desktop users		
+    if [ -f "$DOCKER_PID_FILE" ]; then
+    	echo -e "Docker is running."   
     echo -e '\e[31mDocker daemon is not running'
     echo -e '\e[31mAborting...'
     echo -e "\e[31mPlease start docker daemon and restart again"
