@@ -20,12 +20,11 @@ require (
 	github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568 // indirect
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-contrib/static v0.0.0-20200916080430-d45d9a37d28e
-	github.com/gin-gonic/gin v1.7.0
+	github.com/gin-gonic/gin v1.9.0
 	github.com/gliderlabs/ssh v0.1.1 // indirect
 	github.com/go-openapi/spec v0.20.3 // indirect
 	github.com/go-sql-driver/mysql v1.4.0
-	github.com/golang/protobuf v1.3.3
-	github.com/google/go-cmp v0.2.0 // indirect
+	github.com/golang/protobuf v1.5.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jinzhu/gorm v1.9.1
@@ -34,7 +33,6 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mitchellh/go-homedir v1.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/gomega v1.4.2 // indirect
@@ -49,10 +47,8 @@ require (
 	github.com/swaggo/gin-swagger v1.0.0
 	github.com/swaggo/swag v1.7.0
 	github.com/xanzy/ssh-agent v0.2.0 // indirect
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	golang.org/x/sys v0.0.0-20210227040730-b0d1d43c014d // indirect
-	golang.org/x/tools v0.1.0 // indirect
+	golang.org/x/crypto v0.5.0
+	golang.org/x/net v0.7.0
 	google.golang.org/appengine v1.2.0 // indirect
 	google.golang.org/grpc v1.19.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect
