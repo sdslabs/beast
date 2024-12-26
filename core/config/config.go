@@ -118,7 +118,7 @@ func (config *BeastConfig) ValidateConfig() error {
 
 	if config.BeastScriptsDir == "" {
 		defaultBeastScriptDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR)
-		log.Warn("No scripts directory provided for beast, using default : %s", defaultBeastScriptDir)
+		log.Warnf("No scripts directory provided for beast, using default : %s", defaultBeastScriptDir)
 		config.BeastScriptsDir = defaultBeastScriptDir
 	} else {
 		err := utils.CreateIfNotExistDir(config.BeastScriptsDir)
@@ -209,11 +209,11 @@ func (config *GitRemote) ValidateGitConfig() error {
 	}
 
 	if !gitUrlRegexp.MatchString(config.Url) {
-		return errors.New("The provided git url is not valid.")
+		return errors.New("The provided git url is not valid")
 	}
 
 	if config.Branch == "" {
-		log.Warn("Branch for git remote not provided, using %s", core.GIT_REMOTE_DEFAULT_BRANCH)
+		log.Warnf("Branch for git remote not provided, using %s", core.GIT_REMOTE_DEFAULT_BRANCH)
 		config.Branch = core.GIT_REMOTE_DEFAULT_BRANCH
 	}
 

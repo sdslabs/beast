@@ -171,7 +171,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
 		containers, err := cr.SearchContainerByFilter(map[string]string{"id": challenge.ContainerId})
 		if err != nil {
-			log.Error("Error while searching for container with id %s", challenge.ContainerId)
+			log.Errorf("Error while searching for container with id %s", challenge.ContainerId)
 			return nil, errors.New("CONTAINER RUNTIME ERROR")
 		}
 

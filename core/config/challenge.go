@@ -152,7 +152,7 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	}
 	log.Debugf("Available sidecars: %v", Cfg.AvailableSidecars)
 	if !(utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "") {
-		return fmt.Errorf("Sidecar provided is not an available sidecar."), false
+		return fmt.Errorf("Sidecar provided is not an available sidecar"), false
 	}
 	//Check if challenge points are within permissible range.
 	if config.MaxPoints < config.MinPoints {
@@ -434,7 +434,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		// ServicePath must be relative.
 		if config.ServicePath != "" {
 			if filepath.IsAbs(config.ServicePath) {
-				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
+				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable")
 			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
 				// Skip this, we might create service later too.
 				log.Warnf("Service path file %s does not exist", config.ServicePath)
@@ -481,7 +481,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if config.DockerCtx == "" {
 			return errors.New("Docker Context file not provided in docker-type challenge")
 		} else if filepath.IsAbs(config.DockerCtx) {
-			return fmt.Errorf("For challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
+			return fmt.Errorf("For challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file")
 		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
 			return fmt.Errorf("File : %s does not exist", config.DockerCtx)
 		}
