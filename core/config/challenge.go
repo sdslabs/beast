@@ -154,7 +154,10 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if !(utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "") {
 		return fmt.Errorf("Sidecar provided is not an available sidecar."), false
 	}
-
+	//Check if challenge points are within permissible range.
+	if config.MaxPoints < config.MinPoints {
+		return fmt.Errorf("Max points should be greater than min points"), false
+	}
 	// Check if the config type is static here and if it is
 	// then return an indication for that, so that caller knows if it need
 	// to check a valid environment or not.
@@ -396,7 +399,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 	for _, portMap := range portMappings {
 		if portMap.HostPort < core.ALLOWED_MIN_PORT_VALUE || portMap.HostPort > core.ALLOWED_MAX_PORT_VALUE {
-			return fmt.Errorf("Port value must be between %s and %s", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE)
+			return fmt.Errorf("Port value must be between %d and %d", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE)
 		}
 	}
 

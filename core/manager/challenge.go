@@ -298,7 +298,6 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			Info: info,
 		}, nil
 	}
-	return nil, nil
 }
 
 // Handle multiple challenges simultaneously.
@@ -349,12 +348,12 @@ func HandleTagRelatedChallenges(action string, tag string, user string) []string
 	// exist the provided tag, simply skip doing anything.
 	err := database.QueryOrCreateTagEntry(tagEntry)
 	if err != nil {
-		return []string{fmt.Sprintf("DATABASE_ERROR")}
+		return []string{"DATABASE_ERROR"}
 	}
 
 	challs, err := database.QueryRelatedChallenges(tagEntry)
 	if err != nil {
-		return []string{fmt.Sprintf("DATABASE_ERROR")}
+		return []string{"DATABASE_ERROR"}
 	}
 
 	var challsNameList []string
@@ -400,7 +399,7 @@ func HandleAll(action string, user string) []string {
 			// is up to date. This ignores this error.
 			if !strings.Contains(err.Error(), "already up-to-date") {
 				log.Warnf("Error while syncing beast for DEPLOY_ALL : %s ...", err)
-				return []string{fmt.Sprintf("GIT_REMOTE_SYNC_ERROR")}
+				return []string{"GIT_REMOTE_SYNC_ERROR"}
 			}
 		}
 		log.Debugf("Sync for beast remote done for DEPLOY_ALL")
@@ -480,10 +479,12 @@ func InitialAutoDeploy() {
 //   - If a new challenge is added to the remote repo then it is deployed
 //   - If an existing challenge is modified in the remote repo then it is redeployed
 //   - If an existing challenge is deleted in the remote repo then it is purged
+//
 // Note:
-//   If an existing challenge was undeployed manually then it will
-//   remain undeployed even if it is modified in the remote remo, but
-//   it will be purged if it is deleted in the remote repo
+//
+//	If an existing challenge was undeployed manually then it will
+//	remain undeployed even if it is modified in the remote remo, but
+//	it will be purged if it is deleted in the remote repo
 func AutoUpdate() {
 	log.Infof("Checking for updates in remote repository")
 
