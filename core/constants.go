@@ -26,6 +26,7 @@ const ( //names
 	BEAST_REMOTE_CHALLENGE_DIR  string = "challenges"
 	BEAST_STATIC_CONTAINER_NAME string = "beast-static"
 	BEAST_STATIC_FOLDER         string = "static"
+	BEAST_CHALLENGE_DIR         string = "chall"
 	PUBLIC                      string = "public"
 	HIDDEN                      string = ".hidden"
 	ISSUER                      string = "beast-sds"
