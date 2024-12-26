@@ -516,20 +516,31 @@ func manageUploadHandler(c *gin.Context) {
 	})
 }
 
+// Create challenge configuration file
+// @Summary Create a challenge configuration file from the fields provided
+// @Description Handles the creation of a challenge configuration file from the fields provided in the form along with the files uploaded.
+// @Tags manage
+// @Accept  json
+// @Produce json
+// @Param ChallengeConfig
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} json
+// @Router /api/manage/challenge/configure [post]
 func manageConifgureHandler(c *gin.Context) {
 	var config cfg.BeastChallengeConfig
 
-	// Populating Author
+	// Populating Author struct
 	config.Author.Name = c.PostForm("author_name")
 	config.Author.Email = c.PostForm("author_email")
 	config.Author.SSHKey = c.PostForm("author_ssh_key")
+	// Validate Author struct
 	err := config.Author.ValidateRequiredFields()
 	if err != nil {
 		utils.SendError(c, err)
 		return
 	}
 
-	// Populating Challenge Metadata
+	// Populating Challenge Metadata struct
 	config.Challenge.Metadata.Name = c.PostForm("challenge_name")
 	config.Challenge.Metadata.Type = c.PostForm("challenge_type")
 	config.Challenge.Metadata.Flag = c.PostForm("challenge_flag")
@@ -555,7 +566,7 @@ func manageConifgureHandler(c *gin.Context) {
 		return
 	}
 	config.Challenge.Metadata.MinPoints = uint(minpoints)
-
+	// Validate Challenge Metadata struct
 	err, _ = config.Challenge.Metadata.ValidateRequiredFields()
 	if err != nil {
 		utils.SendError(c, err)
@@ -699,5 +710,18 @@ func manageConifgureHandler(c *gin.Context) {
 			SSHKey: c.PostForm(fmt.Sprintf("maintainer_ssh_key_%d", i)),
 		})
 	}
-
+	tomlfile := filepath.Join(challroot, core.CHALLENGE_CONFIG_FILE_NAME)
+	err = utils.WriteChallConfigFile(tomlfile, config)
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+	err = manager.CopyDir(challroot, filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR, config.Challenge.Metadata.Name))
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Challenge configuration file created",
+	})
 }
