@@ -70,3 +70,55 @@ func banUserHandler(c *gin.Context) {
 	})
 	return
 }
+
+func banTeamHandler(c *gin.Context) {
+	action := c.Param("action")
+	teamId := c.Param("id")
+
+	// Validate action
+	if (action != core.TEAM_STATUS["ban"]) && (action != core.TEAM_STATUS["unban"]) {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Action not provided or invalid action format",
+		})
+		return
+	}
+
+	var teamState uint
+	if action == core.TEAM_STATUS["ban"] {
+		teamState = 1
+	} else if action == core.TEAM_STATUS["unban"] {
+		teamState = 0
+	}
+
+	// Convert teamId to integer
+	parsedTeamId, err := strconv.Atoi(teamId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Team Id format invalid",
+		})
+		return
+	}
+
+	// Fetch the team from the database
+	team, err := database.QueryTeamById(uint(parsedTeamId))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	// Update the team's status
+	err = database.UpdateTeam(&team, map[string]interface{}{"Status": teamState})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: fmt.Sprintf("Successfully %sned the team with id %s", action, teamId),
+	})
+
+}

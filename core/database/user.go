@@ -33,6 +33,11 @@ type User struct {
 	Status     uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score      uint    `gorm:"default:0"`
 	Hints      []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
+
+	// Team-related fields
+	TeamID        uint  `gorm:"default:null"`
+	Team          *Team `gorm:"foreignKey:TeamID"`
+	IsTeamCaptain bool  `gorm:"default:false"`
 }
 
 // Queries all the users entries where the column represented by key
@@ -143,11 +148,11 @@ func CreateUserEntry(user *User) error {
 
 // Update an entry for the user in the User table
 func UpdateUser(user *User, m map[string]interface{}) error {
-
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	return Db.Model(user).Updates(m).Error
+	// Use the user's ID to specify the condition
+	return Db.Model(user).Where("id = ?", user.ID).Updates(m).Error
 }
 
 // Get Related Challenges
@@ -353,4 +358,158 @@ func GetUserCount() (int64, error) {
 		return 0, nil
 	}
 	return count, tx.Error
+}
+
+// GetUserTeam gets the team of a user
+func GetUserTeam(userID uint) (*Team, error) {
+	var user User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	if err := Db.Preload("Team").First(&user, userID).Error; err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	if user.TeamID == 0 {
+		return nil, fmt.Errorf("user not in a team")
+	}
+
+	return user.Team, nil
+}
+
+// IsUserTeamCaptain checks if user is a team captain
+func IsUserTeamCaptain(userID uint) (bool, error) {
+	var user User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	if err := Db.First(&user, userID).Error; err != nil {
+		return false, fmt.Errorf("user not found")
+	}
+
+	return user.IsTeamCaptain, nil
+}
+
+// GetTeammates gets all teammates of a user
+func GetTeammates(userID uint) ([]User, error) {
+	var user User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	if err := Db.First(&user, userID).Error; err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	if user.TeamID == 0 {
+		return nil, fmt.Errorf("user not in a team")
+	}
+
+	var teammates []User
+	if err := Db.Where("team_id = ? AND id != ?", user.TeamID, userID).Find(&teammates).Error; err != nil {
+		return nil, err
+	}
+
+	return teammates, nil
+}
+
+// LeaveTeam makes a user leave their team
+func LeaveTeam(userID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+
+	var user User
+	if err := tx.First(&user, userID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("user not found")
+	}
+
+	if user.TeamID == 0 {
+		tx.Rollback()
+		return fmt.Errorf("user not in a team")
+	}
+
+	if user.IsTeamCaptain {
+		tx.Rollback()
+		return fmt.Errorf("team captain cannot leave, must transfer captaincy first")
+	}
+
+	if err := tx.Model(&user).Updates(map[string]interface{}{
+		"TeamID":        0,
+		"IsTeamCaptain": false,
+	}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to leave team")
+	}
+
+	return tx.Commit().Error
+}
+
+// TransferCaptaincy transfers team captain role to another team member
+func TransferCaptaincy(currentCaptainID uint, newCaptainID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+
+	// Check current captain
+	var currentCaptain User
+	if err := tx.First(&currentCaptain, currentCaptainID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("current captain not found")
+	}
+
+	if !currentCaptain.IsTeamCaptain {
+		tx.Rollback()
+		return fmt.Errorf("user is not a team captain")
+	}
+
+	// Check new captain
+	var newCaptain User
+	if err := tx.First(&newCaptain, newCaptainID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("new captain not found")
+	}
+
+	if newCaptain.TeamID != currentCaptain.TeamID {
+		tx.Rollback()
+		return fmt.Errorf("new captain must be in the same team")
+	}
+
+	// Transfer captaincy
+	if err := tx.Model(&currentCaptain).Update("IsTeamCaptain", false).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Model(&newCaptain).Update("IsTeamCaptain", true).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}
+
+func GetTeamByName(userName string) (*Team, error) {
+	var user User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	// Fetch the user by their name along with their team
+	if err := Db.Preload("Team").Where("name = ?", userName).First(&user).Error; err != nil {
+		return nil, fmt.Errorf("user not found: %v", err)
+	}
+
+	// Check if the user has an associated team
+	if user.TeamID == 0 {
+		return nil, fmt.Errorf("user not part of any team")
+	}
+
+	// Return the associated team
+	return user.Team, nil
 }
