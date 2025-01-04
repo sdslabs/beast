@@ -113,7 +113,22 @@ func initGinRouter() *gin.Engine {
 		adminPanelGroup := apiGroup.Group("/admin", adminAuthorize)
 		{
 			adminPanelGroup.POST("/users/:action/:id", banUserHandler)
+			adminPanelGroup.POST("/teams/:action/:id", banTeamHandler)
 			adminPanelGroup.GET("/statistics", getUsersStatisticsHandler)
+		}
+		teamGroup := apiGroup.Group("/team")
+		{
+			teamGroup.POST("/create", createTeamHandler)
+			teamGroup.GET("/scoreboard", scoreboardHandler)
+			// teamGroup.POST("/join", JoinTeamHandler)
+			teamGroup.GET("/members/:id", getTeamMembersHandler)
+
+			// Captain-only routes
+			captainGroup := teamGroup.Group("/", teamCaptainAuthorize)
+			{
+				// captainGroup.POST("/invite", InviteMemberHandler)
+				captainGroup.POST("/remove", removeMemberHandler)
+			}
 		}
 	}
 

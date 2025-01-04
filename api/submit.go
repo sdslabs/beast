@@ -112,25 +112,35 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
-		if challenge.Flag != flag {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Your flag is incorrect",
-				Success: false,
+
+		// Check if user is in a team
+		if user.TeamID == 0 {
+			c.JSON(http.StatusBadRequest, HTTPErrorResp{
+				Error: "You must be in a team to submit a challenge.",
 			})
 			return
 		}
 
-		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
+		// Check if user's team has already solved it
+		solved, err := database.CheckTeamSolvedChallenge(user.TeamID, challenge.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
-
 		if solved {
 			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Challenge has already been solved.",
+				Message: "Challenge has already been solved by your team.",
+				Success: false,
+			})
+			return
+		}
+
+		// Validate the flag after team checks
+		if challenge.Flag != flag {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Your flag is incorrect",
 				Success: false,
 			})
 			return
@@ -160,21 +170,46 @@ func submitFlagHandler(c *gin.Context) {
 			}
 		}
 
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
-		if err != nil {
+		// Save the solve
+		UserChallengesEntry := database.UserChallenges{
+			CreatedAt:   time.Time{},
+			UserID:      user.ID,
+			ChallengeID: challenge.ID,
+		}
+		if err := database.SaveFlagSubmission(&UserChallengesEntry); err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
 
-		UserChallengesEntry := database.UserChallenges{
-			CreatedAt:   time.Time{},
-			UserID:      user.ID,
-			ChallengeID: challenge.ID,
+		// Save team solve
+		if err := database.SaveTeamSolve(user.TeamID, challenge.ID, user.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
 		}
 
-		err = database.SaveFlagSubmission(&UserChallengesEntry)
+		// Update team score
+		team, err := database.GetTeamByID(user.TeamID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		if err := database.UpdateTeam(&team, map[string]interface{}{
+			"Score": team.Score + challengePoints,
+		}); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		// Update user score
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",

@@ -195,3 +195,8 @@ var USER_STATUS = map[string]string{
 	"ban":   "ban",
 	"unban": "unban",
 }
+
+var TEAM_STATUS = map[string]string{
+	"ban":   "ban",
+	"unban": "unban",
+}
