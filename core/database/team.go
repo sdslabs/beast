@@ -10,11 +10,13 @@ import (
 
 type Team struct {
 	gorm.Model
-	Name       string       `gorm:"unique;not null"`
-	Members    []*User      `gorm:"foreignKey:TeamID"`
-	Status     uint         `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
-	Score      uint         `gorm:"default:0"`
-	Challenges []*Challenge `gorm:"many2many:team_challenges;"` // Solved challenges
+	Name         string    `gorm:"not null;unique"`
+	Score        uint      `gorm:"default:0"`
+	Members      []*User   `gorm:"foreignKey:TeamID"`
+	InviteCode   string    `gorm:"unique"`
+	InviteExpiry time.Time
+	Status       uint      `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Challenges   []*Challenge `gorm:"many2many:team_challenges;"` // Solved challenges
 }
 
 type TeamChallenges struct {
@@ -152,6 +154,11 @@ func RemoveUserFromTeam(userID uint) error {
 	defer DBMux.Unlock()
 
 	tx := Db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 
 	// Check if user exists and is in a team
 	var user User
@@ -166,15 +173,16 @@ func RemoveUserFromTeam(userID uint) error {
 	}
 
 	// Remove user from team
-	if err := tx.Model(&user).Updates(map[string]interface{}{
-		"TeamID":        0,
-		"IsTeamCaptain": false,
-	}).Error; err != nil {
+	if err := tx.Model(&user).Update("TeamID", 0).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to remove user from team")
+		return fmt.Errorf("failed to remove user from team: %v", err)
 	}
 
-	return tx.Commit().Error
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
+	return nil
 }
 
 // GetTeamByID gets a team by its ID
@@ -193,53 +201,73 @@ func GetTeamByID(teamID uint) (Team, error) {
 }
 
 // CheckTeamSolvedChallenge checks if a team has already solved a challenge
-func CheckTeamSolvedChallenge(teamID uint, challID uint) (bool, error) {
-	var teamChallenges []TeamChallenges
-	var count int64
-	count = 0
-
+func CheckTeamSolvedChallenge(teamID uint, challengeID uint) (bool, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("team_id = ? AND challenge_id = ?", teamID, challID).Find(&teamChallenges).Count(&count)
-
-	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return false, nil
+	// Join users and user_challenges to check if any team member has solved it
+	var count int64
+	err := Db.Model(&User{}).
+		Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
+		Where("users.team_id = ? AND user_challenges.challenge_id = ?", teamID, challengeID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
 	}
 
-	return (count >= 1), tx.Error
+	return count > 0, nil
 }
 
-// SaveTeamSolve records a team's solve of a challenge
+// SaveTeamSolve records a team's solve of a challenge and updates team score
 func SaveTeamSolve(teamID uint, challengeID uint, solverID uint) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
+    DBMux.Lock()
+    defer DBMux.Unlock()
 
-	tx := Db.Begin()
+    tx := Db.Begin()
 
-	// Check if already solved
-	solved, err := CheckTeamSolvedChallenge(teamID, challengeID)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	if solved {
-		tx.Rollback()
-		return fmt.Errorf("challenge already solved by team")
-	}
+    // Check if already solved
+    solved, err := CheckTeamSolvedChallenge(teamID, challengeID)
+    if err != nil {
+        tx.Rollback()
+        return err
+    }
+    if solved {
+        tx.Rollback()
+        return fmt.Errorf("challenge already solved by team")
+    }
 
-	// Record the solve
-	solve := TeamChallenges{
-		TeamID:      teamID,
-		ChallengeID: challengeID,
-		SolverID:    solverID,
-	}
-	if err := tx.Create(&solve).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
+    // Get challenge points
+    var challenge Challenge
+    if err := tx.First(&challenge, challengeID).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
 
-	return tx.Commit().Error
+    // Get team to update score
+    var team Team
+    if err := tx.First(&team, teamID).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
+
+    // Record the solve
+    solve := TeamChallenges{
+        TeamID:      teamID,
+        ChallengeID: challengeID,
+        SolverID:    solverID,
+    }
+    if err := tx.Create(&solve).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
+
+    // Update team score
+    if err := tx.Model(&team).Update("score", team.Score+challenge.Points).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
+
+    return tx.Commit().Error
 }
 
 // GetTeamSolves gets all challenges solved by a team
@@ -289,4 +317,45 @@ func QueryTeamByName(name string) (*Team, error) {
 		return nil, err
 	}
 	return &team, nil
+}
+
+// QueryTeamByUserId gets a team by user ID
+func QueryTeamByUserId(userID uint) (*Team, error) {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	var user User
+	if err := Db.First(&user, userID).Error; err != nil {
+		return nil, nil // User not found, return nil team
+	}
+
+	if user.TeamID == 0 {
+		return nil, nil // User not in a team
+	}
+
+	var team Team
+	err := Db.First(&team, user.TeamID).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil // Team not found, just return nil instead of error
+		}
+		return nil, err // Return other errors
+	}
+
+	return &team, nil
+}
+
+// GetAllTeams gets all teams ordered by score
+func GetAllTeams() ([]Team, error) {
+    var teams []Team
+
+    DBMux.Lock()
+    defer DBMux.Unlock()
+
+    tx := Db.Order("score desc").Find(&teams)
+    if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+        return nil, nil
+    }
+
+    return teams, tx.Error
 }

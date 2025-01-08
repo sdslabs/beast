@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/database"
@@ -95,7 +97,15 @@ func scoreboardHandler(c *gin.Context) {
 
 // CreateTeamHandler handles the creation of a new team
 func createTeamHandler(c *gin.Context) {
-	name := c.PostForm("name")
+	name := strings.TrimSpace(c.PostForm("name"))
+	
+	// Validate team name
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Team name cannot be empty.",
+		})
+		return
+	}
 
 	// Get the username from the Authorization header
 	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
@@ -134,9 +144,11 @@ func createTeamHandler(c *gin.Context) {
 
 	// Create the team
 	team := database.Team{
-		Name:   name,
-		Status: 0, // Active
-		Score:  0,
+		Name:         name,
+		Status:       0, // Active
+		Score:        0,
+		InviteCode:   "",
+		InviteExpiry: time.Time{}, // Zero time
 	}
 
 	if err := database.CreateTeamEntry(&team); err != nil {
@@ -153,10 +165,9 @@ func createTeamHandler(c *gin.Context) {
 	updateData := map[string]interface{}{
 		"TeamID":        team.ID,
 		"IsTeamCaptain": true,
-		"Team":          &team, // Add the team directly here
+		"Team":          &team,
 	}
 
-	// Call UpdateUser with both arguments
 	if err := database.UpdateUser(&user, updateData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Failed to update user with team info.",
@@ -205,65 +216,62 @@ func teamCaptainAuthorize(c *gin.Context) {
 }
 
 func removeMemberHandler(c *gin.Context) {
-	// Extract the username to be removed from the request body
-	var requestBody struct {
-		UserName string `json:"user_name"`
-	}
-	if err := c.ShouldBindJSON(&requestBody); err != nil {
+	// Get username from form data
+	username := strings.TrimSpace(c.PostForm("username"))
+	if username == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid request body.",
+			"message": "Username is required.",
 		})
 		return
 	}
 
 	// Get the captain's username (captain is validated by middleware)
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	captainUsername, err := coreUtils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-			Message: "Unauthorized user",
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "Unauthorized user",
 		})
 		return
 	}
 
 	// Fetch the captain's details
-	captain, err := database.QueryFirstUserEntry("username", username)
+	captain, err := database.QueryFirstUserEntry("username", captainUsername)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-			Message: "Unauthorized user",
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "Unauthorized user",
 		})
 		return
 	}
 
-	// Ensure the captain is associated with the correct team using GetTeamByName
-	captainTeam, err := database.GetTeamByName(captain.Name)
-	if err != nil {
+	// Verify captain is actually a team captain
+	if !captain.IsTeamCaptain {
 		c.JSON(http.StatusForbidden, gin.H{
-			"message": "You are not a member of a team.",
+			"message": "Only team captains can remove members.",
 		})
 		return
 	}
 
-	// Fetch the user to be removed from the database by userName
-	var user database.User
-	if err := database.Db.Where("name = ?", requestBody.UserName).First(&user).Error; err != nil {
+	// Fetch the user to be removed from the database by username
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"message": "User not found.",
 		})
 		return
 	}
 
-	// Ensure the user is part of the same team as the captain using GetTeamByName
-	userTeam, err := database.GetTeamByName(user.Name)
-	if err != nil {
+	// Check if user is in captain's team
+	if user.TeamID != captain.TeamID {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "User is not a member of any team.",
+			"message": "User is not a member of your team.",
 		})
 		return
 	}
 
-	if userTeam.ID != captainTeam.ID {
+	// Prevent removing self
+	if user.ID == captain.ID {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "User is not a member of your team.",
+			"message": "Team captain cannot remove themselves.",
 		})
 		return
 	}
