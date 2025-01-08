@@ -148,11 +148,17 @@ func CreateUserEntry(user *User) error {
 
 // Update an entry for the user in the User table
 func UpdateUser(user *User, m map[string]interface{}) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
+    DBMux.Lock()
+    defer DBMux.Unlock()
 
-	// Use the user's ID to specify the condition
-	return Db.Model(user).Where("id = ?", user.ID).Updates(m).Error
+    return Db.Transaction(func(tx *gorm.DB) error {
+        var userToUpdate User
+        if err := tx.First(&userToUpdate, user.ID).Error; err != nil {
+            return err
+        }
+        
+        return tx.Model(&userToUpdate).Updates(m).Error
+    })
 }
 
 // Get Related Challenges

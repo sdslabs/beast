@@ -172,19 +172,11 @@ func submitFlagHandler(c *gin.Context) {
 
 		// Save the solve
 		UserChallengesEntry := database.UserChallenges{
-			CreatedAt:   time.Time{},
+			CreatedAt:   time.Now(),
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
 		}
 		if err := database.SaveFlagSubmission(&UserChallengesEntry); err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		// Save team solve
-		if err := database.SaveTeamSolve(user.TeamID, challenge.ID, user.ID); err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
@@ -199,6 +191,8 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+
+		// Update team with new points
 		if err := database.UpdateTeam(&team, map[string]interface{}{
 			"Score": team.Score + challengePoints,
 		}); err != nil {

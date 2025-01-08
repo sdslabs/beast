@@ -48,7 +48,11 @@ func init() {
 		log.Fatalf("Cannot create related models: %s", err)
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{})
+	if err := Db.SetupJoinTable(&Team{}, "Challenges", &TeamChallenges{}); err != nil {
+		log.Fatalf("Cannot create team related models: %s", err)
+	}
+
+	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Team{}, &TeamChallenges{})
 
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {

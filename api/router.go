@@ -81,6 +81,8 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/users", getAllUsersInfoHandler)
 			infoGroup.GET("/submissions", submissionsHandler)
 			infoGroup.GET("/tags", tagHandler)
+			infoGroup.GET("/teams", teamsInfoHandler)
+			infoGroup.GET("/teams/:name", teamInfoHandler)
 		}
 
 		// Notification route group
@@ -120,13 +122,13 @@ func initGinRouter() *gin.Engine {
 		{
 			teamGroup.POST("/create", createTeamHandler)
 			teamGroup.GET("/scoreboard", scoreboardHandler)
-			// teamGroup.POST("/join", JoinTeamHandler)
+			teamGroup.POST("/join/:code", joinTeamHandler)
 			teamGroup.GET("/members/:id", getTeamMembersHandler)
 
 			// Captain-only routes
 			captainGroup := teamGroup.Group("/", teamCaptainAuthorize)
 			{
-				// captainGroup.POST("/invite", InviteMemberHandler)
+				captainGroup.POST("/invite", generateInviteLinkHandler)
 				captainGroup.POST("/remove", removeMemberHandler)
 			}
 		}

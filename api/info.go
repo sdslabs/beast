@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
@@ -471,6 +472,20 @@ func userInfoHandler(c *gin.Context) {
 		return
 	}
 
+	team, err := database.QueryTeamByUserId(parsedUserId)
+	if err != nil {
+		log.Error(err)
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	var teamInfo string
+	if team != nil {
+		teamInfo = team.Name
+	}
+
 	resp = UserResp{
 		Username:   user.Username,
 		Id:         user.ID,
@@ -480,6 +495,7 @@ func userInfoHandler(c *gin.Context) {
 		Rank:       rank,
 		Email:      user.Email,
 		Challenges: userChallenges,
+		TeamName:   teamInfo,
 	}
 	c.JSON(http.StatusOK, resp)
 	return
@@ -507,7 +523,6 @@ func getAllUsersInfoHandler(c *gin.Context) {
 	availableUsers := make([]UsersResp, len(users))
 	if len(users) > 0 {
 		for index, user := range users {
-
 			parsedUserId := uint(user.ID)
 
 			var rank int64
@@ -525,6 +540,21 @@ func getAllUsersInfoHandler(c *gin.Context) {
 				return
 			}
 
+			// Get team info
+			team, err := database.QueryTeamByUserId(parsedUserId)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			var teamName string
+			if team != nil {
+				teamName = team.Name
+			}
+
 			availableUsers[index] = UsersResp{
 				Username: user.Username,
 				Id:       user.ID,
@@ -533,6 +563,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 				Score:    user.Score,
 				Email:    user.Email,
 				Rank:     rank,
+				TeamName: teamName,
 			}
 		}
 
@@ -789,4 +820,186 @@ func tagHandler(c *gin.Context) {
 		Tags: uniqueTags,
 	})
 	return
+}
+
+type TeamInfoResp struct {
+    ID        uint                `json:"id"`
+    Name      string             `json:"name"`
+    Score     uint               `json:"score"`
+    Members   []UserResp         `json:"members"`
+    Solves    []ChallengeSolveResp `json:"solves"`
+    CreatedAt time.Time          `json:"created_at"`
+}
+
+// Returns info for all teams
+// @Summary Returns info for all teams
+// @Description Returns a list of all teams with their info
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {array} api.TeamInfoResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/teams [get]
+func teamsInfoHandler(c *gin.Context) {
+    teams, err := database.GetAllTeams()
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+            Error: "DATABASE ERROR while getting teams.",
+        })
+        return
+    }
+
+    teamInfos := make([]TeamInfoResp, len(teams))
+    for i, team := range teams {
+        // Get team members
+        members, err := database.GetTeamMembers(team.ID)
+        if err != nil {
+            log.Error(err)
+            continue
+        }
+
+        // Get member info
+        memberInfo := make([]UserResp, len(members))
+        for j, member := range members {
+            rank, err := database.GetUserRank(member.ID, member.Score, member.UpdatedAt)
+            if err != nil {
+                log.Error(err)
+                rank = 0
+            }
+
+            memberInfo[j] = UserResp{
+                Username: member.Username,
+                Id:       member.ID,
+                Role:     member.Role,
+                Status:   member.Status,
+                Score:    member.Score,
+                Rank:     rank,
+                Email:    member.Email,
+            }
+        }
+
+        teamInfos[i] = TeamInfoResp{
+            ID:        team.ID,
+            Name:      team.Name,
+            Score:     team.Score,
+            Members:   memberInfo,
+            CreatedAt: team.CreatedAt,
+        }
+    }
+
+    c.JSON(http.StatusOK, teamInfos)
+}
+
+// Returns team info by name
+// @Summary Returns team info by name
+// @Description Returns detailed info for a specific team
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param name path string true "Team name"
+// @Success 200 {object} api.TeamInfoResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/teams/{name} [get]
+func teamInfoHandler(c *gin.Context) {
+    teamName := c.Param("name")
+    if teamName == "" {
+        c.JSON(http.StatusBadRequest, HTTPErrorResp{
+            Error: "Team name cannot be empty",
+        })
+        return
+    }
+
+    team, err := database.QueryFirstTeamEntry("name", teamName)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+            Error: "DATABASE ERROR while processing the request.",
+        })
+        return
+    }
+
+    // Get team members
+    members, err := database.GetTeamMembers(team.ID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+            Error: "DATABASE ERROR while getting team members.",
+        })
+        return
+    }
+
+    // Get team solves
+    solves := []ChallengeSolveResp{}
+    for _, member := range members {
+        challenges, err := database.GetRelatedChallenges(&member)
+        if err != nil {
+            log.Error(err)
+            continue
+        }
+
+        for _, challenge := range challenges {
+            challengeTags := make([]string, len(challenge.Tags))
+            for i, tag := range challenge.Tags {
+                challengeTags[i] = tag.TagName
+            }
+
+            solve := ChallengeSolveResp{
+                Id:       challenge.ID,
+                Name:     challenge.Name,
+                Tags:     challengeTags,
+                Category: challenge.Type,
+                SolvedAt: challenge.CreatedAt,
+                Points:   challenge.Points,
+            }
+            solves = append(solves, solve)
+        }
+    }
+
+    // Remove duplicate solves (same challenge solved by multiple team members)
+    uniqueSolves := make(map[uint]ChallengeSolveResp)
+    for _, solve := range solves {
+        uniqueSolves[solve.Id] = solve
+    }
+
+    finalSolves := make([]ChallengeSolveResp, 0, len(uniqueSolves))
+    for _, solve := range uniqueSolves {
+        finalSolves = append(finalSolves, solve)
+    }
+
+    // Sort solves by time
+    sort.Slice(finalSolves, func(i, j int) bool {
+        return finalSolves[i].SolvedAt.Before(finalSolves[j].SolvedAt)
+    })
+
+    // Get member info
+    memberInfo := make([]UserResp, len(members))
+    for i, member := range members {
+        rank, err := database.GetUserRank(member.ID, member.Score, member.UpdatedAt)
+        if err != nil {
+            log.Error(err)
+            rank = 0
+        }
+
+        memberInfo[i] = UserResp{
+            Username: member.Username,
+            Id:       member.ID,
+            Role:     member.Role,
+            Status:   member.Status,
+            Score:    member.Score,
+            Rank:     rank,
+            Email:    member.Email,
+        }
+    }
+
+    resp := TeamInfoResp{
+        ID:        team.ID,
+        Name:      team.Name,
+        Score:     team.Score,
+        Members:   memberInfo,
+        Solves:    finalSolves,
+        CreatedAt: team.CreatedAt,
+    }
+
+    c.JSON(http.StatusOK, resp)
 }
