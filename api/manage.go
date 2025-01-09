@@ -433,7 +433,7 @@ func manageUploadHandler(c *gin.Context) {
 	// The file cannot be received.
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("No file received from user"),
+			Message: "no file received from user",
 		})
 		return
 	}

@@ -11,6 +11,9 @@ scripts_dir = "$HOME/.beast/scripts"
 # Base OS image that beast allows the challenges to use.
 allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
 
+# The sidecar that we support with beast, currently we only support two MySQL and
+# MongoDB.
+available_sidecars = ["mysql", "mongodb"]
 
 # For authentication purposes beast uses JWT based authentication, this is the
 # key used for encrypting the claims of a user. Keep this strong.
@@ -30,10 +33,6 @@ service_name = "discord"
 # Status of webhook URL to be used.
 # If it is false then notification will not be sent on this URL
 active = false
-
-# The sidecar that we support with beast, currently we only support two MySQL and
-# MongoDB.
-available_sidecars = ["mysql", "mongodb"]
 
 
 # The frequency for any periodic event in beast, the value is provided in seconds.
@@ -71,7 +70,7 @@ active = false
 # The following fields are required only while hosting a competition on beast
 # This section contains information about the competition to be hosted
 # Structure of the sections with the acceptable fields are:
-[[competition_info]]
+[competition_info]
 # Required Fields
 
 # Name of the competition   
@@ -96,3 +95,6 @@ prizes = ""
 
 # Absolute path of logo file. Default logo dir is in the "BEAST_GLOBAL_DIR/assets/"
 logo_url = ""
+
+# Dynamic scoring for challenges
+dynamic_score = false

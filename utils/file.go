@@ -22,10 +22,10 @@ func CheckPathValid(path string) (os.FileInfo, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Debugf("Requested Path(%s) does not exist", path)
-			return nil, errors.New("Path does not exist")
+			return nil, errors.New("path does not exist")
 		} else {
 			log.Debugf("Requested Path(%s) is not accessbile", path)
-			return nil, errors.New("Not accessible path.")
+			return nil, errors.New("not accessible path")
 		}
 	}
 
@@ -45,7 +45,7 @@ func ValidateDirExists(dirPath string) error {
 	// Check if the path provided points to a directory
 	if !dirPathInfo.IsDir() {
 		log.Warnf("%s is not a directory", dirPath)
-		return fmt.Errorf("Not a directory : %s", dirPath)
+		return fmt.Errorf("not a directory : %s", dirPath)
 	}
 
 	return nil
@@ -63,7 +63,7 @@ func ValidateFileExists(filePath string) error {
 	// Check if the path provided points to a file
 	if !filePathInfo.Mode().IsRegular() {
 		log.Warnf("%s is not a file", filePath)
-		return errors.New("Not a file")
+		return errors.New("not a file")
 	}
 
 	return nil
@@ -76,7 +76,7 @@ func CreateIfNotExistDir(dirPath string) error {
 	err := ValidateDirExists(dirPath)
 	if err != nil {
 		if e := os.MkdirAll(dirPath, 0755); e != nil {
-			eMsg := fmt.Errorf("Could not create directory : %s", dirPath)
+			eMsg := fmt.Errorf("could not create directory : %s", dirPath)
 			return eMsg
 		}
 	}
@@ -92,7 +92,7 @@ func RemoveFileIfExists(filePath string) error {
 
 	err = os.Remove(filePath)
 	if err != nil {
-		return fmt.Errorf("Error while removing existing file : %s : %s", filePath, err)
+		return fmt.Errorf("error while removing existing file : %s : %s", filePath, err)
 	}
 
 	return nil
@@ -102,12 +102,11 @@ func CreateFileIfNotExist(filePath string) error {
 	err := ValidateFileExists(filePath)
 	if err != nil {
 		file, e := os.Create(filePath)
-		defer file.Close()
-
-		if e != nil {
-			eMsg := fmt.Errorf("Could not create file : %s", filePath)
+		if(e != nil) {
+			eMsg := fmt.Errorf("could not create file : %s", filePath)
 			return eMsg
 		}
+		defer file.Close()
 	}
 
 	return nil
@@ -121,7 +120,7 @@ func RemoveDirRecursively(dirPath string) error {
 
 	err = os.RemoveAll(dirPath)
 	if err != nil {
-		return fmt.Errorf("Error while removing directory %s : %s :: MAKE SURE TO CLEAN THE DIRECTORY YOURSELF", dirPath, err)
+		return fmt.Errorf("error while removing directory %s : %s :: MAKE SURE TO CLEAN THE DIRECTORY YOURSELF", dirPath, err)
 	}
 
 	return nil
@@ -141,7 +140,7 @@ func CopyFile(src, dst string) error {
 
 	destination, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
-		return fmt.Errorf("Error while creating destination file : %s", err)
+		return fmt.Errorf("error while creating destination file : %s", err)
 	}
 	defer destination.Close()
 
@@ -230,7 +229,7 @@ func GetDirsInDir(dirPath string) (error, []string) {
 
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
-		return fmt.Errorf("Error while reading directory with path %s : %s", dirPath, err), dirs
+		return fmt.Errorf("error while reading directory with path %s : %s", dirPath, err), dirs
 	}
 
 	for _, file := range files {
