@@ -44,6 +44,7 @@ type Challenge struct {
 	Name            string `gorm:"not null;type:varchar(64);unique"`
 	Flag            string `gorm:"not null;type:text"`
 	Type            string `gorm:"type:varchar(64)"`
+	FailSolveLimit  int    `gorm:"default:-1"`
 	Sidecar         string `gorm:"type:varchar(64)"`
 	Hints           string `gorm:"type:text"`
 	Assets          string `gorm:"type:text"`
@@ -67,6 +68,7 @@ type UserChallenges struct {
 	CreatedAt   time.Time
 	UserID      uint
 	ChallengeID uint
+	Tries       uint
 }
 
 // Create an entry for the challenge in the Challenge table
@@ -164,6 +166,54 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 	return challenges[0], nil
 }
 
+// Get User Related Challenges
+func GetUserPreviousTriesStatus(userID uint, challengeID uint, chalSolveAttemptLimit int) (bool, error) {
+	var userChallenges UserChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Return true  if no record is found
+			return true, nil
+		}
+		return false, err
+	}
+
+	if chalSolveAttemptLimit < 0 {
+		return true, nil
+	}
+	if userChallenges.Tries >= uint(chalSolveAttemptLimit) {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func UpdateUserChallengeTries(userID uint, challengeID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	var userChallenges UserChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Create a new record if not found
+			userChallenges = UserChallenges{
+				UserID:      userID,
+				ChallengeID: challengeID,
+				Tries:       1,
+			}
+			return Db.Create(&userChallenges).Error
+		}
+		return err
+	}
+
+	updates := map[string]interface{}{
+		"tries": userChallenges.Tries + 1,
+	}
+
+	return Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates).Error
+}
+
 // Update an entry for the challenge in the Challenge table
 func UpdateChallenge(chall *Challenge, m map[string]interface{}) error {
 
@@ -200,7 +250,7 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 	return tx.Error
 }
 
-//Get Related Tags
+// Get Related Tags
 func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	var tags []Tag
 
@@ -214,7 +264,7 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	return tags, nil
 }
 
-//Get Related Users
+// Get Related Users
 func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	var users []User
 
@@ -298,7 +348,7 @@ func SaveFlagSubmission(user_challenges *UserChallenges) error {
 	return tx.Commit().Error
 }
 
-//hook after update of challenge
+// hook after update of challenge
 func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
 	iFace, _ := tx.InstanceGet("gorm:update_attrs")
 	if iFace == nil {
@@ -313,7 +363,7 @@ func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
 	return nil
 }
 
-//hook after create of challenge
+// hook after create of challenge
 func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
 	var users []*User
 	Db.Model(challenge).Association("Users")
@@ -322,7 +372,7 @@ func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
 	return nil
 }
 
-//hook after deleting the challenge
+// hook after deleting the challenge
 func (challenge *Challenge) AfterDelete(tx *gorm.DB) error {
 	var users []*User
 	Db.Model(challenge).Association("Users")
@@ -335,14 +385,14 @@ type ScriptFile struct {
 	Challenges map[string]string
 }
 
-//updates users' script
+// updates users' script
 func updateScripts(users []*User) {
 	for _, user := range users {
 		go updateScript(user)
 	}
 }
 
-//updates user script
+// updates user script
 func updateScript(user *User) error {
 
 	time.Sleep(3 * time.Second)

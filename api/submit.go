@@ -112,6 +112,33 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+
+		tryStatus, err := database.GetUserPreviousTriesStatus(user.ID, challenge.ID, challenge.FailSolveLimit)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request."})
+			return
+		}
+
+		if !tryStatus {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "You have reached the maximum number of tries for this challenge.",
+				Success: false,
+			})
+			return
+		}
+
+		// Increase user tries by 1
+		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
 		if challenge.Flag != flag {
 			c.JSON(http.StatusOK, FlagSubmitResp{
 				Message: "Your flag is incorrect",

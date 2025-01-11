@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/sdslabs/beastv4/pkg/auth"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -13,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/sdslabs/beastv4/pkg/auth"
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -197,12 +198,15 @@ func getCommandAndModifierForWebChall(language, framework, webRoot, port string)
 }
 
 // This function provides the run command and image for a particular type of web challenge
-//  * webRoot:  relative path to web challenge directory
-//  * port:     web port
-//  * challengeInfo
 //
-//  It returns the run command for challenge
-//  and the docker base image corresponding to language
+//   - webRoot:  relative path to web challenge directory
+//
+//   - port:     web port
+//
+//   - challengeInfo
+//
+//     It returns the run command for challenge
+//     and the docker base image corresponding to language
 func GetWebChallSetup(webRoot, port string, challengeInfo []string) (string, string, func(*BeastBareDockerfile)) {
 	length := len(challengeInfo)
 	reqLength := 4
@@ -486,21 +490,22 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
 		*challEntry = database.Challenge{
-			Name:        config.Challenge.Metadata.Name,
-			AuthorID:    userEntry.ID,
-			Format:      config.Challenge.Metadata.Type,
-			Status:      core.DEPLOY_STATUS["undeployed"],
-			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-			Flag:        config.Challenge.Metadata.Flag,
-			Type:        config.Challenge.Metadata.Type,
-			Sidecar:     config.Challenge.Metadata.Sidecar,
-			Description: config.Challenge.Metadata.Description,
-			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
-			Assets:      strings.Join(assetsURL, core.DELIMITER),
-			Points:      config.Challenge.Metadata.Points,
-			MinPoints:   config.Challenge.Metadata.MinPoints,
-			MaxPoints:   config.Challenge.Metadata.MaxPoints,
+			Name:           config.Challenge.Metadata.Name,
+			AuthorID:       userEntry.ID,
+			Format:         config.Challenge.Metadata.Type,
+			Status:         core.DEPLOY_STATUS["undeployed"],
+			ContainerId:    coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:        coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			FailSolveLimit: config.Challenge.Metadata.FailSolveLimit,
+			Flag:           config.Challenge.Metadata.Flag,
+			Type:           config.Challenge.Metadata.Type,
+			Sidecar:        config.Challenge.Metadata.Sidecar,
+			Description:    config.Challenge.Metadata.Description,
+			Hints:          strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
+			Assets:         strings.Join(assetsURL, core.DELIMITER),
+			Points:         config.Challenge.Metadata.Points,
+			MinPoints:      config.Challenge.Metadata.MinPoints,
+			MaxPoints:      config.Challenge.Metadata.MaxPoints,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
@@ -573,7 +578,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	return nil
 }
 
-//Provides the Static Content Folder Name from the config
+// Provides the Static Content Folder Name from the config
 func GetStaticContentDir(configFile, contextDir string) (string, error) {
 	var config cfg.BeastChallengeConfig
 	_, err := toml.DecodeFile(configFile, &config)
@@ -587,7 +592,7 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 	return filepath.Join(contextDir, relativeStaticContentDir), nil
 }
 
-//Takes and save the data to transaction table
+// Takes and save the data to transaction table
 func LogTransaction(identifier string, action string, authorization string) error {
 	log.Debugf("Logging transaction for %s on %s", action, identifier)
 
@@ -621,7 +626,7 @@ func LogTransaction(identifier string, action string, authorization string) erro
 	return err
 }
 
-//Copies the Static content to the staging/static/folder
+// Copies the Static content to the staging/static/folder
 func CopyToStaticContent(challengeName, staticContentDir string) error {
 	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
 	err := utils.CreateIfNotExistDir(dirPath)
@@ -678,78 +683,77 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 	return challengeNames
 }
 
-//Unzips challenge folder in a destination directory
+// Unzips challenge folder in a destination directory
 func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 
 	baseFileName := filepath.Base(zipContextPath)
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
 	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
-        log.Fatal(err)
-    }
+		log.Fatal(err)
+	}
 
 	// 1. Open the zip file
-    reader, err := zip.OpenReader(zipContextPath)
-    if err != nil {
-        return "", err
-    }
-    defer reader.Close()
+	reader, err := zip.OpenReader(zipContextPath)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
 
-    // 2. Get the absolute destination path
-    destination, err := filepath.Abs(targetDir)
-    if err != nil {
-        return "", err
-    }
+	// 2. Get the absolute destination path
+	destination, err := filepath.Abs(targetDir)
+	if err != nil {
+		return "", err
+	}
 
-    // 3. Iterate over zip files inside the archive and unzip each of them
-    for _, f := range reader.File {
-        err := unzipFile(f, destination)
-        if err != nil {
-            return "", err
-        }
-    }
+	// 3. Iterate over zip files inside the archive and unzip each of them
+	for _, f := range reader.File {
+		err := unzipFile(f, destination)
+		if err != nil {
+			return "", err
+		}
+	}
 
-    return targetDir, nil
+	return targetDir, nil
 }
 
-
 func unzipFile(f *zip.File, destination string) error {
-    // 4. Check if file paths are not vulnerable to [Zip Slip](https://snyk.io/research/zip-slip-vulnerability)
-    filePath := filepath.Join(destination, f.Name)
-    if !strings.HasPrefix(filePath, filepath.Clean(destination)+string(os.PathSeparator)) {
-        return fmt.Errorf("invalid file path: %s", filePath)
-    }
+	// 4. Check if file paths are not vulnerable to [Zip Slip](https://snyk.io/research/zip-slip-vulnerability)
+	filePath := filepath.Join(destination, f.Name)
+	if !strings.HasPrefix(filePath, filepath.Clean(destination)+string(os.PathSeparator)) {
+		return fmt.Errorf("invalid file path: %s", filePath)
+	}
 
-    // 5. Create directory tree
-    if f.FileInfo().IsDir() {
-        if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-            return err
-        }
-        return nil
-    }
+	// 5. Create directory tree
+	if f.FileInfo().IsDir() {
+		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+			return err
+		}
+		return nil
+	}
 
-    if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-        return err
-    }
+	if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+		return err
+	}
 
-    // 6. Create a destination file for unzipped content
-    destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-    if err != nil {
-        return err
-    }
-    defer destinationFile.Close()
+	// 6. Create a destination file for unzipped content
+	destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	if err != nil {
+		return err
+	}
+	defer destinationFile.Close()
 
-    // 7. Unzip the content of a file and copy it to the destination file
-    zippedFile, err := f.Open()
-    if err != nil {
-        return err
-    }
-    defer zippedFile.Close()
+	// 7. Unzip the content of a file and copy it to the destination file
+	zippedFile, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer zippedFile.Close()
 
-    if _, err := io.Copy(destinationFile, zippedFile); err != nil {
-        return err
-    }
-    return nil
+	if _, err := io.Copy(destinationFile, zippedFile); err != nil {
+		return err
+	}
+	return nil
 }
 
 // File copies a single file from src to dst
