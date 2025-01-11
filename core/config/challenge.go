@@ -137,6 +137,7 @@ type ChallengeMetadata struct {
 	Description     string   `toml:"description"`
 	Hints           []string `toml:"hints"`
 	FailSolveLimit  int      `toml:"failSolveLimit"`
+	PreReqs         []string `toml:"preReqs"`
 	Points          uint     `toml:"points"`
 	MaxPoints       uint     `toml:"maxPoints"`
 	MinPoints       uint     `toml:"minPoints"`
@@ -150,6 +151,7 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if config.Name == "" || config.Flag == "" {
 		return fmt.Errorf("Name and Flag required for the challenge"), false
 	}
+
 	if config.FailSolveLimit <= 0 {
 		return fmt.Errorf("fail Solve Limit must be greater than 0"), false
 	}

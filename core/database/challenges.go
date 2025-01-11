@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
@@ -45,6 +46,7 @@ type Challenge struct {
 	Flag            string `gorm:"not null;type:text"`
 	Type            string `gorm:"type:varchar(64)"`
 	FailSolveLimit  int    `gorm:"default:-1"`
+	PreReqs         string `gorm:"type:text"`
 	Sidecar         string `gorm:"type:varchar(64)"`
 	Hints           string `gorm:"type:text"`
 	Assets          string `gorm:"type:text"`
@@ -165,6 +167,44 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 	}
 
 	return challenges[0], nil
+}
+
+// Check Pre Reqs Status
+func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
+	if challenge.PreReqs == "" {
+		return true, nil
+	}
+	// Split the PreReqs field to get the list of prerequisite challenge names
+	preReqChallengeNames := strings.Split(challenge.PreReqs, core.DELIMITER)
+
+	// Query the database to get the user's solved challenges
+	var userChallenges []UserChallenges
+	err := Db.Where("user_id = ? AND solved = ?", userID, true).Find(&userChallenges).Error
+	if err != nil {
+		return false, err
+	}
+
+	// Create a map to quickly check if a challenge is solved
+	solvedChallenges := make(map[string]bool)
+	for _, userChallenge := range userChallenges {
+		if userChallenge.Solved {
+			var solvedChallenge Challenge
+			err := Db.Where("id = ?", userChallenge.ChallengeID).First(&solvedChallenge).Error
+			if err != nil {
+				return false, err
+			}
+			solvedChallenges[solvedChallenge.Name] = true
+		}
+	}
+
+	// Check if all prerequisite challenges are solved
+	for _, preReq := range preReqChallengeNames {
+		if !solvedChallenges[preReq] {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // Get User Related Challenges

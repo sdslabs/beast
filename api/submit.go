@@ -113,6 +113,23 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		if !preReqsStatus {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "You have not solved the prerequisites of this challenge.",
+				Success: false,
+			})
+			return
+		}
+
 		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
