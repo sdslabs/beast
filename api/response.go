@@ -107,7 +107,7 @@ type ChallengeInfoResp struct {
 	AdditionalLinks []string        `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
 	CreatedAt       time.Time       `json:"createdAt"`
 	Status          string          `json:"status" example:"deployed"`
-	FailSolveLimit  int            `json:"failSolveLimit" example:"5"`
+	FailSolveLimit  int             `json:"failSolveLimit" example:"5"`
 	Ports           []uint32        `json:"ports" example:[3001, 3002]`
 	Hints           string          `json:"hints" example:"Try robots"`
 	Desc            string          `json:"description" example:"A simple web challenge"`

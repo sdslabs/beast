@@ -150,7 +150,7 @@ func UpdateUser(user *User, m map[string]interface{}) error {
 	return Db.Model(user).Updates(m).Error
 }
 
-//Get Related Challenges
+// Get Related Challenges
 func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	var challenges []Challenge
 
@@ -182,7 +182,7 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	return (count >= 1), tx.Error
 }
 
-//hook after create
+// hook after create
 func (user *User) AfterCreate(tx *gorm.DB) error {
 	if user.SshKey == "" {
 		return nil
@@ -193,7 +193,7 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 	return nil
 }
 
-//hook after update
+// hook after update
 func (user *User) AfterUpdate(tx *gorm.DB) error {
 	iFace, _ := tx.InstanceGet("gorm:update_attrs")
 	if iFace == nil {
@@ -257,7 +257,7 @@ func generateContentAuthorizedKeyFile(user *User) ([]byte, error) {
 	return authKey.Bytes(), nil
 }
 
-//adds to authorized keys
+// adds to authorized keys
 func addToAuthorizedKeys(user *User) error {
 	if config.Cfg == nil {
 		log.Warn("No config initialized, skipping add to authorized keys hook")
