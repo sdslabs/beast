@@ -69,6 +69,7 @@ type UserChallenges struct {
 	UserID      uint
 	ChallengeID uint
 	Tries       uint
+	Solved      bool
 }
 
 // Create an entry for the challenge in the Challenge table
@@ -201,6 +202,7 @@ func UpdateUserChallengeTries(userID uint, challengeID uint) error {
 				UserID:      userID,
 				ChallengeID: challengeID,
 				Tries:       1,
+				Solved:      false,
 			}
 			return Db.Create(&userChallenges).Error
 		}

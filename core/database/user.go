@@ -173,7 +173,7 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("user_id = ? AND challenge_id = ?", userId, challId).Find(&userChallenges).Count(&count)
+	tx := Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userId, challId, true).Find(&userChallenges).Count(&count)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return false, nil

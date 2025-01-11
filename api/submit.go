@@ -113,6 +113,22 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		if solved {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Challenge has already been solved.",
+				Success: false,
+			})
+			return
+		}
+
 		tryStatus, err := database.GetUserPreviousTriesStatus(user.ID, challenge.ID, challenge.FailSolveLimit)
 
 		if err != nil {
@@ -142,22 +158,6 @@ func submitFlagHandler(c *gin.Context) {
 		if challenge.Flag != flag {
 			c.JSON(http.StatusOK, FlagSubmitResp{
 				Message: "Your flag is incorrect",
-				Success: false,
-			})
-			return
-		}
-
-		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if solved {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Challenge has already been solved.",
 				Success: false,
 			})
 			return
@@ -199,6 +199,7 @@ func submitFlagHandler(c *gin.Context) {
 			CreatedAt:   time.Time{},
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
+			Solved:      true,
 		}
 
 		err = database.SaveFlagSubmission(&UserChallengesEntry)
