@@ -1,16 +1,24 @@
 [author]
-name = "fristonio"
-email = "contact+fristonio@sdslabs.co.in"
+name = ""
+email = ""
 ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
 name = "simple"
 flag = "BACKDOOR{SAMPLE_FLAG}"
 type = "bare"
-hints = ["simple_hint_1", "simple_hint_2"]
+points = 100
+
+[[challenge.metadata.hints]]
+text = "simple_hint_1"
+percentage = 10.0
+
+[[challenge.metadata.hints]]
+text = "simple_hint_2"
+percentage = 20.0
 
 [challenge.env]
 apt_deps = ["gcc", "socat"]
 setup_scripts = ["setup.sh"]
-run_cmd = "socat tcp-l:10001,fork,reuseaddr exec:./pwn"
-ports = [10001]
+run_cmd = "socat tcp-l:10005,fork,reuseaddr exec:./pwn"
+ports = [10005]

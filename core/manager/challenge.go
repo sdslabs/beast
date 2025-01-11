@@ -480,10 +480,12 @@ func InitialAutoDeploy() {
 //   - If a new challenge is added to the remote repo then it is deployed
 //   - If an existing challenge is modified in the remote repo then it is redeployed
 //   - If an existing challenge is deleted in the remote repo then it is purged
+//
 // Note:
-//   If an existing challenge was undeployed manually then it will
-//   remain undeployed even if it is modified in the remote remo, but
-//   it will be purged if it is deleted in the remote repo
+//
+//	If an existing challenge was undeployed manually then it will
+//	remain undeployed even if it is modified in the remote remo, but
+//	it will be purged if it is deleted in the remote repo
 func AutoUpdate() {
 	log.Infof("Checking for updates in remote repository")
 

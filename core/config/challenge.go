@@ -129,13 +129,16 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 // sidecar = "" # Name of the sidecar if any used by the challenge.
 // ```
 type ChallengeMetadata struct {
-	Flag            string   `toml:"flag"`
-	Name            string   `toml:"name"`
-	Type            string   `toml:"type"`
-	Tags            []string `toml:"tags"`
-	Sidecar         string   `toml:"sidecar"`
-	Description     string   `toml:"description"`
-	Hints           []string `toml:"hints"`
+	Flag        string   `toml:"flag"`
+	Name        string   `toml:"name"`
+	Type        string   `toml:"type"`
+	Tags        []string `toml:"tags"`
+	Sidecar     string   `toml:"sidecar"`
+	Description string   `toml:"description"`
+	Hints       []struct {
+		Text       string  `toml:"text"`
+		Percentage float64 `toml:"percentage"`
+	} `toml:"hints"`
 	Points          uint     `toml:"points"`
 	MaxPoints       uint     `toml:"maxPoints"`
 	MinPoints       uint     `toml:"minPoints"`
@@ -188,16 +191,13 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # Dependencies required by challenge, installed using default package manager of base image apt for most cases.
 // apt_deps = ["", ""]
 //
-//
 // # A list of setup scripts to run for building challenge enviroment.
 // # Keep in mind that these are only for building the challenge environment and are executed
 // # in the iamge building step of the deployment pipeline.
 // setup_scripts = ["", ""]
 //
-//
 // # A directory containing any of the static assets for the challenge, exposed by beast static endpoint.
 // static_dir = ""
-//
 //
 // # Command to execute inside the container, if a predefined type is being used try to
 // # use an existing field to let beast automatically calculate what command to run.
@@ -205,42 +205,38 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # of the service using service_path field.
 // run_cmd = ""
 //
-//
 // # Similar to run_cmd but in this case you have the entire container to yourself
 // # and everything you are doing is done using root permissions inside the container
 // # When using this keep in mind you are root inside the container.
 // entrypoint = ""
-//
 //
 // # Relative path to binary which needs to be executed when the specified
 // # Type for the challenge is service.
 // # This can be anything which can be exeucted, a python file, a binary etc.
 // service_path = ""
 //
-//
 // # Relative directory corresponding to root of the challenge where the root
 // # of the web application lies.
 // web_root = ""
-//
 //
 // # Any custom base image you might want to use for your particular challenge.
 // # Exists for flexibility reasons try to use existing base iamges wherever possible.
 // base_image = ""
 //
-//
 // # Docker file name for specific type challenge - `docker`.
 // # Helps to build flexible images for specific user-custom challenges
 // docket_context = ""
 //
-//
 // # Environment variables that can be used in the application code.
 // [[var]]
-//     key = ""
-//     value = ""
+//
+//	key = ""
+//	value = ""
 //
 // [[var]]
-//     key = ""
-//     value = ""
+//
+//	key = ""
+//	value = ""
 //
 // Type of traffic to expose through the port mapping provided.
 // traffic = "udp" / "tcp"
@@ -501,10 +497,10 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 // Metadata related to author of the challenge, this structure includes
 //
-// * Name - Name of the author of the challenge
-// * Email - Email of the author
-// * SSHKey - Public SSH key for the challenge author, to give the access
-//		to the challenge container.
+//   - Name - Name of the author of the challenge
+//   - Email - Email of the author
+//   - SSHKey - Public SSH key for the challenge author, to give the access
+//     to the challenge container.
 //
 // ```toml
 // # Optional fields

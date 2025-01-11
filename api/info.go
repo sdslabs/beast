@@ -14,6 +14,7 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,6 +33,91 @@ func usedPortsInfoHandler(c *gin.Context) {
 		MinPortValue: core.ALLOWED_MIN_PORT_VALUE,
 		MaxPortValue: core.ALLOWED_MAX_PORT_VALUE,
 		PortsInUse:   cfg.USED_PORTS_LIST,
+	})
+}
+
+func hintHandler(c *gin.Context) {
+	hintIDStr := c.Param("hintID")
+
+	if hintIDStr == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Hint ID cannot be empty",
+		})
+		return
+	}
+
+	hintID, err := strconv.Atoi(hintIDStr)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Hint Id format invalid",
+		})
+		return
+	}
+
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	if user.Status == 1 {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Banned user",
+		})
+		return
+	}
+
+	// Fetch hint details
+	hint, err := database.GetHintByID(uint(hintID))
+	if err != nil {
+		if err.Error() == "not_found" {
+			c.JSON(http.StatusNotFound, HTTPErrorResp{
+				Error: "Hint not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request",
+			})
+		}
+		return
+	}
+
+	// Check if the user has already taken the hint
+	hasTakenHint, err := database.UserHasTakenHint(user.ID, uint(hintID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while checking hint usage",
+		})
+		return
+	}
+	if hasTakenHint {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "You have already taken this hint",
+		})
+		return
+	}
+
+	// Save user hint
+	if err := database.SaveUserHint(user.ID, hint.ChallengeID, hint.HintID); err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while saving the hint usage",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Hint successfully taken",
 	})
 }
 
@@ -118,14 +204,14 @@ func challengeInfoHandler(c *gin.Context) {
 
 		if autherr != nil {
 			c.JSON(http.StatusOK, ChallengeInfoResp{
-				Name:            name,
-				ChallId:         challenge.ID,
-				Category:        challenge.Type,
-				CreatedAt:       challenge.CreatedAt,
-				Tags:            challengeTags,
-				Status:          challenge.Status,
-				Ports:           challengePorts,
-				Hints:           challenge.Hints,
+				Name:      name,
+				ChallId:   challenge.ID,
+				Category:  challenge.Type,
+				CreatedAt: challenge.CreatedAt,
+				Tags:      challengeTags,
+				Status:    challenge.Status,
+				Ports:     challengePorts,
+				// Hints:           challenge.Hints,
 				Desc:            challenge.Description,
 				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
 				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
@@ -137,15 +223,15 @@ func challengeInfoHandler(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, ChallengeInfoResp{
-			Name:            name,
-			ChallId:         challenge.ID,
-			Category:        challenge.Type,
-			Flag:            challenge.Flag,
-			CreatedAt:       challenge.CreatedAt,
-			Tags:            challengeTags,
-			Status:          challenge.Status,
-			Ports:           challengePorts,
-			Hints:           challenge.Hints,
+			Name:      name,
+			ChallId:   challenge.ID,
+			Category:  challenge.Type,
+			Flag:      challenge.Flag,
+			CreatedAt: challenge.CreatedAt,
+			Tags:      challengeTags,
+			Status:    challenge.Status,
+			Ports:     challengePorts,
+			// Hints:           challenge.Hints,
 			Desc:            challenge.Description,
 			Assets:          strings.Split(challenge.Assets, core.DELIMITER),
 			AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
@@ -297,14 +383,14 @@ func challengesInfoHandler(c *gin.Context) {
 			}
 
 			availableChallenges[index] = ChallengeInfoResp{
-				Name:            challenge.Name,
-				ChallId:         challenge.ID,
-				Category:        challenge.Type,
-				Tags:            challengeTags,
-				CreatedAt:       challenge.CreatedAt,
-				Status:          challenge.Status,
-				Ports:           challengePorts,
-				Hints:           challenge.Hints,
+				Name:      challenge.Name,
+				ChallId:   challenge.ID,
+				Category:  challenge.Type,
+				Tags:      challengeTags,
+				CreatedAt: challenge.CreatedAt,
+				Status:    challenge.Status,
+				Ports:     challengePorts,
+				//Hints:           challenge.Hints,
 				Desc:            challenge.Description,
 				Points:          challenge.Points,
 				Assets:          strings.Split(challenge.Assets, core.DELIMITER),

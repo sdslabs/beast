@@ -160,7 +160,29 @@ func submitFlagHandler(c *gin.Context) {
 			}
 		}
 
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
+		// Fetch hints taken by the user for this challenge
+		hints, err := database.QueryHintsTaken(user.ID, challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		// Calculate total deduction percentage
+		totalDeduction := 0.0
+		for _, hint := range hints {
+			totalDeduction += hint.DeductionPercentage
+		}
+		if totalDeduction > 100 {
+			totalDeduction = 100 // Cap deduction at 100%
+		}
+
+		// Adjust points based on hints taken
+		deductedPoints := float64(challengePoints) * (1 - totalDeduction/100)
+		finalPoints := uint(math.Round(deductedPoints))
+
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + finalPoints})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",

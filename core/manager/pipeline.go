@@ -264,10 +264,10 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 //
 // The pipeline goes through the following stages:
 //
-// * stageChallenge - Add the challenge to the staging area for beast creating
-//		a tar for the challenge with Dockerfile embedded into the context.
-// 		This challenge is then present in the staging area($BEAST_HOME/staging/challengeId/)
-//		for further steps in the pipeline.
+//   - stageChallenge - Add the challenge to the staging area for beast creating
+//     a tar for the challenge with Dockerfile embedded into the context.
+//     This challenge is then present in the staging area($BEAST_HOME/staging/challengeId/)
+//     for further steps in the pipeline.
 //
 // The skipStage flag is a boolean value to skip the staging step for the challenge
 // if this flag is true then the deployment to succeed the challenge should already

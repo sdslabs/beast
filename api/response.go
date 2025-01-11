@@ -108,7 +108,6 @@ type ChallengeInfoResp struct {
 	CreatedAt       time.Time       `json:"createdAt"`
 	Status          string          `json:"status" example:"deployed"`
 	Ports           []uint32        `json:"ports" example:[3001, 3002]`
-	Hints           string          `json:"hints" example:"Try robots"`
 	Desc            string          `json:"description" example:"A simple web challenge"`
 	Points          uint            `json:"points" example:"50"`
 	SolvesNumber    int             `json:"solvesNumber" example:"100"`
@@ -123,7 +122,6 @@ type ChallengePreviewResp struct {
 	Assets          []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
 	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
 	Ports           []uint32 `json:"ports" example:[3001, 3002]`
-	Hints           []string `json:"hints" example:"Try robots"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
 }
