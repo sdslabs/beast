@@ -3,7 +3,6 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
@@ -129,9 +128,11 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *datab
 		database.UpdateChallenge(challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["deployed"]})
 
 		configFile := filepath.Join(challengeStagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
-		err = os.Rename(configFile, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))
+		newPath := fmt.Sprintf("%s/%s", challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME)
+		// err = os.Rename(configFile, newPath)
+		err = utils.CopyFile(configFile, newPath)
 		if err != nil {
-			log.Errorf("Error while removing challenge config file.")
+			log.Errorf("Error while removing challenge config file. %s", err)
 		}
 	}
 }

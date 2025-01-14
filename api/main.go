@@ -62,7 +62,22 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	manager.Q.StartWorkers(&manager.Worker{})
 
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
-
+	manager.ServerQueue = manager.NewLoadBalancerQueue()
+	for _, server := range config.Cfg.AvailableServers {
+		if server.Active {
+			if server.Host == "localhost" {
+				manager.ServerQueue.Push(server)
+				continue
+			}
+			client, err := manager.CreateSSHClient(server)
+			if err != nil {
+				log.Errorf("SSH connection to %s failed: %s\n", server.Host, err)
+			}
+			defer client.Close()
+			manager.ServerQueue.Push(server)
+			manager.RunCommandOnServer(server, "mkdir -p $HOME/.beast/staging/")
+		}
+	}
 	runBeastApiBootsteps(defaultauthorpassword)
 
 	// Initialize Gin router.

@@ -19,6 +19,38 @@ available_sidecars = ["mysql", "mongodb"]
 # key used for encrypting the claims of a user. Keep this strong.
 jwt_secret = "beast_jwt_secret_SUPER_STRONG_0x100010000100"
 
+# List of ip addresses of all the servers where challenge could be deployed for 
+# balanced load accross servers. 
+[available_servers]
+
+# [available_servers."host"]
+[available_servers."192.168.1.1"]
+# IP-address/Hostname of the server
+host = "192.168.1.1"
+
+# Username to be used for ssh connection
+username = "user1"
+
+# Path to private SSH key for interacting with the server.
+ssh_key_path = "/path/to/your/private/key1"
+
+# Status of remote server to be used
+# If it is set to false then that remote server will not be used
+active = false
+
+[available_servers.localhost]
+# IP-address/Hostname of the server
+host = "localhost"
+
+# Username to be used for ssh connection (Leave empty for localhost)
+username = "user1"
+
+# Path to private SSH key for interacting with the server. (Leave empty for localhost)
+ssh_key_path = "/path/to/your/private/key1"
+
+# Status of remote server to be used
+active = true
+
 
 # To allow beast to send notification to a notification channel povide this webhook URL
 # We are also working on implmeneting notification using IRC.

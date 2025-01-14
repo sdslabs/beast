@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/sdslabs/beastv4/pkg/auth"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -13,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/sdslabs/beastv4/pkg/auth"
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -455,7 +456,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
-			return nil
+			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
 				(userEntry.SshKey != config.Author.SSHKey || config.Author.SSHKey == "") &&
@@ -485,22 +486,24 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
+		availableServer, _ := ServerQueue.GetNextAvailableInstance()
 		*challEntry = database.Challenge{
-			Name:        config.Challenge.Metadata.Name,
-			AuthorID:    userEntry.ID,
-			Format:      config.Challenge.Metadata.Type,
-			Status:      core.DEPLOY_STATUS["undeployed"],
-			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-			Flag:        config.Challenge.Metadata.Flag,
-			Type:        config.Challenge.Metadata.Type,
-			Sidecar:     config.Challenge.Metadata.Sidecar,
-			Description: config.Challenge.Metadata.Description,
-			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
-			Assets:      strings.Join(assetsURL, core.DELIMITER),
-			Points:      config.Challenge.Metadata.Points,
-			MinPoints:   config.Challenge.Metadata.MinPoints,
-			MaxPoints:   config.Challenge.Metadata.MaxPoints,
+			Name:           config.Challenge.Metadata.Name,
+			AuthorID:       userEntry.ID,
+			Format:         config.Challenge.Metadata.Type,
+			Status:         core.DEPLOY_STATUS["undeployed"],
+			ContainerId:    coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:        coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			Flag:           config.Challenge.Metadata.Flag,
+			Type:           config.Challenge.Metadata.Type,
+			Sidecar:        config.Challenge.Metadata.Sidecar,
+			Description:    config.Challenge.Metadata.Description,
+			Hints:          strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
+			Assets:         strings.Join(assetsURL, core.DELIMITER),
+			Points:         config.Challenge.Metadata.Points,
+			MinPoints:      config.Challenge.Metadata.MinPoints,
+			MaxPoints:      config.Challenge.Metadata.MaxPoints,
+			ServerDeployed: availableServer.Host,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
@@ -621,7 +624,7 @@ func LogTransaction(identifier string, action string, authorization string) erro
 	return err
 }
 
-//Copies the Static content to the staging/static/folder
+// Copies the Static content to the staging/static/folder
 func CopyToStaticContent(challengeName, staticContentDir string) error {
 	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
 	err := utils.CreateIfNotExistDir(dirPath)
@@ -675,36 +678,36 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 	return challengeNames
 }
 
-//Unzips challenge folder in a destination directory
+// Unzips challenge folder in a destination directory
 func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 
 	baseFileName := filepath.Base(zipContextPath)
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
 	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
-        log.Fatal(err)
-    }
+		log.Fatal(err)
+	}
 
 	// 1. Open the zip file
-    reader, err := zip.OpenReader(zipContextPath)
-    if err != nil {
-        return "", err
-    }
-    defer reader.Close()
+	reader, err := zip.OpenReader(zipContextPath)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
 
-    // 2. Get the absolute destination path
-    destination, err := filepath.Abs(targetDir)
-    if err != nil {
-        return "", err
-    }
+	// 2. Get the absolute destination path
+	destination, err := filepath.Abs(targetDir)
+	if err != nil {
+		return "", err
+	}
 
-    // 3. Iterate over zip files inside the archive and unzip each of them
-    for _, f := range reader.File {
-        err := unzipFile(f, destination)
-        if err != nil {
-            return "", err
-        }
-    }
+	// 3. Iterate over zip files inside the archive and unzip each of them
+	for _, f := range reader.File {
+		err := unzipFile(f, destination)
+		if err != nil {
+			return "", err
+		}
+	}
 
 	return targetDir, nil
 }

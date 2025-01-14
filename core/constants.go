@@ -83,6 +83,7 @@ const ( // default config
 	ITERATIONS               int    = 65536
 	HASH_LENGTH              int    = 32
 	TIMEPERIOD               int64  = 6 * 60 * 60
+	SSH_PORT                 int    = 22
 )
 
 const ( // roles

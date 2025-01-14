@@ -169,7 +169,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	// If the challange is already deployed, return an error.
 	// If not then start the deploy pipeline for the challenge.
 	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
-		containers, err := cr.SearchContainerByFilter(map[string]string{"id": challenge.ContainerId})
+		containers, err := cr.SearchRunningContainerByFilter(map[string]string{"id": challenge.ContainerId})
 		if err != nil {
 			log.Error("Error while searching for container with id %s", challenge.ContainerId)
 			return nil, errors.New("CONTAINER RUNTIME ERROR")

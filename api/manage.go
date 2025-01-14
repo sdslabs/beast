@@ -458,9 +458,9 @@ func manageUploadHandler(c *gin.Context) {
 
 	// Extract and show from zip and return response
 	tempStageDir, err := manager.UnzipChallengeFolder(zipContextPath, core.BEAST_TEMP_DIR)
-	
+
 	// log.Debug("The dir is ",tempStageDir)
-	
+
 	// The file cannot be successfully un-zipped or the resultant was a malformed directory
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
