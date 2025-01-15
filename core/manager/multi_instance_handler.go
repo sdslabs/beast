@@ -11,6 +11,7 @@ import (
 
 	"os/exec"
 
+	"github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -256,7 +257,145 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 	}
 	log.Println(output[:12])
 	return strings.TrimSpace(output[:12]), nil
-
-	log.Println(containerConfig)
-	return "", nil
 }
+
+func StopAndRemoveContainerRemote(containerId string, server config.AvailableServer) error {
+	stopCommand := fmt.Sprintf("docker stop %s", containerId)
+	if _, err := RunCommandOnServer(server, stopCommand); err != nil {
+		return fmt.Errorf("failed to stop container: %w", err)
+	}
+	fmt.Println("Stopped container with ID", containerId)
+
+	removeCommand := fmt.Sprintf("docker rm --force %s", containerId)
+	if _, err := RunCommandOnServer(server, removeCommand); err != nil {
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+	fmt.Println("Removed container with ID", containerId)
+
+	return nil
+}
+
+// Function searches containers based on the filter map on remote server
+func SearchContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
+	filterArgs := ""
+	for key, val := range filterMap {
+		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
+	}
+	output, err := RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
+	if err != nil {
+		return []types.Container{}, err
+	}
+	log.Println(output)
+	return []types.Container{}, nil
+}
+
+// Function searches for running containers based on the filter map on remote server
+func SearchRunningContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]string, error) {
+	filterArgs := ""
+	for key, val := range filterMap {
+		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
+	}
+	output, err := RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
+	if err != nil {
+		return []string{}, err
+	}
+	log.Println(output)
+
+	containers := []string{}
+	for _, line := range bytes.Split([]byte(output), []byte("\n")) {
+		if len(line) > 0 {
+			containers = append(containers, string(line))
+		}
+	}
+	return containers, nil
+}
+
+// Function searhes for container images based on filter map on remote server
+func SearchImageByFilter(filterMap map[string]string, server config.AvailableServer) ([]string, error) {
+	filterArgs := ""
+	for key, val := range filterMap {
+		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
+	}
+	command := fmt.Sprintf("docker images %s --format '{{.ID}}'", filterArgs)
+	output, err := RunCommandOnServer(server, command)
+	if err != nil {
+		return nil, err
+	}
+
+	images := []string{}
+	for _, line := range bytes.Split([]byte(output), []byte("\n")) {
+		if len(line) > 0 {
+			images = append(images, string(line))
+		}
+	}
+	return images, nil
+}
+
+// Remove image from remote server.
+func RemoveImageRemote(imageId string, server config.AvailableServer) error {
+	command := fmt.Sprintf("docker rmi %s", imageId)
+	_, err := RunCommandOnServer(server, command)
+	return err
+}
+
+// Check for existence on image on remote server
+func CheckIfImageExistsOnRemote(imageId string, server config.AvailableServer) (bool, error) {
+	command := fmt.Sprintf("docker inspect --format='{{.ID}}' %s", imageId)
+	output, err := RunCommandOnServer(server, command)
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok && exitError.ExitCode() == 1 {
+			return false, nil
+		}
+		return false, err
+	}
+	return output != "", nil
+}
+
+type Log struct {
+	Stderr string
+	Stdout string
+}
+
+// Get Containers stdout, stderr logs
+func GetContainerStdLogsRemote(containerID string, server config.AvailableServer) (*Log, error) {
+	stdoutCmd := fmt.Sprintf("docker logs --details --stdout %s", containerID)
+	stderrCmd := fmt.Sprintf("docker logs --details --stderr %s", containerID)
+
+	stdout, err := RunCommandOnServer(server, stdoutCmd)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching stdout logs: %w", err)
+	}
+
+	stderr, err := RunCommandOnServer(server, stderrCmd)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching stderr logs: %w", err)
+	}
+
+	return &Log{Stdout: stdout, Stderr: stderr}, nil
+}
+
+// Get live logs of container
+func ShowLiveContainerLogsRemote(containerID string, server config.AvailableServer) error {
+	command := fmt.Sprintf("docker logs --details --follow %s", containerID)
+
+	output, err := RunCommandOnServer(server, command)
+	if err != nil {
+		return fmt.Errorf("error streaming live logs: %w", err)
+	}
+
+	fmt.Println(output)
+	return nil
+}
+
+// Commit container on remote server
+func CommitContainerRemote(containerID string, server config.AvailableServer) (string, error) {
+	command := fmt.Sprintf("docker commit %s", containerID)
+
+	output, err := RunCommandOnServer(server, command)
+	if err != nil {
+		return "", fmt.Errorf("error committing container: %w", err)
+	}
+	imageID := strings.TrimSpace(output)
+	return imageID, nil
+}
+

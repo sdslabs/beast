@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	containerType "github.com/docker/docker/api/types"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
@@ -169,12 +170,17 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	// If the challange is already deployed, return an error.
 	// If not then start the deploy pipeline for the challenge.
 	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
-		containers, err := cr.SearchRunningContainerByFilter(map[string]string{"id": challenge.ContainerId})
-		if err != nil {
-			log.Error("Error while searching for container with id %s", challenge.ContainerId)
-			return nil, errors.New("CONTAINER RUNTIME ERROR")
+		var containers []containerType.Container
+		if challenge.ServerDeployed != "localhost" {
+			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+			SearchContainerByFilterRemote(map[string]string{"id": challenge.ContainerId}, server)
+		} else {
+			containers, err = cr.SearchRunningContainerByFilter(map[string]string{"id": challenge.ContainerId})
+			if err != nil {
+				log.Error("Error while searching for container with id %s", challenge.ContainerId)
+				return nil, errors.New("CONTAINER RUNTIME ERROR")
+			}
 		}
-
 		if len(containers) > 1 {
 			log.Error("Got more than one containers, something fishy here. Contact admin to check manually.")
 			return nil, errors.New("CONTAINER RUNTIME ERROR")
@@ -212,7 +218,14 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	}
 
 	if coreUtils.IsImageIdValid(challenge.ImageId) {
-		imageExist, err := cr.CheckIfImageExists(challenge.ImageId)
+		var imageExist bool
+		var err error
+		if challenge.ServerDeployed != "localhost" {
+			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+			imageExist, err = CheckIfImageExistsOnRemote(challenge.ImageId, server)
+		} else {
+			imageExist, err = cr.CheckIfImageExists(challenge.ImageId)
+		}
 		if err != nil {
 			log.Errorf("Error while searching for image with id %s: %s", challenge.ImageId, err)
 			return nil, errors.New("CONTAINER RUNTIME ERROR")
@@ -480,10 +493,12 @@ func InitialAutoDeploy() {
 //   - If a new challenge is added to the remote repo then it is deployed
 //   - If an existing challenge is modified in the remote repo then it is redeployed
 //   - If an existing challenge is deleted in the remote repo then it is purged
+//
 // Note:
-//   If an existing challenge was undeployed manually then it will
-//   remain undeployed even if it is modified in the remote remo, but
-//   it will be purged if it is deleted in the remote repo
+//
+//	If an existing challenge was undeployed manually then it will
+//	remain undeployed even if it is modified in the remote remo, but
+//	it will be purged if it is deleted in the remote repo
 func AutoUpdate() {
 	log.Infof("Checking for updates in remote repository")
 
