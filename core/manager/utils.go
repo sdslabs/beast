@@ -496,7 +496,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Status:         core.DEPLOY_STATUS["undeployed"],
 			ContainerId:    coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:        coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-			FailSolveLimit: config.Challenge.Metadata.FailSolveLimit,
+			FailSolveLimit: *config.Challenge.Metadata.FailSolveLimit,
 			PreReqs:        strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
 			Flag:           config.Challenge.Metadata.Flag,
 			Type:           config.Challenge.Metadata.Type,

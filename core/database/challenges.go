@@ -208,25 +208,18 @@ func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
 }
 
 // Get User Related Challenges
-func GetUserPreviousTriesStatus(userID uint, challengeID uint, chalSolveAttemptLimit int) (bool, error) {
+func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
 	var userChallenges UserChallenges
 	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Return true  if no record is found
-			return true, nil
+			return 0, nil
 		}
-		return false, err
+		return 0, err
 	}
 
-	if chalSolveAttemptLimit < 0 {
-		return true, nil
-	}
-	if userChallenges.Tries >= uint(chalSolveAttemptLimit) {
-		return false, nil
-	}
-
-	return true, nil
+	return int(userChallenges.Tries), nil
 }
 
 func UpdateUserChallengeTries(userID uint, challengeID uint) error {
@@ -250,7 +243,8 @@ func UpdateUserChallengeTries(userID uint, challengeID uint) error {
 	}
 
 	updates := map[string]interface{}{
-		"tries": userChallenges.Tries + 1,
+		"created_at": time.Now(),
+		"tries":      userChallenges.Tries + 1,
 	}
 
 	return Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates).Error
