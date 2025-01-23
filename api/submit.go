@@ -112,6 +112,44 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+		if challenge.Flag == "" {
+			validFlags, err := database.QueryDynamicFlagEntries("Name", challenge.Name)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			if len(validFlags) == 0 {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "Your flag is incorrect",
+					Success: false,
+				})
+				return
+			}
+			if flag != validFlags[0].Flag {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "Your flag is incorrect",
+					Success: false,
+				})
+				return
+			}
+			wheremap := map[string]interface{}{
+				"challenge_id": challenge.ID,
+				"Flag": flag,
+			}
+			submissions, err := database.QuerySubmissions(wheremap)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+			if len(submissions) > 0 {
+
+			}
+		}
 		if challenge.Flag != flag {
 			c.JSON(http.StatusOK, FlagSubmitResp{
 				Message: "Your flag is incorrect",
