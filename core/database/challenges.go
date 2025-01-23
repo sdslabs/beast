@@ -79,7 +79,7 @@ type DynamicFlag struct {
 	gorm.Model
 
 	Name string `gorm:"not null;type:varchar(64)"`
-	Flag string `gorm:"type:text"`
+	Flag string `gorm:"type:text:unique"`
 }
 
 // Create an entry for the challenge in the Challenge table
