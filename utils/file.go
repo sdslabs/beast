@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -246,4 +247,23 @@ func GetDirsInDir(dirPath string) (error, []string) {
 func GetCurrentDirectoryName(path string) string {
 	directories := strings.Split(path, string(os.PathSeparator))
 	return directories[len(directories)-1]
+}
+
+// Generates a Toml
+func WriteChallConfigFile(filePath string, data interface{}) error {
+	err := ValidateDirExists(filepath.Dir(filePath))
+	if err != nil {
+		return err
+	}
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("Error while creating file : %s", err)
+	}
+	defer file.Close()
+
+	err = toml.NewEncoder(file).Encode(data)
+	if err != nil {
+		return fmt.Errorf("Error while writing to file : %s", err)
+	}
+	return nil
 }

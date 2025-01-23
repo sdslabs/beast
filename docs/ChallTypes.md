@@ -4,7 +4,7 @@
 
 Any service whether it is a binary file, or a shell script, which needs to be instantiated on every connection can be easily hosted using `service` type challenge. **Xinetd** is for hosting these type of challenges inside a docker container.
 
-###Primary Requirements
+### Primary Requirements
 
 ```toml
 # Relative path to binary or script which needs to be executed when the specified
@@ -21,7 +21,7 @@ Web challenges are hosted using the corresponding images from Dockerhub. Current
 * Python : Django and Flask
 * Php
 
-###Primary Requirements
+### Primary Requirements
 
 ```toml
 # Relative directory corresponding to root of the challenge where the root

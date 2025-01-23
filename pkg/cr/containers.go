@@ -177,7 +177,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, containerName)
 	if err != nil {
-		log.Error("Error while creating the container with name %s", containerName)
+		log.Errorf("Error while creating the container with name %s", containerName)
 		return "", err
 	}
 

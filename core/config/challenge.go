@@ -146,14 +146,18 @@ type ChallengeMetadata struct {
 // In this validation returned boolean value represents if the challenge type is
 // static or not.
 func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
+	log.Debugf("Validating Challenge: %s", config.Name)
 	if config.Name == "" || config.Flag == "" {
 		return fmt.Errorf("Name and Flag required for the challenge"), false
 	}
-
+	log.Debugf("Available sidecars: %v", Cfg.AvailableSidecars)
 	if !(utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "") {
-		return fmt.Errorf("Sidecar provided is not an available sidecar."), false
+		return fmt.Errorf("Sidecar provided is not an available sidecar"), false
 	}
-
+	//Check if challenge points are within permissible range.
+	if config.MaxPoints < config.MinPoints {
+		return fmt.Errorf("Max points should be greater than min points"), false
+	}
 	// Check if the config type is static here and if it is
 	// then return an indication for that, so that caller knows if it need
 	// to check a valid environment or not.
@@ -188,16 +192,13 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # Dependencies required by challenge, installed using default package manager of base image apt for most cases.
 // apt_deps = ["", ""]
 //
-//
 // # A list of setup scripts to run for building challenge enviroment.
 // # Keep in mind that these are only for building the challenge environment and are executed
 // # in the iamge building step of the deployment pipeline.
 // setup_scripts = ["", ""]
 //
-//
 // # A directory containing any of the static assets for the challenge, exposed by beast static endpoint.
 // static_dir = ""
-//
 //
 // # Command to execute inside the container, if a predefined type is being used try to
 // # use an existing field to let beast automatically calculate what command to run.
@@ -205,42 +206,38 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # of the service using service_path field.
 // run_cmd = ""
 //
-//
 // # Similar to run_cmd but in this case you have the entire container to yourself
 // # and everything you are doing is done using root permissions inside the container
 // # When using this keep in mind you are root inside the container.
 // entrypoint = ""
-//
 //
 // # Relative path to binary which needs to be executed when the specified
 // # Type for the challenge is service.
 // # This can be anything which can be exeucted, a python file, a binary etc.
 // service_path = ""
 //
-//
 // # Relative directory corresponding to root of the challenge where the root
 // # of the web application lies.
 // web_root = ""
-//
 //
 // # Any custom base image you might want to use for your particular challenge.
 // # Exists for flexibility reasons try to use existing base iamges wherever possible.
 // base_image = ""
 //
-//
 // # Docker file name for specific type challenge - `docker`.
 // # Helps to build flexible images for specific user-custom challenges
 // docket_context = ""
 //
-//
 // # Environment variables that can be used in the application code.
 // [[var]]
-//     key = ""
-//     value = ""
+//
+//	key = ""
+//	value = ""
 //
 // [[var]]
-//     key = ""
-//     value = ""
+//
+//	key = ""
+//	value = ""
 //
 // Type of traffic to expose through the port mapping provided.
 // traffic = "udp" / "tcp"
@@ -402,7 +399,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 	for _, portMap := range portMappings {
 		if portMap.HostPort < core.ALLOWED_MIN_PORT_VALUE || portMap.HostPort > core.ALLOWED_MAX_PORT_VALUE {
-			return fmt.Errorf("Port value must be between %s and %s", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE)
+			return fmt.Errorf("Port value must be between %d and %d", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE)
 		}
 	}
 
@@ -437,7 +434,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		// ServicePath must be relative.
 		if config.ServicePath != "" {
 			if filepath.IsAbs(config.ServicePath) {
-				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
+				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable")
 			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
 				// Skip this, we might create service later too.
 				log.Warnf("Service path file %s does not exist", config.ServicePath)
@@ -484,7 +481,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if config.DockerCtx == "" {
 			return errors.New("Docker Context file not provided in docker-type challenge")
 		} else if filepath.IsAbs(config.DockerCtx) {
-			return fmt.Errorf("For challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
+			return fmt.Errorf("For challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file")
 		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
 			return fmt.Errorf("File : %s does not exist", config.DockerCtx)
 		}
@@ -501,10 +498,10 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 // Metadata related to author of the challenge, this structure includes
 //
-// * Name - Name of the author of the challenge
-// * Email - Email of the author
-// * SSHKey - Public SSH key for the challenge author, to give the access
-//		to the challenge container.
+//   - Name - Name of the author of the challenge
+//   - Email - Email of the author
+//   - SSHKey - Public SSH key for the challenge author, to give the access
+//     to the challenge container.
 //
 // ```toml
 // # Optional fields

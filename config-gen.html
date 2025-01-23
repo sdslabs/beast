@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Create New Challenge</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
+        }
+
+        .field-group {
+            margin-bottom: 15px;
+        }
+
+        .field-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .field-group input[type="text"],
+        .field-group input[type="number"],
+        .field-group textarea,
+        .field-group select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        .field-group input[type="file"] {
+            padding: 5px 0;
+        }
+
+        .maintainers {
+            margin-top: 10px;
+        }
+
+        .maintainers .maintainer {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .add-maintainer {
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+    <script>
+        let maintainerCount = 0;
+
+        function addMaintainer() {
+            maintainerCount++;
+            const maintainersDiv = document.getElementById('maintainers');
+            const maintainerDiv = document.createElement('div');
+            maintainerDiv.className = 'maintainer';
+            maintainerDiv.innerHTML = `
+                <div class="field-group">
+                    <label for="maintainer_name_${maintainerCount}">Maintainer Name:</label>
+                    <input type="text" id="maintainer_name_${maintainerCount}" name="maintainer_name_${maintainerCount}" required>
+                </div>
+                <div class="field-group">
+                    <label for="maintainer_email_${maintainerCount}">Maintainer Email:</label>
+                    <input type="text" id="maintainer_email_${maintainerCount}" name="maintainer_email_${maintainerCount}" required>
+                </div>
+                <div class="field-group">
+                    <label for="maintainer_ssh_key_${maintainerCount}">Maintainer SSH Key:</label>
+                    <input type="text" id="maintainer_ssh_key_${maintainerCount}" name="maintainer_ssh_key_${maintainerCount}" >
+                </div>
+            `;
+            maintainersDiv.appendChild(maintainerDiv);
+            document.getElementById('maintainers_count').value = maintainerCount;
+        }
+    </script>
+</head>
+
+<body>
+
+    <h1>Create New Challenge</h1>
+
+    <form action="/challenge/configure" method="post" enctype="multipart/form-data">
+
+        <!-- Author Information -->
+        <div class="section">
+            <h2>Author Information</h2>
+            <div class="field-group">
+                <label for="author_name">Name:</label>
+                <input type="text" id="author_name" name="author_name" required>
+            </div>
+            <div class="field-group">
+                <label for="author_email">Email:</label>
+                <input type="text" id="author_email" name="author_email">
+            </div>
+            <div class="field-group">
+                <label for="author_ssh_key">SSH Key:</label>
+                <input type="text" id="author_ssh_key" name="author_ssh_key">
+            </div>
+        </div>
+
+        <!-- Challenge Metadata -->
+        <div class="section">
+            <h2>Challenge Metadata</h2>
+            <div class="field-group">
+                <label for="challenge_name">Challenge Name:</label>
+                <input type="text" id="challenge_name" name="challenge_name" required>
+            </div>
+            <div class="field-group">
+                <label for="challenge_type">Challenge Type:</label>
+                <input type="text" id="challenge_type" name="challenge_type" required>
+            </div>
+            <div class="field-group">
+                <label for="challenge_flag">Challenge Flag:</label>
+                <input type="text" id="challenge_flag" name="challenge_flag" required>
+            </div>
+            <div class="field-group">
+                <label for="challenge_sidecar">Challenge Sidecar:</label>
+                <input type="text" id="challenge_sidecar" name="challenge_sidecar">
+            </div>
+            <div class="field-group">
+                <label for="challenge_tags">Tags (comma-separated):</label>
+                <input type="text" id="challenge_tags" name="challenge_tags">
+            </div>
+            <div class="field-group">
+                <label for="challenge_assets">Assets (comma-separated):</label>
+                <input type="text" id="challenge_assets" name="challenge_assets">
+            </div>
+            <div class="field-group">
+                <label for="challenge_additional_links">Additional Links (comma-separated):</label>
+                <input type="text" id="challenge_additional_links" name="challenge_additional_links">
+            </div>
+            <div class="field-group">
+                <label for="challenge_hints">Hints (comma-separated):</label>
+                <input type="text" id="challenge_hints" name="challenge_hints">
+            </div>
+            <div class="field-group">
+                <label for="challenge_desc">Description:</label>
+                <textarea id="challenge_desc" name="challenge_desc" rows="4"></textarea>
+            </div>
+            <div class="field-group">
+                <label for="challenge_maxpoints">Max Points:</label>
+                <input type="number" id="challenge_maxpoints" name="challenge_maxpoints" min="0" required>
+            </div>
+            <div class="field-group">
+                <label for="challenge_minpoints">Min Points:</label>
+                <input type="number" id="challenge_minpoints" name="challenge_minpoints" min="0" required>
+            </div>
+        </div>
+
+        <!-- Challenge Environment -->
+        <div class="section">
+            <h2>Challenge Environment</h2>
+            <div class="field-group">
+                <label for="challenge_apt_deps">Apt Dependencies (comma-separated):</label>
+                <input type="text" id="challenge_apt_deps" name="challenge_apt_deps">
+            </div>
+            <div class="field-group">
+                <label for="challenge_ports">Ports (comma-separated):</label>
+                <input type="text" id="challenge_ports" name="challenge_ports">
+            </div>
+            <div class="field-group">
+                <label for="challenge_setup_scripts">Setup Scripts:</label>
+                <input type="file" id="challenge_setup_scripts" name="challenge_setup_scripts" multiple>
+            </div>
+            <div class="field-group">
+                <label for="challenge_default_port">Default Port:</label>
+                <input type="number" id="challenge_default_port" name="challenge_default_port" min="0" required>
+            </div>
+            <div class="field-group">
+                <label for="challenge_port_mappings">Port Mappings:</label>
+                <input type="text" id="challenge_port_mappings" name="challenge_port_mappings">
+            </div>
+            <div class="field-group">
+                <label>Public Zip Option:</label>
+                <input type="radio" id="public_zip_yes" name="public_zip_btn" value="yes">
+                <label for="public_zip_yes">Yes</label>
+                <input type="radio" id="public_zip_no" name="public_zip_btn" value="no" checked>
+                <label for="public_zip_no">No</label>
+            </div>
+            <div class="field-group">
+                <label for="public_zip">Public ZIP File:</label>
+                <input type="file" id="public_zip" name="public_zip">
+            </div>
+            <div class="field-group">
+                <label for="challenge_zip">Challenge ZIP File:</label>
+                <input type="file" id="challenge_zip" name="challenge_zip" required>
+            </div>
+            <div class="field-group">
+                <label for="challenge_run_cmd">Run Command:</label>
+                <input type="text" id="challenge_run_cmd" name="challenge_run_cmd" required>
+            </div>
+            <div class="field-group">
+                <label for="challenge_base_image">Base Image:</label>
+                <input type="text" id="challenge_base_image" name="challenge_base_image" required>
+            </div>
+            <div class="field-group">
+                <label for="challenge_entrypoint">Entrypoint:</label>
+                <input type="text" id="challenge_entrypoint" name="challenge_entrypoint">
+            </div>
+            <div class="field-group">
+                <label for="challenge_web_root">Web Root:</label>
+                <input type="text" id="challenge_web_root" name="challenge_web_root">
+            </div>
+            <div class="field-group">
+                <label for="challenge_service_path">Service Path:</label>
+                <input type="text" id="challenge_service_path" name="challenge_service_path">
+            </div>
+            <div class="field-group">
+                <label for="challenge_dockerfile">Dockerfile:</label>
+                <input type="file" id="challenge_dockerfile" name="challenge_dockerfile">
+            </div>
+            <div class="field-group">
+                <label for="challenge_traffic">Traffic:</label>
+                <input type="text" id="challenge_traffic" name="challenge_traffic">
+            </div>
+            <div class="field-group">
+                <label>Environment Variables (Key-Value Pairs):</label>
+                <div id="env_vars">
+                    <input type="text" name="challenge_env_vars[KEY1]" placeholder="Key1">
+                    <input type="text" name="challenge_env_vars[VALUE1]" placeholder="Value1">
+                </div>
+                <button type="button" onclick="addEnvVar()">Add More</button>
+            </div>
+        </div>
+
+        <!-- Resources -->
+        <div class="section">
+            <h2>Resources</h2>
+            <div class="field-group">
+                <label for="resources_cpu">CPU Shares:</label>
+                <input type="number" id="resources_cpu" name="resources_cpu" min="0" required>
+            </div>
+            <div class="field-group">
+                <label for="resources_memory">Memory (MB):</label>
+                <input type="number" id="resources_memory" name="resources_memory" min="0" required>
+            </div>
+            <div class="field-group">
+                <label for="resources_pidslimit">Pids Limit:</label>
+                <input type="number" id="resources_pidslimit" name="resources_pidslimit" min="0" required>
+            </div>
+        </div>
+
+        <!-- Maintainers -->
+        <div class="section">
+            <h2>Maintainers</h2>
+            <div class="field-group">
+                <label for="maintainers_count">Number of Maintainers:</label>
+                <input type="number" id="maintainers_count" name="maintainers_count" min="0" value="0" readonly>
+            </div>
+            <div id="maintainers"></div>
+            <button type="button" class="add-maintainer" onclick="addMaintainer()">Add Maintainer</button>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="section">
+            <button type="submit">Create Challenge</button>
+        </div>
+
+    </form>
+
+    <script>
+        let envVarCount = 1;
+
+        function addEnvVar() {
+            envVarCount++;
+            const envVarsDiv = document.getElementById('env_vars');
+            const envVarInputs = document.createElement('div');
+            envVarInputs.innerHTML = `
+                <input type="text" name="challenge_env_vars[KEY${envVarCount}]" placeholder="Key${envVarCount}">
+                <input type="text" name="challenge_env_vars[VALUE${envVarCount}]" placeholder="Value${envVarCount}">
+            `;
+            envVarsDiv.appendChild(envVarInputs);
+        }
+    </script>
+
+</body>
+
+</html>

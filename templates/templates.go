@@ -36,7 +36,9 @@ RUN apt-get -y install {{.AptDeps}}
 {{if .Ports}}EXPOSE {{.Ports}} {{end}}
 VOLUME ["{{.MountVolume}}"]
 
-COPY . /challenge
+COPY ./challenge /challenge
+
+COPY {{ range $index, $elem := .SetupScripts}}{{$elem}} /challenge/{{end}}
 
 WORKDIR /challenge
 
@@ -47,7 +49,8 @@ ENV {{$key}} "{{$elem}}"
 RUN cd /challenge {{ range $index, $elem := .SetupScripts}} && \
     chmod u+x {{$elem}} {{end}} {{ range $index, $elem := .SetupScripts}} && \
     ./{{$elem}} {{end}}
-
+{{ range $index, $elem := .SetupScripts}}RUN rm /challenge/{{$elem}} {{end}}
+ 
 {{if not .Entrypoint}}
 RUN touch /entrypoint.sh && \
     echo "#!/bin/bash" > /entrypoint.sh && \

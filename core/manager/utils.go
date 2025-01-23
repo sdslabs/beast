@@ -440,9 +440,9 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 
 		if userEntry.Email == "" {
-			if defaultauthorpassword == "" {
-				return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
-			}
+			// if defaultauthorpassword == "" {
+			// 	return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
+			// }
 			log.Infof("User with the given email does not exist : %v, creating this user", config.Author.Email)
 			newUser := database.User{
 				Name:      config.Author.Name,

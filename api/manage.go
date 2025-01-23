@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -458,9 +459,9 @@ func manageUploadHandler(c *gin.Context) {
 
 	// Extract and show from zip and return response
 	tempStageDir, err := manager.UnzipChallengeFolder(zipContextPath, core.BEAST_TEMP_DIR)
-	
+
 	// log.Debug("The dir is ",tempStageDir)
-	
+
 	// The file cannot be successfully un-zipped or the resultant was a malformed directory
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
@@ -512,5 +513,215 @@ func manageUploadHandler(c *gin.Context) {
 		Hints:           config.Challenge.Metadata.Hints,
 		Desc:            config.Challenge.Metadata.Description,
 		Points:          config.Challenge.Metadata.Points,
+	})
+}
+
+// Create challenge configuration file
+// @Summary Create a challenge configuration file from the fields provided
+// @Description Handles the creation of a challenge configuration file from the fields provided in the form along with the files uploaded.
+// @Tags manage
+// @Accept  json
+// @Produce json
+// @Param ChallengeConfig
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} json
+// @Router /api/manage/challenge/configure [post]
+func manageConifgureHandler(c *gin.Context) {
+	var config cfg.BeastChallengeConfig
+
+	// Populating Author struct
+	config.Author.Name = c.PostForm("author_name")
+	config.Author.Email = c.PostForm("author_email")
+	config.Author.SSHKey = c.PostForm("author_ssh_key")
+	// Validate Author struct
+	err := config.Author.ValidateRequiredFields()
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+
+	// Populating Challenge Metadata struct
+	config.Challenge.Metadata.Name = c.PostForm("challenge_name")
+	config.Challenge.Metadata.Type = c.PostForm("challenge_type")
+	config.Challenge.Metadata.Flag = c.PostForm("challenge_flag")
+	config.Challenge.Metadata.Sidecar = c.PostForm("challenge_sidecar")
+	config.Challenge.Metadata.Tags = strings.Split(c.PostForm("challenge_tags"), ",")
+	config.Challenge.Metadata.Assets = strings.Split(c.PostForm("challenge_assets"), ",")
+	config.Challenge.Metadata.AdditionalLinks = strings.Split(c.PostForm("challenge_additional_links"), ",")
+	config.Challenge.Metadata.Hints = strings.Split(c.PostForm("challenge_hints"), ",")
+	config.Challenge.Metadata.Description = c.PostForm("challenge_desc")
+	maxpointsStr := c.PostForm("challenge_maxpoints")
+	maxpoints, err := strconv.ParseInt(maxpointsStr, 10, 64)
+	err = utils.ValidatePoints(int(maxpoints), err)
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+	config.Challenge.Metadata.MaxPoints = uint(maxpoints)
+	minpointsStr := c.PostForm("challenge_minpoints")
+	minpoints, err := strconv.ParseInt(minpointsStr, 10, 64)
+	err = utils.ValidatePoints(int(minpoints), err)
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+	config.Challenge.Metadata.MinPoints = uint(minpoints)
+	// Validate Challenge Metadata struct
+	err, _ = config.Challenge.Metadata.ValidateRequiredFields()
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+
+	// Populating Challenge Env
+	config.Challenge.Env.AptDeps = strings.Split(c.PostForm("challenge_apt_deps"), ",")
+	portsStr := c.PostForm("challenge_ports")
+	ports := strings.Split(portsStr, ",")
+	config.Challenge.Env.Ports = make([]uint32, len(ports))
+	for i, port := range ports {
+		portInt, err := strconv.ParseUint(port, 10, 32)
+		if err != nil {
+			err = fmt.Errorf("Port is not a valid port in %s: %s", portsStr, err)
+			utils.SendError(c, err)
+			return
+		}
+		config.Challenge.Env.Ports[i] = uint32(portInt)
+	}
+	if err = utils.CreateIfNotExistDir(core.BEAST_TEMP_DIR); err != nil {
+		if err := os.MkdirAll(core.BEAST_TEMP_DIR, 0755); err != nil {
+			err = fmt.Errorf("Could not create dir %s: %s", core.BEAST_TEMP_DIR, err)
+			utils.SendError(c, err)
+			return
+		}
+	}
+
+	// Preparing challenge directory
+	challroot := filepath.Join(core.BEAST_TEMP_DIR, config.Challenge.Metadata.Name)
+	err = utils.CreateIfNotExistDir(challroot)
+	if err != nil {
+		err = fmt.Errorf("Could not create dir %s: %s", config.Challenge.Metadata.Name, err)
+		utils.SendError(c, err)
+	}
+
+	files := c.Request.MultipartForm.File["challenge_setup_scripts"]
+	for _, fileHeader := range files {
+		config.Challenge.Env.SetupScripts = append(config.Challenge.Env.SetupScripts, fileHeader.Filename)
+		if err != nil {
+			utils.SendError(c, err)
+			return
+		}
+		err = c.SaveUploadedFile(fileHeader, challroot)
+		if utils.FileSaveError(c, err) != nil {
+			return
+		}
+	}
+	defaultport, err := strconv.ParseUint(c.PostForm("challenge_default_port"), 10, 32)
+	if err != nil {
+		err = fmt.Errorf("Port is not a valid port in %s: %s", portsStr, err)
+		utils.SendError(c, err)
+		return
+	}
+	config.Challenge.Env.DefaultPort = uint32(defaultport)
+	config.Challenge.Env.PortMappings = c.PostFormArray("challenge_port_mappings")
+
+	// Preparing public directory
+	publicdir := filepath.Join(challroot, core.PUBLIC)
+	err = utils.CreateIfNotExistDir(publicdir)
+	if err != nil {
+		err = fmt.Errorf("Could not create dir %s: %s", core.PUBLIC, err)
+		utils.SendError(c, err)
+		return
+	}
+	// if yes, we unzip the public.zip file given else we simply store it in the public directory
+	publicopt := c.PostForm("public_zip_btn")
+	publiczip := utils.FileDownload(c, "public_zip", publicdir)
+	zipContextPath := filepath.Join(publicdir, publiczip)
+	if publicopt == "yes" {
+		_, err = manager.UnzipChallengeFolder(zipContextPath, publicdir)
+		if err != nil {
+			err = fmt.Errorf("The unzip process failed or the ZIP was unacceptable: %s", err)
+			utils.SendError(c, err)
+			return
+		}
+	}
+	config.Challenge.Env.StaticContentDir = core.PUBLIC
+
+	// Preparing chall directory
+	challdir := filepath.Join(challroot, core.BEAST_CHALLENGE_DIR)
+	challzip := utils.FileDownload(c, "challenge_zip", challdir)
+	zipContextPath = filepath.Join(challdir, challzip)
+	_, err = manager.UnzipChallengeFolder(zipContextPath, challdir)
+	if err != nil {
+		err = fmt.Errorf("The unzip process failed or the ZIP was unacceptable: %s", err)
+		utils.SendError(c, err)
+		return
+	}
+	config.Challenge.Env.RunCmd = c.PostForm("challenge_run_cmd")
+	config.Challenge.Env.BaseImage = c.PostForm("challenge_base_image")
+	config.Challenge.Env.Entrypoint = c.PostForm("challenge_entrypoint")
+	config.Challenge.Env.WebRoot = c.PostForm("challenge_web_root")
+	config.Challenge.Env.ServicePath = c.PostForm("challenge_service_path")
+	config.Challenge.Env.DockerCtx = utils.FileDownload(c, "challenge_dockerfile", challroot)
+	config.Challenge.Env.Traffic = c.PostForm("challenge_traffic")
+	envVars := c.PostFormMap("challenge_env_vars")
+	for key, value := range envVars {
+		var EnvVar = cfg.EnvironmentVar{Key: key, Value: value}
+		config.Challenge.Env.EnvironmentVars = append(config.Challenge.Env.EnvironmentVars, EnvVar)
+	}
+	err = config.Challenge.Env.ValidateRequiredFields(config.Challenge.Metadata.Type, challroot)
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+
+	//Populating Resources
+	nCPU, err := strconv.ParseInt(c.PostForm("resources_cpu"), 10, 64)
+	if err != nil || nCPU < 0 {
+		err = fmt.Errorf("CPU is not a valid number: %s", err)
+		utils.SendError(c, err)
+		return
+	}
+	config.Resources.CPUShares = nCPU
+	mem, err := strconv.ParseInt(c.PostForm("resources_memory"), 10, 64)
+	if err != nil || mem < 0 {
+		err = fmt.Errorf("Memory is not a valid number: %s", err)
+		utils.SendError(c, err)
+		return
+	}
+	config.Resources.Memory = mem
+	pidslimit, err := strconv.ParseInt(c.PostForm("resources_pidslimit"), 10, 64)
+	if err != nil || pidslimit < 0 {
+		err = fmt.Errorf("Pids limit is not a valid number: %s", err)
+		utils.SendError(c, err)
+		return
+	}
+	config.Resources.PidsLimit = pidslimit
+	config.Resources.ValidateRequiredFields()
+	nMaintainers, err := strconv.ParseInt(c.PostForm("maintainers_count"), 10, 64)
+	if err != nil || nMaintainers < 0 {
+		err = fmt.Errorf("Maintainers count is not a valid number: %s", err)
+		utils.SendError(c, err)
+		return
+	}
+	for i := 0; i < int(nMaintainers); i++ {
+		config.Maintainers = append(config.Maintainers, cfg.Author{
+			Name:   c.PostForm(fmt.Sprintf("maintainer_name_%d", i)),
+			Email:  c.PostForm(fmt.Sprintf("maintainer_email_%d", i)),
+			SSHKey: c.PostForm(fmt.Sprintf("maintainer_ssh_key_%d", i)),
+		})
+	}
+	tomlfile := filepath.Join(challroot, core.CHALLENGE_CONFIG_FILE_NAME)
+	err = utils.WriteChallConfigFile(tomlfile, config)
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+	err = manager.CopyDir(challroot, filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR, config.Challenge.Metadata.Name))
+	if err != nil {
+		utils.SendError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Challenge configuration file created",
 	})
 }
