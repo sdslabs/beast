@@ -42,6 +42,7 @@ type Challenge struct {
 	gorm.Model
 
 	Name            string `gorm:"not null;type:varchar(64);unique"`
+	DynamicFlag     bool   `gorm:"not null;default:false"`
 	Flag            string `gorm:"type:text"`
 	Type            string `gorm:"type:varchar(64)"`
 	Sidecar         string `gorm:"type:varchar(64)"`
@@ -414,13 +415,13 @@ func CreateDynamicFlagEntry(dynamicFlag *DynamicFlag) error {
 }
 
 // Query the entries in the DynamicFlag table
-func QueryDynamicFlagEntries(field, value string) ([]DynamicFlag, error) {
+func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, error) {
 	var dynamicFlags []DynamicFlag
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where(field+" = ?", value).Find(&dynamicFlags)
+	tx := Db.Where(whereMap).Find(&dynamicFlags)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return []DynamicFlag{}, nil
 	}
