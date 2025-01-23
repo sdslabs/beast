@@ -458,9 +458,9 @@ func manageUploadHandler(c *gin.Context) {
 
 	// Extract and show from zip and return response
 	tempStageDir, err := manager.UnzipChallengeFolder(zipContextPath, core.BEAST_TEMP_DIR)
-	
+
 	// log.Debug("The dir is ",tempStageDir)
-	
+
 	// The file cannot be successfully un-zipped or the resultant was a malformed directory
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
@@ -513,4 +513,24 @@ func manageUploadHandler(c *gin.Context) {
 		Desc:            config.Challenge.Metadata.Description,
 		Points:          config.Challenge.Metadata.Points,
 	})
+}
+
+func validateFlagHandler(c *gin.Context) {
+	flag := c.PostForm("flag")
+	challenge_name := c.PostForm("challenge_name")
+	authorization := c.GetHeader("Authorization")
+
+	if msgs := manager.LogTransaction(challenge_name, "VALIDATE_FLAG: "+flag, authorization); msgs != nil {
+		log.Warn("Error while saving transaction")
+	}
+
+	err := manager.ValidateFlag(flag, challenge_name)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
+		})
+		return
+	}
+
 }
