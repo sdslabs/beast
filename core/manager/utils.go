@@ -492,6 +492,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Status:      core.DEPLOY_STATUS["undeployed"],
 			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			DynamicFlag: config.Challenge.Metadata.DynamicFlag,
 			Flag:        config.Challenge.Metadata.Flag,
 			Type:        config.Challenge.Metadata.Type,
 			Sidecar:     config.Challenge.Metadata.Sidecar,
