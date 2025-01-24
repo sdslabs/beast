@@ -231,17 +231,44 @@ func dynamicScore(maxPoints, minPoints, solvers uint) uint {
 
 // updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes
 func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve uint) error {
-	for _, submission := range submissions {
-		user, err := database.QueryUserById(submission.UserID)
-		if err != nil {
-			return err
-		}
-		if user.Role == "contestant" {
-			err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)})
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+    // Track which teams we've updated to avoid duplicate updates
+    updatedTeams := make(map[uint]bool)
+
+    for _, submission := range submissions {
+        user, err := database.QueryUserById(submission.UserID)
+        if err != nil {
+            return err
+        }
+        
+        if user.Role == "contestant" {
+            // Update user's score
+            err = database.UpdateUser(&user, map[string]interface{}{
+                "Score": user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve),
+            })
+            if err != nil {
+                return err
+            }
+
+            // Update team's score if user is in a team and we haven't updated this team yet
+            if user.TeamID != 0 && !updatedTeams[user.TeamID] {
+                team, err := database.GetTeamByID(user.TeamID)
+                if err != nil {
+                    log.Error(err)
+                    continue
+                }
+
+                err = database.UpdateTeam(&team, map[string]interface{}{
+                    "Score": team.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve),
+                })
+                if err != nil {
+                    log.Error(err)
+                    continue
+                }
+
+                // Mark this team as updated
+                updatedTeams[user.TeamID] = true
+            }
+        }
+    }
+    return nil
 }

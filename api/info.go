@@ -868,22 +868,92 @@ func teamsInfoHandler(c *gin.Context) {
                 rank = 0
             }
 
+            // Get member's solved challenges
+            challenges, err := database.GetRelatedChallenges(&member)
+            if err != nil {
+                log.Error(err)
+                challenges = []database.Challenge{}
+            }
+
+            // Convert challenges to challenge info
+            memberChallenges := make([]ChallengeSolveResp, len(challenges))
+            for k, challenge := range challenges {
+                challengeTags := make([]string, len(challenge.Tags))
+                for i, tag := range challenge.Tags {
+                    challengeTags[i] = tag.TagName
+                }
+
+                memberChallenges[k] = ChallengeSolveResp{
+                    Id:       challenge.ID,
+                    Name:     challenge.Name,
+                    Tags:     challengeTags,
+                    Category: challenge.Type,
+                    SolvedAt: challenge.CreatedAt,
+                    Points:   challenge.Points,
+                }
+            }
+
             memberInfo[j] = UserResp{
-                Username: member.Username,
-                Id:       member.ID,
-                Role:     member.Role,
-                Status:   member.Status,
-                Score:    member.Score,
-                Rank:     rank,
-                Email:    member.Email,
+                Username:    member.Username,
+                Id:         member.ID,
+                Role:       member.Role,
+                Status:     member.Status,
+                Score:      member.Score,
+                Rank:       rank,
+                Email:      member.Email,
+                Challenges: memberChallenges,
             }
         }
+
+        // Get team solves
+        solves := []ChallengeSolveResp{}
+        for _, member := range members {
+            challenges, err := database.GetRelatedChallenges(&member)
+            if err != nil {
+                log.Error(err)
+                continue
+            }
+
+            for _, challenge := range challenges {
+                challengeTags := make([]string, len(challenge.Tags))
+                for i, tag := range challenge.Tags {
+                    challengeTags[i] = tag.TagName
+                }
+
+                solve := ChallengeSolveResp{
+                    Id:       challenge.ID,
+                    Name:     challenge.Name,
+                    Tags:     challengeTags,
+                    Category: challenge.Type,
+                    SolvedAt: challenge.CreatedAt,
+                    Points:   challenge.Points,
+                }
+                solves = append(solves, solve)
+            }
+        }
+
+        // Remove duplicate solves (same challenge solved by multiple team members)
+        uniqueSolves := make(map[uint]ChallengeSolveResp)
+        for _, solve := range solves {
+            uniqueSolves[solve.Id] = solve
+        }
+
+        finalSolves := make([]ChallengeSolveResp, 0, len(uniqueSolves))
+        for _, solve := range uniqueSolves {
+            finalSolves = append(finalSolves, solve)
+        }
+
+        // Sort solves by time
+        sort.Slice(finalSolves, func(i, j int) bool {
+            return finalSolves[i].SolvedAt.Before(finalSolves[j].SolvedAt)
+        })
 
         teamInfos[i] = TeamInfoResp{
             ID:        team.ID,
             Name:      team.Name,
             Score:     team.Score,
             Members:   memberInfo,
+            Solves:    finalSolves,
             CreatedAt: team.CreatedAt,
         }
     }
@@ -929,6 +999,52 @@ func teamInfoHandler(c *gin.Context) {
         return
     }
 
+    // Get member info
+    memberInfo := make([]UserResp, len(members))
+    for i, member := range members {
+        rank, err := database.GetUserRank(member.ID, member.Score, member.UpdatedAt)
+        if err != nil {
+            log.Error(err)
+            rank = 0
+        }
+
+        // Get member's solved challenges
+        challenges, err := database.GetRelatedChallenges(&member)
+        if err != nil {
+            log.Error(err)
+            challenges = []database.Challenge{}
+        }
+
+        // Convert challenges to challenge info
+        memberChallenges := make([]ChallengeSolveResp, len(challenges))
+        for k, challenge := range challenges {
+            challengeTags := make([]string, len(challenge.Tags))
+            for i, tag := range challenge.Tags {
+                challengeTags[i] = tag.TagName
+            }
+
+            memberChallenges[k] = ChallengeSolveResp{
+                Id:       challenge.ID,
+                Name:     challenge.Name,
+                Tags:     challengeTags,
+                Category: challenge.Type,
+                SolvedAt: challenge.CreatedAt,
+                Points:   challenge.Points,
+            }
+        }
+
+        memberInfo[i] = UserResp{
+            Username:    member.Username,
+            Id:         member.ID,
+            Role:       member.Role,
+            Status:     member.Status,
+            Score:      member.Score,
+            Rank:       rank,
+            Email:      member.Email,
+            Challenges: memberChallenges,
+        }
+    }
+
     // Get team solves
     solves := []ChallengeSolveResp{}
     for _, member := range members {
@@ -971,26 +1087,6 @@ func teamInfoHandler(c *gin.Context) {
     sort.Slice(finalSolves, func(i, j int) bool {
         return finalSolves[i].SolvedAt.Before(finalSolves[j].SolvedAt)
     })
-
-    // Get member info
-    memberInfo := make([]UserResp, len(members))
-    for i, member := range members {
-        rank, err := database.GetUserRank(member.ID, member.Score, member.UpdatedAt)
-        if err != nil {
-            log.Error(err)
-            rank = 0
-        }
-
-        memberInfo[i] = UserResp{
-            Username: member.Username,
-            Id:       member.ID,
-            Role:     member.Role,
-            Status:   member.Status,
-            Score:    member.Score,
-            Rank:     rank,
-            Email:    member.Email,
-        }
-    }
 
     resp := TeamInfoResp{
         ID:        team.ID,

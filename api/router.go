@@ -124,12 +124,14 @@ func initGinRouter() *gin.Engine {
 			teamGroup.GET("/scoreboard", scoreboardHandler)
 			teamGroup.POST("/join/:code", joinTeamHandler)
 			teamGroup.GET("/members/:id", getTeamMembersHandler)
+			teamGroup.POST("/leave", leaveTeamHandler)
 
 			// Captain-only routes
 			captainGroup := teamGroup.Group("/", teamCaptainAuthorize)
 			{
 				captainGroup.POST("/invite", generateInviteLinkHandler)
 				captainGroup.POST("/remove", removeMemberHandler)
+				captainGroup.POST("/transfer", transferCaptaincyHandler)
 			}
 		}
 	}

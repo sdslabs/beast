@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-
+	"strconv"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
@@ -288,4 +288,155 @@ func removeMemberHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "User removed from the team successfully.",
 	})
+}
+
+// leaveTeamHandler handles a team member's request to leave their team
+func leaveTeamHandler(c *gin.Context) {
+    // Get the current user
+    username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{
+            "message": "Unauthorized user",
+        })
+        return
+    }
+
+    // Get user details
+    user, err := database.QueryFirstUserEntry("username", username)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "message": "Error fetching user details",
+        })
+        return
+    }
+
+    // Check if user is in a team
+    if user.TeamID == 0 {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "message": "You are not in a team",
+        })
+        return
+    }
+
+    // Check if user is team captain
+    isCaptain, err := database.IsUserTeamCaptain(user.ID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "message": "Error checking team captain status",
+        })
+        return
+    }
+
+    if isCaptain {
+        // Get number of team members
+        members, err := database.GetTeamMembers(user.TeamID)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{
+                "message": "Error fetching team members",
+            })
+            return
+        }
+
+        if len(members) > 1 {
+            c.JSON(http.StatusBadRequest, gin.H{
+                "message": "Team captain cannot leave while other members are in the team. Transfer captaincy first.",
+            })
+            return
+        }
+    }
+
+    // Leave team
+    if err := database.LeaveTeam(user.ID); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "message": fmt.Sprintf("Error leaving team: %v", err),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Successfully left the team",
+    })
+}
+
+// transferCaptaincyHandler handles the transfer of team captaincy to another team member
+func transferCaptaincyHandler(c *gin.Context) {
+    // Get the current user
+    username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{
+            "message": "Unauthorized user",
+        })
+        return
+    }
+
+    // Get new captain's user ID from request
+    memberID := c.PostForm("member_id")
+    if memberID == "" {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "message": "New captain ID is required",
+        })
+        return
+    }
+
+    // Parse member ID to uint
+    parsedMemberID, err := strconv.ParseUint(memberID, 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "message": "Invalid member ID format",
+        })
+        return
+    }
+
+    // Get current user details
+    currentUser, err := database.QueryFirstUserEntry("username", username)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "message": "Error fetching user details",
+        })
+        return
+    }
+
+    // Verify current user is team captain
+    isCaptain, err := database.IsUserTeamCaptain(currentUser.ID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "message": "Error checking team captain status",
+        })
+        return
+    }
+
+    if !isCaptain {
+        c.JSON(http.StatusForbidden, gin.H{
+            "message": "Only team captain can transfer captaincy",
+        })
+        return
+    }
+
+    // Verify new captain exists and is in the same team
+    newCaptain, err := database.QueryUserById(uint(parsedMemberID))
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "message": "Error fetching new captain details",
+        })
+        return
+    }
+
+    if newCaptain.TeamID != currentUser.TeamID {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "message": "New captain must be in your team",
+        })
+        return
+    }
+
+    // Transfer captaincy
+    if err := database.TransferCaptaincy(currentUser.ID, uint(parsedMemberID)); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "message": fmt.Sprintf("Error transferring captaincy: %v", err),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Team captaincy transferred successfully",
+    })
 }
