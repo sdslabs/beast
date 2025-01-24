@@ -71,6 +71,7 @@ type UserResp struct {
 	Rank       int64                `json:"rank" example:"15"`
 	Email      string               `json:"email" example:"fristonio@gmail.com"`
 	Challenges []ChallengeSolveResp `json:"challenges"`
+	TeamName   string               `json:"team_name,omitempty"`
 }
 
 type UsersResp struct {
@@ -81,6 +82,7 @@ type UsersResp struct {
 	Score    uint   `json:"score" example:"750"`
 	Email    string `json:"email" example:"fristonio@gmail.com"`
 	Rank     int64  `json:"rank" example:"15"`
+	TeamName string `json:"team_name,omitempty"`
 }
 
 type ChallengeSolveResp struct {

@@ -81,6 +81,8 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/users", getAllUsersInfoHandler)
 			infoGroup.GET("/submissions", submissionsHandler)
 			infoGroup.GET("/tags", tagHandler)
+			infoGroup.GET("/teams", teamsInfoHandler)
+			infoGroup.GET("/teams/:name", teamInfoHandler)
 		}
 
 		// Notification route group
@@ -113,7 +115,24 @@ func initGinRouter() *gin.Engine {
 		adminPanelGroup := apiGroup.Group("/admin", adminAuthorize)
 		{
 			adminPanelGroup.POST("/users/:action/:id", banUserHandler)
+			adminPanelGroup.POST("/teams/:action/:id", banTeamHandler)
 			adminPanelGroup.GET("/statistics", getUsersStatisticsHandler)
+		}
+		teamGroup := apiGroup.Group("/team")
+		{
+			teamGroup.POST("/create", createTeamHandler)
+			teamGroup.GET("/scoreboard", scoreboardHandler)
+			teamGroup.POST("/join/:code", joinTeamHandler)
+			teamGroup.GET("/members/:id", getTeamMembersHandler)
+			teamGroup.POST("/leave", leaveTeamHandler)
+
+			// Captain-only routes
+			captainGroup := teamGroup.Group("/", teamCaptainAuthorize)
+			{
+				captainGroup.POST("/invite", generateInviteLinkHandler)
+				captainGroup.POST("/remove", removeMemberHandler)
+				captainGroup.POST("/transfer", transferCaptaincyHandler)
+			}
 		}
 	}
 

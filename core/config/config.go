@@ -250,6 +250,7 @@ type CompetitionInfo struct {
 	TimeZone     string `toml:"timezone"`
 	LogoURL      string `toml:"logo_url"`
 	DynamicScore bool   `toml:"dynamic_score"`
+	TeamSize     uint   `toml:"team_size"`  // Maximum number of members in a team
 }
 
 func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {

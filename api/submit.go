@@ -112,25 +112,35 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
-		if challenge.Flag != flag {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Your flag is incorrect",
-				Success: false,
+
+		// Check if user is in a team
+		if user.TeamID == 0 {
+			c.JSON(http.StatusBadRequest, HTTPErrorResp{
+				Error: "You must be in a team to submit a challenge.",
 			})
 			return
 		}
 
-		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
+		// Check if user's team has already solved it
+		solved, err := database.CheckTeamSolvedChallenge(user.TeamID, challenge.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
-
 		if solved {
 			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Challenge has already been solved.",
+				Message: "Challenge has already been solved by your team.",
+				Success: false,
+			})
+			return
+		}
+
+		// Validate the flag after team checks
+		if challenge.Flag != flag {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Your flag is incorrect",
 				Success: false,
 			})
 			return
@@ -160,7 +170,21 @@ func submitFlagHandler(c *gin.Context) {
 			}
 		}
 
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
+		// Save the solve
+		UserChallengesEntry := database.UserChallenges{
+			CreatedAt:   time.Now(),
+			UserID:      user.ID,
+			ChallengeID: challenge.ID,
+		}
+		if err := database.SaveFlagSubmission(&UserChallengesEntry); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		// Update team score
+		team, err := database.GetTeamByID(user.TeamID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
@@ -168,13 +192,18 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
-		UserChallengesEntry := database.UserChallenges{
-			CreatedAt:   time.Time{},
-			UserID:      user.ID,
-			ChallengeID: challenge.ID,
+		// Update team with new points
+		if err := database.UpdateTeam(&team, map[string]interface{}{
+			"Score": team.Score + challengePoints,
+		}); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
 		}
 
-		err = database.SaveFlagSubmission(&UserChallengesEntry)
+		// Update user score
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
@@ -202,17 +231,44 @@ func dynamicScore(maxPoints, minPoints, solvers uint) uint {
 
 // updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes
 func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve uint) error {
-	for _, submission := range submissions {
-		user, err := database.QueryUserById(submission.UserID)
-		if err != nil {
-			return err
-		}
-		if user.Role == "contestant" {
-			err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)})
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+    // Track which teams we've updated to avoid duplicate updates
+    updatedTeams := make(map[uint]bool)
+
+    for _, submission := range submissions {
+        user, err := database.QueryUserById(submission.UserID)
+        if err != nil {
+            return err
+        }
+        
+        if user.Role == "contestant" {
+            // Update user's score
+            err = database.UpdateUser(&user, map[string]interface{}{
+                "Score": user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve),
+            })
+            if err != nil {
+                return err
+            }
+
+            // Update team's score if user is in a team and we haven't updated this team yet
+            if user.TeamID != 0 && !updatedTeams[user.TeamID] {
+                team, err := database.GetTeamByID(user.TeamID)
+                if err != nil {
+                    log.Error(err)
+                    continue
+                }
+
+                err = database.UpdateTeam(&team, map[string]interface{}{
+                    "Score": team.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve),
+                })
+                if err != nil {
+                    log.Error(err)
+                    continue
+                }
+
+                // Mark this team as updated
+                updatedTeams[user.TeamID] = true
+            }
+        }
+    }
+    return nil
 }
