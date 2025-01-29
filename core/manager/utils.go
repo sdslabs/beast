@@ -14,6 +14,7 @@ import (
 	"text/template"
 
 	"github.com/sdslabs/beastv4/pkg/auth"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -486,7 +487,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
-		availableServer, _ := ServerQueue.GetNextAvailableInstance()
+		availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
 		*challEntry = database.Challenge{
 			Name:           config.Challenge.Metadata.Name,
 			AuthorID:       userEntry.ID,

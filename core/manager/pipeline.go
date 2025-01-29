@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -133,11 +133,11 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
 		stagedRemoteChallengePath := filepath.Join("~/.beast", core.BEAST_STAGING_DIR, challengeName)
 		remoteStagedPath := filepath.Join(stagedRemoteChallengePath, fmt.Sprintf("%s.tar.gz", challengeName))
-		isValid := ValidateFileRemoteExists(server, stagedRemoteChallengePath)
+		isValid := remoteManager.ValidateFileRemoteExists(server, stagedRemoteChallengePath)
 		if !isValid {
 			return fmt.Errorf("error while checking if the challenge is staged on the remote server")
 		}
-		logBytes, imageId, buildErr = BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server)
+		logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server)
 	} else {
 		var buff *bytes.Buffer
 		buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
@@ -259,7 +259,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
 	} else {
 		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-		containerId, err = CreateContainerFromImageRemote(containerConfig, server)
+		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, server)
 	}
 
 	if err != nil {
@@ -395,12 +395,12 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 			return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, err)
 		}
 		if challenge.ServerDeployed != "localhost" {
-			StageChallRemote(cfg.Cfg.AvailableServers[challenge.ServerDeployed], challenge)
+			remoteManager.StageChallRemote(cfg.Cfg.AvailableServers[challenge.ServerDeployed], challenge)
 		}
 	} else {
 		log.Debugf("Checking if challenge already staged")
 		if challenge.ServerDeployed != "localhost" {
-			isValid := ValidateFileRemoteExists(cfg.Cfg.AvailableServers[challenge.ServerDeployed], stagedRemoteChallengePath)
+			isValid := remoteManager.ValidateFileRemoteExists(cfg.Cfg.AvailableServers[challenge.ServerDeployed], stagedRemoteChallengePath)
 			if !isValid {
 				msg := "Challenge not already in staged(but skipping asked), could not proceed further"
 				log.WithFields(log.Fields{
@@ -417,8 +417,6 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 					"DEPLOY_ERROR": "STAGING :: " + challengeName,
 				}).Errorf("%s", msg)
 
-				return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, msg)
-				return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, msg)
 				return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, msg)
 			}
 		}

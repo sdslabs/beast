@@ -13,6 +13,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/pkg/auth"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/pkg/scheduler"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 )
@@ -62,20 +63,20 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	manager.Q.StartWorkers(&manager.Worker{})
 
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
-	manager.ServerQueue = manager.NewLoadBalancerQueue()
+	remoteManager.ServerQueue = remoteManager.NewLoadBalancerQueue()
 	for _, server := range config.Cfg.AvailableServers {
 		if server.Active {
 			if server.Host == "localhost" {
-				manager.ServerQueue.Push(server)
+				remoteManager.ServerQueue.Push(server)
 				continue
 			}
-			client, err := manager.CreateSSHClient(server)
+			client, err := remoteManager.CreateSSHClient(server)
 			if err != nil {
 				log.Errorf("SSH connection to %s failed: %s\n", server.Host, err)
 			}
 			defer client.Close()
-			manager.ServerQueue.Push(server)
-			manager.RunCommandOnServer(server, "mkdir -p $HOME/.beast/staging/")
+			remoteManager.ServerQueue.Push(server)
+			remoteManager.RunCommandOnServer(server, "mkdir -p $HOME/.beast/staging/")
 		}
 	}
 	runBeastApiBootsteps(defaultauthorpassword)
