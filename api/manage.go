@@ -532,5 +532,8 @@ func validateFlagHandler(c *gin.Context) {
 		})
 		return
 	}
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "Flag validated!",
+	})
 
 }
