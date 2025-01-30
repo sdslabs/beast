@@ -11,6 +11,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/pkg/notify"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -138,7 +139,7 @@ func submitFlagHandler(c *gin.Context) {
 
 			wheremap := map[string]interface{}{
 				"challenge_id": challenge.ID,
-				"Flag":         flag,
+				"flag":         flag,
 			}
 			submissions, err := database.QuerySubmissions(wheremap)
 			if err != nil {
@@ -150,6 +151,9 @@ func submitFlagHandler(c *gin.Context) {
 			if len(submissions) > 0 {
 				if user.ID != submissions[0].UserID {
 					// notify the admin about cheating
+					user, _ := database.QueryUserById(submissions[0].UserID)
+					msg := "User " + user.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by another user " + user.Username
+					notify.SendNotification(notify.Warning, msg)
 					c.JSON(http.StatusOK, FlagSubmitResp{
 						Message: "Your flag is incorrect",
 						Success: false,
@@ -224,6 +228,9 @@ func submitFlagHandler(c *gin.Context) {
 			CreatedAt:   time.Time{},
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
+		}
+		if challenge.DynamicFlag {
+			UserChallengesEntry.Flag = flag
 		}
 
 		err = database.SaveFlagSubmission(&UserChallengesEntry)
