@@ -130,7 +130,7 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 // sidecar = "" # Name of the sidecar if any used by the challenge.
 // ```
 type ChallengeMetadata struct {
-	DynamicFlag	 	bool     `toml:"dynamicFlag"`
+	DynamicFlag     bool     `toml:"dynamic_flag"`
 	Flag            string   `toml:"flag"`
 	Name            string   `toml:"name"`
 	Type            string   `toml:"type"`
