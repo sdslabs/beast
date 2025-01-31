@@ -90,7 +90,7 @@ func SendNotification(nType NotificationType, message string) error {
 	var errs []string
 
 	for _, webhook := range config.Cfg.NotificationWebhooks {
-		if webhook.ServiceName != "" || webhook.Active == true || webhook.URL != "" {
+		if webhook.ServiceName != "" && webhook.Active == true && webhook.URL != "" {
 			var provider ProviderTypeEnum
 
 			url, err := url.ParseRequestURI(webhook.URL)
