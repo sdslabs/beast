@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
@@ -520,11 +521,26 @@ func validateFlagHandler(c *gin.Context) {
 	challenge_name := c.PostForm("challenge_name")
 	authorization := c.GetHeader("Authorization")
 
+	challenges, err := database.QueryChallengeEntries("name", challenge_name)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	if len(challenges) == 0 {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Challenge not found",
+		})
+		return
+	}
+
 	if msgs := manager.LogTransaction(challenge_name, "VALIDATE_FLAG: "+flag, authorization); msgs != nil {
 		log.Warn("Error while saving transaction")
 	}
 
-	err := manager.ValidateFlag(flag, challenge_name)
+	err = manager.ValidateFlag(flag, challenge_name)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
