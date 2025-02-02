@@ -151,9 +151,9 @@ func submitFlagHandler(c *gin.Context) {
 			if len(submissions) > 0 {
 				if user.ID != submissions[0].UserID {
 					// notify the admin about cheating
-					user, _ := database.QueryUserById(submissions[0].UserID)
-					msg := "User " + user.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by another user " + user.Username
-					notify.SendNotification(notify.Warning, msg)
+					subuser, _ := database.QueryUserById(submissions[0].UserID)
+					msg := "User " + subuser.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by another user " + user.Username
+					go notify.SendNotification(notify.Warning, msg)
 					c.JSON(http.StatusOK, FlagSubmitResp{
 						Message: "Your flag is incorrect",
 						Success: false,
@@ -174,22 +174,21 @@ func submitFlagHandler(c *gin.Context) {
 				})
 				return
 			}
+		}
+		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
 
-			solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-
-			if solved {
-				c.JSON(http.StatusOK, FlagSubmitResp{
-					Message: "Challenge has already been solved.",
-					Success: false,
-				})
-				return
-			}
+		if solved {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Challenge has already been solved.",
+				Success: false,
+			})
+			return
 		}
 
 		challengePoints := challenge.Points
