@@ -69,8 +69,12 @@ import (
 // # MongoDB.
 // available_sidecars = ["mysql", "mongodb"]
 //
+// #Health Prober, if active starts a health prober on a thread which checks for
+// #deployed challenges, containers and servers after every ticker_frequency period
+// health_prober = false
+
 // # The frequency for any periodic event in beast, the value is provided in seconds.
-// # This is currently only used for health check periodic duration.s
+// # This is currently only used for health check periodic durations.
 // ticker_frequency = 3000
 //
 // # Container default resource limits for each challenge, this can be
@@ -107,9 +111,9 @@ type BeastConfig struct {
 	CompetitionInfo      CompetitionInfo            `toml:"competition_info"`
 	BeastStaticUrl       string                     `toml:"beast_static_url"`
 	TickerFrequency      int                        `toml:"ticker_frequency"`
-
-	RemoteSyncPeriod time.Duration `toml:"-"`
-	Rsp              string        `toml:"remote_sync_period"`
+	HealthProber         bool                       `toml:"health_prober"`
+	RemoteSyncPeriod     time.Duration              `toml:"-"`
+	Rsp                  string                     `toml:"remote_sync_period"`
 
 	CPUShares int64 `toml:"default_cpu_shares"`
 	Memory    int64 `toml:"default_memory_limit"`
@@ -149,11 +153,13 @@ func (config *BeastConfig) ValidateConfig() error {
 
 	if len(config.AvailableServers) == 0 {
 		log.Warn("No available servers provided for challenges. Using default localhost")
-		config.AvailableServers["localhost"] = AvailableServer{
-			Host:       "localhost",
-			Username:   os.Getenv("USER"),
-			SSHKeyPath: "",
-			Active:     true,
+		config.AvailableServers = map[string]AvailableServer{
+			"localhost": {
+				Host:       "localhost",
+				Username:   os.Getenv("USER"),
+				SSHKeyPath: "",
+				Active:     true,
+			},
 		}
 	}
 

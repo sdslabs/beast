@@ -5,6 +5,8 @@ import (
 	"net"
 	"strconv"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Creates a new TCP prober
@@ -18,7 +20,20 @@ type TcpProber struct{}
 // If the socket can be opened, it returns Success
 // If the socket fails to open, it returns Failure.
 func (pr TcpProber) Probe(host string, port int, timeout time.Duration) (ProbeResult, error) {
-	address := net.JoinHostPort(host, strconv.Itoa(port))
+	var hostAddress string
+	if host == "localhost" || host == "" {
+		hostAddress = "127.0.0.1"
+	} else {
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			log.Errorf("Failed to resolve %s: %v\n", host, err)
+			hostAddress = host
+		} else {
+			hostAddress = ips[0].String()
+		}
+	}
+	fmt.Println(host, hostAddress)
+	address := net.JoinHostPort(hostAddress, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", address, timeout)
 	if err != nil {
 		return Failure, err

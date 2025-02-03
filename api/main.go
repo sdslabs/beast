@@ -109,8 +109,8 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 		BeastScheduler.ScheduleEvery(config.Cfg.RemoteSyncPeriod, manager.AutoUpdate)
 	}
 
-	if healthProbe {
-		go manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
+	if healthProbe || config.Cfg.HealthProber {
+		go manager.BeastHeathCheckProber(config.Cfg.TickerFrequency)
 	}
 
 	if autoDeploy {

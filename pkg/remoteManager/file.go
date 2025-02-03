@@ -15,17 +15,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func ValidateFileRemoteExists(server config.AvailableServer, stagedChallengePath string) bool {
+func ValidateFileRemoteExists(server config.AvailableServer, stagedChallengePath string) error {
 	output, err := RunCommandOnServer(server, fmt.Sprintf("test -e %s&&echo exists||echo not exists", stagedChallengePath))
 	if err != nil {
 		log.Errorf("Error while checking file existence: %s\n", err)
-		return false
+		return err
 	}
 	log.Printf("Output: %s\n", output)
 	if strings.TrimSpace(output) == "exists" {
-		return true
+		return nil
 	} else {
-		return false
+		return fmt.Errorf("path %s does not exist in remote server %s", stagedChallengePath, server.Host)
 	}
 }
 

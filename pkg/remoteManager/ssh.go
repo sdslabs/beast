@@ -55,14 +55,16 @@ func (q *LoadBalancerQueue) GetNextAvailableInstance() (config.AvailableServer, 
 }
 
 // Pings the server to check if it is reachable.
-func PingServer(server config.AvailableServer) {
+func PingServer(server config.AvailableServer) error {
 	client, err := CreateSSHClient(server)
 	if err != nil {
-		log.Errorf("SSH connection to %s failed: %s\n", server.Host, err)
-		return
+		err = fmt.Errorf("SSH connection to %s failed: %s\n", server.Host, err)
+		log.Error(err)
+		return err
 	}
 	defer client.Close()
 	log.Printf("SSH ping to %s succeeded!\n", server.Host)
+	return nil
 }
 
 // Run the command passed as argument on the remote server

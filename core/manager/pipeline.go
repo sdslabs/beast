@@ -133,8 +133,8 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
 		stagedRemoteChallengePath := filepath.Join("~/.beast", core.BEAST_STAGING_DIR, challengeName)
 		remoteStagedPath := filepath.Join(stagedRemoteChallengePath, fmt.Sprintf("%s.tar.gz", challengeName))
-		isValid := remoteManager.ValidateFileRemoteExists(server, stagedRemoteChallengePath)
-		if !isValid {
+		err := remoteManager.ValidateFileRemoteExists(server, stagedRemoteChallengePath)
+		if err != nil {
 			return fmt.Errorf("error while checking if the challenge is staged on the remote server")
 		}
 		logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server)
@@ -400,8 +400,8 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	} else {
 		log.Debugf("Checking if challenge already staged")
 		if challenge.ServerDeployed != "localhost" {
-			isValid := remoteManager.ValidateFileRemoteExists(cfg.Cfg.AvailableServers[challenge.ServerDeployed], stagedRemoteChallengePath)
-			if !isValid {
+			err := remoteManager.ValidateFileRemoteExists(cfg.Cfg.AvailableServers[challenge.ServerDeployed], stagedRemoteChallengePath)
+			if err != nil {
 				msg := "Challenge not already in staged(but skipping asked), could not proceed further"
 				log.WithFields(log.Fields{
 					"DEPLOY_ERROR": "STAGING :: " + challengeName,

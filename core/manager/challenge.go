@@ -178,7 +178,8 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
 		var containers, remoteContainers []containerType.Container
 		if challenge.ServerDeployed != "localhost" {
-			remoteContainers, err = remoteManager.SearchRunningContainerByFilterRemote(map[string]string{"id": challenge.ContainerId})
+			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+			remoteContainers, err = remoteManager.SearchRunningContainerByFilterRemote(map[string]string{"id": challenge.ContainerId}, server)
 			if err != nil {
 				log.Error("Error while searching for rmote container with id %s", challenge.ContainerId)
 				return nil, errors.New("CONTAINER RUNTIME ERROR")
@@ -276,11 +277,12 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	// Check if the challenge is in staged state, it it is start the
 	// pipeline from there on, else start deploy pipeline for the challenge
 	// from remote
-	// if challenge.ServerDeployed != "localhost" {
-	// 	err = ValidateFileRemoteExists(challenge.ServerDeployed, stagedFileName)
-	// } else {
-	err = utils.ValidateFileExists(stagedFileName)
-	// }
+	if challenge.ServerDeployed != "localhost" {
+		server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+		err = remoteManager.ValidateFileRemoteExists(server, stagedFileName)
+	} else {
+		err = utils.ValidateFileExists(stagedFileName)
+	}
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
 		if challengeDir == "" {

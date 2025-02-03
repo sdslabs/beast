@@ -26,7 +26,8 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 		return nil, fmt.Errorf("Underlying challenge configuration present is not valid.")
 	}
 	var containers, remoteContainers []container_types.Container
-	remoteContainers, err = remoteManager.SearchContainerByFilterRemote(map[string]string{"id": chall.ContainerId})
+	server := config.AvailableServer{}
+	remoteContainers, err = remoteManager.SearchContainerByFilterRemote(map[string]string{"id": chall.ContainerId}, server)
 	if err != nil {
 		return nil, fmt.Errorf("Error while searching for remote container with id %s", chall.ContainerId)
 	}

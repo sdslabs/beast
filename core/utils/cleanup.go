@@ -24,7 +24,8 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 		log.Error("Error while searching for container with %s : ", filter, filterVal)
 		return err
 	}
-	remoteContainers, err := remoteManager.SearchContainerByFilterRemote(map[string]string{filter: filterVal})
+	server := config.AvailableServer{}
+	remoteContainers, err := remoteManager.SearchContainerByFilterRemote(map[string]string{filter: filterVal}, server)
 	if err != nil {
 		log.Error("Error while searching for remote container with %s : ", filter, filterVal)
 		return err
