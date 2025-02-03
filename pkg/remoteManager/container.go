@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
@@ -107,7 +108,7 @@ func SearchContainerByFilterRemote(filterMap map[string]string, server config.Av
 	if server == (config.AvailableServer{}) {
 		for _, server := range config.Cfg.AvailableServers {
 			if server.Active {
-				if server.Host != "localhost" {
+				if server.Host != core.LOCALHOST {
 					output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
 					if err != nil {
 						return []types.Container{}, err
@@ -122,7 +123,7 @@ func SearchContainerByFilterRemote(filterMap map[string]string, server config.Av
 		}
 	} else {
 		if server.Active {
-			if server.Host != "localhost" {
+			if server.Host != core.LOCALHOST {
 				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
 				if err != nil {
 					return []types.Container{}, err
@@ -151,7 +152,7 @@ func SearchRunningContainerByFilterRemote(filterMap map[string]string, server co
 	if server == (config.AvailableServer{}) {
 		for _, server := range config.Cfg.AvailableServers {
 			if server.Active {
-				if server.Host != "localhost" {
+				if server.Host != core.LOCALHOST {
 					output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
 					if err != nil {
 						return []types.Container{}, err
@@ -166,7 +167,7 @@ func SearchRunningContainerByFilterRemote(filterMap map[string]string, server co
 		}
 	} else {
 		if server.Active {
-			if server.Host != "localhost" {
+			if server.Host != core.LOCALHOST {
 				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
 				if err != nil {
 					return []types.Container{}, err

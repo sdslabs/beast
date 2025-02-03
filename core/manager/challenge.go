@@ -57,7 +57,7 @@ func CommitChallengeContainer(challName string) error {
 		return fmt.Errorf("Challenge is not deployed")
 	}
 	var imageId string
-	if chall.ServerDeployed != "localhost" && chall.ServerDeployed != "" {
+	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
 		server := config.Cfg.AvailableServers[chall.ServerDeployed]
 		imageId, err = remoteManager.CommitContainerRemote(chall.ContainerId, server)
 	} else {
@@ -177,7 +177,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	// If not then start the deploy pipeline for the challenge.
 	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
 		var containers, remoteContainers []containerType.Container
-		if challenge.ServerDeployed != "localhost" && challenge.ServerDeployed != "" {
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 			remoteContainers, err = remoteManager.SearchRunningContainerByFilterRemote(map[string]string{"id": challenge.ContainerId}, server)
 			if err != nil {
@@ -231,7 +231,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	if coreUtils.IsImageIdValid(challenge.ImageId) {
 		var imageExist bool
 		var err error
-		if challenge.ServerDeployed != "localhost" && challenge.ServerDeployed != "" {
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 			imageExist, err = remoteManager.CheckIfImageExistsOnRemote(challenge.ImageId, server)
 		} else {
@@ -277,7 +277,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	// Check if the challenge is in staged state, it it is start the
 	// pipeline from there on, else start deploy pipeline for the challenge
 	// from remote
-	if challenge.ServerDeployed != "localhost" && challenge.ServerDeployed != "" {
+	if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 		server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 		err = remoteManager.ValidateFileRemoteExists(server, stagedFileName)
 	} else {
@@ -637,7 +637,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 		log.Warnf("No instance of challenge(%s) deployed", challengeName)
 	} else {
 		log.Debug("Removing challenge instance for ", challengeName)
-		if challenge.ServerDeployed != "localhost" && challenge.ServerDeployed != "" {
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 			err = remoteManager.StopAndRemoveContainerRemote(challenge.ContainerId, server)
 		} else {

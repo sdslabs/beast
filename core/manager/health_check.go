@@ -39,7 +39,7 @@ func CheckStaticChallenge(chall database.Challenge) error {
 // Check for container running or not.
 func containerProber(chall database.Challenge) error {
 	challHost := chall.ServerDeployed
-	if challHost == "localhost" || challHost == "" {
+	if challHost == core.LOCALHOST || challHost == "" {
 		containers, err := cr.SearchRunningContainerByFilter(map[string]string{"id": chall.ContainerId})
 		if err != nil || len(containers) <= 0 {
 			err = fmt.Errorf("error while searching for container with id %s on server: %s", chall.ContainerId, chall.ServerDeployed)
@@ -124,7 +124,7 @@ func ChallengesHealthProber(waitTime int) {
 // Check for Remote Server running or not
 func ServerHealthProber(waitTime int) {
 	for _, server := range config.Cfg.AvailableServers {
-		if server.Active && server.Host != "localhost" {
+		if server.Active && server.Host != core.LOCALHOST {
 			err := remoteManager.PingServer(server)
 			if err != nil {
 				msg := fmt.Sprintf("SERVER HEALTH CHECK Faliure: %s : %s", server.Host, err)

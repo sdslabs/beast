@@ -66,7 +66,7 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	remoteManager.ServerQueue = remoteManager.NewLoadBalancerQueue()
 	for _, server := range config.Cfg.AvailableServers {
 		if server.Active {
-			if server.Host == "localhost" {
+			if server.Host == core.LOCALHOST {
 				remoteManager.ServerQueue.Push(server)
 				continue
 			}

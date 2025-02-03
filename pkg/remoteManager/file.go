@@ -61,7 +61,7 @@ func StageChallRemote(server config.AvailableServer, challenge database.Challeng
 	defer client.Close()
 
 	stagingDirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-	stagingRemoteDirPath := filepath.Join("~/.beast", core.BEAST_STAGING_DIR)
+	stagingRemoteDirPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR)
 	// err = RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s/%s", remoteStagingDir, challenge.Name))
 	// if err != nil {
 	// 	return fmt.Errorf("failed to create directory: %s", err)
@@ -80,7 +80,7 @@ func StageChallRemote(server config.AvailableServer, challenge database.Challeng
 //
 //	TODO: Sidecar's configuration left. Need to be added.
 func BuildImageFromTarContextRemote(challengeName string, imageTag string, stagedDir string, server config.AvailableServer) ([]byte, string, error) {
-	remoteExtractPath := filepath.Join("~/.beast", core.BEAST_STAGING_DIR, challengeName, challengeName)
+	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
 	_, err := RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", remoteExtractPath, stagedDir, remoteExtractPath))
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to extract tar: %s", err)

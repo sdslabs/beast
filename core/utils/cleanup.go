@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	container_types "github.com/docker/docker/api/types"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -75,7 +76,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 }
 
 func CleanupChallengeImage(chall *database.Challenge) error {
-	if chall.ServerDeployed != "localhost" && chall.ServerDeployed != "" {
+	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
 		server := config.Cfg.AvailableServers[chall.ServerDeployed]
 		err := remoteManager.RemoveImageRemote(chall.ImageId, server)
 		if err != nil {

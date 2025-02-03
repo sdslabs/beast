@@ -154,8 +154,8 @@ func (config *BeastConfig) ValidateConfig() error {
 	if len(config.AvailableServers) == 0 {
 		log.Warn("No available servers provided for challenges. Using default localhost")
 		config.AvailableServers = map[string]AvailableServer{
-			"localhost": {
-				Host:       "localhost",
+			core.LOCALHOST: {
+				Host:       core.LOCALHOST,
 				Username:   os.Getenv("USER"),
 				SSHKeyPath: "",
 				Active:     true,
@@ -239,7 +239,7 @@ type AvailableServer struct {
 }
 
 func (config *AvailableServer) ValidateServerConfig() error {
-	if config.Host == "localhost" {
+	if config.Host == core.LOCALHOST {
 		return nil
 	}
 	if config.Host == "" || config.Username == "" || config.SSHKeyPath == "" {

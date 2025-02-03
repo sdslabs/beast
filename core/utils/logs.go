@@ -45,7 +45,7 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 	}
 
 	if live {
-		if chall.ServerDeployed != "localhost" && chall.ServerDeployed != "" {
+		if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
 			server := config.Cfg.AvailableServers[chall.ServerDeployed]
 			remoteManager.ShowLiveContainerLogsRemote(chall.ContainerId, server)
 		} else {
@@ -53,7 +53,7 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 		}
 		return nil, nil
 	}
-	if chall.ServerDeployed != "localhost" && chall.ServerDeployed != "" {
+	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
 		server := config.Cfg.AvailableServers[chall.ServerDeployed]
 		return remoteManager.GetContainerStdLogsRemote(chall.ContainerId, server)
 	}
