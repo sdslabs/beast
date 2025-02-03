@@ -75,7 +75,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 }
 
 func CleanupChallengeImage(chall *database.Challenge) error {
-	if chall.ServerDeployed != "localhost" {
+	if chall.ServerDeployed != "localhost" && chall.ServerDeployed != "" {
 		server := config.Cfg.AvailableServers[chall.ServerDeployed]
 		err := remoteManager.RemoveImageRemote(chall.ImageId, server)
 		if err != nil {

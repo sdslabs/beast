@@ -487,30 +487,29 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
-		var availableServerHostname string
-		if config.Challenge.Metadata.Type == core.STATIC_CHALLENGE_TYPE_NAME {
-			availableServerHostname = "localhost"
-		} else {
+		availableServerHostname := "localhost"
+		if config.Challenge.Metadata.Type != core.STATIC_CHALLENGE_TYPE_NAME {
 			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
 			availableServerHostname = availableServer.Host
 		}
 		*challEntry = database.Challenge{
-			Name:           config.Challenge.Metadata.Name,
-			AuthorID:       userEntry.ID,
-			Format:         config.Challenge.Metadata.Type,
-			Status:         core.DEPLOY_STATUS["undeployed"],
-			ContainerId:    coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:        coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-			Flag:           config.Challenge.Metadata.Flag,
-			Type:           config.Challenge.Metadata.Type,
-			Sidecar:        config.Challenge.Metadata.Sidecar,
-			Description:    config.Challenge.Metadata.Description,
-			Hints:          strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
-			Assets:         strings.Join(assetsURL, core.DELIMITER),
-			Points:         config.Challenge.Metadata.Points,
-			MinPoints:      config.Challenge.Metadata.MinPoints,
-			MaxPoints:      config.Challenge.Metadata.MaxPoints,
-			ServerDeployed: availableServerHostname,
+			Name:            config.Challenge.Metadata.Name,
+			AuthorID:        userEntry.ID,
+			Format:          config.Challenge.Metadata.Type,
+			Status:          core.DEPLOY_STATUS["undeployed"],
+			ContainerId:     coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:         coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			Flag:            config.Challenge.Metadata.Flag,
+			Type:            config.Challenge.Metadata.Type,
+			Sidecar:         config.Challenge.Metadata.Sidecar,
+			Description:     config.Challenge.Metadata.Description,
+			Hints:           strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
+			Assets:          strings.Join(assetsURL, core.DELIMITER),
+			AdditionalLinks: strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),
+			Points:          config.Challenge.Metadata.Points,
+			MinPoints:       config.Challenge.Metadata.MinPoints,
+			MaxPoints:       config.Challenge.Metadata.MaxPoints,
+			ServerDeployed:  availableServerHostname,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
