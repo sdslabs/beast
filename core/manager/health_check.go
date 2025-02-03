@@ -17,8 +17,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var HEALTH_CHECKER = false
+
 // Check for static challenegs' assets to be present on staging server.
-// At the time of writing, Beast deploys assets to localhost only. 
+// At the time of writing, Beast deploys assets to localhost only.
 // So it will check only on localhost
 func CheckStaticChallenge(chall database.Challenge) error {
 	assets := strings.Split(chall.Assets, core.DELIMITER)
@@ -139,12 +141,16 @@ func ServerHealthProber(waitTime int) {
 
 // Check for beast services running or not
 func BeastHeathCheckProber(waitTime int) {
-	log.Info("Starting Health Check prober.")
-
-	for {
-		go ChallengesHealthProber(waitTime)
-		go ServerHealthProber(waitTime)
-		// Wait for some time before next probing.
-		time.Sleep(time.Duration(waitTime) * time.Second)
+	if !HEALTH_CHECKER {
+		log.Info("Starting Health Check prober.")
+		HEALTH_CHECKER = true
+		for {
+			go ChallengesHealthProber(waitTime)
+			go ServerHealthProber(waitTime)
+			// Wait for some time before next probing.
+			time.Sleep(time.Duration(waitTime) * time.Second)
+		}
+	} else {
+		log.Warn("Health Checker Already Running. Not Starting Again")
 	}
 }

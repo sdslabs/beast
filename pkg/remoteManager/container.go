@@ -77,7 +77,9 @@ func StopAndRemoveContainerRemote(containerId string, server config.AvailableSer
 		}
 		if len(chall) > 0 {
 			server = config.Cfg.AvailableServers[chall[0].ServerDeployed]
-		} else {return fmt.Errorf("no container with container id %s found", containerId)}
+		} else {
+			return fmt.Errorf("no container with container id %s found", containerId)
+		}
 	}
 	stopCommand := fmt.Sprintf("docker stop %s", containerId)
 	if _, err := RunCommandOnServer(server, stopCommand); err != nil {
@@ -95,7 +97,7 @@ func StopAndRemoveContainerRemote(containerId string, server config.AvailableSer
 }
 
 // Function searches containers based on the filter map on all remote servers
-func SearchContainerByFilterRemote(filterMap map[string]string) ([]types.Container, error) {
+func SearchContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
 	filterArgs := ""
 	containers := []types.Container{}
 	var output string
@@ -103,7 +105,23 @@ func SearchContainerByFilterRemote(filterMap map[string]string) ([]types.Contain
 	for key, val := range filterMap {
 		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
 	}
-	for _, server := range config.Cfg.AvailableServers {
+	if server == (config.AvailableServer{}) {
+		for _, server := range config.Cfg.AvailableServers {
+			if server.Active {
+				if server.Host != "localhost" {
+					output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
+					if err != nil {
+						return []types.Container{}, err
+					}
+					for _, line := range bytes.Split([]byte(output), []byte("\n")) {
+						if len(line) > 0 {
+							containers = append(containers, types.Container{ID: string(line)})
+						}
+					}
+				}
+			}
+		}
+	} else {
 		if server.Active {
 			if server.Host != "localhost" {
 				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
@@ -118,11 +136,12 @@ func SearchContainerByFilterRemote(filterMap map[string]string) ([]types.Contain
 			}
 		}
 	}
+
 	return containers, nil
 }
 
 // Function searches for running containers based on the filter map on all remote server
-func SearchRunningContainerByFilterRemote(filterMap map[string]string) ([]types.Container, error) {
+func SearchRunningContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
 	filterArgs := ""
 	containers := []types.Container{}
 	var output string
@@ -130,10 +149,26 @@ func SearchRunningContainerByFilterRemote(filterMap map[string]string) ([]types.
 	for key, val := range filterMap {
 		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
 	}
-	for _, server := range config.Cfg.AvailableServers {
+	if server == (config.AvailableServer{}) {
+		for _, server := range config.Cfg.AvailableServers {
+			if server.Active {
+				if server.Host != "localhost" {
+					output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
+					if err != nil {
+						return []types.Container{}, err
+					}
+					for _, line := range bytes.Split([]byte(output), []byte("\n")) {
+						if len(line) > 0 {
+							containers = append(containers, types.Container{ID: string(line)})
+						}
+					}
+				}
+			}
+		}
+	} else {
 		if server.Active {
 			if server.Host != "localhost" {
-				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
+				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
 				if err != nil {
 					return []types.Container{}, err
 				}
@@ -145,6 +180,7 @@ func SearchRunningContainerByFilterRemote(filterMap map[string]string) ([]types.
 			}
 		}
 	}
+
 	return containers, nil
 }
 
