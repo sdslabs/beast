@@ -6,13 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-	"github.com/sdslabs/beastv4/pkg/remoteManager"
+
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/notify"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/utils"
 
 	"github.com/BurntSushi/toml"
@@ -141,7 +142,11 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	} else {
 		var buff *bytes.Buffer
 		buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
-		logBytes = buff.Bytes()
+		if buff != nil {
+			logBytes = buff.Bytes()
+		} else {
+			logBytes = []byte("BuildImageFromTarContext returned nil buffer")
+		}
 	}
 	// Create logs directory for the challenge in staging directory.
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)

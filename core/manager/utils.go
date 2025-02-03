@@ -487,7 +487,13 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
-		availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
+		var availableServerHostname string
+		if config.Challenge.Metadata.Type == core.STATIC_CHALLENGE_TYPE_NAME {
+			availableServerHostname = "localhost"
+		} else {
+			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
+			availableServerHostname = availableServer.Host
+		}
 		*challEntry = database.Challenge{
 			Name:           config.Challenge.Metadata.Name,
 			AuthorID:       userEntry.ID,
@@ -504,7 +510,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Points:         config.Challenge.Metadata.Points,
 			MinPoints:      config.Challenge.Metadata.MinPoints,
 			MaxPoints:      config.Challenge.Metadata.MaxPoints,
-			ServerDeployed: availableServer.Host,
+			ServerDeployed: availableServerHostname,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)

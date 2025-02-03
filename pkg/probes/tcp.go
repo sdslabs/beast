@@ -32,7 +32,6 @@ func (pr TcpProber) Probe(host string, port int, timeout time.Duration) (ProbeRe
 			hostAddress = ips[0].String()
 		}
 	}
-	fmt.Println(host, hostAddress)
 	address := net.JoinHostPort(hostAddress, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", address, timeout)
 	if err != nil {

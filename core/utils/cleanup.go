@@ -30,17 +30,11 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 		log.Error("Error while searching for remote container with %s : ", filter, filterVal)
 		return err
 	}
-	containers = append(containers, remoteContainers...)
 
 	var erroredContainers []string
 	if len(containers) != 0 {
 		log.Infof("Cleaning up container with %s %s", filter, filterVal)
 		for _, container := range containers {
-			err = remoteManager.StopAndRemoveContainerRemote(container.ID, config.AvailableServer{})
-			if err != nil {
-				erroredContainers = append(erroredContainers, container.ID)
-				log.Errorf("Error while cleaning up remote container %s : %s", container.ID, err)
-			}
 			err = cr.StopAndRemoveContainer(container.ID)
 			if err != nil {
 				erroredContainers = append(erroredContainers, container.ID)
@@ -49,10 +43,20 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 		}
 	}
 
+	if len(remoteContainers) != 0 {
+		log.Infof("Cleaning up remote container with %s %s", filter, filterVal)
+		for _, container := range remoteContainers {
+			err = remoteManager.StopAndRemoveContainerRemote(container.ID, config.AvailableServer{})
+			if err != nil {
+				erroredContainers = append(erroredContainers, container.ID)
+				log.Errorf("Error while cleaning up remote container %s : %s", container.ID, err)
+			}
+		}
+	}
+
 	if len(erroredContainers) != 0 {
 		return fmt.Errorf("Error while cleaning up container : %s", erroredContainers)
 	}
-
 	return nil
 }
 

@@ -80,31 +80,33 @@ func ChallengesHealthProber(waitTime int) {
 			log.Debugf("Doing HealthCheck Probe for %s", chall.Name)
 
 			// Do a better job at health probing mechanism.
-			port := int(allocatedPorts[0].PortNo)
-			prober := probes.NewTcpProber()
-			result, err := prober.Probe(chall.ServerDeployed, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
-			if err != nil {
-				msg := fmt.Sprintf("NETWORK HEALTH CHECK %s: %s : %s", result, chall.Name, err)
-				log.WithFields(log.Fields{
-					"ChallName": chall.Name,
-				}).Error(msg)
-				go notify.SendNotification(notify.Error, msg)
-			} else {
-				log.WithFields(log.Fields{
-					"ChallName": chall.Name,
-				}).Info("NETWORK HEALTH CHECK returned success.")
-			}
-			err = containerProber(chall)
-			if err != nil {
-				msg := fmt.Sprintf("CONTAINER HEALTH CHECK %s: %s : %s", result, chall.Name, err)
-				log.WithFields(log.Fields{
-					"ChallName": chall.Name,
-				}).Error(msg)
-				go notify.SendNotification(notify.Error, msg)
-			} else {
-				log.WithFields(log.Fields{
-					"ChallName": chall.Name,
-				}).Info("CONTAINER HEALTH CHECK returned success.")
+			if len(allocatedPorts) > 0 {
+				port := int(allocatedPorts[0].PortNo)
+				prober := probes.NewTcpProber()
+				result, err := prober.Probe(chall.ServerDeployed, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
+				if err != nil {
+					msg := fmt.Sprintf("NETWORK HEALTH CHECK %s: %s : %s", result, chall.Name, err)
+					log.WithFields(log.Fields{
+						"ChallName": chall.Name,
+					}).Error(msg)
+					go notify.SendNotification(notify.Error, msg)
+				} else {
+					log.WithFields(log.Fields{
+						"ChallName": chall.Name,
+					}).Info("NETWORK HEALTH CHECK returned success.")
+				}
+				err = containerProber(chall)
+				if err != nil {
+					msg := fmt.Sprintf("CONTAINER HEALTH CHECK %s: %s : %s", result, chall.Name, err)
+					log.WithFields(log.Fields{
+						"ChallName": chall.Name,
+					}).Error(msg)
+					go notify.SendNotification(notify.Error, msg)
+				} else {
+					log.WithFields(log.Fields{
+						"ChallName": chall.Name,
+					}).Info("CONTAINER HEALTH CHECK returned success.")
+				}
 			}
 		} else {
 			err := CheckStaticChallenge(chall)

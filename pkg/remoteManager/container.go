@@ -41,7 +41,6 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 		mountBindings += fmt.Sprintf("--mount type=bind,source=%s,target=%s ", src, dest)
 	}
 	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s", containerName, containerEnv, exposedPorts, mountBindings, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
-	fmt.Println(dockerCommand)
 	// fmt.Printf("%s, %s, %s, %s\n", containerName, containerEnv, exposedPorts, portMap)
 	// dockerCommand := fmt.Sprintf("docker run \\
 	// 	--name <container_name> \\

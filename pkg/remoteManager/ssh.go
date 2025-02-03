@@ -56,6 +56,9 @@ func (q *LoadBalancerQueue) GetNextAvailableInstance() (config.AvailableServer, 
 
 // Pings the server to check if it is reachable.
 func PingServer(server config.AvailableServer) error {
+	if !server.Active {
+		return fmt.Errorf("server is inactive in config.toml")
+	}
 	client, err := CreateSSHClient(server)
 	if err != nil {
 		err = fmt.Errorf("SSH connection to %s failed: %s\n", server.Host, err)
@@ -69,7 +72,13 @@ func PingServer(server config.AvailableServer) error {
 
 // Run the command passed as argument on the remote server
 func RunCommandOnServer(server config.AvailableServer, cmd string) (string, error) {
-	client, _ := CreateSSHClient(server)
+	if !server.Active {
+		return "", fmt.Errorf("server is inactive in config.toml")
+	}
+	client, err := CreateSSHClient(server)
+	if err != nil {
+		return "", fmt.Errorf("failed to create session: %s", err)
+	}
 	session, err := client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %s", err)
@@ -87,7 +96,9 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 
 // Creates an SSH client to connect to the remote server.
 func CreateSSHClient(remoteServer config.AvailableServer) (*ssh.Client, error) {
-
+	if !remoteServer.Active {
+		return nil, fmt.Errorf("server is inactive in config.toml")
+	}
 	key, err := ioutil.ReadFile(remoteServer.SSHKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read private key: %s", err)

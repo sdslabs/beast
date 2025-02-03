@@ -20,15 +20,11 @@ func CheckIfImageExistsOnRemote(imageId string, server config.AvailableServer) (
 	command := fmt.Sprintf("docker inspect --format='{{.ID}}' %s", imageId)
 	output, err := RunCommandOnServer(server, command)
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok && exitError.ExitCode() == 1 {
+		exitError, success := err.(*exec.ExitError)
+		if success && exitError.ExitCode() == 1 {
 			return false, nil
 		}
 		return false, err
 	}
 	return output != "", nil
 }
-
-// type Log struct {
-// 	Stderr string
-// 	Stdout string
-// }
