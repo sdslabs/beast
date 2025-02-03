@@ -511,9 +511,9 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		for _, hint := range config.Challenge.Metadata.Hints {
 			hintEntry := database.Hint{
-				ChallengeID:         challEntry.ID,
-				DeductionPercentage: hint.Percentage,
-				Description:         hint.Text,
+				ChallengeID: challEntry.ID,
+				Points:      hint.Points,
+				Description: hint.Text,
 			}
 
 			err := database.CreateHintEntry(&hintEntry)

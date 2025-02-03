@@ -136,8 +136,8 @@ type ChallengeMetadata struct {
 	Sidecar     string   `toml:"sidecar"`
 	Description string   `toml:"description"`
 	Hints       []struct {
-		Text       string  `toml:"text"`
-		Percentage float64 `toml:"percentage"`
+		Text   string `toml:"text"`
+		Points uint   `toml:"points"`
 	} `toml:"hints"`
 	Points          uint     `toml:"points"`
 	MaxPoints       uint     `toml:"maxPoints"`

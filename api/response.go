@@ -98,6 +98,16 @@ type UserSolveResp struct {
 	SolvedAt time.Time `json:"solvedAt"`
 }
 
+type HintInfo struct {
+	ID     uint `json:"id"`
+	Points uint `json:"points"`
+}
+
+type HintResponse struct {
+	Description string `json:"description" example:"This is a hint"`
+	Points      uint   `json:"points" example:"10"`
+}
+
 type ChallengeInfoResp struct {
 	Name            string          `json:"name" example:"Web Challenge"`
 	ChallId         uint            `json:"id" example:"0"`
@@ -108,6 +118,7 @@ type ChallengeInfoResp struct {
 	CreatedAt       time.Time       `json:"createdAt"`
 	Status          string          `json:"status" example:"deployed"`
 	Ports           []uint32        `json:"ports" example:[3001, 3002]`
+	Hints           []HintInfo      `json:"hints"`
 	Desc            string          `json:"description" example:"A simple web challenge"`
 	Points          uint            `json:"points" example:"50"`
 	SolvesNumber    int             `json:"solvesNumber" example:"100"`

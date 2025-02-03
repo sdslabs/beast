@@ -9,7 +9,7 @@ import (
 type Hint struct {
 	HintID              uint    `gorm:"primaryKey;autoIncrement"`
 	ChallengeID         uint    `gorm:"not null"`
-	DeductionPercentage float64 `gorm:"not null"`
+	Points      uint   `gorm:"not null"`
 	Description         string  `gorm:"size:255"`
 }
 
@@ -100,6 +100,34 @@ func SaveUserHint(userID, challengeID, hintID uint) error {
 		return fmt.Errorf("error while starting transaction: %w", tx.Error)
 	}
 
+	// Get the hint to check its points
+	var hint Hint
+	if err := tx.First(&hint, "hint_id = ?", hintID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Get the user to update their points
+	var user User
+	if err := tx.First(&user, "id = ?", userID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Deduct points from user
+	if user.Score >= hint.Points {
+		user.Score -= hint.Points
+	} else {
+		user.Score = 0
+	}
+
+	// Update user's score
+	if err := tx.Save(&user).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Save the hint usage
 	userHint := UserHint{
 		UserID:      userID,
 		ChallengeID: challengeID,
@@ -108,7 +136,7 @@ func SaveUserHint(userID, challengeID, hintID uint) error {
 
 	if err := tx.Create(&userHint).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("db_error")
+		return err
 	}
 
 	return tx.Commit().Error
@@ -143,6 +171,19 @@ func QueryHintsTaken(userID, challengeID uint) ([]Hint, error) {
 		}
 
 		hints = append(hints, hint)
+	}
+
+	return hints, nil
+}
+
+func QueryHintsByChallengeID(challengeID uint) ([]Hint, error) {
+	var hints []Hint
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	if err := Db.Where("challenge_id = ?", challengeID).Find(&hints).Error; err != nil {
+		return nil, err
 	}
 
 	return hints, nil
