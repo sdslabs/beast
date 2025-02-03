@@ -132,5 +132,6 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *datab
 		// if err != nil {
 		// 	log.Errorf("Error while removing challenge config file: %s", err)
 		// }
+
 	}
 }

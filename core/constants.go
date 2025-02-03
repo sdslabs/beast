@@ -7,6 +7,7 @@ import (
 )
 
 var (
+	// BEAST_GLOBAL_DIR should always be used only on local deployment
 	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
 	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
 	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
@@ -30,6 +31,8 @@ const ( //names
 	HIDDEN                      string = ".hidden"
 	ISSUER                      string = "beast-sds"
 	DELIMITER                   string = "::::"
+	LOCALHOST                   string = "localhost"
+	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast"			// This should always be used for remote only.
 )
 
 const ( //paths
@@ -83,6 +86,7 @@ const ( // default config
 	ITERATIONS               int    = 65536
 	HASH_LENGTH              int    = 32
 	TIMEPERIOD               int64  = 6 * 60 * 60
+	SSH_PORT                 int    = 22
 )
 
 const ( // roles

@@ -13,6 +13,8 @@ import (
 	"text/template"
 
 	"github.com/sdslabs/beastv4/pkg/auth"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
+
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -455,7 +457,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
-			return nil
+			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
 				(userEntry.SshKey != config.Author.SSHKey || config.Author.SSHKey == "") &&
@@ -487,22 +489,29 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
+		availableServerHostname := core.LOCALHOST
+		if config.Challenge.Metadata.Type != core.STATIC_CHALLENGE_TYPE_NAME {
+			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
+			availableServerHostname = availableServer.Host
+		}
 		*challEntry = database.Challenge{
-			Name:        config.Challenge.Metadata.Name,
-			AuthorID:    userEntry.ID,
-			Format:      config.Challenge.Metadata.Type,
-			Status:      core.DEPLOY_STATUS["undeployed"],
-			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-			Flag:        config.Challenge.Metadata.Flag,
-			Type:        config.Challenge.Metadata.Type,
-			Sidecar:     config.Challenge.Metadata.Sidecar,
-			Description: config.Challenge.Metadata.Description,
-			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
-			Assets:      strings.Join(assetsURL, core.DELIMITER),
-			Points:      config.Challenge.Metadata.Points,
-			MinPoints:   config.Challenge.Metadata.MinPoints,
-			MaxPoints:   config.Challenge.Metadata.MaxPoints,
+			Name:            config.Challenge.Metadata.Name,
+			AuthorID:        userEntry.ID,
+			Format:          config.Challenge.Metadata.Type,
+			Status:          core.DEPLOY_STATUS["undeployed"],
+			ContainerId:     coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:         coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			Flag:            config.Challenge.Metadata.Flag,
+			Type:            config.Challenge.Metadata.Type,
+			Sidecar:         config.Challenge.Metadata.Sidecar,
+			Description:     config.Challenge.Metadata.Description,
+			Hints:           strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
+			Assets:          strings.Join(assetsURL, core.DELIMITER),
+			AdditionalLinks: strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),
+			Points:          config.Challenge.Metadata.Points,
+			MinPoints:       config.Challenge.Metadata.MinPoints,
+			MaxPoints:       config.Challenge.Metadata.MaxPoints,
+			ServerDeployed:  availableServerHostname,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
@@ -623,7 +632,7 @@ func LogTransaction(identifier string, action string, authorization string) erro
 	return err
 }
 
-//Copies the Static content to the staging/static/folder
+// Copies the Static content to the staging/static/folder
 func CopyToStaticContent(challengeName, staticContentDir string) error {
 	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
 	err := utils.CreateIfNotExistDir(dirPath)
@@ -677,36 +686,36 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 	return challengeNames
 }
 
-//Unzips challenge folder in a destination directory
+// Unzips challenge folder in a destination directory
 func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 
 	baseFileName := filepath.Base(zipContextPath)
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
 	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
-        log.Fatal(err)
-    }
+		log.Fatal(err)
+	}
 
 	// 1. Open the zip file
-    reader, err := zip.OpenReader(zipContextPath)
-    if err != nil {
-        return "", err
-    }
-    defer reader.Close()
+	reader, err := zip.OpenReader(zipContextPath)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
 
-    // 2. Get the absolute destination path
-    destination, err := filepath.Abs(targetDir)
-    if err != nil {
-        return "", err
-    }
+	// 2. Get the absolute destination path
+	destination, err := filepath.Abs(targetDir)
+	if err != nil {
+		return "", err
+	}
 
-    // 3. Iterate over zip files inside the archive and unzip each of them
-    for _, f := range reader.File {
-        err := unzipFile(f, destination)
-        if err != nil {
-            return "", err
-        }
-    }
+	// 3. Iterate over zip files inside the archive and unzip each of them
+	for _, f := range reader.File {
+		err := unzipFile(f, destination)
+		if err != nil {
+			return "", err
+		}
+	}
 
 	return targetDir, nil
 }
@@ -872,4 +881,28 @@ func UpdateChallenges(defaultauthorpassword string) {
 		}
 	}
 	log.Debugf("Challenges updated in Db")
+}
+
+func ValidateFlag(flag, challenge_name string)  error{
+	if challenge_name == "" {
+		log.Errorf("Challenge name is empty")
+		return fmt.Errorf("challenge name is empty")
+	}
+
+	if flag == "" {
+		log.Errorf("Flag for challenge %s is empty", challenge_name)
+		return fmt.Errorf("flag for challenge %s is empty", challenge_name)
+	}
+
+	dynamicflag := database.DynamicFlag{
+		Name: challenge_name,
+		Flag:          flag,
+	}
+	err := database.CreateDynamicFlagEntry(&dynamicflag)
+
+	if err != nil {
+		log.Errorf("Error while creating dynamic flag for challenge %s : %s", challenge_name, err)
+		return err
+	}
+	return nil
 }

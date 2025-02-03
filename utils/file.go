@@ -102,7 +102,7 @@ func CreateFileIfNotExist(filePath string) error {
 	err := ValidateFileExists(filePath)
 	if err != nil {
 		file, e := os.Create(filePath)
-		if(e != nil) {
+		if e != nil {
 			eMsg := fmt.Errorf("could not create file : %s", filePath)
 			return eMsg
 		}
