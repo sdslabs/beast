@@ -49,7 +49,7 @@ func init() {
 		log.Fatalf("Cannot create related models: %s", err)
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{})
+	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &DynamicFlag{})
 
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
