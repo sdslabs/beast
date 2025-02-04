@@ -44,7 +44,8 @@ func sendEmail(email, otp string) error {
 
 	// Check if template file exists
 	var body bytes.Buffer
-	if _, err := os.Stat(emailTemplatePath); err == nil {
+	_, err := os.Stat(emailTemplatePath)
+	if err == nil {
 		// Template exists, parse and execute
 		tmpl, err := template.ParseFiles(emailTemplatePath)
 		if err != nil {
@@ -148,7 +149,19 @@ func sendEmail(email, otp string) error {
 	return nil
 }
 
-func sendOTPHandler(email string) error {
+func sendOTPHandler(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid request",
+		})
+		return
+	}
+
+	email := req.Email
 	otp := generateOTP()
 	expiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
 
@@ -161,17 +174,25 @@ func sendOTPHandler(email string) error {
 	err := database.CreateOTPEntry(&otpEntry)
 	if err != nil {
 		log.Println("Failed to store OTP:", err)
-		return fmt.Errorf("failed to store OTP: %w", err)
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "Failed to store OTP",
+		})
+		return
 	}
 
 	// Send OTP to email
 	err = sendEmail(email, otp)
 	if err != nil {
 		log.Println("Failed to send OTP:", err)
-		return fmt.Errorf("failed to send OTP: %w", err)
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "Failed to send OTP",
+		})
+		return
 	}
 
-	return nil
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "OTP sent successfully",
+	})
 }
 
 func verifyOTPHandler(c *gin.Context) {
@@ -206,15 +227,6 @@ func verifyOTPHandler(c *gin.Context) {
 	if time.Now().After(otpEntry.Expiry) {
 		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 			Error: "OTP expired",
-		})
-		return
-	}
-
-	err = database.DeleteOTPEntry(req.Email)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "Failed to verify OTP",
 		})
 		return
 	}

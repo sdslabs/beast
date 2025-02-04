@@ -5,9 +5,10 @@ import (
 )
 
 type OTP struct {
-	Email  string `gorm:"primaryKey"`
-	Code   string
-	Expiry time.Time
+	Email    string `gorm:"primaryKey"`
+	Code     string
+	Expiry   time.Time
+	Verified bool
 }
 
 func CreateOTPEntry(otpEntry *OTP) error {
@@ -35,9 +36,9 @@ func QueryOTPEntry(email string) (OTP, error) {
 	return otpEntry, tx.Error
 }
 
-func DeleteOTPEntry(email string) error {
+func VerifyOTPEntry(email string) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	return Db.Delete(&OTP{}, email).Error
+	return Db.Model(&OTP{}).Where("email = ?", email).Update("verified", true).Error
 }

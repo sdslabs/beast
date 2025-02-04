@@ -35,6 +35,7 @@ func initGinRouter() *gin.Engine {
 		authGroup.POST("/register", register)
 		authGroup.POST("/login", login)
 		authGroup.POST("/reset-password", authorize, resetPasswordHandler)
+		authGroup.POST("/send-otp", sendOTPHandler)
 		authGroup.POST("/verify-otp", verifyOTPHandler)
 	}
 

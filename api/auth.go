@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -219,7 +218,7 @@ func register(c *gin.Context) {
 		return
 	}
 
-	re := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@iitr\.ac\.in$`)
+	re := regexp.MustCompile(`^.*@.*iitr\.ac\.in$`)
 	isIITR := re.MatchString(email)
 
 	if !isIITR {
@@ -236,21 +235,27 @@ func register(c *gin.Context) {
 		SshKey:    sshKey,
 	}
 
-	err := database.CreateUserEntry(&userEntry)
+	otpEntry, err := database.QueryOTPEntry(email)
 
 	if err != nil {
-		c.JSON(http.StatusNotAcceptable, HTTPPlainResp{
-			Message: err.Error(),
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "Failed to verify OTP",
 		})
 		return
 	}
 
-	err = sendOTPHandler(email)
+	if !otpEntry.Verified {
+		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
+			Error: "Email not verified, cannot register user",
+		})
+		return
+	}
+
+	err = database.CreateUserEntry(&userEntry)
 
 	if err != nil {
-		log.Println("Something Went Wrong in SMTP:", err)
-		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
-			Message: "Failed to send OTP",
+		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
+			Error: err.Error(),
 		})
 		return
 	}
