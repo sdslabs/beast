@@ -307,7 +307,10 @@ func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(challenge).Association("Users").Find(&users); err != nil {
+	// Query users who have solved this challenge by checking the user_challenges table
+	if err := Db.Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
+		Where("user_challenges.challenge_id = ? AND user_challenges.solved = ?", challenge.ID, true).
+		Find(&users).Error; err != nil {
 		return users, err
 	}
 

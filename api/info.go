@@ -14,6 +14,7 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	log "github.com/sirupsen/logrus"
 )
@@ -113,6 +114,7 @@ func challengeInfoHandler(c *gin.Context) {
 			c.Abort()
 			return
 		}
+		
 
 		autherr := auth.Authorize(values[1], core.ADMIN)
 
@@ -125,6 +127,7 @@ func challengeInfoHandler(c *gin.Context) {
 				Tags:            challengeTags,
 				Status:          challenge.Status,
 				Ports:           challengePorts,
+				FailSolveLimit:  challenge.FailSolveLimit,
 				Hints:           challenge.Hints,
 				Desc:            challenge.Description,
 				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
@@ -145,6 +148,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Tags:            challengeTags,
 			Status:          challenge.Status,
 			Ports:           challengePorts,
+			FailSolveLimit:  challenge.FailSolveLimit,
 			Hints:           challenge.Hints,
 			Desc:            challenge.Description,
 			Assets:          strings.Split(challenge.Assets, core.DELIMITER),
@@ -260,6 +264,23 @@ func challengesInfoHandler(c *gin.Context) {
 
 		availableChallenges := make([]ChallengeInfoResp, len(challenges))
 
+		// Get user ID from token
+		username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Unauthorized user",
+			})
+			return
+		}
+
+		user, err := database.QueryFirstUserEntry("username", username)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Unauthorized user",
+			})
+			return
+		}
+
 		for index, challenge := range challenges {
 			users, err := database.GetRelatedUsers(&challenge)
 			if err != nil {
@@ -296,6 +317,13 @@ func challengesInfoHandler(c *gin.Context) {
 				challengeTags[index] = tags.TagName
 			}
 
+			// Get previous tries for the current user and challenge
+			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
+			if err != nil {
+				log.Error(err)
+				previousTries = 0
+			}
+
 			availableChallenges[index] = ChallengeInfoResp{
 				Name:            challenge.Name,
 				ChallId:         challenge.ID,
@@ -304,6 +332,7 @@ func challengesInfoHandler(c *gin.Context) {
 				CreatedAt:       challenge.CreatedAt,
 				Status:          challenge.Status,
 				Ports:           challengePorts,
+				FailSolveLimit:  challenge.FailSolveLimit,
 				Hints:           challenge.Hints,
 				Desc:            challenge.Description,
 				Points:          challenge.Points,
@@ -311,6 +340,7 @@ func challengesInfoHandler(c *gin.Context) {
 				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
 				SolvesNumber:    challSolves,
 				Solves:          challengeUser,
+				PreviousTries:   previousTries,
 			}
 		}
 
