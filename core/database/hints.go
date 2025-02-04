@@ -114,12 +114,14 @@ func SaveUserHint(userID, challengeID, hintID uint) error {
 		return err
 	}
 
-	// Deduct points from user
-	if user.Score >= hint.Points {
-		user.Score -= hint.Points
-	} else {
-		user.Score = 0
+	// Check if user has enough points
+	if user.Score < hint.Points {
+		tx.Rollback()
+		return fmt.Errorf("Not enough points to take this hint")
 	}
+
+	// Deduct points from user
+	user.Score -= hint.Points
 
 	// Update user's score
 	if err := tx.Save(&user).Error; err != nil {

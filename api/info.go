@@ -128,12 +128,19 @@ func hintHandler(c *gin.Context) {
 
 	// Save user hint if not already taken
 	if err := database.SaveUserHint(user.ID, hint.ChallengeID, hint.HintID); err != nil {
+		if err.Error() == "Not enough points to take this hint" {
+			c.JSON(http.StatusForbidden, HTTPErrorResp{
+				Error: "You don't have enough points to take this hint",
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "DATABASE ERROR while saving the hint usage",
 		})
 		return
 	}
 
+	// Return the hint description after successfully taking it
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: hint.Description,
 	})
@@ -238,13 +245,13 @@ func challengeInfoHandler(c *gin.Context) {
 
 		if autherr != nil {
 			c.JSON(http.StatusOK, ChallengeInfoResp{
-				Name:      name,
-				ChallId:   challenge.ID,
-				Category:  challenge.Type,
-				CreatedAt: challenge.CreatedAt,
-				Tags:      challengeTags,
-				Status:    challenge.Status,
-				Ports:     challengePorts,
+				Name:            name,
+				ChallId:         challenge.ID,
+				Category:        challenge.Type,
+				CreatedAt:       challenge.CreatedAt,
+				Tags:            challengeTags,
+				Status:          challenge.Status,
+				Ports:           challengePorts,
 				Hints:           hintInfos,
 				Desc:            challenge.Description,
 				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
@@ -257,14 +264,14 @@ func challengeInfoHandler(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, ChallengeInfoResp{
-			Name:      name,
-			ChallId:   challenge.ID,
-			Category:  challenge.Type,
-			Flag:      challenge.Flag,
-			CreatedAt: challenge.CreatedAt,
-			Tags:      challengeTags,
-			Status:    challenge.Status,
-			Ports:     challengePorts,
+			Name:            name,
+			ChallId:         challenge.ID,
+			Category:        challenge.Type,
+			Flag:            challenge.Flag,
+			CreatedAt:       challenge.CreatedAt,
+			Tags:            challengeTags,
+			Status:          challenge.Status,
+			Ports:           challengePorts,
 			Hints:           hintInfos,
 			Desc:            challenge.Description,
 			Assets:          strings.Split(challenge.Assets, core.DELIMITER),
@@ -435,13 +442,13 @@ func challengesInfoHandler(c *gin.Context) {
 			}
 
 			availableChallenges[index] = ChallengeInfoResp{
-				Name:      challenge.Name,
-				ChallId:   challenge.ID,
-				Category:  challenge.Type,
-				Tags:      challengeTags,
-				CreatedAt: challenge.CreatedAt,
-				Status:    challenge.Status,
-				Ports:     challengePorts,
+				Name:            challenge.Name,
+				ChallId:         challenge.ID,
+				Category:        challenge.Type,
+				Tags:            challengeTags,
+				CreatedAt:       challenge.CreatedAt,
+				Status:          challenge.Status,
+				Ports:           challengePorts,
 				Hints:           hintInfos,
 				Desc:            challenge.Description,
 				Points:          challenge.Points,
