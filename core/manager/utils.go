@@ -498,6 +498,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
       FailSolveLimit: *config.Challenge.Metadata.FailSolveLimit,
 			PreReqs:        strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
+			DynamicFlag: config.Challenge.Metadata.DynamicFlag,
 			Flag:        config.Challenge.Metadata.Flag,
 			Type:        config.Challenge.Metadata.Type,
 			Sidecar:     config.Challenge.Metadata.Sidecar,
@@ -890,4 +891,28 @@ func UpdateChallenges(defaultauthorpassword string) {
 		}
 	}
 	log.Debugf("Challenges updated in Db")
+}
+
+func ValidateFlag(flag, challenge_name string)  error{
+	if challenge_name == "" {
+		log.Errorf("Challenge name is empty")
+		return fmt.Errorf("challenge name is empty")
+	}
+
+	if flag == "" {
+		log.Errorf("Flag for challenge %s is empty", challenge_name)
+		return fmt.Errorf("flag for challenge %s is empty", challenge_name)
+	}
+
+	dynamicflag := database.DynamicFlag{
+		Name: challenge_name,
+		Flag:          flag,
+	}
+	err := database.CreateDynamicFlagEntry(&dynamicflag)
+
+	if err != nil {
+		log.Errorf("Error while creating dynamic flag for challenge %s : %s", challenge_name, err)
+		return err
+	}
+	return nil
 }

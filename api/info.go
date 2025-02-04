@@ -269,6 +269,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Name:            name,
 			ChallId:         challenge.ID,
 			Category:        challenge.Type,
+			DynamicFlag:     challenge.DynamicFlag,
 			Flag:            challenge.Flag,
 			CreatedAt:       challenge.CreatedAt,
 			Tags:            challengeTags,

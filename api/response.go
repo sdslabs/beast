@@ -126,6 +126,7 @@ type ChallengeInfoResp struct {
 	SolvesNumber    int             `json:"solvesNumber" example:"100"`
 	Solves          []UserSolveResp `json:"solves"`
 	PreviousTries   int             `json:"previous_tries" example:"3"`
+	DynamicFlag     bool            `json:"dynamicFlag" example:"true"`
 	Flag            string          `json:"flag"`
 }
 

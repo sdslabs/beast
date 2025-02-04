@@ -44,6 +44,7 @@ func (Author *Author) PopulateAuthor() {
 func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
 	Metadata.Name = "ChallengeName"
 	Metadata.Type = "ChallengeType"
+	Metadata.DynamicFlag = false
 	Metadata.Flag = "ChallengeFlag"
 	Metadata.Sidecar = "SidecarHelper"
 }
@@ -129,7 +130,6 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 // sidecar = "" # Name of the sidecar if any used by the challenge.
 // ```
 type ChallengeMetadata struct {
-
 	Flag        string   `toml:"flag"`
 	Name        string   `toml:"name"`
 	Type        string   `toml:"type"`
@@ -142,6 +142,7 @@ type ChallengeMetadata struct {
 	} `toml:"hints"`
 	FailSolveLimit  *int     `toml:"failSolveLimit"`
 	PreReqs         []string `toml:"preReqs"`
+	DynamicFlag     bool     `toml:"dynamic_flag"`
 	Points          uint     `toml:"points"`
 	MaxPoints       uint     `toml:"maxPoints"`
 	MinPoints       uint     `toml:"minPoints"`
@@ -152,7 +153,7 @@ type ChallengeMetadata struct {
 // In this validation returned boolean value represents if the challenge type is
 // static or not.
 func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
-	if config.Name == "" || config.Flag == "" {
+	if config.Name == "" || (config.Flag == "" && !config.DynamicFlag) {
 		return fmt.Errorf("Name and Flag required for the challenge"), false
 	}
 
