@@ -39,3 +39,9 @@ active = true
 url = ""
 service_name = "slack"
 active = false
+
+[mail_config]
+from = "your-email@example.com"
+password = "your-email-password"
+smtpHost = "smtp.example.com"
+smtpPort = "587"

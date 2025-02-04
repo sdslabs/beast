@@ -8,10 +8,12 @@ import (
 	"math/rand"
 	"net/http"
 	"net/smtp"
-	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 )
 
@@ -21,15 +23,21 @@ func generateOTP() string {
 }
 
 func sendEmail(email, otp string) error {
-	from := os.Getenv("SMTP_EMAIL")
-	password := os.Getenv("SMTP_PASSWORD")
-	smtpHost := os.Getenv("SMTP_HOST")
-	smtpPort := os.Getenv("SMTP_PORT")
+	from := config.Cfg.MailConfig.From
+	password := config.Cfg.MailConfig.Password
+	smtpHost := config.Cfg.MailConfig.SMTPHost
+	smtpPort := config.Cfg.MailConfig.SMTPPort
 
 	to := []string{email}
 
+	emailTemplatePath := filepath.Join(
+		core.BEAST_GLOBAL_DIR,
+		core.BEAST_ASSETS_DIR,
+		core.BEAST_EMAIL_TEMPLATE_DIR,
+		"email_template.html",
+	)
 	// Load email template
-	tmpl, err := template.ParseFiles("email_template.html")
+	tmpl, err := template.ParseFiles(emailTemplatePath)
 	if err != nil {
 		log.Println("Error loading email template:", err)
 		return err
@@ -39,20 +47,34 @@ func sendEmail(email, otp string) error {
 	var body bytes.Buffer
 	err = tmpl.Execute(&body, struct{ OTP string }{OTP: otp})
 	if err != nil {
-		log.Println("Error executing template:", err)
-		return err
+		log.Println("Warning: Email template not found. Sending plain text email.")
+
+		// Fallback to plain text email
+		body.WriteString(fmt.Sprintf("Subject: OTP Verification\r\n\r\nYour OTP is: %s", otp))
+	} else {
+		// Replace placeholders in the template
+		err = tmpl.Execute(&body, struct{ OTP string }{OTP: otp})
+		if err != nil {
+			log.Println("Error executing template:", err)
+			return err
+		}
+
+		// Add email headers for HTML
+		bodyHeader := "Subject: OTP Verification\r\n" +
+			"MIME-Version: 1.0\r\n" +
+			"Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n"
+		bodyString := bodyHeader + body.String()
+		body.Reset()
+		body.WriteString(bodyString)
 	}
 
-	// Email headers
-	subject := "Subject: OTP Verification\r\n"
-	mime := "MIME-Version: 1.0\r\nContent-Type: text/html; charset=\"UTF-8\"\r\n\r\n"
-	message := []byte(subject + mime + "\r\n" + body.String())
-
+	// SMTP Authentication
 	auth := smtp.PlainAuth("", from, password, smtpHost)
 
-	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, message)
+	// Send email
+	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, body.Bytes())
 	if err != nil {
-		fmt.Println("Failed to send email:", err)
+		log.Println("Failed to send email:", err)
 		return err
 	}
 

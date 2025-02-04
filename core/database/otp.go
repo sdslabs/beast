@@ -17,9 +17,11 @@ func CreateOTPEntry(otpEntry *OTP) error {
 	var existingOTP OTP
 	tx := Db.First(&existingOTP, "email = ?", otpEntry.Email)
 	if tx.Error == nil {
-		Db.Delete(&existingOTP)
+		existingOTP.Code = otpEntry.Code
+		existingOTP.Expiry = otpEntry.Expiry
+		return Db.Save(&existingOTP).Error
 	}
-	
+
 	return Db.Create(otpEntry).Error
 }
 
