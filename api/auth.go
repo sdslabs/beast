@@ -233,10 +233,18 @@ func register(c *gin.Context) {
 		return
 	}
 
+	err = sendOTPHandler(email)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "Failed to send OTP",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User created successfully",
 	})
-	return
 }
 
 // ResetPasswordHandler
