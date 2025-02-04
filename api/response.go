@@ -98,6 +98,16 @@ type UserSolveResp struct {
 	SolvedAt time.Time `json:"solvedAt"`
 }
 
+type HintInfo struct {
+	ID     uint `json:"id"`
+	Points uint `json:"points"`
+}
+
+type HintResponse struct {
+	Description string `json:"description" example:"This is a hint"`
+	Points      uint   `json:"points" example:"10"`
+}
+
 type ChallengeInfoResp struct {
 	Name            string          `json:"name" example:"Web Challenge"`
 	ChallId         uint            `json:"id" example:"0"`
@@ -110,7 +120,7 @@ type ChallengeInfoResp struct {
 	FailSolveLimit  int             `json:"failSolveLimit" example:"5"`
 	PreReqs         []string        `json:"preReqs" example:"['web-php','simple']"`
 	Ports           []uint32        `json:"ports" example:[3001, 3002]`
-	Hints           string          `json:"hints" example:"Try robots"`
+	Hints           []HintInfo      `json:"hints"`
 	Desc            string          `json:"description" example:"A simple web challenge"`
 	Points          uint            `json:"points" example:"50"`
 	SolvesNumber    int             `json:"solvesNumber" example:"100"`
@@ -128,7 +138,6 @@ type ChallengePreviewResp struct {
 	FailSolveLimit  int      `json:"failSolveLimit" example:"5"`
 	PreReqs         []string `json:"preReqs" example:"['web-php','simple']"`
 	Ports           []uint32 `json:"ports" example:[3001, 3002]`
-	Hints           []string `json:"hints" example:"Try robots"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
 }

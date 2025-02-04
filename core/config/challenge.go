@@ -129,13 +129,17 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 // sidecar = "" # Name of the sidecar if any used by the challenge.
 // ```
 type ChallengeMetadata struct {
-	Flag            string   `toml:"flag"`
-	Name            string   `toml:"name"`
-	Type            string   `toml:"type"`
-	Tags            []string `toml:"tags"`
-	Sidecar         string   `toml:"sidecar"`
-	Description     string   `toml:"description"`
-	Hints           []string `toml:"hints"`
+
+	Flag        string   `toml:"flag"`
+	Name        string   `toml:"name"`
+	Type        string   `toml:"type"`
+	Tags        []string `toml:"tags"`
+	Sidecar     string   `toml:"sidecar"`
+	Description string   `toml:"description"`
+	Hints       []struct {
+		Text   string `toml:"text"`
+		Points uint   `toml:"points"`
+	} `toml:"hints"`
 	FailSolveLimit  *int     `toml:"failSolveLimit"`
 	PreReqs         []string `toml:"preReqs"`
 	Points          uint     `toml:"points"`

@@ -30,8 +30,9 @@ type User struct {
 	Name       string       `gorm:"not null"`
 	Email      string       `gorm:"non null;unique"`
 	SshKey     string
-	Status     uint `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
-	Score      uint `gorm:"default:0"`
+	Status     uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Score      uint    `gorm:"default:0"`
+	Hints      []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
 // Queries all the users entries where the column represented by key

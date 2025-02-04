@@ -52,7 +52,6 @@ type ChallengePreview struct {
 	Category        string
 	Tags            []string
 	Ports           []database.Port
-	Hints           string
 	Assets          []string
 	AdditionalLinks []string
 	Desc            string
@@ -490,28 +489,41 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
 		*challEntry = database.Challenge{
-			Name:           config.Challenge.Metadata.Name,
-			AuthorID:       userEntry.ID,
-			Format:         config.Challenge.Metadata.Type,
-			Status:         core.DEPLOY_STATUS["undeployed"],
-			ContainerId:    coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:        coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-			FailSolveLimit: *config.Challenge.Metadata.FailSolveLimit,
+
+			Name:        config.Challenge.Metadata.Name,
+			AuthorID:    userEntry.ID,
+			Format:      config.Challenge.Metadata.Type,
+			Status:      core.DEPLOY_STATUS["undeployed"],
+			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+      FailSolveLimit: *config.Challenge.Metadata.FailSolveLimit,
 			PreReqs:        strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
-			Flag:           config.Challenge.Metadata.Flag,
-			Type:           config.Challenge.Metadata.Type,
-			Sidecar:        config.Challenge.Metadata.Sidecar,
-			Description:    config.Challenge.Metadata.Description,
-			Hints:          strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
-			Assets:         strings.Join(assetsURL, core.DELIMITER),
-			Points:         config.Challenge.Metadata.Points,
-			MinPoints:      config.Challenge.Metadata.MinPoints,
-			MaxPoints:      config.Challenge.Metadata.MaxPoints,
+			Flag:        config.Challenge.Metadata.Flag,
+			Type:        config.Challenge.Metadata.Type,
+			Sidecar:     config.Challenge.Metadata.Sidecar,
+			Description: config.Challenge.Metadata.Description,
+			Assets:      strings.Join(assetsURL, core.DELIMITER),
+			Points:      config.Challenge.Metadata.Points,
+			MinPoints:   config.Challenge.Metadata.MinPoints,
+			MaxPoints:   config.Challenge.Metadata.MaxPoints,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
 		if err != nil {
 			return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
+		}
+
+		for _, hint := range config.Challenge.Metadata.Hints {
+			hintEntry := database.Hint{
+				ChallengeID: challEntry.ID,
+				Points:      hint.Points,
+				Description: hint.Text,
+			}
+
+			err := database.CreateHintEntry(&hintEntry)
+			if err != nil {
+				return fmt.Errorf("Error while creating hint entry: %v", err)
+			}
 		}
 
 		database.Db.Model(challEntry).Association("Tags").Append(tags)
@@ -714,7 +726,6 @@ func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 			return "", err
 		}
 	}
-
 	return targetDir, nil
 }
 

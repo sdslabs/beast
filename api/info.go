@@ -36,6 +36,116 @@ func usedPortsInfoHandler(c *gin.Context) {
 	})
 }
 
+func hintHandler(c *gin.Context) {
+	hintIDStr := c.Param("hintID")
+
+	if hintIDStr == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Hint ID cannot be empty",
+		})
+		return
+	}
+
+	hintID, err := strconv.Atoi(hintIDStr)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Hint Id format invalid",
+		})
+		return
+	}
+
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	if user.Status == 1 {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Banned user",
+		})
+		return
+	}
+
+	// Fetch hint details
+	hint, err := database.GetHintByID(uint(hintID))
+	if err != nil {
+		if err.Error() == "not_found" {
+			c.JSON(http.StatusNotFound, HTTPErrorResp{
+				Error: "Hint not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request",
+			})
+		}
+		return
+	}
+
+	// Check if the user has already taken the hint
+	hasTakenHint, err := database.UserHasTakenHint(user.ID, uint(hintID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while checking hint usage",
+		})
+		return
+	}
+
+	if c.Request.Method == "GET" {
+		if hasTakenHint {
+			c.JSON(http.StatusOK, HintResponse{
+				Description: hint.Description,
+				Points:      hint.Points,
+			})
+		} else {
+			c.JSON(http.StatusOK, HintResponse{
+				Description: "Hint is not taken yet",
+				Points:      hint.Points,
+			})
+		}
+		return
+	}
+
+	if hasTakenHint {
+		// If hint already taken, just return the description
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: hint.Description,
+			
+		})
+		return
+	}
+
+	// Save user hint if not already taken
+	if err := database.SaveUserHint(user.ID, hint.ChallengeID, hint.HintID); err != nil {
+		if err.Error() == "Not enough points to take this hint" {
+			c.JSON(http.StatusForbidden, HTTPErrorResp{
+				Error: "You don't have enough points to take this hint",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while saving the hint usage",
+		})
+		return
+	}
+
+	// Return the hint description after successfully taking it
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: hint.Description,
+	})
+}
+
 // Returns information about a challenge
 // @Summary Returns all information about the challenges.
 // @Description Returns all information about the challenges by the challenge name.
@@ -103,6 +213,22 @@ func challengeInfoHandler(c *gin.Context) {
 			challengeTags[index] = tags.TagName
 		}
 
+		hints, err := database.QueryHintsByChallengeID(challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while fetching hints.",
+			})
+			return
+		}
+
+		hintInfos := make([]HintInfo, len(hints))
+		for i, hint := range hints {
+			hintInfos[i] = HintInfo{
+				ID:     hint.HintID,
+				Points: hint.Points,
+			}
+		}
+
 		authHeader := c.GetHeader("Authorization")
 
 		values := strings.Split(authHeader, " ")
@@ -127,8 +253,8 @@ func challengeInfoHandler(c *gin.Context) {
 				Tags:            challengeTags,
 				Status:          challenge.Status,
 				Ports:           challengePorts,
+				Hints:           hintInfos,
 				FailSolveLimit:  challenge.FailSolveLimit,
-				Hints:           challenge.Hints,
 				Desc:            challenge.Description,
 				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
 				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
@@ -148,8 +274,8 @@ func challengeInfoHandler(c *gin.Context) {
 			Tags:            challengeTags,
 			Status:          challenge.Status,
 			Ports:           challengePorts,
+			Hints:           hintInfos,
 			FailSolveLimit:  challenge.FailSolveLimit,
-			Hints:           challenge.Hints,
 			Desc:            challenge.Description,
 			Assets:          strings.Split(challenge.Assets, core.DELIMITER),
 			AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
@@ -317,11 +443,28 @@ func challengesInfoHandler(c *gin.Context) {
 				challengeTags[index] = tags.TagName
 			}
 
+			// Get hints for this challenge
+			hints, err := database.QueryHintsByChallengeID(challenge.ID)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			hintInfos := make([]HintInfo, len(hints))
+			for i, hint := range hints {
+				hintInfos[i] = HintInfo{
+					ID:     hint.HintID,
+					Points: hint.Points,
+				}
 			// Get previous tries for the current user and challenge
 			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
 			if err != nil {
 				log.Error(err)
 				previousTries = 0
+
 			}
 
 			availableChallenges[index] = ChallengeInfoResp{
@@ -332,8 +475,8 @@ func challengesInfoHandler(c *gin.Context) {
 				CreatedAt:       challenge.CreatedAt,
 				Status:          challenge.Status,
 				Ports:           challengePorts,
+				Hints:           hintInfos,
 				FailSolveLimit:  challenge.FailSolveLimit,
-				Hints:           challenge.Hints,
 				Desc:            challenge.Description,
 				Points:          challenge.Points,
 				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
@@ -665,7 +808,6 @@ func submissionsHandler(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 					Error: "DATABASE ERROR while fetching user details.",
 				})
-				return
 			}
 			if len(challenge) == 0 {
 				continue
