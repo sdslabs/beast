@@ -1,7 +1,9 @@
 package api
 
 import (
+	"log"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -217,6 +219,16 @@ func register(c *gin.Context) {
 		return
 	}
 
+	re := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@iitr\.ac\.in$`)
+	isIITR := re.MatchString(email)
+
+	if !isIITR {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Email should be of IITR domain",
+		})
+		return
+	}
+
 	userEntry := database.User{
 		Name:      name,
 		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["contestant"]),
@@ -236,6 +248,7 @@ func register(c *gin.Context) {
 	err = sendOTPHandler(email)
 
 	if err != nil {
+		log.Println("Something Went Wrong in SMTP:", err)
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "Failed to send OTP",
 		})

@@ -2,12 +2,14 @@ package api
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"log"
 	"math/rand"
 	"net/http"
 	"net/smtp"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -22,59 +24,123 @@ func generateOTP() string {
 	return fmt.Sprintf("%06d", r.Intn(1000000)) // 6-digit OTP
 }
 
+// sendEmail sends an OTP email using an SMTP client with TLS. Falls back to plain text if template is missing.
 func sendEmail(email, otp string) error {
 	from := config.Cfg.MailConfig.From
 	password := config.Cfg.MailConfig.Password
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
 
-	to := []string{email}
+	// Email subject
+	subject := "Your OTP Code"
 
+	// Path to email template
 	emailTemplatePath := filepath.Join(
 		core.BEAST_GLOBAL_DIR,
 		core.BEAST_ASSETS_DIR,
 		core.BEAST_EMAIL_TEMPLATE_DIR,
 		"email_template.html",
 	)
-	// Load email template
-	tmpl, err := template.ParseFiles(emailTemplatePath)
-	if err != nil {
-		log.Println("Error loading email template:", err)
-		return err
-	}
 
-	// Replace placeholders in template
+	// Check if template file exists
 	var body bytes.Buffer
-	err = tmpl.Execute(&body, struct{ OTP string }{OTP: otp})
-	if err != nil {
-		log.Println("Warning: Email template not found. Sending plain text email.")
-
-		// Fallback to plain text email
-		body.WriteString(fmt.Sprintf("Subject: OTP Verification\r\n\r\nYour OTP is: %s", otp))
-	} else {
-		// Replace placeholders in the template
-		err = tmpl.Execute(&body, struct{ OTP string }{OTP: otp})
+	if _, err := os.Stat(emailTemplatePath); err == nil {
+		// Template exists, parse and execute
+		tmpl, err := template.ParseFiles(emailTemplatePath)
 		if err != nil {
-			log.Println("Error executing template:", err)
+			log.Println("Failed to read email template:", err)
 			return err
 		}
 
-		// Add email headers for HTML
-		bodyHeader := "Subject: OTP Verification\r\n" +
-			"MIME-Version: 1.0\r\n" +
-			"Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n"
-		bodyString := bodyHeader + body.String()
-		body.Reset()
-		body.WriteString(bodyString)
+		emailData := struct {
+			OTP string
+		}{OTP: otp}
+
+		if err := tmpl.Execute(&body, emailData); err != nil {
+			log.Println("Failed to execute email template:", err)
+			return err
+		}
+	} else {
+		// Template does not exist, send plain text email
+		log.Println("Template not found, sending plain text email.")
+		body.WriteString(fmt.Sprintf("Hello,\n\nYour OTP is: %s\nThis OTP will expire in 10 minutes.\n\nRegards,\nTeam", otp))
 	}
 
-	// SMTP Authentication
-	auth := smtp.PlainAuth("", from, password, smtpHost)
+	// Create email headers
+	message := fmt.Sprintf("From: %s\r\n", from) +
+		fmt.Sprintf("To: %s\r\n", email) +
+		fmt.Sprintf("Subject: %s\r\n", subject) +
+		"MIME-Version: 1.0\r\n"
 
-	// Send email
-	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, body.Bytes())
+	// Set Content-Type based on template availability
+	if body.String()[0] == '<' {
+		message += "Content-Type: text/html; charset=\"utf-8\"\r\n\r\n"
+	} else {
+		message += "Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n"
+	}
+
+	message += body.String()
+
+	// Setup TLS connection
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: false, // Set true only if SMTP server uses self-signed certs
+		ServerName:         smtpHost,
+	}
+
+	// Connect to SMTP server
+	conn, err := tls.Dial("tcp", smtpHost+":"+smtpPort, tlsConfig)
 	if err != nil {
-		log.Println("Failed to send email:", err)
+		log.Println("Failed to connect to SMTP server:", err)
+		return err
+	}
+
+	client, err := smtp.NewClient(conn, smtpHost)
+	if err != nil {
+		log.Println("Failed to create SMTP client:", err)
+		return err
+	}
+	defer client.Close()
+
+	// Authenticate
+	auth := smtp.PlainAuth("", from, password, smtpHost)
+	if err := client.Auth(auth); err != nil {
+		log.Println("SMTP authentication failed:", err)
+		return err
+	}
+
+	// Set sender and recipient
+	if err := client.Mail(from); err != nil {
+		log.Println("Failed to set sender:", err)
+		return err
+	}
+
+	if err := client.Rcpt(email); err != nil {
+		log.Println("Failed to set recipient:", err)
+		return err
+	}
+
+	// Write email data
+	w, err := client.Data()
+	if err != nil {
+		log.Println("Failed to get SMTP data writer:", err)
+		return err
+	}
+
+	_, err = w.Write([]byte(message))
+	if err != nil {
+		log.Println("Failed to write email content:", err)
+		return err
+	}
+
+	err = w.Close()
+	if err != nil {
+		log.Println("Failed to close SMTP writer:", err)
+		return err
+	}
+
+	// Quit SMTP session
+	if err := client.Quit(); err != nil {
+		log.Println("Failed to close SMTP connection:", err)
 		return err
 	}
 
@@ -94,12 +160,14 @@ func sendOTPHandler(email string) error {
 
 	err := database.CreateOTPEntry(&otpEntry)
 	if err != nil {
+		log.Println("Failed to store OTP:", err)
 		return fmt.Errorf("failed to store OTP: %w", err)
 	}
 
 	// Send OTP to email
 	err = sendEmail(email, otp)
 	if err != nil {
+		log.Println("Failed to send OTP:", err)
 		return fmt.Errorf("failed to send OTP: %w", err)
 	}
 
