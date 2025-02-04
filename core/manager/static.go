@@ -106,13 +106,13 @@ func UndeployStaticContentContainer() {
 func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *database.Challenge, challengeDir string) {
 	log.Infof("Starting static challenge deploy pipeline")
 	challengeStagingRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challConf.Challenge.Metadata.Name)
-	challengeStagingDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
+	// challengeStagingDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
 
 	// Check if the challenge is already in staged state
 	// Remove the already staged challenge and then copy the new files.
-	err := utils.ValidateDirExists(challengeStagingDir)
+	err := utils.ValidateDirExists(challengeStagingRoot)
 	if err == nil {
-		err = utils.RemoveDirRecursively(challengeStagingDir)
+		err = utils.RemoveDirRecursively(challengeStagingRoot)
 		if err != nil {
 			log.Errorf("Error while cleaning already staged static challenge %s : %s", challConf.Challenge.Metadata.Name, err)
 			return
@@ -127,12 +127,11 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *datab
 
 		database.UpdateChallenge(challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["deployed"]})
 
-		configFile := filepath.Join(challengeStagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
-		newPath := fmt.Sprintf("%s/%s", challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME)
-		// err = os.Rename(configFile, newPath)
-		err = utils.CopyFile(configFile, newPath)
-		if err != nil {
-			log.Errorf("Error while removing challenge config file: %s", err)
-		}
+		// configFile := filepath.Join(challengeStaticDir, core.CHALLENGE_CONFIG_FILE_NAME)
+		// err = os.Rename(configFile, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))
+		// if err != nil {
+		// 	log.Errorf("Error while removing challenge config file: %s", err)
+		// }
+
 	}
 }

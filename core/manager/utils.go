@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
+
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -472,9 +472,11 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		var assetsURL = make([]string, len(config.Challenge.Metadata.Assets))
 
 		for index, asset := range config.Challenge.Metadata.Assets {
-			beastStaticAssetUrl, _ := url.Parse(cfg.Cfg.BeastStaticUrl)
-			beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER, asset)
-			assetsURL[index] = beastStaticAssetUrl.String()
+			// beastStaticAssetUrl, _ := url.Parse(cfg.Cfg.BeastStaticUrl)
+			// beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER, asset)
+			// assetsURL[index] = beastStaticAssetUrl.String()
+
+			assetsURL[index] = asset
 		}
 		if config.Challenge.Metadata.MaxPoints > 0 {
 			log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
