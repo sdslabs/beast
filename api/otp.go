@@ -12,6 +12,7 @@ import (
 	"net/smtp"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -86,7 +87,7 @@ func sendEmail(email, otp string) error {
 
 	// Setup TLS connection
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: false, // Set true only if SMTP server uses self-signed certs
+		InsecureSkipVerify: true, // Set true only if SMTP server uses self-signed certs
 		ServerName:         smtpHost,
 	}
 
@@ -165,6 +166,17 @@ func sendOTPHandler(c *gin.Context) {
 	}
 
 	email := req.Email
+
+	re := regexp.MustCompile(`^.*@.*iitr\.ac\.in$`)
+	isIITR := re.MatchString(email)
+
+	if !isIITR {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Email should be of IITR domain",
+		})
+		return
+	}
+
 	otp := generateOTP()
 	expiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
 
@@ -192,6 +204,9 @@ func sendOTPHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	otpEntry.Code = otp
+	otpEntry.Expiry = expiry
 
 	err = database.CreateOTPEntry(&otpEntry)
 	if err != nil {

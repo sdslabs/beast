@@ -32,7 +32,7 @@ func QueryOTPEntry(email string) (OTP, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.First(&otpEntry, email)
+	tx := Db.Where("email = ?", email).First(&otpEntry)
 
 	return otpEntry, tx.Error
 }
