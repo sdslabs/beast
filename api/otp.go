@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"gorm.io/gorm"
 )
 
 func generateOTP() string {
@@ -154,7 +156,8 @@ func sendOTPHandler(c *gin.Context) {
 		Email string `json:"email" binding:"required,email"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	err := c.ShouldBindJSON(&req)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: "Invalid request",
 		})
@@ -165,13 +168,32 @@ func sendOTPHandler(c *gin.Context) {
 	otp := generateOTP()
 	expiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
 
-	otpEntry := database.OTP{
-		Email:  email,
-		Code:   otp,
-		Expiry: expiry,
+	otpEntry, err := database.QueryOTPEntry(email)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			otpEntry = database.OTP{
+				Email:  email,
+				Code:   otp,
+				Expiry: expiry,
+			}
+		} else {
+			log.Println("Failed to query OTP:", err)
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Failed to send OTP",
+			})
+			return
+		}
 	}
 
-	err := database.CreateOTPEntry(&otpEntry)
+	if otpEntry.Verified {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Email already verified",
+		})
+		return
+	}
+
+	err = database.CreateOTPEntry(&otpEntry)
 	if err != nil {
 		log.Println("Failed to store OTP:", err)
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -211,6 +233,27 @@ func verifyOTPHandler(c *gin.Context) {
 	otpEntry, err := database.QueryOTPEntry(req.Email)
 
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "OTP not found",
+			})
+		} else {
+			log.Println("Failed to query OTP:", err)
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Failed to send OTP",
+			})
+			return
+		}
+	}
+
+	if otpEntry.Verified {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "Email already verified",
+		})
+		return
+	}
+
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "Failed to verify OTP",
 		})
@@ -227,6 +270,15 @@ func verifyOTPHandler(c *gin.Context) {
 	if time.Now().After(otpEntry.Expiry) {
 		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 			Error: "OTP expired",
+		})
+		return
+	}
+
+	err = database.VerifyOTPEntry(req.Email)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "Failed to verify OTP",
 		})
 		return
 	}

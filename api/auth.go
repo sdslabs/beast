@@ -1,6 +1,8 @@
 package api
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
+	"gorm.io/gorm"
 )
 
 // Acts as a middleware to authorize user
@@ -238,10 +241,17 @@ func register(c *gin.Context) {
 	otpEntry, err := database.QueryOTPEntry(email)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "Failed to verify OTP",
-		})
-		return
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "OTP not found",
+			})
+		} else {
+			log.Println("Failed to query OTP:", err)
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Failed to send OTP",
+			})
+			return
+		}
 	}
 
 	if !otpEntry.Verified {
