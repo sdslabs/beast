@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/sdslabs/beastv4/pkg/auth"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -13,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/sdslabs/beastv4/pkg/auth"
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -488,12 +489,15 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
 		*challEntry = database.Challenge{
+
 			Name:        config.Challenge.Metadata.Name,
 			AuthorID:    userEntry.ID,
 			Format:      config.Challenge.Metadata.Type,
 			Status:      core.DEPLOY_STATUS["undeployed"],
 			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+      FailSolveLimit: *config.Challenge.Metadata.FailSolveLimit,
+			PreReqs:        strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
 			Flag:        config.Challenge.Metadata.Flag,
 			Type:        config.Challenge.Metadata.Type,
 			Sidecar:     config.Challenge.Metadata.Sidecar,
@@ -722,7 +726,6 @@ func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 			return "", err
 		}
 	}
-
 	return targetDir, nil
 }
 
