@@ -208,15 +208,15 @@ func register(c *gin.Context) {
 	sshKey := c.PostForm("ssh-key")
 
 	if username == "" || password == "" || email == "" {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Username ,password and email can not be empty",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Username ,password and email can not be empty",
 		})
 		return
 	}
 
 	if len(username) > 12 {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Username cannot be greater than 12 characters",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Username cannot be greater than 12 characters",
 		})
 		return
 	}
@@ -225,8 +225,8 @@ func register(c *gin.Context) {
 	isIITR := re.MatchString(email)
 
 	if !isIITR {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Email should be of IITR domain",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email should be of IITR domain",
 		})
 		return
 	}
@@ -243,8 +243,9 @@ func register(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "OTP not found",
+				Error: "OTP not found, email not verified",
 			})
+			return
 		} else {
 			log.Println("Failed to query OTP:", err)
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -316,5 +317,4 @@ func resetPasswordHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "Password changed successfully",
 	})
-	return
 }

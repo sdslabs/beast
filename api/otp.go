@@ -153,19 +153,7 @@ func sendEmail(email, otp string) error {
 }
 
 func sendOTPHandler(c *gin.Context) {
-	var req struct {
-		Email string `json:"email" binding:"required,email"`
-	}
-
-	err := c.ShouldBindJSON(&req)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Invalid request",
-		})
-		return
-	}
-
-	email := req.Email
+	email := c.PostForm("email")
 
 	re := regexp.MustCompile(`^.*@.*iitr\.ac\.in$`)
 	isIITR := re.MatchString(email)
@@ -233,19 +221,10 @@ func sendOTPHandler(c *gin.Context) {
 }
 
 func verifyOTPHandler(c *gin.Context) {
-	var req struct {
-		Email string `json:"email"`
-		OTP   string `json:"otp"`
-	}
+	email := c.PostForm("email")
+	otp := c.PostForm("otp")
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Invalid request",
-		})
-		return
-	}
-
-	otpEntry, err := database.QueryOTPEntry(req.Email)
+	otpEntry, err := database.QueryOTPEntry(email)
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -275,7 +254,7 @@ func verifyOTPHandler(c *gin.Context) {
 		return
 	}
 
-	if otpEntry.Code != req.OTP {
+	if otpEntry.Code != otp {
 		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 			Error: "Invalid OTP",
 		})
@@ -289,7 +268,7 @@ func verifyOTPHandler(c *gin.Context) {
 		return
 	}
 
-	err = database.VerifyOTPEntry(req.Email)
+	err = database.VerifyOTPEntry(email)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
