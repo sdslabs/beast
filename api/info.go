@@ -132,6 +132,7 @@ func challengeInfoHandler(c *gin.Context) {
 				Points:          challenge.Points,
 				SolvesNumber:    challSolves,
 				Solves:          challengeUser,
+				DeployedLink:    challenge.ServerDeployed,
 			})
 			return
 		}
@@ -153,6 +154,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Points:          challenge.Points,
 			SolvesNumber:    challSolves,
 			Solves:          challengeUser,
+			DeployedLink:    challenge.ServerDeployed,
 		})
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
@@ -312,6 +314,7 @@ func challengesInfoHandler(c *gin.Context) {
 				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
 				SolvesNumber:    challSolves,
 				Solves:          challengeUser,
+				DeployedLink:    challenge.ServerDeployed,
 			}
 		}
 
