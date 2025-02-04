@@ -105,23 +105,7 @@ func SearchContainerByFilterRemote(filterMap map[string]string, server config.Av
 	for key, val := range filterMap {
 		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
 	}
-	if server == (config.AvailableServer{}) {
-		for _, server := range config.Cfg.AvailableServers {
-			if server.Active {
-				if server.Host != core.LOCALHOST {
-					output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
-					if err != nil {
-						return []types.Container{}, err
-					}
-					for _, line := range bytes.Split([]byte(output), []byte("\n")) {
-						if len(line) > 0 {
-							containers = append(containers, types.Container{ID: string(line)})
-						}
-					}
-				}
-			}
-		}
-	} else {
+	for _, server := range config.Cfg.AvailableServers {
 		if server.Active {
 			if server.Host != core.LOCALHOST {
 				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
@@ -149,26 +133,10 @@ func SearchRunningContainerByFilterRemote(filterMap map[string]string, server co
 	for key, val := range filterMap {
 		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
 	}
-	if server == (config.AvailableServer{}) {
-		for _, server := range config.Cfg.AvailableServers {
-			if server.Active {
-				if server.Host != core.LOCALHOST {
-					output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
-					if err != nil {
-						return []types.Container{}, err
-					}
-					for _, line := range bytes.Split([]byte(output), []byte("\n")) {
-						if len(line) > 0 {
-							containers = append(containers, types.Container{ID: string(line)})
-						}
-					}
-				}
-			}
-		}
-	} else {
+	for _, server := range config.Cfg.AvailableServers {
 		if server.Active {
 			if server.Host != core.LOCALHOST {
-				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
+				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
 				if err != nil {
 					return []types.Container{}, err
 				}
