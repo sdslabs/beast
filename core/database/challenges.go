@@ -46,7 +46,7 @@ type Challenge struct {
 	DynamicFlag     bool   `gorm:"not null;default:false"`
 	Flag            string `gorm:"type:text"`
 	Type            string `gorm:"type:varchar(64)"`
-	MaxAttemptLimit  int    `gorm:"default:-1"`
+	MaxAttemptLimit int    `gorm:"default:-1"`
 	PreReqs         string `gorm:"type:text"`
 	Sidecar         string `gorm:"type:varchar(64)"`
 	Assets          string `gorm:"type:text"`
@@ -207,6 +207,7 @@ func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
 	}
 
 	return true, nil
+}
 
 // Get User Related Challenges
 func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
@@ -248,7 +249,7 @@ func UpdateUserChallengeTries(userID uint, challengeID uint) error {
 		"tries":      userChallenges.Tries + 1,
 	}
 
-	tx:= Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
+	tx := Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
 
 	return tx.Error
 }

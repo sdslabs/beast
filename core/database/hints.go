@@ -7,10 +7,10 @@ import (
 )
 
 type Hint struct {
-	HintID              uint    `gorm:"primaryKey;autoIncrement"`
-	ChallengeID         uint    `gorm:"not null"`
+	HintID      uint   `gorm:"primaryKey;autoIncrement"`
+	ChallengeID uint   `gorm:"not null"`
 	Points      uint   `gorm:"not null"`
-	Description         string  `gorm:"size:255"`
+	Description string `gorm:"size:255"`
 }
 
 type UserHint struct {
@@ -64,7 +64,7 @@ func GetHintByID(hintID uint) (*Hint, error) {
 	return &hint, nil
 }
 
-//checks if user has already taken the hint
+// checks if user has already taken the hint
 func UserHasTakenHint(userID, hintID uint) (bool, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
