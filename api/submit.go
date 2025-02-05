@@ -170,17 +170,14 @@ func submitFlagHandler(c *gin.Context) {
 					subuser, _ := database.QueryUserById(submissions[0].UserID)
 					msg := "User " + subuser.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by another user " + user.Username
 					go notify.SendNotification(notify.Warning, msg)
-					c.JSON(http.StatusOK, FlagSubmitResp{
-						Message: "Your flag is incorrect",
-						Success: false,
-					})
+					go coreUtils.LogCheating(msg)
 				} else {
 					c.JSON(http.StatusOK, FlagSubmitResp{
 						Message: "You have already solved this challenge",
 						Success: false,
 					})
+					return
 				}
-				return
 			}
 		} else {
 			if challenge.Flag != flag {

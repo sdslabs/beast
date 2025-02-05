@@ -29,6 +29,7 @@ func init() {
 	// Check if the beast directory exist, if it does not exist then create it
 	// if an error occurs in between exit the utility printing the error.
 	initDirectory(core.BEAST_GLOBAL_DIR)
+	initDirectory(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR))
 	initDirectory(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR))
 
 	// Setup logger for the application.

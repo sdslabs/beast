@@ -64,6 +64,7 @@ type Challenge struct {
 	Ports           []Port
 	Tags            []*Tag  `gorm:"many2many:tag_challenges;"`
 	Users           []*User `gorm:"many2many:user_challenges;"`
+	ServerDeployed  string  `gorm:"type:varchar(64)"`
 }
 
 type UserChallenges struct {

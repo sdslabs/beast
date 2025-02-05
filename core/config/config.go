@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -43,6 +44,23 @@ import (
 // # key used for encrypting the claims of a user. Keep this strong.
 // jwt_secret = "beast_jwt_secret_SUPER_STRONG_0x100010000100"
 //
+// # List of ip addresses of all the servers where challenge could be deployed for
+// # balanced load accross servers.
+// [[available_servers]]
+//
+// # IP-address/ Hostname of the server
+// host = "192.168.1.1"
+//
+// # Username to be used for ssh connection
+// username = "user1"
+//
+// # Path to private SSH key for interacting with the server.
+// ssh_key_path = "/path/to/your/private/key1"
+//
+// # Status of remote server to be used
+// # If it is set to false then that remote server will not be used
+// active = false
+//
 // # To allow beast to send notification to a notification channel povide this webhook URL
 // # We are also working on implmeneting notification using Discord and IRC.
 // slack_webhook = ""
@@ -51,8 +69,12 @@ import (
 // # MongoDB.
 // available_sidecars = ["mysql", "mongodb"]
 //
+// #Health Prober, if active starts a health prober on a thread which checks for
+// #deployed challenges, containers and servers after every ticker_frequency period
+// health_prober = false
+
 // # The frequency for any periodic event in beast, the value is provided in seconds.
-// # This is currently only used for health check periodic duration.s
+// # This is currently only used for health check periodic durations.
 // ticker_frequency = 3000
 //
 // # Container default resource limits for each challenge, this can be
@@ -78,19 +100,20 @@ import (
 // ssh_key = "/home/fristonio/.beast/secrets/key.priv"
 // ```
 type BeastConfig struct {
-	AuthorizedKeysFile   string                `toml:"authorized_keys_file"`
-	BeastScriptsDir      string                `toml:"scripts_dir"`
-	AllowedBaseImages    []string              `toml:"allowed_base_images"`
-	AvailableSidecars    []string              `toml:"available_sidecars"`
-	GitRemotes           []GitRemote           `toml:"remote"`
-	JWTSecret            string                `toml:"jwt_secret"`
-	NotificationWebhooks []NotificationWebhook `toml:"notification_webhooks"`
-	CompetitionInfo      CompetitionInfo       `toml:"competition_info"`
-	BeastStaticUrl       string                `toml:"beast_static_url"`
-	TickerFrequency      int                   `toml:"ticker_frequency"`
-
-	RemoteSyncPeriod time.Duration `toml:"-"`
-	Rsp              string        `toml:"remote_sync_period"`
+	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
+	BeastScriptsDir      string                     `toml:"scripts_dir"`
+	AllowedBaseImages    []string                   `toml:"allowed_base_images"`
+	AvailableSidecars    []string                   `toml:"available_sidecars"`
+	AvailableServers     map[string]AvailableServer `toml:"available_servers"`
+	GitRemotes           []GitRemote                `toml:"remote"`
+	JWTSecret            string                     `toml:"jwt_secret"`
+	NotificationWebhooks []NotificationWebhook      `toml:"notification_webhooks"`
+	CompetitionInfo      CompetitionInfo            `toml:"competition_info"`
+	BeastStaticUrl       string                     `toml:"beast_static_url"`
+	TickerFrequency      int                        `toml:"ticker_frequency"`
+	HealthProber         bool                       `toml:"health_prober"`
+	RemoteSyncPeriod     time.Duration              `toml:"-"`
+	Rsp                  string                     `toml:"remote_sync_period"`
 
 	CPUShares int64 `toml:"default_cpu_shares"`
 	Memory    int64 `toml:"default_memory_limit"`
@@ -108,7 +131,7 @@ func (config *BeastConfig) ValidateConfig() error {
 
 		config.AuthorizedKeysFile, err = filepath.Abs(config.AuthorizedKeysFile)
 		if err != nil {
-			return fmt.Errorf("Error while getting absolute path : %s", err)
+			return fmt.Errorf("error while getting absolute path : %s", err)
 		}
 	} else {
 		defaultAuthKeyFile := filepath.Join(os.Getenv("HOME"), core.DEFAULT_AUTH_KEYS_FILE)
@@ -118,7 +141,7 @@ func (config *BeastConfig) ValidateConfig() error {
 
 	if config.BeastScriptsDir == "" {
 		defaultBeastScriptDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR)
-		log.Warn("No scripts directory provided for beast, using default : %s", defaultBeastScriptDir)
+		log.Warnf("no scripts directory provided for beast, using default : %s", defaultBeastScriptDir)
 		config.BeastScriptsDir = defaultBeastScriptDir
 	} else {
 		err := utils.CreateIfNotExistDir(config.BeastScriptsDir)
@@ -128,10 +151,31 @@ func (config *BeastConfig) ValidateConfig() error {
 		}
 	}
 
+	if len(config.AvailableServers) == 0 {
+		log.Warn("No available servers provided for challenges. Using default localhost")
+		config.AvailableServers = map[string]AvailableServer{
+			core.LOCALHOST: {
+				Host:       core.LOCALHOST,
+				Username:   os.Getenv("USER"),
+				SSHKeyPath: "",
+				Active:     true,
+			},
+		}
+	}
+
+	for _, server := range config.AvailableServers {
+		if server.Active {
+			err := server.ValidateServerConfig()
+			if err != nil {
+				return fmt.Errorf("error while validating config : %s", server.Host)
+			}
+		}
+	}
+
 	_, err := url.Parse(config.BeastStaticUrl)
 
 	if err != nil {
-		return fmt.Errorf("Invalid beast static URL provided : %s", config.BeastStaticUrl)
+		return fmt.Errorf("invalid beast static URL provided : %s", config.BeastStaticUrl)
 	}
 
 	if !utils.StringInSlice(core.DEFAULT_BASE_IMAGE, config.AllowedBaseImages) {
@@ -140,14 +184,14 @@ func (config *BeastConfig) ValidateConfig() error {
 
 	if config.JWTSecret == "" {
 		log.Error("The secret string is empty in beast config")
-		return fmt.Errorf("Invalid config")
+		return fmt.Errorf("invalid config")
 	}
 
 	for _, gitRemote := range config.GitRemotes {
-		if gitRemote.Active == true {
+		if gitRemote.Active {
 			err := gitRemote.ValidateGitConfig()
 			if err != nil {
-				return fmt.Errorf("Error while validating config : %s", gitRemote.RemoteName)
+				return fmt.Errorf("error while validating config : %s", gitRemote.RemoteName)
 			}
 		}
 	}
@@ -187,6 +231,27 @@ func (config *BeastConfig) ValidateConfig() error {
 
 	return nil
 }
+type AvailableServer struct {
+	Host       string `toml:"host"`
+	Username   string `toml:"username"`
+	SSHKeyPath string `toml:"ssh_key_path"`
+	Active     bool   `toml:"active"`
+}
+
+func (config *AvailableServer) ValidateServerConfig() error {
+	if config.Host == core.LOCALHOST {
+		return nil
+	}
+	if config.Host == "" || config.Username == "" || config.SSHKeyPath == "" {
+		log.Error("One of host, username or ssh_key_path is missing in the config")
+		return errors.New("server config not valid, config parameters missing")
+	}
+	err := utils.ValidateFileExists(config.SSHKeyPath)
+	if err != nil {
+		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.SSHKeyPath, err)
+	}
+	return nil
+}
 
 type GitRemote struct {
 	Url        string `toml:"url"`
@@ -199,28 +264,28 @@ type GitRemote struct {
 func (config *GitRemote) ValidateGitConfig() error {
 	if config.Url == "" || config.RemoteName == "" || config.Secret == "" {
 		log.Error("One of url, RemoteName or ssh_key is missing in the config")
-		return errors.New("Git remote config not valid, config parameters missing")
+		return errors.New("git remote config not valid, config parameters missing")
 	}
 
 	gitUrlRegexp, err := regexp.Compile(config.Url)
 	if err != nil {
-		eMsg := fmt.Errorf("Error while compiling git url regex : %s", err)
+		eMsg := fmt.Errorf("error while compiling git url regex : %s", err)
 		return eMsg
 	}
 
 	if !gitUrlRegexp.MatchString(config.Url) {
-		return errors.New("The provided git url is not valid.")
+		return errors.New("the provided git url is not valid")
 	}
 
 	if config.Branch == "" {
-		log.Warn("Branch for git remote not provided, using %s", core.GIT_REMOTE_DEFAULT_BRANCH)
+		log.Warnf("branch for git remote not provided, using %s", core.GIT_REMOTE_DEFAULT_BRANCH)
 		config.Branch = core.GIT_REMOTE_DEFAULT_BRANCH
 	}
 
 	err = utils.ValidateFileExists(config.Secret)
 	log.Debugf("Using git ssh secret : %s", config.Secret)
 	if err != nil {
-		return fmt.Errorf("Provided ssh key file(%s) does not exists : %s", config.Secret, err)
+		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.Secret, err)
 	}
 
 	return nil
@@ -309,7 +374,9 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 		return config, err
 	}
 
-	log.Debugf("Parsed beast global config file is : %s", config)
+	prettyJSON, _ := json.MarshalIndent(config, "", "  ")
+	log.Debugf("Parsed beast global config file is : %s", string(prettyJSON))
+
 	err = config.ValidateConfig()
 	if err != nil {
 		return config, err
@@ -329,7 +396,7 @@ func UpdateUsedPortList() {
 	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
 
 	for _, gitRemote := range Cfg.GitRemotes {
-		if gitRemote.Active != true {
+		if !gitRemote.Active {
 			continue
 		}
 
@@ -385,7 +452,7 @@ func ReloadBeastConfig() error {
 	cfg, err := LoadBeastConfig(configPath)
 
 	if err != nil {
-		return fmt.Errorf("Error while loading beast config: %s", err)
+		return fmt.Errorf("error while loading beast config: %s", err)
 	}
 
 	Cfg = &cfg
