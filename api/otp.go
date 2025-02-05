@@ -155,6 +155,17 @@ func sendEmail(email, otp string) error {
 func sendOTPHandler(c *gin.Context) {
 	email := c.PostForm("email")
 
+	smtpHost := config.Cfg.MailConfig.SMTPHost
+	smtpPort := config.Cfg.MailConfig.SMTPPort
+
+	if smtpHost == "" || smtpPort == "" {
+		log.Printf("WARNING: %s", "SMTP not configured")
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "SMTP not configured",
+		})
+		return
+	}
+
 	re := regexp.MustCompile(`^.*@.*iitr\.ac\.in$`)
 	isIITR := re.MatchString(email)
 
@@ -223,6 +234,17 @@ func sendOTPHandler(c *gin.Context) {
 func verifyOTPHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	otp := c.PostForm("otp")
+
+	smtpHost := config.Cfg.MailConfig.SMTPHost
+	smtpPort := config.Cfg.MailConfig.SMTPPort
+
+	if smtpHost == "" || smtpPort == "" {
+		log.Printf("WARNING: %s", "SMTP not configured")
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "SMTP not configured",
+		})
+		return
+	}
 
 	otpEntry, err := database.QueryOTPEntry(email)
 

@@ -238,31 +238,35 @@ func register(c *gin.Context) {
 		SshKey:    sshKey,
 	}
 
-	otpEntry, err := database.QueryOTPEntry(email)
+	smtpHost := config.Cfg.MailConfig.SMTPHost
+	smtpPort := config.Cfg.MailConfig.SMTPPort
 
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "OTP not found, email not verified",
-			})
-			return
-		} else {
-			log.Println("Failed to query OTP:", err)
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "Failed to send OTP",
+	if smtpHost == "" || smtpPort == "" {
+		log.Printf("WARNING: %s", "SMTP not configured")
+	} else {
+		otpEntry, err := database.QueryOTPEntry(email)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+					Error: "OTP not found, email not verified",
+				})
+				return
+			} else {
+				log.Println("Failed to query OTP:", err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "Failed to send OTP",
+				})
+				return
+			}
+		}
+		if !otpEntry.Verified {
+			c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
+				Error: "Email not verified, cannot register user",
 			})
 			return
 		}
 	}
-
-	if !otpEntry.Verified {
-		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
-			Error: "Email not verified, cannot register user",
-		})
-		return
-	}
-
-	err = database.CreateUserEntry(&userEntry)
+	err := database.CreateUserEntry(&userEntry)
 
 	if err != nil {
 		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{

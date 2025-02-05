@@ -194,6 +194,10 @@ func (config *BeastConfig) ValidateConfig() error {
 		config.PidsLimit = core.DEFAULT_PIDS_LIMIT
 	}
 
+	if config.MailConfig.From == "" || config.MailConfig.Password == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {
+		log.Warn("Mail configuration not provided, email notifications will not work")
+	}
+
 	return nil
 }
 
