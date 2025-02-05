@@ -113,21 +113,24 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
-		preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
 
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
+		if challenge.PreReqs != "" {
+			preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
 
-		if !preReqsStatus {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "You have not solved the prerequisites of this challenge.",
-				Success: false,
-			})
-			return
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			if !preReqsStatus {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have not solved the prerequisites of this challenge.",
+					Success: false,
+				})
+				return
+			}
 		}
 
 		// If the challenge is dynamic, then the flag is not stored in the database
@@ -204,7 +207,7 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
-		if challenge.FailSolveLimit > 0 {
+		if challenge.MaxAttemptLimit > 0 {
 			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
 
 			if err != nil {
@@ -213,7 +216,7 @@ func submitFlagHandler(c *gin.Context) {
 				return
 			}
 
-			if previousTries >= challenge.FailSolveLimit {
+			if previousTries >= challenge.MaxAttemptLimit {
 				c.JSON(http.StatusOK, FlagSubmitResp{
 					Message: "You have reached the maximum number of tries for this challenge.",
 					Success: false,

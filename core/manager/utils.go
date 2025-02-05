@@ -497,20 +497,20 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 		*challEntry = database.Challenge{
 
-			Name:        config.Challenge.Metadata.Name,
-			AuthorID:    userEntry.ID,
-			Format:      config.Challenge.Metadata.Type,
-			Status:      core.DEPLOY_STATUS["undeployed"],
-			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-      FailSolveLimit: *config.Challenge.Metadata.FailSolveLimit,
-			PreReqs:        strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
-			DynamicFlag: config.Challenge.Metadata.DynamicFlag,
-			Flag:        config.Challenge.Metadata.Flag,
-			Type:        config.Challenge.Metadata.Type,
-			Sidecar:     config.Challenge.Metadata.Sidecar,
-			Description: config.Challenge.Metadata.Description,
-			Assets:      strings.Join(assetsURL, core.DELIMITER),
+			Name:            config.Challenge.Metadata.Name,
+			AuthorID:        userEntry.ID,
+			Format:          config.Challenge.Metadata.Type,
+			Status:          core.DEPLOY_STATUS["undeployed"],
+			ContainerId:     coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:         coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			MaxAttemptLimit: config.Challenge.Metadata.MaxAttemptLimit,
+			PreReqs:         strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
+			DynamicFlag:     config.Challenge.Metadata.DynamicFlag,
+			Flag:            config.Challenge.Metadata.Flag,
+			Type:            config.Challenge.Metadata.Type,
+			Sidecar:         config.Challenge.Metadata.Sidecar,
+			Description:     config.Challenge.Metadata.Description,
+			Assets:          strings.Join(assetsURL, core.DELIMITER),
 			AdditionalLinks: strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),
 			Points:          config.Challenge.Metadata.Points,
 			MinPoints:       config.Challenge.Metadata.MinPoints,
@@ -899,7 +899,7 @@ func UpdateChallenges(defaultauthorpassword string) {
 	log.Debugf("Challenges updated in Db")
 }
 
-func ValidateFlag(flag, challenge_name string)  error{
+func ValidateFlag(flag, challenge_name string) error {
 	if challenge_name == "" {
 		log.Errorf("Challenge name is empty")
 		return fmt.Errorf("challenge name is empty")
@@ -912,7 +912,7 @@ func ValidateFlag(flag, challenge_name string)  error{
 
 	dynamicflag := database.DynamicFlag{
 		Name: challenge_name,
-		Flag:          flag,
+		Flag: flag,
 	}
 	err := database.CreateDynamicFlagEntry(&dynamicflag)
 

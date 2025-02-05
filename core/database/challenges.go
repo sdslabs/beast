@@ -46,7 +46,7 @@ type Challenge struct {
 	DynamicFlag     bool   `gorm:"not null;default:false"`
 	Flag            string `gorm:"type:text"`
 	Type            string `gorm:"type:varchar(64)"`
-	FailSolveLimit  int    `gorm:"default:-1"`
+	MaxAttemptLimit  int    `gorm:"default:-1"`
 	PreReqs         string `gorm:"type:text"`
 	Sidecar         string `gorm:"type:varchar(64)"`
 	Assets          string `gorm:"type:text"`
@@ -185,41 +185,28 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 
 // Check Pre Reqs Status
 func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
-	if challenge.PreReqs == "" {
-		return true, nil
-	}
 	// Split the PreReqs field to get the list of prerequisite challenge names
 	preReqChallengeNames := strings.Split(challenge.PreReqs, core.DELIMITER)
 
-	// Query the database to get the user's solved challenges
-	var userChallenges []UserChallenges
-	err := Db.Where("user_id = ? AND solved = ?", userID, true).Find(&userChallenges).Error
-	if err != nil {
-		return false, err
-	}
-
-	// Create a map to quickly check if a challenge is solved
-	solvedChallenges := make(map[string]bool)
-	for _, userChallenge := range userChallenges {
-		if userChallenge.Solved {
-			var solvedChallenge Challenge
-			err := Db.Where("id = ?", userChallenge.ChallengeID).First(&solvedChallenge).Error
-			if err != nil {
-				return false, err
-			}
-			solvedChallenges[solvedChallenge.Name] = true
-		}
-	}
-
 	// Check if all prerequisite challenges are solved
 	for _, preReq := range preReqChallengeNames {
-		if !solvedChallenges[preReq] {
-			return false, nil
+		var preReqChallenge Challenge
+		err := Db.Where("name = ?", preReq).First(&preReqChallenge).Error
+		if err != nil {
+			return false, err
+		}
+
+		var userChallenge UserChallenges
+		err = Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userID, preReqChallenge.ID, true).First(&userChallenge).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return false, nil
+			}
+			return false, err
 		}
 	}
 
 	return true, nil
-}
 
 // Get User Related Challenges
 func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
@@ -261,7 +248,9 @@ func UpdateUserChallengeTries(userID uint, challengeID uint) error {
 		"tries":      userChallenges.Tries + 1,
 	}
 
-	return Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates).Error
+	tx:= Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
+
+	return tx.Error
 }
 
 // Update an entry for the challenge in the Challenge table

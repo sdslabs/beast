@@ -122,7 +122,6 @@ func hintHandler(c *gin.Context) {
 		// If hint already taken, just return the description
 		c.JSON(http.StatusOK, HTTPPlainResp{
 			Message: hint.Description,
-			
 		})
 		return
 	}
@@ -241,7 +240,6 @@ func challengeInfoHandler(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		
 
 		autherr := auth.Authorize(values[1], core.ADMIN)
 
@@ -255,7 +253,7 @@ func challengeInfoHandler(c *gin.Context) {
 				Status:          challenge.Status,
 				Ports:           challengePorts,
 				Hints:           hintInfos,
-				FailSolveLimit:  challenge.FailSolveLimit,
+				MaxAttemptLimit: challenge.MaxAttemptLimit,
 				Desc:            challenge.Description,
 				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
 				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
@@ -278,7 +276,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Status:          challenge.Status,
 			Ports:           challengePorts,
 			Hints:           hintInfos,
-			FailSolveLimit:  challenge.FailSolveLimit,
+			MaxAttemptLimit: challenge.MaxAttemptLimit,
 			Desc:            challenge.Description,
 			Assets:          strings.Split(challenge.Assets, core.DELIMITER),
 			AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
@@ -463,7 +461,7 @@ func challengesInfoHandler(c *gin.Context) {
 					ID:     hint.HintID,
 					Points: hint.Points,
 				}
-      }
+			}
 			// Get previous tries for the current user and challenge
 			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
 			if err != nil {
@@ -481,7 +479,7 @@ func challengesInfoHandler(c *gin.Context) {
 				Status:          challenge.Status,
 				Ports:           challengePorts,
 				Hints:           hintInfos,
-				FailSolveLimit:  challenge.FailSolveLimit,
+				MaxAttemptLimit: challenge.MaxAttemptLimit,
 				Desc:            challenge.Description,
 				Points:          challenge.Points,
 				Assets:          strings.Split(challenge.Assets, core.DELIMITER),

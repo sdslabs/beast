@@ -140,7 +140,7 @@ type ChallengeMetadata struct {
 		Text   string `toml:"text"`
 		Points uint   `toml:"points"`
 	} `toml:"hints"`
-	FailSolveLimit  *int     `toml:"failSolveLimit"`
+	MaxAttemptLimit int      `toml:"max_attempt_limit"`
 	PreReqs         []string `toml:"preReqs"`
 	DynamicFlag     bool     `toml:"dynamic_flag"`
 	Points          uint     `toml:"points"`
@@ -157,15 +157,12 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 		return fmt.Errorf("Name and Flag required for the challenge"), false
 	}
 
-	// Checks if fail solve limit is provided and is greater than 0.
-	if config.FailSolveLimit != nil {
-		if *config.FailSolveLimit <= 0 {
-			return fmt.Errorf("fail Solve Limit must be greater than equal to 0"), false
-		}
-	} else {
+	// Checks if fail solve limit is provided and is greater than 0
+	if config.MaxAttemptLimit < 0 {
+		return fmt.Errorf("fail solve limit must be greater than equal to 0"), false
+	} else if config.MaxAttemptLimit == 0 {
 		// sets default value to -1 so it means that there is no limit.
-		defaultLimit := -1
-		config.FailSolveLimit = &defaultLimit
+		config.MaxAttemptLimit = -1
 	}
 
 	if !(utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "") {

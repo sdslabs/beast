@@ -117,7 +117,7 @@ type ChallengeInfoResp struct {
 	AdditionalLinks []string        `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
 	CreatedAt       time.Time       `json:"createdAt"`
 	Status          string          `json:"status" example:"deployed"`
-	FailSolveLimit  int             `json:"failSolveLimit" example:"5"`
+	MaxAttemptLimit int             `json:"maxAttemptLimit" example:"5"`
 	PreReqs         []string        `json:"preReqs" example:"['web-php','simple']"`
 	Ports           []uint32        `json:"ports" example:[3001, 3002]`
 	Hints           []HintInfo      `json:"hints"`
@@ -137,7 +137,7 @@ type ChallengePreviewResp struct {
 	Tags            []string `json:"tags" example:"['pwn','misc']"`
 	Assets          []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
 	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
-	FailSolveLimit  int      `json:"failSolveLimit" example:"5"`
+	MaxAttemptLimit int      `json:"maxAttemptLimit" example:"5"`
 	PreReqs         []string `json:"preReqs" example:"['web-php','simple']"`
 	Ports           []uint32 `json:"ports" example:[3001, 3002]`
 	Desc            string   `json:"description" example:"A simple web challenge"`
