@@ -459,12 +459,13 @@ func challengesInfoHandler(c *gin.Context) {
 					ID:     hint.HintID,
 					Points: hint.Points,
 				}
+			}
+
 			// Get previous tries for the current user and challenge
 			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
 			if err != nil {
 				log.Error(err)
 				previousTries = 0
-
 			}
 
 			availableChallenges[index] = ChallengeInfoResp{
