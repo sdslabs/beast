@@ -3,6 +3,8 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	container_types "github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
@@ -58,4 +60,18 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 		return remoteManager.GetContainerStdLogsRemote(chall.ContainerId, server)
 	}
 	return cr.GetContainerStdLogs(chall.ContainerId)
+}
+
+func LogCheating(msg string) error {
+	// log the cheating attempt in a file in cheat.log
+	file, err := os.OpenFile(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CHEAT_LOG_FILE), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("error while opening cheat log file : %s", err)
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(msg + "\n"); err != nil {
+		return fmt.Errorf("error while appending to cheat log file : %s", err)
+	}
+	return nil
 }
