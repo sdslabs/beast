@@ -8,4 +8,6 @@ name = "static-chall"
 flag = "BACKDOOR{SAMPLE_FLAG}"
 type = "static"
 hints = ["static_hint_1", "static_hint_2"]
-tags = ["easy"]
+maxPoints = 100
+minPoints = 50
+tags = ["easy", "web"]

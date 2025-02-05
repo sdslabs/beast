@@ -11,10 +11,59 @@ scripts_dir = "$HOME/.beast/scripts"
 # Base OS image that beast allows the challenges to use.
 allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
 
+# The sidecar that we support with beast, currently we only support two MySQL and
+# MongoDB.
+available_sidecars = ["mysql", "mongodb"]
 
 # For authentication purposes beast uses JWT based authentication, this is the
 # key used for encrypting the claims of a user. Keep this strong.
 jwt_secret = "beast_jwt_secret_SUPER_STRONG_0x100010000100"
+
+#Health Prober, if active, starts a health prober on a thread which checks for
+#deployed challenges, containers and servers after every ticker_frequency period
+health_prober = false
+
+# The frequency for any periodic event in beast, the value is provided in seconds.
+# This is currently only used for health check periodic durations.
+ticker_frequency = 3000
+
+
+# Container default resource limits for each challenge, this can be
+# Overridden by challenge configuration beast.toml file.
+default_cpu_shares = 1024
+default_memory_limit = 1024
+default_pids_limit = 100
+
+# List of ip addresses of all the servers where challenge could be deployed for 
+# balanced load accross servers. 
+[available_servers]
+# [available_servers."host"]
+[available_servers."192.168.1.1"]
+# IP-address/Hostname of the server
+host = "192.168.1.1"
+
+# Username to be used for ssh connection
+username = "user1"
+
+# Path to private SSH key for interacting with the server.
+ssh_key_path = "/path/to/your/private/key1"
+
+# Status of remote server to be used
+# If it is set to false then that remote server will not be used
+active = false
+
+[available_servers.localhost]
+# IP-address/Hostname of the server
+host = "localhost"
+
+# Username to be used for ssh connection (Leave empty for localhost)
+username = "user1"
+
+# Path to private SSH key for interacting with the server. (Leave empty for localhost)
+ssh_key_path = "/path/to/your/private/key1"
+
+# Status of remote server to be used
+active = true
 
 
 # To allow beast to send notification to a notification channel povide this webhook URL
@@ -30,23 +79,6 @@ service_name = "discord"
 # Status of webhook URL to be used.
 # If it is false then notification will not be sent on this URL
 active = false
-
-# The sidecar that we support with beast, currently we only support two MySQL and
-# MongoDB.
-available_sidecars = ["mysql", "mongodb"]
-
-
-# The frequency for any periodic event in beast, the value is provided in seconds.
-# This is currently only used for health check periodic duration.s
-ticker_frequency = 3000
-
-
-# Container default resource limits for each challenge, this can be
-# Overridden by challenge configuration beast.toml file.
-default_cpu_shares = 1024
-default_memory_limit = 1024
-default_pids_limit = 100
-
 
 # Configuration corresponding to the remote repository used by beast
 # We use ssh authentication mechanism for interacting with git repository.
@@ -71,7 +103,7 @@ active = false
 # The following fields are required only while hosting a competition on beast
 # This section contains information about the competition to be hosted
 # Structure of the sections with the acceptable fields are:
-[[competition_info]]
+[competition_info]
 # Required Fields
 
 # Name of the competition   
@@ -96,3 +128,6 @@ prizes = ""
 
 # Absolute path of logo file. Default logo dir is in the "BEAST_GLOBAL_DIR/assets/"
 logo_url = ""
+
+# Dynamic scoring for challenges
+dynamic_score = false

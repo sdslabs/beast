@@ -115,6 +115,7 @@ type ChallengeInfoResp struct {
 	Solves          []UserSolveResp `json:"solves"`
 	DynamicFlag     bool            `json:"dynamicFlag" example:"true"`
 	Flag            string          `json:"flag"`
+	DeployedLink    string          `json:"deployedLink" example:"beast.sdslabs.co"`
 }
 
 type ChallengePreviewResp struct {
@@ -127,6 +128,7 @@ type ChallengePreviewResp struct {
 	Hints           []string `json:"hints" example:"Try robots"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
+	DeployedLink    string   `json:"deployedLink" example:"beast.sdslabs.co"`
 }
 
 type SubmissionResp struct {

@@ -15,6 +15,7 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
+	fileUtils "github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -132,6 +133,7 @@ func challengeInfoHandler(c *gin.Context) {
 				Points:          challenge.Points,
 				SolvesNumber:    challSolves,
 				Solves:          challengeUser,
+				DeployedLink:    challenge.ServerDeployed,
 			})
 			return
 		}
@@ -153,6 +155,7 @@ func challengeInfoHandler(c *gin.Context) {
 			Points:          challenge.Points,
 			SolvesNumber:    challSolves,
 			Solves:          challengeUser,
+			DeployedLink:    challenge.ServerDeployed,
 		})
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
@@ -312,6 +315,7 @@ func challengesInfoHandler(c *gin.Context) {
 				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
 				SolvesNumber:    challSolves,
 				Solves:          challengeUser,
+				DeployedLink:    challenge.ServerDeployed,
 			}
 		}
 
@@ -789,5 +793,36 @@ func tagHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, TagInfoResp{
 		Tags: uniqueTags,
 	})
+	return
+}
+
+// @Tags info
+// @Accept  json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param challenge query string false "The name of the challenge to get the logs for."
+// @Param asset query string false "The name of the static asset requested."
+// @Success 200 {object} api.LogsInfoResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /api/info/download [get]
+func serveAssets(c *gin.Context) {
+	log.Print("Recieved request")
+	challenge := c.Query("challenge")
+	assetName := c.Query("asset")
+	challenge = filepath.Base(challenge)
+	assetName = filepath.Base(assetName)
+	if challenge == "" || assetName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "challenge and asset parameters are required"})
+		return
+	}
+	filepath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, core.BEAST_STATIC_FOLDER, assetName)
+	err := fileUtils.ValidateFileExists(filepath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Incorrect file requested"})
+		return
+	}
+	c.FileAttachment(filepath, assetName)
+
 	return
 }
