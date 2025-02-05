@@ -28,7 +28,7 @@ func initGinRouter() *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}
 	router.Use(cors.New(corsConfig))
-
+	router.GET("/dummy", dummyHandler)
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
