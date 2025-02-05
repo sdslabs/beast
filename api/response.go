@@ -98,6 +98,16 @@ type UserSolveResp struct {
 	SolvedAt time.Time `json:"solvedAt"`
 }
 
+type HintInfo struct {
+	ID     uint `json:"id"`
+	Points uint `json:"points"`
+}
+
+type HintResponse struct {
+	Description string `json:"description" example:"This is a hint"`
+	Points      uint   `json:"points" example:"10"`
+}
+
 type ChallengeInfoResp struct {
 	Name            string          `json:"name" example:"Web Challenge"`
 	ChallId         uint            `json:"id" example:"0"`
@@ -107,12 +117,15 @@ type ChallengeInfoResp struct {
 	AdditionalLinks []string        `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
 	CreatedAt       time.Time       `json:"createdAt"`
 	Status          string          `json:"status" example:"deployed"`
+	MaxAttemptLimit int             `json:"maxAttemptLimit" example:"5"`
+	PreReqs         []string        `json:"preReqs" example:"['web-php','simple']"`
 	Ports           []uint32        `json:"ports" example:[3001, 3002]`
-	Hints           string          `json:"hints" example:"Try robots"`
+	Hints           []HintInfo      `json:"hints"`
 	Desc            string          `json:"description" example:"A simple web challenge"`
 	Points          uint            `json:"points" example:"50"`
 	SolvesNumber    int             `json:"solvesNumber" example:"100"`
 	Solves          []UserSolveResp `json:"solves"`
+	PreviousTries   int             `json:"previous_tries" example:"3"`
 	DynamicFlag     bool            `json:"dynamicFlag" example:"true"`
 	Flag            string          `json:"flag"`
 	DeployedLink    string          `json:"deployedLink" example:"beast.sdslabs.co"`
@@ -124,8 +137,9 @@ type ChallengePreviewResp struct {
 	Tags            []string `json:"tags" example:"['pwn','misc']"`
 	Assets          []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
 	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
+	MaxAttemptLimit int      `json:"maxAttemptLimit" example:"5"`
+	PreReqs         []string `json:"preReqs" example:"['web-php','simple']"`
 	Ports           []uint32 `json:"ports" example:[3001, 3002]`
-	Hints           []string `json:"hints" example:"Try robots"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
 	DeployedLink    string   `json:"deployedLink" example:"beast.sdslabs.co"`

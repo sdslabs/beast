@@ -30,8 +30,9 @@ type User struct {
 	Name       string       `gorm:"not null"`
 	Email      string       `gorm:"non null;unique"`
 	SshKey     string
-	Status     uint `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
-	Score      uint `gorm:"default:0"`
+	Status     uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Score      uint    `gorm:"default:0"`
+	Hints      []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
 // Queries all the users entries where the column represented by key
@@ -150,7 +151,7 @@ func UpdateUser(user *User, m map[string]interface{}) error {
 	return Db.Model(user).Updates(m).Error
 }
 
-//Get Related Challenges
+// Get Related Challenges
 func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	var challenges []Challenge
 
@@ -173,7 +174,7 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("user_id = ? AND challenge_id = ?", userId, challId).Find(&userChallenges).Count(&count)
+	tx := Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userId, challId, true).Find(&userChallenges).Count(&count)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return false, nil
@@ -182,7 +183,7 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	return (count >= 1), tx.Error
 }
 
-//hook after create
+// hook after create
 func (user *User) AfterCreate(tx *gorm.DB) error {
 	if user.SshKey == "" {
 		return nil
@@ -193,7 +194,7 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 	return nil
 }
 
-//hook after update
+// hook after update
 func (user *User) AfterUpdate(tx *gorm.DB) error {
 	iFace, _ := tx.InstanceGet("gorm:update_attrs")
 	if iFace == nil {
@@ -257,7 +258,7 @@ func generateContentAuthorizedKeyFile(user *User) ([]byte, error) {
 	return authKey.Bytes(), nil
 }
 
-//adds to authorized keys
+// adds to authorized keys
 func addToAuthorizedKeys(user *User) error {
 	if config.Cfg == nil {
 		log.Warn("No config initialized, skipping add to authorized keys hook")

@@ -114,6 +114,25 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		if challenge.PreReqs != "" {
+			preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			if !preReqsStatus {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have not solved the prerequisites of this challenge.",
+					Success: false,
+				})
+				return
+			}
+		}
+
 		// If the challenge is dynamic, then the flag is not stored in the database
 		if challenge.DynamicFlag {
 			whereMap := map[string]interface{}{
@@ -188,6 +207,42 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		if challenge.MaxAttemptLimit > 0 {
+			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request."})
+				return
+			}
+
+			if previousTries >= challenge.MaxAttemptLimit {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have reached the maximum number of tries for this challenge.",
+					Success: false,
+				})
+				return
+			}
+		}
+
+		// Increase user tries by 1
+		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		if challenge.Flag != flag {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Your flag is incorrect",
+				Success: false,
+			})
+			return
+		}
+
 		challengePoints := challenge.Points
 		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
 		if config.Cfg.CompetitionInfo.DynamicScore {
@@ -224,6 +279,7 @@ func submitFlagHandler(c *gin.Context) {
 			CreatedAt:   time.Time{},
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
+			Solved:      true,
 		}
 		if challenge.DynamicFlag {
 			UserChallengesEntry.Flag = flag

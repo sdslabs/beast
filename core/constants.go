@@ -33,7 +33,7 @@ const ( //names
 	ISSUER                      string = "beast-sds"
 	DELIMITER                   string = "::::"
 	LOCALHOST                   string = "localhost"
-	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast"			// This should always be used for remote only.
+	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
 )
 
 const ( //paths

@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
@@ -45,8 +46,9 @@ type Challenge struct {
 	DynamicFlag     bool   `gorm:"not null;default:false"`
 	Flag            string `gorm:"type:text"`
 	Type            string `gorm:"type:varchar(64)"`
+	MaxAttemptLimit int    `gorm:"default:-1"`
+	PreReqs         string `gorm:"type:text"`
 	Sidecar         string `gorm:"type:varchar(64)"`
-	Hints           string `gorm:"type:text"`
 	Assets          string `gorm:"type:text"`
 	AdditionalLinks string `gorm:"type:text"`
 	Description     string `gorm:"type:text"`
@@ -69,6 +71,8 @@ type UserChallenges struct {
 	CreatedAt   time.Time
 	UserID      uint
 	ChallengeID uint
+	Tries       uint
+	Solved      bool
 	Flag        string
 }
 
@@ -179,6 +183,77 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 	return challenges[0], nil
 }
 
+// Check Pre Reqs Status
+func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
+	// Split the PreReqs field to get the list of prerequisite challenge names
+	preReqChallengeNames := strings.Split(challenge.PreReqs, core.DELIMITER)
+
+	// Check if all prerequisite challenges are solved
+	for _, preReq := range preReqChallengeNames {
+		var preReqChallenge Challenge
+		err := Db.Where("name = ?", preReq).First(&preReqChallenge).Error
+		if err != nil {
+			return false, err
+		}
+
+		var userChallenge UserChallenges
+		err = Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userID, preReqChallenge.ID, true).First(&userChallenge).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+
+	return true, nil
+}
+
+// Get User Related Challenges
+func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
+	var userChallenges UserChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Return true  if no record is found
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	return int(userChallenges.Tries), nil
+}
+
+func UpdateUserChallengeTries(userID uint, challengeID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	var userChallenges UserChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Create a new record if not found
+			userChallenges = UserChallenges{
+				UserID:      userID,
+				ChallengeID: challengeID,
+				Tries:       1,
+				Solved:      false,
+			}
+			return Db.Create(&userChallenges).Error
+		}
+		return err
+	}
+
+	updates := map[string]interface{}{
+		"created_at": time.Now(),
+		"tries":      userChallenges.Tries + 1,
+	}
+
+	tx := Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
+
+	return tx.Error
+}
+
 // Update an entry for the challenge in the Challenge table
 func UpdateChallenge(chall *Challenge, m map[string]interface{}) error {
 
@@ -236,7 +311,10 @@ func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(challenge).Association("Users").Find(&users); err != nil {
+	// Query users who have solved this challenge by checking the user_challenges table
+	if err := Db.Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
+		Where("user_challenges.challenge_id = ? AND user_challenges.solved = ?", challenge.ID, true).
+		Find(&users).Error; err != nil {
 		return users, err
 	}
 

@@ -8,6 +8,8 @@ name = "xinetd-service"
 flag = "CTF{sample_flag}"
 type = "service"
 hints = ["xinetd_hint_1", "xinetd_hint_2"]
+preReqs = ["simple", "web-php"]
+max_attempt_limit=2
 
 [challenge.env]
 apt_deps = ["gcc", "socat"]

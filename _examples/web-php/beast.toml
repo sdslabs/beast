@@ -8,6 +8,7 @@ name = "web-php"
 flag = "BACKDOOR{SAMPLE_WEB_FLAG}"
 type = "web:php:7.1:cli"
 hints = ["web_hint_1", "web_hint_2"]
+max_attempt_limit = 3
 
 [challenge.env]
 ports = [10002]

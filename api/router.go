@@ -82,6 +82,8 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/users", getAllUsersInfoHandler)
 			infoGroup.GET("/submissions", submissionsHandler)
 			infoGroup.GET("/tags", tagHandler)
+			infoGroup.GET("/hint/:hintID", hintHandler)
+			infoGroup.POST("/hint/:hintID", hintHandler)
 			infoGroup.GET("/download", serveAssets)
 		}
 
