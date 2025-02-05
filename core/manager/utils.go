@@ -496,7 +496,6 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			availableServerHostname = availableServer.Host
 		}
 		*challEntry = database.Challenge{
-
 			Name:            config.Challenge.Metadata.Name,
 			AuthorID:        userEntry.ID,
 			Format:          config.Challenge.Metadata.Type,
