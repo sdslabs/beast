@@ -162,6 +162,7 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 		return fmt.Errorf("fail solve limit must be greater than equal to 0"), false
 	} else if config.MaxAttemptLimit == 0 {
 		// sets default value to -1 so it means that there is no limit.
+		log.Warn("MaxAttemptLimit is set to 0, defaulting to no limit for attempts")
 		config.MaxAttemptLimit = -1
 	}
 
