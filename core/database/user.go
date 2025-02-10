@@ -18,7 +18,8 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
-	_ "gorm.io/driver/sqlite"
+
+	// _ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -38,12 +39,9 @@ type User struct {
 // have the value in value.
 func QueryUserEntries(key string, value string) ([]User, error) {
 	queryKey := fmt.Sprintf("%s = ?", key)
-
 	var users []User
-
 	DBMux.Lock()
 	defer DBMux.Unlock()
-
 	tx := Db.Where(queryKey, value).Find(&users)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -93,7 +91,7 @@ func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("id != ? AND score >= ? AND role == ? AND status == ?", userID, userScore, core.USER_ROLES["contestant"], 0).Find(&users)
+	tx := Db.Where("id != ? AND score >= ? AND role = ? AND status = ?", userID, userScore, core.USER_ROLES["contestant"], 0).Find(&users)
 
 	for _, user := range users {
 		if user.Score > userScore {
@@ -150,7 +148,7 @@ func UpdateUser(user *User, m map[string]interface{}) error {
 	return Db.Model(user).Updates(m).Error
 }
 
-//Get Related Challenges
+// Get Related Challenges
 func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	var challenges []Challenge
 
@@ -182,7 +180,7 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	return (count >= 1), tx.Error
 }
 
-//hook after create
+// hook after create
 func (user *User) AfterCreate(tx *gorm.DB) error {
 	if user.SshKey == "" {
 		return nil
@@ -193,7 +191,7 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 	return nil
 }
 
-//hook after update
+// hook after update
 func (user *User) AfterUpdate(tx *gorm.DB) error {
 	iFace, _ := tx.InstanceGet("gorm:update_attrs")
 	if iFace == nil {
@@ -257,7 +255,7 @@ func generateContentAuthorizedKeyFile(user *User) ([]byte, error) {
 	return authKey.Bytes(), nil
 }
 
-//adds to authorized keys
+// adds to authorized keys
 func addToAuthorizedKeys(user *User) error {
 	if config.Cfg == nil {
 		log.Warn("No config initialized, skipping add to authorized keys hook")

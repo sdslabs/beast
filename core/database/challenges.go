@@ -12,7 +12,7 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	tools "github.com/sdslabs/beastv4/templates"
-	_ "gorm.io/driver/sqlite"
+	// _ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
