@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"sync"
+	"time"
 
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
@@ -115,6 +116,7 @@ func CreateSSHClient(remoteServer config.AvailableServer) (*ssh.Client, error) {
 			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Insecure for now. Integrate proper callback for host key verification.
+		Timeout:         10 * time.Second,
 	}
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", remoteServer.Host), config)
