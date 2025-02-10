@@ -133,6 +133,40 @@ func submitFlagHandler(c *gin.Context) {
 			}
 		}
 
+		if challenge.MaxAttemptLimit > 0 {
+			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request."})
+				return
+			}
+
+			if previousTries >= challenge.MaxAttemptLimit {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have reached the maximum number of tries for this challenge.",
+					Success: false,
+				})
+				return
+			}
+		}
+
+		// Increase user tries by 1
+		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		if challenge.Flag != flag {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Your flag is incorrect",
+				Success: false,
+			})
+			return
+		}
+
 		// If the challenge is dynamic, then the flag is not stored in the database
 		if challenge.DynamicFlag {
 			whereMap := map[string]interface{}{
@@ -202,42 +236,6 @@ func submitFlagHandler(c *gin.Context) {
 		if solved {
 			c.JSON(http.StatusOK, FlagSubmitResp{
 				Message: "Challenge has already been solved.",
-				Success: false,
-			})
-			return
-		}
-
-		if challenge.MaxAttemptLimit > 0 {
-			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
-
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request."})
-				return
-			}
-
-			if previousTries >= challenge.MaxAttemptLimit {
-				c.JSON(http.StatusOK, FlagSubmitResp{
-					Message: "You have reached the maximum number of tries for this challenge.",
-					Success: false,
-				})
-				return
-			}
-		}
-
-		// Increase user tries by 1
-		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if challenge.Flag != flag {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Your flag is incorrect",
 				Success: false,
 			})
 			return
