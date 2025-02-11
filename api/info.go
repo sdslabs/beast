@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -53,7 +52,7 @@ func challengeInfoHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: fmt.Sprintf("Challenge name cannot be empty"),
+			Error: "Challenge name cannot be empty",
 		})
 		return
 	}
@@ -162,8 +161,6 @@ func challengeInfoHandler(c *gin.Context) {
 			Error: "No challenge found with name: " + name,
 		})
 	}
-
-	return
 }
 
 // Returns information about all challenges with and without filters
@@ -356,7 +353,7 @@ func challengeLogsHandler(c *gin.Context) {
 	chall := c.Query("challenge")
 	if chall == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Challenge name cannot be empty"),
+			Message: "Challenge name cannot be empty",
 		})
 		return
 	}
@@ -392,7 +389,7 @@ func userInfoHandler(c *gin.Context) {
 	username := c.Param("username")
 	if userId == "" && username == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: fmt.Sprintf("Both User Id and Username cannot be empty"),
+			Error: "Both User Id and Username cannot be empty",
 		})
 		return
 	}
@@ -403,7 +400,7 @@ func userInfoHandler(c *gin.Context) {
 		id, err := strconv.ParseUint(userId, 10, 64)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, HTTPErrorResp{
-				Error: fmt.Sprintf("Could not parse User Id or invalid User Id"),
+				Error: "Could not parse User Id or invalid User Id",
 			})
 			return
 		}
@@ -435,11 +432,6 @@ func userInfoHandler(c *gin.Context) {
 		return
 	}
 	var resp UserResp
-
-	var challNameString []string
-	for _, challenge := range challenges {
-		challNameString = append(challNameString, challenge.Name)
-	}
 
 	userChallenges := make([]ChallengeSolveResp, len(challenges))
 	for index, challenge := range challenges {
@@ -487,7 +479,6 @@ func userInfoHandler(c *gin.Context) {
 		Challenges: userChallenges,
 	}
 	c.JSON(http.StatusOK, resp)
-	return
 }
 
 // Returns all user's info
@@ -601,7 +592,6 @@ func getAllUsersInfoHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, availableUsers)
 	}
 
-	return
 }
 
 // Handles submissions made by the user
@@ -682,7 +672,6 @@ func submissionsHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, submissionsResp)
-	return
 }
 
 // Returns statistics of users in competition
@@ -729,7 +718,6 @@ func getUsersStatisticsHandler(c *gin.Context) {
 		UnbannedUsers:        totalRegisteredUsers - bannedUsers,
 	})
 
-	return
 }
 
 // Returns competition information
@@ -761,7 +749,6 @@ func competitionInfoHandler(c *gin.Context) {
 		TimeZone:     competitionInfo.TimeZone,
 		LogoURL:      strings.Trim(logoPath, "/"),
 	})
-	return
 }
 
 // Returns allTags
@@ -793,7 +780,6 @@ func tagHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, TagInfoResp{
 		Tags: uniqueTags,
 	})
-	return
 }
 
 // @Tags info
@@ -824,5 +810,92 @@ func serveAssets(c *gin.Context) {
 	}
 	c.FileAttachment(filepath, assetName)
 
-	return
+}
+
+var (
+	leaderboardCache []UserResp
+	leaderboardStale = true
+)
+
+// Returns leaderboard
+// @Summary Returns leaderboard
+// @Description Returns leaderboard of all users
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param page query string false "Page number"
+// @Success 200 {object} api.UserResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/leaderboard [get]
+func leaderboardHandler(c *gin.Context) {
+	pageStr := c.Query("page")
+	log.Print(pageStr)
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid page number",
+		})
+		return
+	}
+	log.Print(page)
+	if page == 1 {
+		if leaderboardStale {
+			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
+			log.Printf("Users: %v", len(users))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+			var leaderboard []UserResp
+			for index, user := range users {
+				resp := UserResp{
+					Username: user.Username,
+					Id:       user.ID,
+					Role:     user.Role,
+					Status:   user.Status,
+					Score:    user.Score,
+					Email:    user.Email,
+					Rank:     int64(index + 1),
+				}
+				leaderboard = append(leaderboard, resp)
+			}
+			leaderboardCache = leaderboard
+			leaderboardStale = false
+		}
+		c.JSON(http.StatusOK, leaderboardCache)
+		return
+	}
+	offset := (page - 1) * core.LEADERBOARD_SIZE
+	log.Print(offset)
+	users, err := database.QueryUsersByScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
+	log.Printf("Users: %v", len(users))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	var leaderboard []UserResp
+	rankOffset := offset
+	for index, user := range users {
+		resp := UserResp{
+			Username: user.Username,
+			Id:       user.ID,
+			Role:     user.Role,
+			Status:   user.Status,
+			Score:    user.Score,
+			Email:    user.Email,
+			Rank:     int64(rankOffset + index + 1),
+		}
+		leaderboard = append(leaderboard, resp)
+	}
+	c.JSON(http.StatusOK, leaderboard)
+
 }

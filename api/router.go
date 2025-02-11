@@ -80,6 +80,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/logs", challengeLogsHandler)
 			infoGroup.GET("/user/:username", userInfoHandler)
 			infoGroup.GET("/users", getAllUsersInfoHandler)
+			infoGroup.GET("/leaderboard", leaderboardHandler)
 			infoGroup.GET("/submissions", submissionsHandler)
 			infoGroup.GET("/tags", tagHandler)
 			infoGroup.GET("/download", serveAssets)
