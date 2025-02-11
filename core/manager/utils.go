@@ -15,7 +15,6 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 
-
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -199,12 +198,15 @@ func getCommandAndModifierForWebChall(language, framework, webRoot, port string)
 }
 
 // This function provides the run command and image for a particular type of web challenge
-//  * webRoot:  relative path to web challenge directory
-//  * port:     web port
-//  * challengeInfo
 //
-//  It returns the run command for challenge
-//  and the docker base image corresponding to language
+//   - webRoot:  relative path to web challenge directory
+//
+//   - port:     web port
+//
+//   - challengeInfo
+//
+//     It returns the run command for challenge
+//     and the docker base image corresponding to language
 func GetWebChallSetup(webRoot, port string, challengeInfo []string) (string, string, func(*BeastBareDockerfile)) {
 	length := len(challengeInfo)
 	reqLength := 4
@@ -457,6 +459,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
+			userEntry = newUser
 			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
@@ -883,7 +886,7 @@ func UpdateChallenges(defaultauthorpassword string) {
 	log.Debugf("Challenges updated in Db")
 }
 
-func ValidateFlag(flag, challenge_name string)  error{
+func ValidateFlag(flag, challenge_name string) error {
 	if challenge_name == "" {
 		log.Errorf("Challenge name is empty")
 		return fmt.Errorf("challenge name is empty")
@@ -896,7 +899,7 @@ func ValidateFlag(flag, challenge_name string)  error{
 
 	dynamicflag := database.DynamicFlag{
 		Name: challenge_name,
-		Flag:          flag,
+		Flag: flag,
 	}
 	err := database.CreateDynamicFlagEntry(&dynamicflag)
 
