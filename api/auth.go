@@ -205,7 +205,7 @@ func register(c *gin.Context) {
 
 	if username == "" || password == "" || email == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Username ,password and email can not be empty",
+			Message: "Username, password and email can not be empty",
 		})
 		return
 	}
