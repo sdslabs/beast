@@ -75,3 +75,18 @@ func LogCheating(msg string) error {
 	}
 	return nil
 }
+
+
+func LogFlag(msg string, challName string) error {
+	// log the cheating attempt in a file in cheat.log
+	file, err := os.OpenFile(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challName, core.BEAST_CHALLENGE_LOGS_DIR, core.BEAST_FLAG_LOG_FILE), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("error while opening cheat log file : %s", err)
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(msg + "\n"); err != nil {
+		return fmt.Errorf("error while appending to flag log file : %s", err)
+	}
+	return nil
+}

@@ -19,6 +19,7 @@ const ( //names
 	BEAST_CONFIG_FILE_NAME      string = "config.toml"
 	BEAST_LOG_FILE              string = "beast.log"
 	BEAST_CHEAT_LOG_FILE        string = "cheat.log"
+	BEAST_FLAG_LOG_FILE         string = "flag.log"
 	BEAST_DATABASE              string = "beast.db"
 	DEFAULT_CHALLENGE_NAME      string = "Backdoor-Challenge"
 	DEFAULT_AUTHOR_NAME         string = "ghost"

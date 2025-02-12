@@ -159,13 +159,10 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
-		if challenge.Flag != flag {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Your flag is incorrect",
-				Success: false,
-			})
-			return
-		}
+
+		currentTime := time.Now()
+		msg := "User " + username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " | TimeStamp: " + currentTime.Format("20060102150405")
+		go coreUtils.LogFlag(msg, challenge.Name)
 
 		// If the challenge is dynamic, then the flag is not stored in the database
 		if challenge.DynamicFlag {
