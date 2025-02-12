@@ -19,6 +19,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/auth"
 	"gorm.io/gorm"
 )
 
@@ -303,3 +304,78 @@ func verifyOTPHandler(c *gin.Context) {
 		Message: "OTP verified successfully",
 	})
 }
+
+func verifyOTPForForgetHandler(c *gin.Context) {
+	email := c.PostForm("email")
+	otp := c.PostForm("otp")
+
+	smtpHost := config.Cfg.MailConfig.SMTPHost
+	smtpPort := config.Cfg.MailConfig.SMTPPort
+
+	if smtpHost == "" || smtpPort == "" {
+		log.Printf("WARNING: %s", "SMTP not configured")
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "SMTP not configured",
+		})
+		return
+	}
+
+	otpEntry, err := database.QueryOTPEntry(email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "OTP not found",
+			})
+		} else {
+			log.Println("Failed to query OTP:", err)
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Failed to verify OTP",
+			})
+		}
+		return
+	}
+
+	if otpEntry.Code != otp {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Invalid OTP",
+		})
+		return
+	}
+
+	if time.Now().After(otpEntry.Expiry) {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "OTP expired",
+		})
+		return
+	}
+
+	userEntry, err := database.QueryFirstUserEntry("email", email)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if userEntry.Status == 1 {
+		c.JSON(http.StatusForbidden, HTTPPlainResp{
+			Message: "The user has been banned from this competition. Please contact competition admin for more information",
+		})
+		return
+	}
+
+	tempToken, err := auth.Authenticate(userEntry.Username, "", userEntry.AuthModel)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "Failed to create authentication session",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, HTTPAuthorizeResp{
+		Token:   tempToken,
+		Role:    userEntry.Role,
+		Message: "OTP verified. Use this token to reset your password within 5 minutes.",
+	})
+}
+

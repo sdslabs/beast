@@ -37,6 +37,7 @@ func initGinRouter() *gin.Engine {
 		authGroup.POST("/reset-password", authorize, resetPasswordHandler)
 		authGroup.POST("/send-otp", sendOTPHandler)
 		authGroup.POST("/verify-otp", verifyOTPHandler)
+		authGroup.POST("/verify-otp-forget", verifyOTPForForgetHandler)
 	}
 
 	// For serving static files
