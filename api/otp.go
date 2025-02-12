@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -155,6 +156,7 @@ func sendEmail(email, otp string) error {
 
 func sendOTPHandler(c *gin.Context) {
 	email := c.PostForm("email")
+	email = strings.TrimSpace(strings.ToLower(email))
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -234,7 +236,8 @@ func sendOTPHandler(c *gin.Context) {
 
 func verifyOTPHandler(c *gin.Context) {
 	email := c.PostForm("email")
-	otp := c.PostForm("otp")
+	otp := strings.TrimSpace(c.PostForm("otp"))
+	email = strings.TrimSpace(strings.ToLower(email))
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -307,7 +310,8 @@ func verifyOTPHandler(c *gin.Context) {
 
 func verifyOTPForForgetHandler(c *gin.Context) {
 	email := c.PostForm("email")
-	otp := c.PostForm("otp")
+	otp := strings.TrimSpace(c.PostForm("otp"))
+	email = strings.TrimSpace(strings.ToLower(email))
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -378,4 +382,3 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 		Message: "OTP verified. Use this token to reset your password within 5 minutes.",
 	})
 }
-

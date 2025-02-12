@@ -147,6 +147,9 @@ func login(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
+	username = strings.TrimSpace(strings.ToLower(username))
+	password = strings.TrimSpace(password)
+
 	if username == "" || password == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: "Username and password can not be empty",
@@ -206,6 +209,12 @@ func register(c *gin.Context) {
 	password := c.PostForm("password")
 	email := c.PostForm("email")
 	sshKey := c.PostForm("ssh-key")
+
+	name = strings.TrimSpace(name)
+	username = strings.TrimSpace(strings.ToLower(username))
+	password = strings.TrimSpace(password)
+	email = strings.TrimSpace(strings.ToLower(email))
+	sshKey = strings.TrimSpace(sshKey)
 
 	if username == "" || password == "" || email == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
@@ -292,6 +301,7 @@ func register(c *gin.Context) {
 // @Router /auth/reset-password [post]
 func resetPasswordHandler(c *gin.Context) {
 	newPass := c.PostForm("new_pass")
+	newPass = strings.TrimSpace(newPass)
 
 	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
