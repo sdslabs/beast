@@ -60,7 +60,7 @@ func containerProber(chall database.Challenge) error {
 func ChallengesHealthProber(waitTime int) {
 	log.Info("Starting Challenge Health Check prober.")
 	challs, err := database.QueryChallengeEntriesMap(map[string]interface{}{
-		"Status":       core.DEPLOY_STATUS["deployed"],
+		"status":       core.DEPLOY_STATUS["deployed"],
 		"health_check": 1,
 	})
 

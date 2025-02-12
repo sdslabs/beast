@@ -115,7 +115,7 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 		}
 
 		if chall.Name != "" {
-			database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["undeployed"]})
+			database.UpdateChallenge(&chall, map[string]interface{}{"status": core.DEPLOY_STATUS["undeployed"]})
 			log.Errorf("The action(%s) specified for challenge : %s does not exist", info.Action, w.ID)
 		}
 	}
@@ -447,7 +447,7 @@ func HandleAll(action string, user string) []string {
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
-			"Status": core.DEPLOY_STATUS["deployed"],
+			"status": core.DEPLOY_STATUS["deployed"],
 		})
 		if err != nil {
 			break
@@ -457,7 +457,7 @@ func HandleAll(action string, user string) []string {
 
 	case core.MANAGE_ACTION_REDEPLOY:
 		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
-			"Status": core.DEPLOY_STATUS["deployed"],
+			"status": core.DEPLOY_STATUS["deployed"],
 		})
 		if err != nil {
 			break
@@ -541,7 +541,7 @@ func AutoUpdate() {
 	newChallsSet := utils.SetFromArray(newChalls)
 
 	undeployedChalls, err := database.QueryChallengeEntriesMap(map[string]interface{}{
-		"Status": core.DEPLOY_STATUS["undeployed"],
+		"status": core.DEPLOY_STATUS["undeployed"],
 	})
 	if err != nil {
 		log.Warnf("Error getting undeployed challenges: %s", err.Error())
@@ -653,7 +653,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 	}
 
 	err = database.UpdateChallenge(&challenge, map[string]interface{}{
-		"Status":      core.DEPLOY_STATUS["undeployed"],
+		"status":      core.DEPLOY_STATUS["undeployed"],
 		"ContainerId": coreUtils.GetTempContainerId(challengeName),
 	})
 
@@ -731,7 +731,7 @@ func DeployChallenge(challengeName string) error {
 		return err
 	}
 	if chall.Name != "" {
-		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+		database.UpdateChallenge(&chall, map[string]interface{}{"status": core.DEPLOY_STATUS["queued"]})
 	}
 	return Q.Push(*w)
 }
@@ -745,7 +745,7 @@ func UndeployChallenge(challengeName string) error {
 	}
 
 	if chall.Name != "" {
-		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+		database.UpdateChallenge(&chall, map[string]interface{}{"status": core.DEPLOY_STATUS["queued"]})
 	}
 
 	return Q.Push(wpool.Task{
@@ -762,7 +762,7 @@ func PurgeChallenge(challengeName string) error {
 		return err
 	}
 	if chall.Name != "" {
-		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+		database.UpdateChallenge(&chall, map[string]interface{}{"status": core.DEPLOY_STATUS["queued"]})
 	}
 
 	return Q.Push(wpool.Task{
@@ -779,7 +779,7 @@ func RedeployChallenge(challengeName string) error {
 		return err
 	}
 	if chall.Name != "" {
-		database.UpdateChallenge(&chall, map[string]interface{}{"Status": core.DEPLOY_STATUS["queued"]})
+		database.UpdateChallenge(&chall, map[string]interface{}{"status": core.DEPLOY_STATUS["queued"]})
 	}
 
 	return Q.Push(wpool.Task{

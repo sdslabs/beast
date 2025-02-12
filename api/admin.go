@@ -57,7 +57,7 @@ func banUserHandler(c *gin.Context) {
 		return
 	}
 
-	err = database.UpdateUser(&user, map[string]interface{}{"Status": userState})
+	err = database.UpdateUser(&user, map[string]interface{}{"status": userState})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "DATABASE ERROR while processing the request.",

@@ -125,7 +125,7 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *datab
 	} else {
 		log.Infof("Challenge %s has been deployed as a static challenge", challConf.Challenge.Metadata.Name)
 
-		database.UpdateChallenge(challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["deployed"]})
+		database.UpdateChallenge(challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deployed"]})
 
 		// configFile := filepath.Join(challengeStaticDir, core.CHALLENGE_CONFIG_FILE_NAME)
 		// err = os.Rename(configFile, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))

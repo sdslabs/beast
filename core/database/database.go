@@ -150,6 +150,7 @@ func BackupDatabase() error {
 		log.Printf("Backup error: %s\n", string(output))
 		return err
 	}
+	log.Debug("Backup successful.")
 	return nil
 }
 
@@ -180,7 +181,7 @@ func ResetDatabase() error {
 		log.Printf("Create DB error: %s\n", string(output))
 		return err
 	}
-
+	log.Debug("Reset successful.")
 	return nil
 }
 
