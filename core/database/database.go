@@ -10,10 +10,10 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	log "github.com/sirupsen/logrus"
-	"gorm.io/driver/postgres"
+	// "gorm.io/driver/postgres"
 
-	// "gorm.io/driver/sqlite"
-	// _ "gorm.io/driver/sqlite"
+	"gorm.io/driver/sqlite"
+	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -35,10 +35,10 @@ var (
 func init() {
 	DBMux = &sync.Mutex{}
 
-	// beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
-	// Db, dberr = gorm.Open(sqlite.Open(beastDb), &gorm.Config{})
-	dsn := "user=Sukhi password=12345678 dbname=beast host=localhost port=5432 sslmode=disable"
-	Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
+	Db, dberr = gorm.Open(sqlite.Open(beastDb), &gorm.Config{})
+	// dsn := "user=Sukhi password=12345678 dbname=beast host=localhost port=5432 sslmode=disable"
+	// Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if dberr != nil {
 		log.Error("Error while initializing the database.", dberr)
 		// return nil, err
