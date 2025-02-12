@@ -251,6 +251,7 @@ type ChallengeEnv struct {
 	BaseImage        string           `toml:"base_image"`
 	WebRoot          string           `toml:"web_root"`
 	ServicePath      string           `toml:"service_path"`
+	XintedConfig     string           `toml:"xinetd_config"`
 	Entrypoint       string           `toml:"entrypoint"`
 	DockerCtx        string           `toml:"docker_context"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`

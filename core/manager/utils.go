@@ -356,26 +356,30 @@ func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.B
 			return fmt.Errorf("error while creating a tempfile for xinetdconf :: %s", err)
 		}
 		defer file.Close()
+		var xintedConfig string
+		if config.Challenge.Env.XintedConfig == "" {
+			xintedConfig = config.Challenge.Env.XintedConfig
+		} else {
+			var xinetd bytes.Buffer
+			xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
+			if err != nil {
+				return fmt.Errorf("error while parsing Xinetd config template :: %s", err)
+			}
 
-		var xinetd bytes.Buffer
-		xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
-		if err != nil {
-			return fmt.Errorf("error while parsing Xinetd config template :: %s", err)
+			port := config.Challenge.Env.GetDefaultPort()
+
+			data := BeastXinetdConf{
+				Port:        fmt.Sprintf("%d", port),
+				ServiceName: config.Challenge.Metadata.Name,
+				ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
+			}
+			err = xinetdTemplate.Execute(&xinetd, data)
+			if err != nil {
+				return fmt.Errorf("error while executing Xinetd Config template :: %s", err)
+			}
+			xintedConfig = xinetd.String()
 		}
-
-		port := config.Challenge.Env.GetDefaultPort()
-
-		data := BeastXinetdConf{
-			Port:        fmt.Sprintf("%d", port),
-			ServiceName: config.Challenge.Metadata.Name,
-			ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
-		}
-		err = xinetdTemplate.Execute(&xinetd, data)
-		if err != nil {
-			return fmt.Errorf("error while executing Xinetd Config template :: %s", err)
-		}
-
-		_, err = file.WriteString(xinetd.String())
+		_, err = file.WriteString(xintedConfig)
 		if err != nil {
 			return fmt.Errorf("error while writing xinetd config to file :: %s", err)
 		}
