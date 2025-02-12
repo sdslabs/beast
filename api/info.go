@@ -594,6 +594,30 @@ func getAllUsersInfoHandler(c *gin.Context) {
 
 }
 
+// a route handler to get the number of users in the databse with role=contestant
+// @Summary Returns the number of users in the database with role=contestant
+// @Description Returns the number of users in the database with role=contestant
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.UserCountResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/usercount [get]
+func getUserCountHandler(c *gin.Context) {
+	count, err := database.GetUserCount()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, UserCountResp{
+		UserCount: count,
+	})
+}
+
 // Handles submissions made by the user
 // @Summary Handles submissions made by the user
 // @Description Handles submissions made by the user
@@ -817,85 +841,85 @@ var (
 	leaderboardStale = true
 )
 
-// Returns leaderboard
-// @Summary Returns leaderboard
-// @Description Returns leaderboard of all users
-// @Tags info
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param page query string false "Page number"
-// @Success 200 {object} api.UserResp
-// @Failure 400 {object} api.HTTPErrorResp
-// @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/leaderboard [get]
-func leaderboardHandler(c *gin.Context) {
-	pageStr := c.Query("page")
-	log.Print(pageStr)
-	if pageStr == "" {
-		pageStr = "1"
-	}
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Invalid page number",
-		})
-		return
-	}
-	log.Print(page)
-	if page == 1 {
-		if leaderboardStale {
-			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
-			log.Printf("Users: %v", len(users))
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-			var leaderboard []UserResp
-			for index, user := range users {
-				resp := UserResp{
-					Username: user.Username,
-					Id:       user.ID,
-					Role:     user.Role,
-					Status:   user.Status,
-					Score:    user.Score,
-					Email:    user.Email,
-					Rank:     int64(index + 1),
+	// Returns leaderboard
+	// @Summary Returns leaderboard
+	// @Description Returns leaderboard of all users
+	// @Tags info
+	// @Accept json
+	// @Produce json
+	// @Param Authorization header string true "Bearer"
+	// @Param page query string false "Page number"
+	// @Success 200 {object} api.UserResp
+	// @Failure 400 {object} api.HTTPErrorResp
+	// @Failure 500 {object} api.HTTPErrorResp
+	// @Router /api/info/leaderboard [get]
+	func leaderboardHandler(c *gin.Context) {
+		pageStr := c.Query("page")
+		log.Print(pageStr)
+		if pageStr == "" {
+			pageStr = "1"
+		}
+		page, err := strconv.Atoi(pageStr)
+		if err != nil || page < 1 {
+			c.JSON(http.StatusBadRequest, HTTPErrorResp{
+				Error: "Invalid page number",
+			})
+			return
+		}
+		log.Print(page)
+		if page == 1 {
+			if leaderboardStale {
+				users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
+				log.Printf("Users: %v", len(users))
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+						Error: "DATABASE ERROR while processing the request.",
+					})
+					return
 				}
-				leaderboard = append(leaderboard, resp)
+				var leaderboard []UserResp
+				for index, user := range users {
+					resp := UserResp{
+						Username: user.Username,
+						Id:       user.ID,
+						Role:     user.Role,
+						Status:   user.Status,
+						Score:    user.Score,
+						Email:    user.Email,
+						Rank:     int64(index + 1),
+					}
+					leaderboard = append(leaderboard, resp)
+				}
+				leaderboardCache = leaderboard
+				leaderboardStale = false
 			}
-			leaderboardCache = leaderboard
-			leaderboardStale = false
+			c.JSON(http.StatusOK, leaderboardCache)
+			return
 		}
-		c.JSON(http.StatusOK, leaderboardCache)
-		return
-	}
-	offset := (page - 1) * core.LEADERBOARD_SIZE
-	log.Print(offset)
-	users, err := database.QueryUsersByScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
-	log.Printf("Users: %v", len(users))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-	var leaderboard []UserResp
-	rankOffset := offset
-	for index, user := range users {
-		resp := UserResp{
-			Username: user.Username,
-			Id:       user.ID,
-			Role:     user.Role,
-			Status:   user.Status,
-			Score:    user.Score,
-			Email:    user.Email,
-			Rank:     int64(rankOffset + index + 1),
+		offset := (page - 1) * core.LEADERBOARD_SIZE
+		log.Print(offset)
+		users, err := database.QueryUsersByScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
+		log.Printf("Users: %v", len(users))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
 		}
-		leaderboard = append(leaderboard, resp)
-	}
-	c.JSON(http.StatusOK, leaderboard)
+		var leaderboard []UserResp
+		rankOffset := offset
+		for index, user := range users {
+			resp := UserResp{
+				Username: user.Username,
+				Id:       user.ID,
+				Role:     user.Role,
+				Status:   user.Status,
+				Score:    user.Score,
+				Email:    user.Email,
+				Rank:     int64(rankOffset + index + 1),
+			}
+			leaderboard = append(leaderboard, resp)
+		}
+		c.JSON(http.StatusOK, leaderboard)
 
-}
+	}

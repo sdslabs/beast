@@ -166,3 +166,8 @@ type CompetitionInfoResp struct {
 type TagInfoResp struct {
 	Tags []string `json:"tags"`
 }
+
+// UserCountResp represents the response for contestant user count
+type UserCountResp struct {
+	UserCount int64 `json:"user_count"`
+}
