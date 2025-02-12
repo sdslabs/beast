@@ -98,6 +98,12 @@ import (
 //
 // # Path to private SSH key for interacting with the git repository.
 // ssh_key = "/home/fristonio/.beast/secrets/key.priv"
+//
+// # Mail config parameters for SMTP configuration
+// from = ""
+// password = ""
+// smtpHost = ""
+// smtpPort = ""
 // ```
 type BeastConfig struct {
 	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
@@ -118,6 +124,9 @@ type BeastConfig struct {
 	CPUShares int64 `toml:"default_cpu_shares"`
 	Memory    int64 `toml:"default_memory_limit"`
 	PidsLimit int64 `toml:"default_pids_limit"`
+
+	// For SMTP Configuration
+	MailConfig MailConfig `toml:"mail_config"`
 }
 
 func (config *BeastConfig) ValidateConfig() error {
@@ -229,8 +238,13 @@ func (config *BeastConfig) ValidateConfig() error {
 		config.PidsLimit = core.DEFAULT_PIDS_LIMIT
 	}
 
+	if config.MailConfig.From == "" || config.MailConfig.Password == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {
+		log.Warn("Mail configuration not provided, email notifications will not work")
+	}
+
 	return nil
 }
+
 type AvailableServer struct {
 	Host       string `toml:"host"`
 	Username   string `toml:"username"`
@@ -306,6 +320,13 @@ type CompetitionInfo struct {
 	TimeZone     string `toml:"timezone"`
 	LogoURL      string `toml:"logo_url"`
 	DynamicScore bool   `toml:"dynamic_score"`
+}
+
+type MailConfig struct {
+	From     string `toml:"from"`
+	Password string `toml:"password"`
+	SMTPHost string `toml:"smtpHost"`
+	SMTPPort string `toml:"smtpPort"`
 }
 
 func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {

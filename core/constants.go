@@ -18,6 +18,7 @@ const ( //names
 	CHALLENGE_CONFIG_FILE_NAME  string = "beast.toml"
 	BEAST_CONFIG_FILE_NAME      string = "config.toml"
 	BEAST_LOG_FILE              string = "beast.log"
+	BEAST_CHEAT_LOG_FILE        string = "cheat.log"
 	BEAST_DATABASE              string = "beast.db"
 	DEFAULT_CHALLENGE_NAME      string = "Backdoor-Challenge"
 	DEFAULT_AUTHOR_NAME         string = "ghost"
@@ -46,6 +47,7 @@ const ( //paths
 	BEAST_UPLOADS_DIR              string = "uploads"
 	BEAST_ASSETS_DIR               string = "assets"
 	BEAST_LOGO_DIR                 string = "logo"
+	BEAST_EMAIL_TEMPLATE_DIR       string = "mailTemplates"
 )
 
 const ( //chall types

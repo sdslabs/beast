@@ -31,8 +31,9 @@ type User struct {
 	Name       string       `gorm:"not null"`
 	Email      string       `gorm:"non null;unique"`
 	SshKey     string
-	Status     uint `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
-	Score      uint `gorm:"default:0"`
+	Status     uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Score      uint    `gorm:"default:0"`
+	Hints      []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
 // Queries all the users entries where the column represented by key
@@ -170,7 +171,7 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("user_id = ? AND challenge_id = ?", userId, challId).Find(&userChallenges).Count(&count)
+	tx := Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userId, challId, true).Find(&userChallenges).Count(&count)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return false, nil
