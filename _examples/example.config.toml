@@ -116,6 +116,7 @@ host = "localhost"
 port = "5432"
 sslmode = "prefer"
 
+
 # The following fields are required only while hosting a competition on beast
 # This section contains information about the competition to be hosted
 # Structure of the sections with the acceptable fields are:
