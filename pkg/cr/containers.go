@@ -154,7 +154,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	for _, portMapping := range containerConfig.PortMapping {
 		natPort, err := nat.NewPort(containerConfig.TrafficType(), strconv.Itoa(int(portMapping.ContainerPort)))
 		if err != nil {
-			return "", fmt.Errorf("Error while creating new port from port %d", portMapping.ContainerPort)
+			return "", fmt.Errorf("error while creating new port from port %d", portMapping.ContainerPort)
 		}
 
 		portSet[natPort] = struct{}{}
@@ -197,7 +197,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, containerName)
 	if err != nil {
-		log.Error("Error while creating the container with name %s", containerName)
+		log.Errorf("error while creating the container with name %s", containerName)
 		return "", err
 	}
 
@@ -207,7 +207,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	if err := cli.ContainerStart(ctx, containerId, types.ContainerStartOptions{}); err != nil {
-		log.Error("Error while starting the container : %s", err)
+		log.Errorf("error while starting the container : %s", err)
 		return "", err
 	}
 

@@ -254,6 +254,16 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 		return fmt.Errorf("error while starting transaction : %s", tx.Error)
 	}
 
+	// Remove associations first
+	if err := tx.Model(challenge).Association("Tags").Clear(); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to clear tags associations: %v", err)
+	}
+	if err := tx.Model(challenge).Association("Users").Clear(); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to clear users associations: %v", err)
+	}
+
 	if err := tx.Unscoped().Delete(challenge).Error; err != nil {
 		tx.Rollback()
 		return err
