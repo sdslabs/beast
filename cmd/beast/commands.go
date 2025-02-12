@@ -128,5 +128,6 @@ func init() {
 	rootCmd.AddCommand(generateTemplateCmd)
 	rootCmd.AddCommand(challDetailsCmd)
 	rootCmd.AddCommand(resetDatabaseCmd)
+	rootCmd.AddCommand(backupDatabaseCmd)
 	rootCmd.AddCommand(restoreDatabaseCmd)
 }

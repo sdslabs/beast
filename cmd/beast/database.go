@@ -28,3 +28,12 @@ var restoreDatabaseCmd = &cobra.Command{
 		}
 	},
 }
+
+
+var backupDatabaseCmd = &cobra.Command{
+	Use:   "backup-database",
+	Short: "Backups the existing database and remote/staging directories",
+	Run: func(cmd *cobra.Command, args []string) {
+		database.BackupDatabase()
+	},
+}

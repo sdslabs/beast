@@ -18,6 +18,7 @@ const ( //names
 	CHALLENGE_CONFIG_FILE_NAME  string = "beast.toml"
 	BEAST_CONFIG_FILE_NAME      string = "config.toml"
 	BEAST_LOG_FILE              string = "beast.log"
+	BEAST_CHEAT_LOG_FILE        string = "cheat.log"
 	BEAST_DATABASE              string = "beast.db"
 	DEFAULT_CHALLENGE_NAME      string = "Backdoor-Challenge"
 	DEFAULT_AUTHOR_NAME         string = "ghost"
@@ -32,7 +33,7 @@ const ( //names
 	ISSUER                      string = "beast-sds"
 	DELIMITER                   string = "::::"
 	LOCALHOST                   string = "localhost"
-	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast"			// This should always be used for remote only.
+	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
 )
 
 const ( //paths

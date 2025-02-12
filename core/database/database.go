@@ -83,8 +83,11 @@ func init() {
 		log.Fatalf("Cannot create related models: %s", err)
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &DynamicFlag{})
+	if err := Db.SetupJoinTable(&User{}, "Hints", &UserHint{}); err != nil {
+		log.Fatalf("Cannot create related models: %s", err)
+	}
 
+	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{})
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
 		log.Errorf("Error while checking dummy user entry.")
@@ -113,8 +116,6 @@ func init() {
 }
 
 func BackupAndReset() {
-	beastRemoteDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-	beastStagingDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
 	LoadDbConfig()
 	err := BackupDatabase()
 	if err != nil {
@@ -126,19 +127,11 @@ func BackupAndReset() {
 		log.Errorf("Error while resetting up database: %s", err)
 		return
 	}
-	err = os.Rename(beastRemoteDir, beastRemoteDir+time.Now().Format("20060102150405")+".bak")
-	if err != nil {
-		log.Errorf("Error while backing up remote dir: %s", err)
-		return
-	}
-	err = os.Rename(beastStagingDir, beastStagingDir+time.Now().Format("20060102150405")+".bak")
-	if err != nil {
-		log.Errorf("Error while backing up staging dir: %s", err)
-		return
-	}
 }
 
 func BackupDatabase() error {
+	beastRemoteDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
+	beastStagingDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
 	if dbConfig == (Config{}) {
 		LoadDbConfig()
 	}
@@ -148,6 +141,16 @@ func BackupDatabase() error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Backup error: %s\n", string(output))
+		return err
+	}
+	err = os.Rename(beastRemoteDir, beastRemoteDir+time.Now().Format("20060102150405")+".bak")
+	if err != nil {
+		log.Errorf("Error while backing up remote dir: %s", err)
+		return err
+	}
+	err = os.Rename(beastStagingDir, beastStagingDir+time.Now().Format("20060102150405")+".bak")
+	if err != nil {
+		log.Errorf("Error while backing up staging dir: %s", err)
 		return err
 	}
 	log.Debug("Backup successful.")
@@ -160,7 +163,7 @@ func ResetDatabase() error {
 	}
 	err := TerminateDatabaseConnections()
 	if err != nil {
-		log.Errorf("Unable to terminate connections ", err)
+		log.Error("Unable to terminate connections ", err)
 		return err
 	}
 
@@ -218,7 +221,7 @@ func RestoreDatabase(backupFile string) error {
 		log.Error("Unable to terminate connections ", err)
 		return err
 	}
-	
+
 	err = utils.ValidateFileExists(backupFile)
 	if err != nil {
 		return fmt.Errorf("backup file does not exist: %s", backupFile)
@@ -245,4 +248,5 @@ func RestoreDatabase(backupFile string) error {
 
 	log.Println("Database restored successfully from:", backupFile)
 	return nil
+
 }

@@ -247,6 +247,7 @@ func (config *BeastConfig) ValidateConfig() error {
 
 	return nil
 }
+
 type AvailableServer struct {
 	Host       string `toml:"host"`
 	Username   string `toml:"username"`

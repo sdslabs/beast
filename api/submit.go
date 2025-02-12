@@ -114,6 +114,59 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		if challenge.PreReqs != "" {
+			preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			if !preReqsStatus {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have not solved the prerequisites of this challenge.",
+					Success: false,
+				})
+				return
+			}
+		}
+
+		if challenge.MaxAttemptLimit > 0 {
+			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request."})
+				return
+			}
+
+			if previousTries >= challenge.MaxAttemptLimit {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have reached the maximum number of tries for this challenge.",
+					Success: false,
+				})
+				return
+			}
+		}
+
+		// Increase user tries by 1
+		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		if challenge.Flag != flag {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Your flag is incorrect",
+				Success: false,
+			})
+			return
+		}
+
 		// If the challenge is dynamic, then the flag is not stored in the database
 		if challenge.DynamicFlag {
 			whereMap := map[string]interface{}{
@@ -154,17 +207,14 @@ func submitFlagHandler(c *gin.Context) {
 					subuser, _ := database.QueryUserById(submissions[0].UserID)
 					msg := "User " + subuser.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by another user " + user.Username
 					go notify.SendNotification(notify.Warning, msg)
-					c.JSON(http.StatusOK, FlagSubmitResp{
-						Message: "Your flag is incorrect",
-						Success: false,
-					})
+					go coreUtils.LogCheating(msg)
 				} else {
 					c.JSON(http.StatusOK, FlagSubmitResp{
 						Message: "You have already solved this challenge",
 						Success: false,
 					})
+					return
 				}
-				return
 			}
 		} else {
 			if challenge.Flag != flag {
@@ -227,6 +277,7 @@ func submitFlagHandler(c *gin.Context) {
 			CreatedAt:   time.Time{},
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
+			Solved:      true,
 		}
 		if challenge.DynamicFlag {
 			UserChallengesEntry.Flag = flag
