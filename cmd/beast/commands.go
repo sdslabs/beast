@@ -31,6 +31,7 @@ var (
 	Status                string
 	Tags                  string
 	NoCache               bool
+	RestoreFile 		  string
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -110,6 +111,8 @@ func init() {
 	challDetailsCmd.PersistentFlags().StringVarP(&Status, "status", "s", "all", "Filter by status : deployed / undeployed / queued")
 	challDetailsCmd.PersistentFlags().StringVarP(&Tags, "tags", "t", "", "Filter by tagname : pwn / web / image / docker")
 
+	restoreDatabaseCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Backup file to be used for restoration.")
+	
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(runCmd)
@@ -124,5 +127,6 @@ func init() {
 	rootCmd.AddCommand(cmdRef)
 	rootCmd.AddCommand(generateTemplateCmd)
 	rootCmd.AddCommand(challDetailsCmd)
-	rootCmd.AddCommand(resetDatabase)
+	rootCmd.AddCommand(resetDatabaseCmd)
+	rootCmd.AddCommand(restoreDatabaseCmd)
 }
