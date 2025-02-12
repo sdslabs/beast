@@ -11,6 +11,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/pkg/notify"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -113,49 +114,34 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
-		preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
+		if challenge.PreReqs != "" {
+			preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
 
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			if !preReqsStatus {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have not solved the prerequisites of this challenge.",
+					Success: false,
+				})
+				return
+			}
 		}
 
-		if !preReqsStatus {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "You have not solved the prerequisites of this challenge.",
-				Success: false,
-			})
-			return
-		}
-
-		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if solved {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Challenge has already been solved.",
-				Success: false,
-			})
-			return
-		}
-
-		if challenge.FailSolveLimit > 0 {
+		if challenge.MaxAttemptLimit > 0 {
 			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
-
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 					Error: "DATABASE ERROR while processing the request."})
 				return
 			}
 
-			if previousTries >= challenge.FailSolveLimit {
+			if previousTries >= challenge.MaxAttemptLimit {
 				c.JSON(http.StatusOK, FlagSubmitResp{
 					Message: "You have reached the maximum number of tries for this challenge.",
 					Success: false,
@@ -173,10 +159,83 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
-
 		if challenge.Flag != flag {
 			c.JSON(http.StatusOK, FlagSubmitResp{
 				Message: "Your flag is incorrect",
+				Success: false,
+			})
+			return
+		}
+
+		// If the challenge is dynamic, then the flag is not stored in the database
+		if challenge.DynamicFlag {
+			whereMap := map[string]interface{}{
+				"Name": challenge.Name,
+				"Flag": flag,
+			}
+			validFlags, err := database.QueryDynamicFlagEntries(whereMap)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			// flag not present in validFlags table
+			if len(validFlags) == 0 {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "Your flag is incorrect",
+					Success: false,
+				})
+				return
+			}
+
+			wheremap := map[string]interface{}{
+				"challenge_id": challenge.ID,
+				"flag":         flag,
+			}
+			submissions, err := database.QuerySubmissions(wheremap)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+			if len(submissions) > 0 {
+				if user.ID != submissions[0].UserID {
+					// notify the admin about cheating
+					subuser, _ := database.QueryUserById(submissions[0].UserID)
+					msg := "User " + subuser.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by another user " + user.Username
+					go notify.SendNotification(notify.Warning, msg)
+					go coreUtils.LogCheating(msg)
+				} else {
+					c.JSON(http.StatusOK, FlagSubmitResp{
+						Message: "You have already solved this challenge",
+						Success: false,
+					})
+					return
+				}
+			}
+		} else {
+			if challenge.Flag != flag {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "Your flag is incorrect",
+					Success: false,
+				})
+				return
+			}
+		}
+		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		if solved {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Challenge has already been solved.",
 				Success: false,
 			})
 			return
@@ -219,6 +278,9 @@ func submitFlagHandler(c *gin.Context) {
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
 			Solved:      true,
+		}
+		if challenge.DynamicFlag {
+			UserChallengesEntry.Flag = flag
 		}
 
 		err = database.SaveFlagSubmission(&UserChallengesEntry)

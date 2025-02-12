@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	containerType "github.com/docker/docker/api/types"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
@@ -14,6 +15,7 @@ import (
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/notify"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
@@ -43,7 +45,7 @@ var ChallengeActionHandlers = map[string]func(string) error{
 
 // Function which commits the deployed challenge provided
 func CommitChallengeContainer(challName string) error {
-	log.Debug("Starting to commit the chall : %s", challName)
+	log.Debugf("Starting to commit the chall : %s", challName)
 	chall, err := database.QueryFirstChallengeEntry("name", challName)
 	if err != nil {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
@@ -54,8 +56,13 @@ func CommitChallengeContainer(challName string) error {
 		log.Errorf("Challenge : %s not deployed", err.Error())
 		return fmt.Errorf("Challenge is not deployed")
 	}
-
-	imageId, err := cr.CommitContainer(chall.ContainerId)
+	var imageId string
+	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+		server := config.Cfg.AvailableServers[chall.ServerDeployed]
+		imageId, err = remoteManager.CommitContainerRemote(chall.ContainerId, server)
+	} else {
+		imageId, err = cr.CommitContainer(chall.ContainerId)
+	}
 	if err != nil {
 		log.Errorf("Error while commiting the container : %s", err.Error())
 		return err
@@ -169,12 +176,22 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	// If the challange is already deployed, return an error.
 	// If not then start the deploy pipeline for the challenge.
 	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
-		containers, err := cr.SearchContainerByFilter(map[string]string{"id": challenge.ContainerId})
-		if err != nil {
-			log.Error("Error while searching for container with id %s", challenge.ContainerId)
-			return nil, errors.New("CONTAINER RUNTIME ERROR")
+		var containers, remoteContainers []containerType.Container
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+			remoteContainers, err = remoteManager.SearchRunningContainerByFilterRemote(map[string]string{"id": challenge.ContainerId}, server)
+			if err != nil {
+				log.Error("Error while searching for rmote container with id %s", challenge.ContainerId)
+				return nil, errors.New("CONTAINER RUNTIME ERROR")
+			}
+		} else {
+			containers, err = cr.SearchRunningContainerByFilter(map[string]string{"id": challenge.ContainerId})
+			if err != nil {
+				log.Error("Error while searching for container with id %s", challenge.ContainerId)
+				return nil, errors.New("CONTAINER RUNTIME ERROR")
+			}
 		}
-
+		containers = append(containers, remoteContainers...)
 		if len(containers) > 1 {
 			log.Error("Got more than one containers, something fishy here. Contact admin to check manually.")
 			return nil, errors.New("CONTAINER RUNTIME ERROR")
@@ -212,7 +229,14 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	}
 
 	if coreUtils.IsImageIdValid(challenge.ImageId) {
-		imageExist, err := cr.CheckIfImageExists(challenge.ImageId)
+		var imageExist bool
+		var err error
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+			imageExist, err = remoteManager.CheckIfImageExistsOnRemote(challenge.ImageId, server)
+		} else {
+			imageExist, err = cr.CheckIfImageExists(challenge.ImageId)
+		}
 		if err != nil {
 			log.Errorf("Error while searching for image with id %s: %s", challenge.ImageId, err)
 			return nil, errors.New("CONTAINER RUNTIME ERROR")
@@ -253,7 +277,12 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	// Check if the challenge is in staged state, it it is start the
 	// pipeline from there on, else start deploy pipeline for the challenge
 	// from remote
-	err = utils.ValidateFileExists(stagedFileName)
+	if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+		server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+		err = remoteManager.ValidateFileRemoteExists(server, stagedFileName)
+	} else {
+		err = utils.ValidateFileExists(stagedFileName)
+	}
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
 		if challengeDir == "" {
@@ -608,7 +637,12 @@ func undeployChallenge(challengeName string, purge bool) error {
 		log.Warnf("No instance of challenge(%s) deployed", challengeName)
 	} else {
 		log.Debug("Removing challenge instance for ", challengeName)
-		err = cr.StopAndRemoveContainer(challenge.ContainerId)
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+			err = remoteManager.StopAndRemoveContainerRemote(challenge.ContainerId, server)
+		} else {
+			err = cr.StopAndRemoveContainer(challenge.ContainerId)
+		}
 		if err != nil {
 			// This should not return from here, this should assume that
 			// the container instance does not exist and hence should update the database

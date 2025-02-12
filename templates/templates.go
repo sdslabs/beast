@@ -9,7 +9,8 @@ ssh_key   = {{.Author.SSHKey}}                    # Required: Public SSH key for
 [challenge.metadata]
 name            = {{.Challenge.Metadata.Name}}         # Required: Name of the challenge, should be same as directory.
 type            = {{.Challenge.Metadata.Type}}         # Required: Type of challenge -> [web:<language>:<version>:<framework> static service]
-flag            = {{.Challenge.Metadata.Flag}}         # Required: Challenge Flag
+dynamic_flag    = {{.Challenge.Metadata.DynamicFlag}} # Required: Dynamic flag or not -> [true/false]
+flag            = {{.Challenge.Metadata.Flag}}         # Challenge Flag if dynamic_flag is false
 sidecar          = {{.Challenge.Metadata.Sidecar}}        # Specify helper sidecar container for example mysql
 
 [challenge.env]

@@ -58,7 +58,7 @@ const (
 // In the Discord notification provider it was using the same payload which was used for slack.
 // By writing "/slack" in the discord WebHookURL, it execute Slack-Compatible Webhook
 func NewNotifier(url *url.URL, ProviderType ProviderTypeEnum) Notifier {
-	log.Info("Inside notifier: Webhook URL: " + url.String())
+	log.Debug("Inside notifier: Webhook URL: " + url.String())
 
 	switch ProviderType {
 	case SlackProvider:
@@ -90,7 +90,7 @@ func SendNotification(nType NotificationType, message string) error {
 	var errs []string
 
 	for _, webhook := range config.Cfg.NotificationWebhooks {
-		if webhook.ServiceName != "" || webhook.Active == true || webhook.URL != "" {
+		if webhook.ServiceName != "" && webhook.URL != "" && webhook.Active {
 			var provider ProviderTypeEnum
 
 			url, err := url.ParseRequestURI(webhook.URL)
