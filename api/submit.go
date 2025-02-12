@@ -3,6 +3,8 @@ package api
 import (
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -112,6 +114,23 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+
+		challengeStagingDirLogFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge.Name, "logs", "submission.log")
+
+		file, err := os.OpenFile(challengeStagingDirLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Set logrus to write to the file
+		log.SetOutput(file)
+		log.SetFormatter(&log.TextFormatter{DisableColors: true})
+
+		logEntry := log.WithFields(log.Fields{
+			"username": username,
+			"flag":     flag,
+		})
+		logEntry.Info("Flag submission attempt")
 
 		// If the challenge is dynamic, then the flag is not stored in the database
 		if challenge.DynamicFlag {
