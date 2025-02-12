@@ -87,10 +87,14 @@ func init() {
 		log.Fatalf("Cannot create related models: %s", err)
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{})
+	err := Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{})
+	if err != nil {
+		log.Error("Error while migrating db.", err)
+		os.Exit(1)
+	}
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
-		log.Errorf("Error while checking dummy user entry.")
+		log.Error("Error while checking dummy user entry.")
 		os.Exit(1)
 	}
 

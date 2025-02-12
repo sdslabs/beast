@@ -10,14 +10,14 @@ type Hint struct {
 	HintID      uint   `gorm:"primaryKey;autoIncrement"`
 	ChallengeID uint   `gorm:"not null"`
 	Points      uint   `gorm:"not null"`
-	Description string `gorm:"size:255"`
+	Description string `gorm:"type:text"`
 }
 
 type UserHint struct {
 	UserID      uint      `gorm:"not null"`
 	ChallengeID uint      `gorm:"not null"`
 	HintID      uint      `gorm:"not null"`
-	Hint        Hint      `gorm:"foreignKey:HintID;references:HintID"`
+	Hint        Hint      `gorm:"foreignKey:HintID"`
 	Challenge   Challenge `gorm:"foreignKey:ChallengeID;references:ID"`
 }
 
