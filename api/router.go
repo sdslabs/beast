@@ -47,6 +47,7 @@ func initGinRouter() *gin.Engine {
 		false)),
 	)
 	router.GET("/api/info/competition-info", competitionInfoHandler)
+	router.GET("/api/info/download", serveAssets)
 
 	// API routes group
 	apiGroup := router.Group("/api", authorize)
@@ -90,7 +91,6 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/tags", tagHandler)
 			infoGroup.GET("/hint/:hintID", hintHandler)
 			infoGroup.POST("/hint/:hintID", hintHandler)
-			infoGroup.GET("/download", serveAssets)
 		}
 
 		// Notification route group
