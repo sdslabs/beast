@@ -52,7 +52,6 @@ type ChallengePreview struct {
 	Category        string
 	Tags            []string
 	Ports           []database.Port
-	Hints           string
 	Assets          []string
 	AdditionalLinks []string
 	Desc            string
@@ -508,11 +507,13 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Status:          core.DEPLOY_STATUS["undeployed"],
 			ContainerId:     coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:         coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			MaxAttemptLimit: config.Challenge.Metadata.MaxAttemptLimit,
+			PreReqs:         strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
+			DynamicFlag:     config.Challenge.Metadata.DynamicFlag,
 			Flag:            config.Challenge.Metadata.Flag,
 			Type:            config.Challenge.Metadata.Type,
 			Sidecar:         config.Challenge.Metadata.Sidecar,
 			Description:     config.Challenge.Metadata.Description,
-			Hints:           strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
 			Assets:          strings.Join(assetsURL, core.DELIMITER),
 			AdditionalLinks: strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),
 			Points:          config.Challenge.Metadata.Points,
@@ -524,6 +525,19 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		err = database.CreateChallengeEntry(challEntry)
 		if err != nil {
 			return fmt.Errorf("error while creating chall entry with config : %s : %v", err, challEntry)
+		}
+
+		for _, hint := range config.Challenge.Metadata.Hints {
+			hintEntry := database.Hint{
+				ChallengeID: challEntry.ID,
+				Points:      hint.Points,
+				Description: hint.Text,
+			}
+
+			err := database.CreateHintEntry(&hintEntry)
+			if err != nil {
+				return fmt.Errorf("Error while creating hint entry: %v", err)
+			}
 		}
 
 		database.Db.Model(challEntry).Association("Tags").Append(tags)
@@ -723,7 +737,6 @@ func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 			return "", err
 		}
 	}
-
 	return targetDir, nil
 }
 

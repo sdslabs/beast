@@ -149,6 +149,7 @@ func BeastHeathCheckProber(waitTime int) {
 		for {
 			go ChallengesHealthProber(waitTime)
 			go ServerHealthProber(waitTime)
+			go database.BackupDatabase()
 			// Wait for some time before next probing.
 			time.Sleep(time.Duration(waitTime) * time.Second)
 		}

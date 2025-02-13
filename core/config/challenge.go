@@ -130,14 +130,19 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 // sidecar = "" # Name of the sidecar if any used by the challenge.
 // ```
 type ChallengeMetadata struct {
+	Flag        string   `toml:"flag"`
+	Name        string   `toml:"name"`
+	Type        string   `toml:"type"`
+	Tags        []string `toml:"tags"`
+	Sidecar     string   `toml:"sidecar"`
+	Description string   `toml:"description"`
+	Hints       []struct {
+		Text   string `toml:"text"`
+		Points uint   `toml:"points"`
+	} `toml:"hints"`
+	MaxAttemptLimit int      `toml:"max_attempt_limit"`
+	PreReqs         []string `toml:"preReqs"`
 	DynamicFlag     bool     `toml:"dynamic_flag"`
-	Flag            string   `toml:"flag"`
-	Name            string   `toml:"name"`
-	Type            string   `toml:"type"`
-	Tags            []string `toml:"tags"`
-	Sidecar         string   `toml:"sidecar"`
-	Description     string   `toml:"description"`
-	Hints           []string `toml:"hints"`
 	Points          uint     `toml:"points"`
 	MaxPoints       uint     `toml:"maxPoints"`
 	MinPoints       uint     `toml:"minPoints"`
@@ -150,6 +155,15 @@ type ChallengeMetadata struct {
 func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if config.Name == "" || (config.Flag == "" && !config.DynamicFlag) {
 		return fmt.Errorf("Name and Flag required for the challenge"), false
+	}
+
+	// Checks if fail solve limit is provided and is greater than 0
+	if config.MaxAttemptLimit < 0 {
+		return fmt.Errorf("fail solve limit must be greater than equal to 0"), false
+	} else if config.MaxAttemptLimit == 0 {
+		// sets default value to -1 so it means that there is no limit.
+		log.Warn("MaxAttemptLimit is set to 0, defaulting to no limit for attempts")
+		config.MaxAttemptLimit = -1
 	}
 
 	if !(utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "") {

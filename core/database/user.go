@@ -31,8 +31,9 @@ type User struct {
 	Name       string       `gorm:"not null"`
 	Email      string       `gorm:"non null;unique"`
 	SshKey     string
-	Status     uint `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
-	Score      uint `gorm:"default:0"`
+	Status     uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Score      uint    `gorm:"default:0"`
+	Hints      []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
 // Queries all the users entries where the column represented by key
@@ -113,7 +114,7 @@ func QueryFirstUserEntry(key string, value string) (User, error) {
 	}
 
 	if len(users) == 0 {
-		return User{}, nil
+		return User{}, fmt.Errorf("No user found")
 	}
 
 	return users[0], nil
@@ -170,7 +171,7 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("user_id = ? AND challenge_id = ?", userId, challId).Find(&userChallenges).Count(&count)
+	tx := Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userId, challId, true).Find(&userChallenges).Count(&count)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return false, nil
@@ -310,7 +311,7 @@ func QueryTopUsersByScore(limit int) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
+	tx := Db.Where("role == ? AND status == ?", core.USER_ROLES["contestant"], 0).
 		Order("score desc, updated_at asc").
 		Limit(limit).
 		Find(&users)
@@ -328,7 +329,7 @@ func QueryUsersByScoreOffsetLimit(limit, offset int) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
+	tx := Db.Where("role == ? AND status == ?", core.USER_ROLES["contestant"], 0).
 		Order("score desc, updated_at asc").
 		Limit(limit).
 		Offset(offset).
