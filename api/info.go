@@ -1,6 +1,9 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -1013,60 +1016,77 @@ func leaderboardHandler(c *gin.Context) {
 		})
 		return
 	}
-	log.Print(page)
-	if page == 1 {
-		if leaderboardStale {
-			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
-			log.Printf("Users: %v", len(users))
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-			var leaderboard []UserResp
-			for index, user := range users {
-				resp := UserResp{
-					Username: user.Username,
-					Id:       user.ID,
-					Role:     user.Role,
-					Status:   user.Status,
-					Score:    user.Score,
-					Email:    user.Email,
-					Rank:     int64(index + 1),
-				}
-				leaderboard = append(leaderboard, resp)
-			}
-			leaderboardCache = leaderboard
-			leaderboardStale = false
+	if leaderboardFreeze {
+		var allFrozen []UserResp
+		filePath := filepath.Join(core.BEAST_GLOBAL_DIR, fmt.Sprintf("leadboard-%d.json", page-1))
+		data, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Error reading frozen leaderboard file",
+			})
+			return
 		}
-		c.JSON(http.StatusOK, leaderboardCache)
-		return
-	}
-	offset := (page - 1) * core.LEADERBOARD_SIZE
-	log.Print(offset)
-	users, err := database.QueryUsersByScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
-	log.Printf("Users: %v", len(users))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-	var leaderboard []UserResp
-	rankOffset := offset
-	for index, user := range users {
-		resp := UserResp{
-			Username: user.Username,
-			Id:       user.ID,
-			Role:     user.Role,
-			Status:   user.Status,
-			Score:    user.Score,
-			Email:    user.Email,
-			Rank:     int64(rankOffset + index + 1),
+		if err := json.Unmarshal(data, &allFrozen); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Error decoding frozen leaderboard file",
+			})
+			return
 		}
-		leaderboard = append(leaderboard, resp)
-	}
-	c.JSON(http.StatusOK, leaderboard)
 
+		c.JSON(http.StatusOK, allFrozen)
+		return
+	} else {
+		if page == 1 {
+			if leaderboardStale {
+				users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+						Error: "DATABASE ERROR while processing the request.",
+					})
+					return
+				}
+				var leaderboard []UserResp
+				for index, user := range users {
+					resp := UserResp{
+						Username: user.Username,
+						Id:       user.ID,
+						Role:     user.Role,
+						Status:   user.Status,
+						Score:    user.Score,
+						Email:    user.Email,
+						Rank:     int64(index + 1),
+					}
+					leaderboard = append(leaderboard, resp)
+				}
+				leaderboardCache = leaderboard
+				leaderboardStale = false
+			}
+			c.JSON(http.StatusOK, leaderboardCache)
+			return
+		}
+		offset := (page - 1) * core.LEADERBOARD_SIZE
+		users, err := database.QueryUsersByScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		var leaderboard []UserResp
+		rankOffset := offset
+		for index, user := range users {
+			resp := UserResp{
+				Username: user.Username,
+				Id:       user.ID,
+				Role:     user.Role,
+				Status:   user.Status,
+				Score:    user.Score,
+				Email:    user.Email,
+				Rank:     int64(rankOffset + index + 1),
+			}
+			leaderboard = append(leaderboard, resp)
+		}
+		c.JSON(http.StatusOK, leaderboard)
+
+	}
 }

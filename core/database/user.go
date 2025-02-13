@@ -311,7 +311,7 @@ func QueryTopUsersByScore(limit int) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
+	tx := Db.Where("role == ? AND status == ?", core.USER_ROLES["contestant"], 0).
 		Order("score desc, updated_at asc").
 		Limit(limit).
 		Find(&users)
@@ -329,7 +329,7 @@ func QueryUsersByScoreOffsetLimit(limit, offset int) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
+	tx := Db.Where("role == ? AND status == ?", core.USER_ROLES["contestant"], 0).
 		Order("score desc, updated_at asc").
 		Limit(limit).
 		Offset(offset).
