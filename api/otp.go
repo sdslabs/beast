@@ -174,8 +174,8 @@ func sendOTPHandler(c *gin.Context) {
 	isIITR := re.MatchString(email)
 
 	if !isIITR {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Email should be of IITR domain",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email should be of IITR domain",
 		})
 		return
 	}
@@ -309,6 +309,79 @@ func verifyOTPHandler(c *gin.Context) {
 	})
 }
 
+func sendOTPForForgetHandler(c *gin.Context) {
+	email := c.PostForm("email")
+	email = strings.TrimSpace(strings.ToLower(email))
+
+	smtpHost := config.Cfg.MailConfig.SMTPHost
+	smtpPort := config.Cfg.MailConfig.SMTPPort
+
+	if smtpHost == "" || smtpPort == "" {
+		log.Printf("WARNING: %s", "SMTP not configured")
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "SMTP not configured",
+		})
+		return
+	}
+
+	re := regexp.MustCompile(`^.*@.*iitr\.ac\.in$`)
+	isIITR := re.MatchString(email)
+
+	if !isIITR {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email should be of IITR domain",
+		})
+		return
+	}
+
+	otp := generateOTP()
+	expiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
+
+	otpEntry, err := database.QueryOTPEntry(email)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			otpEntry = database.OTP{
+				Email:  email,
+				Code:   otp,
+				Expiry: expiry,
+			}
+		} else {
+			log.Println("Failed to query OTP:", err)
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Failed to send OTP",
+			})
+			return
+		}
+	}
+
+	otpEntry.Code = otp
+	otpEntry.Expiry = expiry
+
+	err = database.CreateOTPEntry(&otpEntry)
+	if err != nil {
+		log.Println("Failed to store OTP:", err)
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "Failed to store OTP",
+		})
+		return
+	}
+
+	// Send OTP to email
+	err = sendEmail(email, otp)
+	if err != nil {
+		log.Println("Failed to send OTP:", err)
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "Failed to send OTP",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "OTP sent successfully",
+	})
+}
+
 func verifyOTPForForgetHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	otp := strings.TrimSpace(c.PostForm("otp"))
@@ -356,15 +429,15 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 
 	userEntry, err := database.QueryFirstUserEntry("email", email)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: err.Error(),
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: err.Error(),
 		})
 		return
 	}
 
 	if userEntry.Status == 1 {
-		c.JSON(http.StatusForbidden, HTTPPlainResp{
-			Message: "The user has been banned from this competition. Please contact competition admin for more information",
+		c.JSON(http.StatusForbidden, HTTPErrorResp{
+			Error: "The user has been banned from this competition. Please contact competition admin for more information",
 		})
 		return
 	}
