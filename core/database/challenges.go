@@ -507,3 +507,56 @@ func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, er
 
 	return dynamicFlags, tx.Error
 }
+
+func SubtractScoreFromSolvers(challengeID uint) error {
+    DBMux.Lock()
+    defer DBMux.Unlock()
+
+    tx := Db.Begin()
+    if tx.Error != nil {
+        return fmt.Errorf("error while starting transaction: %v", tx.Error)
+    }
+
+    var challenge Challenge
+    if err := tx.Where("id = ?", challengeID).First(&challenge).Error; err != nil {
+        tx.Rollback()
+        return fmt.Errorf("error fetching challenge: %v", err)
+    }
+
+    pointsToSubtract := challenge.Points
+
+    var solvers []UserChallenges
+    if err := tx.Where("challenge_id = ? AND solved = ?", challengeID, true).Find(&solvers).Error; err != nil {
+        tx.Rollback()
+        return fmt.Errorf("error fetching solvers: %v", err)
+    }
+
+    for _, solver := range solvers {
+        if err := tx.Model(&User{}).Where("id = ?", solver.UserID).
+		UpdateColumn("score", gorm.Expr("CASE WHEN score - ? < 0 THEN 0 ELSE score - ? END", pointsToSubtract, pointsToSubtract)).Error; err != nil {
+            tx.Rollback()
+            return fmt.Errorf("error updating score for user %d: %v", solver.UserID, err)
+        }
+    }
+
+    return tx.Commit().Error
+}
+
+func DeleteAllUserChallenges(challengeID uint) error {
+    DBMux.Lock()
+    defer DBMux.Unlock()
+
+    tx := Db.Begin()
+    if tx.Error != nil {
+        return fmt.Errorf("error while starting transaction: %v", tx.Error)
+    }
+
+    if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserChallenges{}).Error; err != nil {
+        tx.Rollback()
+        return fmt.Errorf("error deleting user challenge entries: %v", err)
+    }
+
+    return tx.Commit().Error
+}
+
+
