@@ -261,6 +261,9 @@ func submitFlagHandler(c *gin.Context) {
 			}
 		}
 		newScore := user.Score + challengePoints
+		if  newScore <= 0 {
+			newScore =0
+		}
 		err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -317,7 +320,11 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 			return err
 		}
 		if user.Role == "contestant" {
-			err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)})
+			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
+			if newScore <= 0{
+				newScore = 0
+			}
+			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
 			if err != nil {
 				return err
 			}
