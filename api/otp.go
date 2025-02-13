@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
@@ -368,7 +369,18 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 		return
 	}
 
-	tempToken, err := auth.Authenticate(userEntry.Username, "", userEntry.AuthModel)
+	t := time.Now().Unix()
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, auth.CustomClaims{
+		User:      userEntry.Username,
+		Role:      userEntry.Role,
+		ExpiresAt: t + 300,
+		IssuedAt:  t,
+		Issuer:    auth.ISSUER,
+	})
+
+	tempToken, err := token.SignedString([]byte(auth.JWTSECRET))
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "Failed to create authentication session",
