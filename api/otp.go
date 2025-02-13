@@ -174,8 +174,8 @@ func sendOTPHandler(c *gin.Context) {
 	isIITR := re.MatchString(email)
 
 	if !isIITR {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Email should be of IITR domain",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email should be of IITR domain",
 		})
 		return
 	}
@@ -328,8 +328,8 @@ func sendOTPForForgetHandler(c *gin.Context) {
 	isIITR := re.MatchString(email)
 
 	if !isIITR {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Email should be of IITR domain",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email should be of IITR domain",
 		})
 		return
 	}
@@ -429,15 +429,15 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 
 	userEntry, err := database.QueryFirstUserEntry("email", email)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: err.Error(),
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: err.Error(),
 		})
 		return
 	}
 
 	if userEntry.Status == 1 {
-		c.JSON(http.StatusForbidden, HTTPPlainResp{
-			Message: "The user has been banned from this competition. Please contact competition admin for more information",
+		c.JSON(http.StatusForbidden, HTTPErrorResp{
+			Error: "The user has been banned from this competition. Please contact competition admin for more information",
 		})
 		return
 	}
