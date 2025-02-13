@@ -656,6 +656,29 @@ func userInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// a route handler to get the number of users in the databse with role=contestant
+// @Summary Returns the number of users in the database with role=contestant
+// @Description Returns the number of users in the database with role=contestant
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.UserCountResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/usercount [get]
+func getUserCountHandler(c *gin.Context) {
+	count, err := database.GetUserCount()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, UserCountResp{
+		UserCount: count,
+	})
+}
+
 // Returns all user's info
 // @Summary Returns all user's info
 // @Description Returns all available user's info

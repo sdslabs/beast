@@ -341,3 +341,14 @@ func QueryUsersByScoreOffsetLimit(limit, offset int) ([]User, error) {
 
 	return users, tx.Error
 }
+
+func GetUserCount() (int64, error) {
+	var count int64
+	DBMux.Lock()
+	defer DBMux.Unlock()
+	tx := Db.Model(&User{}).Where("role = ?", "contestant").Count(&count)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return 0, nil
+	}
+	return count, tx.Error
+}
