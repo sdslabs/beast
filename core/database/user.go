@@ -114,7 +114,7 @@ func QueryFirstUserEntry(key string, value string) (User, error) {
 	}
 
 	if len(users) == 0 {
-		return User{}, nil
+		return User{}, fmt.Errorf("No user found")
 	}
 
 	return users[0], nil
