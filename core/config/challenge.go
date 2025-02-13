@@ -240,6 +240,10 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # Helps to build flexible images for specific user-custom challenges
 // docket_context = ""
 //
+// # Xinetd.conf file name for specific type challenge - `service_docker`.
+// # Helps to build flexible images for specific user-custom challenges
+// xinetd_conf = ""
+//
 // # Environment variables that can be used in the application code.
 // [[var]]
 //
@@ -267,6 +271,7 @@ type ChallengeEnv struct {
 	ServicePath      string           `toml:"service_path"`
 	Entrypoint       string           `toml:"entrypoint"`
 	DockerCtx        string           `toml:"docker_context"`
+	XinetdConf       string           `toml:"xinetd_conf"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
 	Traffic          string           `toml:"traffic"`
 }
@@ -491,11 +496,27 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 	if challType == core.DOCKER_CHALLENGE_TYPE_NAME {
 		if config.DockerCtx == "" {
-			return errors.New("Docker Context file not provided in docker-type challenge")
+			return errors.New("docker Context file not provided in docker-type challenge")
 		} else if filepath.IsAbs(config.DockerCtx) {
-			return fmt.Errorf("For challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
+			return fmt.Errorf("for challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
 		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
-			return fmt.Errorf("File : %s does not exist", config.DockerCtx)
+			return fmt.Errorf("file : %s does not exist", config.DockerCtx)
+		}
+	} else if challType == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
+		if config.DockerCtx == "" {
+			return errors.New("docker Context file not provided in docker-type challenge")
+		} else if filepath.IsAbs(config.DockerCtx) {
+			return fmt.Errorf("for challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
+			return fmt.Errorf("file : %s does not exist", config.DockerCtx)
+		}
+
+		if config.XinetdConf == "" {
+			return errors.New("Xinted Context file not provided in docker-type challenge")
+		} else if filepath.IsAbs(config.XinetdConf) {
+			return fmt.Errorf("for challenge type Xinted is a required variable, which should be relative path to Xinted file.")
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.XinetdConf)); err != nil {
+			return fmt.Errorf("file : %s does not exist", config.XinetdConf)
 		}
 	} else {
 		config.DockerCtx = core.DEFAULT_DOCKER_FILE
