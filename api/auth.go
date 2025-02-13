@@ -208,8 +208,10 @@ func register(c *gin.Context) {
 	sshKey := c.PostForm("ssh-key")
 
 	if username == "" || password == "" || email == "" {
-		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Username ,password and email can not be empty",
+
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Username, password and email can not be empty",
+
 		})
 		return
 	}

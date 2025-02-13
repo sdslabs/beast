@@ -202,3 +202,7 @@ var USER_STATUS = map[string]string{
 	"ban":   "ban",
 	"unban": "unban",
 }
+
+const (
+	LEADERBOARD_SIZE = 25
+)

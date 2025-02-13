@@ -98,13 +98,12 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
-		if err != nil {
+		if err != nil || len(chall) == 0 {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
-
 		challenge := chall[0]
 		if challenge.Status != core.DEPLOY_STATUS["deployed"] {
 			c.JSON(http.StatusOK, FlagSubmitResp{
@@ -261,13 +260,17 @@ func submitFlagHandler(c *gin.Context) {
 				challengePoints = newPoints
 			}
 		}
-
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
+		newScore := user.Score + challengePoints
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
+		}
+
+		if len(leaderboardCache) < core.LEADERBOARD_SIZE || (len(leaderboardCache) > 0 && newScore > leaderboardCache[len(leaderboardCache)-1].Score) {
+			leaderboardStale = true
 		}
 
 		UserChallengesEntry := database.UserChallenges{
