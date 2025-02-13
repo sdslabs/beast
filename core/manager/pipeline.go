@@ -43,7 +43,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	var dockerfileCtx string
 
-	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME {
+	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME || config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
 		dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
 		err := utils.ValidateFileExists(dockerfileCtx)
 		if err != nil {
@@ -73,6 +73,11 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	// user to download.
 	copyAdditionalContextToStaging(additionalCtx, stagingDir)
 
+	// Copy everything from chall folder into staging folder
+	if config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
+		CopyDir(challengeDir, stagingDir)
+	} 
+
 	log.Debug("Copying Content to Static Folder")
 
 	staticContentDir, err := GetStaticContentDir(challengeConfig, contextDir)
@@ -87,7 +92,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
 
-	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME {
+	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME || config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
 		delete(additionalCtx, "Dockerfile")
 	}
 	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir, filepath.Join(contextDir, core.HIDDEN)})

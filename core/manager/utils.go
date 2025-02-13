@@ -349,6 +349,10 @@ func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.B
 	log.Debug("Adding additional required file context to docker context.")
 	// If the challenge type is service, we need to add xinetd configuration to the
 	// docker directory context.
+	if config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
+		log.Debug("Add provided xinetd.conf")
+		additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = config.Challenge.Env.XinetdConf
+	}
 	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
 		log.Debug("Challenge type is service, trying to embed xinetd configuration.")
 		file, err := ioutil.TempFile("", "xinetd.conf.*")
