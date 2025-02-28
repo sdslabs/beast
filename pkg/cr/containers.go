@@ -78,6 +78,7 @@ type Log struct {
 	Stdout string
 }
 
+// Function is equivalent to docker ps -a
 func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -91,6 +92,25 @@ func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, er
 
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
 		All:     true,
+		Filters: filterArgs,
+	})
+
+	return containers, err
+}
+
+// Function is equivalent to docker ps
+func SearchRunningContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		return []types.Container{}, err
+	}
+
+	filterArgs := filters.NewArgs()
+	for key, val := range filterMap {
+		filterArgs.Add(key, val)
+	}
+
+	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
 		Filters: filterArgs,
 	})
 

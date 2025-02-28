@@ -5,10 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/auth"
+	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
+	// "gorm.io/driver/postgres"
+
 	"gorm.io/driver/sqlite"
 	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -34,12 +38,18 @@ func init() {
 
 	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
 	Db, dberr = gorm.Open(sqlite.Open(beastDb), &gorm.Config{})
-
+	// dsn := "user=Sukhi password=12345678 dbname=beast host=localhost port=5432 sslmode=disable"
+	// Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if dberr != nil {
-		log.WithFields(log.Fields{
-			"LOCATION": beastDb,
-		}).Fatal(dberr)
+		log.Error("Error while initializing the database.", dberr)
+		// return nil, err
 	}
+
+	// if dberr != nil {
+	// 	log.WithFields(log.Fields{
+	// 		"LOCATION": beastDb,
+	// 	}).Fatal(dberr)
+	// }
 
 	if err := Db.SetupJoinTable(&Challenge{}, "Users", &UserChallenges{}); err != nil {
 		log.Fatalf("Cannot create related models: %s", err)
@@ -48,8 +58,11 @@ func init() {
 		log.Fatalf("Cannot create related models: %s", err)
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{})
+	if err := Db.SetupJoinTable(&User{}, "Hints", &UserHint{}); err != nil {
+		log.Fatalf("Cannot create related models: %s", err)
+	}
 
+	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{}, &OTP{})
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
 		log.Errorf("Error while checking dummy user entry.")
@@ -74,5 +87,41 @@ func init() {
 			log.Errorf("Error while creating dummy user entry.")
 			os.Exit(1)
 		}
+	}
+}
+
+func BackupAndReset() {
+	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
+	beastRemoteDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
+	beastStagingDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+	err := os.Rename(beastDb, beastDb+time.Now().Format("20060102150405")+".bak")
+	if err != nil {
+		log.Errorf("Error while backing up database: %s", err)
+	}
+	err = os.Rename(beastRemoteDir, beastRemoteDir+time.Now().Format("20060102150405")+".bak")
+	if err != nil {
+		log.Errorf("Error while backing up remote dir: %s", err)
+	}
+	err = os.Rename(beastStagingDir, beastStagingDir+time.Now().Format("20060102150405")+".bak")
+	if err != nil {
+		log.Errorf("Error while backing up staging dir: %s", err)
+	}
+}
+
+func BackupDatabase() {
+	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
+	beastRemoteDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
+	beastStagingDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+	err := utils.CopyFile(beastDb, beastDb+time.Now().Format("20060102150405")+".bak")
+	if err != nil {
+		log.Errorf("Error while backing up database: %s", err)
+	}
+	err = utils.CopyDirectory(beastRemoteDir, beastRemoteDir+time.Now().Format("20060102150405")+".bak")
+	if err != nil {
+		log.Errorf("Error while backing up remote dir: %s", err)
+	}
+	err = utils.CopyDirectory(beastStagingDir, beastStagingDir+time.Now().Format("20060102150405")+".bak")
+	if err != nil {
+		log.Errorf("Error while backing up staging dir: %s", err)
 	}
 }

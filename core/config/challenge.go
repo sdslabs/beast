@@ -44,6 +44,7 @@ func (Author *Author) PopulateAuthor() {
 func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
 	Metadata.Name = "ChallengeName"
 	Metadata.Type = "ChallengeType"
+	Metadata.DynamicFlag = false
 	Metadata.Flag = "ChallengeFlag"
 	Metadata.Sidecar = "SidecarHelper"
 }
@@ -129,13 +130,19 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 // sidecar = "" # Name of the sidecar if any used by the challenge.
 // ```
 type ChallengeMetadata struct {
-	Flag            string   `toml:"flag"`
-	Name            string   `toml:"name"`
-	Type            string   `toml:"type"`
-	Tags            []string `toml:"tags"`
-	Sidecar         string   `toml:"sidecar"`
-	Description     string   `toml:"description"`
-	Hints           []string `toml:"hints"`
+	Flag        string   `toml:"flag"`
+	Name        string   `toml:"name"`
+	Type        string   `toml:"type"`
+	Tags        []string `toml:"tags"`
+	Sidecar     string   `toml:"sidecar"`
+	Description string   `toml:"description"`
+	Hints       []struct {
+		Text   string `toml:"text"`
+		Points uint   `toml:"points"`
+	} `toml:"hints"`
+	MaxAttemptLimit int      `toml:"max_attempt_limit"`
+	PreReqs         []string `toml:"preReqs"`
+	DynamicFlag     bool     `toml:"dynamic_flag"`
 	Points          uint     `toml:"points"`
 	MaxPoints       uint     `toml:"maxPoints"`
 	MinPoints       uint     `toml:"minPoints"`
@@ -146,8 +153,17 @@ type ChallengeMetadata struct {
 // In this validation returned boolean value represents if the challenge type is
 // static or not.
 func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
-	if config.Name == "" || config.Flag == "" {
+	if config.Name == "" || (config.Flag == "" && !config.DynamicFlag) {
 		return fmt.Errorf("Name and Flag required for the challenge"), false
+	}
+
+	// Checks if fail solve limit is provided and is greater than 0
+	if config.MaxAttemptLimit < 0 {
+		return fmt.Errorf("fail solve limit must be greater than equal to 0"), false
+	} else if config.MaxAttemptLimit == 0 {
+		// sets default value to -1 so it means that there is no limit.
+		log.Warn("MaxAttemptLimit is set to 0, defaulting to no limit for attempts")
+		config.MaxAttemptLimit = -1
 	}
 
 	if !(utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "") {
@@ -188,16 +204,13 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # Dependencies required by challenge, installed using default package manager of base image apt for most cases.
 // apt_deps = ["", ""]
 //
-//
 // # A list of setup scripts to run for building challenge enviroment.
 // # Keep in mind that these are only for building the challenge environment and are executed
 // # in the iamge building step of the deployment pipeline.
 // setup_scripts = ["", ""]
 //
-//
 // # A directory containing any of the static assets for the challenge, exposed by beast static endpoint.
 // static_dir = ""
-//
 //
 // # Command to execute inside the container, if a predefined type is being used try to
 // # use an existing field to let beast automatically calculate what command to run.
@@ -205,42 +218,42 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # of the service using service_path field.
 // run_cmd = ""
 //
-//
 // # Similar to run_cmd but in this case you have the entire container to yourself
 // # and everything you are doing is done using root permissions inside the container
 // # When using this keep in mind you are root inside the container.
 // entrypoint = ""
-//
 //
 // # Relative path to binary which needs to be executed when the specified
 // # Type for the challenge is service.
 // # This can be anything which can be exeucted, a python file, a binary etc.
 // service_path = ""
 //
-//
 // # Relative directory corresponding to root of the challenge where the root
 // # of the web application lies.
 // web_root = ""
-//
 //
 // # Any custom base image you might want to use for your particular challenge.
 // # Exists for flexibility reasons try to use existing base iamges wherever possible.
 // base_image = ""
 //
-//
 // # Docker file name for specific type challenge - `docker`.
 // # Helps to build flexible images for specific user-custom challenges
 // docket_context = ""
 //
+// # Xinetd.conf file name for specific type challenge - `service_docker`.
+// # Helps to build flexible images for specific user-custom challenges
+// xinetd_conf = ""
 //
 // # Environment variables that can be used in the application code.
 // [[var]]
-//     key = ""
-//     value = ""
+//
+//	key = ""
+//	value = ""
 //
 // [[var]]
-//     key = ""
-//     value = ""
+//
+//	key = ""
+//	value = ""
 //
 // Type of traffic to expose through the port mapping provided.
 // traffic = "udp" / "tcp"
@@ -258,6 +271,7 @@ type ChallengeEnv struct {
 	ServicePath      string           `toml:"service_path"`
 	Entrypoint       string           `toml:"entrypoint"`
 	DockerCtx        string           `toml:"docker_context"`
+	XinetdConf       string           `toml:"xinetd_conf"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
 	Traffic          string           `toml:"traffic"`
 }
@@ -482,11 +496,27 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 	if challType == core.DOCKER_CHALLENGE_TYPE_NAME {
 		if config.DockerCtx == "" {
-			return errors.New("Docker Context file not provided in docker-type challenge")
+			return errors.New("docker Context file not provided in docker-type challenge")
 		} else if filepath.IsAbs(config.DockerCtx) {
-			return fmt.Errorf("For challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
+			return fmt.Errorf("for challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
 		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
-			return fmt.Errorf("File : %s does not exist", config.DockerCtx)
+			return fmt.Errorf("file : %s does not exist", config.DockerCtx)
+		}
+	} else if challType == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
+		if config.DockerCtx == "" {
+			return errors.New("docker Context file not provided in docker-type challenge")
+		} else if filepath.IsAbs(config.DockerCtx) {
+			return fmt.Errorf("for challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
+			return fmt.Errorf("file : %s does not exist", config.DockerCtx)
+		}
+
+		if config.XinetdConf == "" {
+			return errors.New("Xinted Context file not provided in docker-type challenge")
+		} else if filepath.IsAbs(config.XinetdConf) {
+			return fmt.Errorf("for challenge type Xinted is a required variable, which should be relative path to Xinted file.")
+		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.XinetdConf)); err != nil {
+			return fmt.Errorf("file : %s does not exist", config.XinetdConf)
 		}
 	} else {
 		config.DockerCtx = core.DEFAULT_DOCKER_FILE
@@ -501,10 +531,10 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 // Metadata related to author of the challenge, this structure includes
 //
-// * Name - Name of the author of the challenge
-// * Email - Email of the author
-// * SSHKey - Public SSH key for the challenge author, to give the access
-//		to the challenge container.
+//   - Name - Name of the author of the challenge
+//   - Email - Email of the author
+//   - SSHKey - Public SSH key for the challenge author, to give the access
+//     to the challenge container.
 //
 // ```toml
 // # Optional fields

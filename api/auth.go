@@ -1,7 +1,10 @@
 package api
 
 import (
+	"errors"
+	"log"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +13,7 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
+	"gorm.io/gorm"
 )
 
 // Acts as a middleware to authorize user
@@ -143,6 +147,9 @@ func login(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
+	username = strings.TrimSpace(strings.ToLower(username))
+	password = strings.TrimSpace(password)
+
 	if username == "" || password == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: "Username and password can not be empty",
@@ -203,16 +210,34 @@ func register(c *gin.Context) {
 	email := c.PostForm("email")
 	sshKey := c.PostForm("ssh-key")
 
+	name = strings.TrimSpace(name)
+	username = strings.TrimSpace(strings.ToLower(username))
+	password = strings.TrimSpace(password)
+	email = strings.TrimSpace(strings.ToLower(email))
+	sshKey = strings.TrimSpace(sshKey)
+
 	if username == "" || password == "" || email == "" {
+
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Username ,password and email can not be empty",
+			Message: "Username, password and email can not be empty",
+
 		})
 		return
 	}
 
 	if len(username) > 12 {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Username cannot be greater than 12 characters",
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Username cannot be greater than 12 characters",
+		})
+		return
+	}
+
+	re := regexp.MustCompile(`^.*@.*iitr\.ac\.in$`)
+	isIITR := re.MatchString(email)
+
+	if !isIITR {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email should be of IITR domain",
 		})
 		return
 	}
@@ -224,11 +249,39 @@ func register(c *gin.Context) {
 		SshKey:    sshKey,
 	}
 
+	smtpHost := config.Cfg.MailConfig.SMTPHost
+	smtpPort := config.Cfg.MailConfig.SMTPPort
+
+	if smtpHost == "" || smtpPort == "" {
+		log.Printf("WARNING: %s", "SMTP not configured")
+	} else {
+		otpEntry, err := database.QueryOTPEntry(email)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+					Error: "OTP not found, email not verified",
+				})
+				return
+			} else {
+				log.Println("Failed to query OTP:", err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "Failed to send OTP",
+				})
+				return
+			}
+		}
+		if !otpEntry.Verified {
+			c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
+				Error: "Email not verified, cannot register user",
+			})
+			return
+		}
+	}
 	err := database.CreateUserEntry(&userEntry)
 
 	if err != nil {
-		c.JSON(http.StatusNotAcceptable, HTTPPlainResp{
-			Message: err.Error(),
+		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
+			Error: err.Error(),
 		})
 		return
 	}
@@ -236,7 +289,6 @@ func register(c *gin.Context) {
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User created successfully",
 	})
-	return
 }
 
 // ResetPasswordHandler
@@ -251,6 +303,7 @@ func register(c *gin.Context) {
 // @Router /auth/reset-password [post]
 func resetPasswordHandler(c *gin.Context) {
 	newPass := c.PostForm("new_pass")
+	newPass = strings.TrimSpace(newPass)
 
 	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
@@ -280,5 +333,4 @@ func resetPasswordHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "Password changed successfully",
 	})
-	return
 }

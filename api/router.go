@@ -28,13 +28,17 @@ func initGinRouter() *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}
 	router.Use(cors.New(corsConfig))
-
+	router.GET("/dummy", dummyHandler)
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
 		authGroup.POST("/register", register)
 		authGroup.POST("/login", login)
 		authGroup.POST("/reset-password", authorize, resetPasswordHandler)
+		authGroup.POST("/send-otp", sendOTPHandler)
+		authGroup.POST("/send-otp-forget", sendOTPForForgetHandler)
+		authGroup.POST("/verify-otp", verifyOTPHandler)
+		authGroup.POST("/verify-otp-forget", verifyOTPForForgetHandler)
 	}
 
 	// For serving static files
@@ -43,6 +47,7 @@ func initGinRouter() *gin.Engine {
 		false)),
 	)
 	router.GET("/api/info/competition-info", competitionInfoHandler)
+	router.GET("/api/info/download", serveAssets)
 
 	// API routes group
 	apiGroup := router.Group("/api", authorize)
@@ -59,6 +64,7 @@ func initGinRouter() *gin.Engine {
 			manageGroup.POST("/challenge/verify", verifyHandler)
 			manageGroup.POST("/schedule/:action", manageScheduledAction)
 			manageGroup.POST("/challenge/upload", manageUploadHandler)
+			manageGroup.POST("/challenge/validateflag", validateFlagHandler)
 		}
 
 		// Status route group
@@ -79,8 +85,12 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/logs", challengeLogsHandler)
 			infoGroup.GET("/user/:username", userInfoHandler)
 			infoGroup.GET("/users", getAllUsersInfoHandler)
+			infoGroup.GET("/leaderboard", leaderboardHandler)
+			infoGroup.GET("/usercount", getUserCountHandler)
 			infoGroup.GET("/submissions", submissionsHandler)
 			infoGroup.GET("/tags", tagHandler)
+			infoGroup.GET("/hint/:hintID", hintHandler)
+			infoGroup.POST("/hint/:hintID", hintHandler)
 		}
 
 		// Notification route group
@@ -114,6 +124,8 @@ func initGinRouter() *gin.Engine {
 		{
 			adminPanelGroup.POST("/users/:action/:id", banUserHandler)
 			adminPanelGroup.GET("/statistics", getUsersStatisticsHandler)
+			adminPanelGroup.POST("/freezeLeaderboard", freezeLeaderboardHandler)
+			adminPanelGroup.POST("/unfreezeLeaderboard", unfreezeLeaderboardHandler)
 		}
 	}
 
