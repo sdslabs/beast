@@ -11,8 +11,6 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
-	// "gorm.io/driver/postgres"
-
 	"gorm.io/driver/sqlite"
 	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -38,18 +36,12 @@ func init() {
 
 	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
 	Db, dberr = gorm.Open(sqlite.Open(beastDb), &gorm.Config{})
-	// dsn := "user=Sukhi password=12345678 dbname=beast host=localhost port=5432 sslmode=disable"
-	// Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if dberr != nil {
-		log.Error("Error while initializing the database.", dberr)
-		// return nil, err
-	}
 
-	// if dberr != nil {
-	// 	log.WithFields(log.Fields{
-	// 		"LOCATION": beastDb,
-	// 	}).Fatal(dberr)
-	// }
+	if dberr != nil {
+		log.WithFields(log.Fields{
+			"LOCATION": beastDb,
+		}).Fatal(dberr)
+	}
 
 	if err := Db.SetupJoinTable(&Challenge{}, "Users", &UserChallenges{}); err != nil {
 		log.Fatalf("Cannot create related models: %s", err)

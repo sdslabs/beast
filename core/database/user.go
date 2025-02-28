@@ -18,7 +18,6 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
-
 	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -41,8 +40,10 @@ type User struct {
 func QueryUserEntries(key string, value string) ([]User, error) {
 	queryKey := fmt.Sprintf("%s == ?", key)
 	var users []User
+
 	DBMux.Lock()
 	defer DBMux.Unlock()
+
 	tx := Db.Where(queryKey, value).Find(&users)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -129,7 +130,7 @@ func CreateUserEntry(user *User) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("error while starting transaction: %s", tx.Error)
+		return fmt.Errorf("Error while starting transaction", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(user, *user).Error; err != nil {
@@ -166,7 +167,8 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 // Check whether challenge is submitted by the user
 func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	var userChallenges []UserChallenges
-	var count int64 = 0
+	var count int64
+	count = 0
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
@@ -186,7 +188,7 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 		return nil
 	}
 	if err := addToAuthorizedKeys(user); err != nil {
-		return fmt.Errorf("error while adding userized_keys : %s", err)
+		return fmt.Errorf("Error while adding userized_keys : %s", err)
 	}
 	return nil
 }
@@ -201,18 +203,18 @@ func (user *User) AfterUpdate(tx *gorm.DB) error {
 	if _, ok := updatedAttr["ssh_key"]; ok {
 		err := deleteFromAuthorizedKeys(user)
 		if err != nil {
-			return fmt.Errorf("error while deleting from userized_keys : %s", err)
+			return fmt.Errorf("Error while deleting from userized_keys : %s", err)
 		}
 		if user.SshKey == "" {
 			return nil
 		}
 		err = addToAuthorizedKeys(user)
 		if err != nil {
-			return fmt.Errorf("error while adding userized_keys : %s", err)
+			return fmt.Errorf("Error while adding userized_keys : %s", err)
 		}
 		err = updateScript(user)
 		if err != nil {
-			return fmt.Errorf("error while updating script : %s", err)
+			return fmt.Errorf("Error while updating script : %s", err)
 		}
 	}
 	return nil
@@ -244,12 +246,12 @@ func generateContentAuthorizedKeyFile(user *User) ([]byte, error) {
 	var authKey bytes.Buffer
 	authKeyTemplate, err := template.New("authKey").Parse(tools.AUTHORIZED_KEY_TEMPLATE)
 	if err != nil {
-		return []byte(""), fmt.Errorf("error while parsing script template :: %s", err)
+		return []byte(""), fmt.Errorf("Error while parsing script template :: %s", err)
 	}
 
 	err = authKeyTemplate.Execute(&authKey, data)
 	if err != nil {
-		return []byte(""), fmt.Errorf("error while executing script template :: %s", err)
+		return []byte(""), fmt.Errorf("Error while executing script template :: %s", err)
 	}
 
 	return authKey.Bytes(), nil
@@ -264,7 +266,7 @@ func addToAuthorizedKeys(user *User) error {
 
 	f, err := os.OpenFile(config.Cfg.AuthorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("error while opening userized keys file : %s", err)
+		return fmt.Errorf("Error while opening userized keys file : %s", err)
 	}
 	defer f.Close()
 
@@ -276,7 +278,7 @@ func addToAuthorizedKeys(user *User) error {
 	authBytes = bytes.Replace(authBytes, []byte("&#43;"), []byte("+"), -1)
 
 	if _, err := f.Write(authBytes); err != nil {
-		return fmt.Errorf("error while appending key to userized keys file : %s", err)
+		return fmt.Errorf("Error while appending key to userized keys file : %s", err)
 	}
 	return nil
 }
@@ -290,7 +292,7 @@ func deleteFromAuthorizedKeys(user *User) error {
 
 	keys, err := ioutil.ReadFile(config.Cfg.AuthorizedKeysFile)
 	if err != nil {
-		return fmt.Errorf("error while reading auth file : %s", err)
+		return fmt.Errorf("Error while reading auth file : %s", err)
 	}
 
 	regex := "(?m)[\r\n]+^.*\"SSH_USER=" + strconv.Itoa(int(user.ID)) + "\".*$"
@@ -300,7 +302,7 @@ func deleteFromAuthorizedKeys(user *User) error {
 
 	err = ioutil.WriteFile(config.Cfg.AuthorizedKeysFile, newKeys, 0644)
 	if err != nil {
-		return fmt.Errorf("error while writing to auth file : %s", err)
+		return fmt.Errorf("Error while writing to auth file : %s", err)
 	}
 	return nil
 }

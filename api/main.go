@@ -73,7 +73,6 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 			client, err := remoteManager.CreateSSHClient(server)
 			if err != nil {
 				log.Errorf("SSH connection to %s failed: %s\n", server.Host, err)
-				continue
 			}
 			defer client.Close()
 			remoteManager.ServerQueue.Push(server)

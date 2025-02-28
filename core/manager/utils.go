@@ -462,7 +462,6 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
-			userEntry = newUser
 			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
