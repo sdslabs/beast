@@ -19,7 +19,7 @@ import (
 	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
 
-	// _ "gorm.io/driver/sqlite"
+	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -31,14 +31,15 @@ type User struct {
 	Name       string       `gorm:"not null"`
 	Email      string       `gorm:"non null;unique"`
 	SshKey     string
-	Status     uint `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
-	Score      uint `gorm:"default:0"`
+	Status     uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Score      uint    `gorm:"default:0"`
+	Hints      []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
 // Queries all the users entries where the column represented by key
 // have the value in value.
 func QueryUserEntries(key string, value string) ([]User, error) {
-	queryKey := fmt.Sprintf("%s = ?", key)
+	queryKey := fmt.Sprintf("%s == ?", key)
 	var users []User
 	DBMux.Lock()
 	defer DBMux.Unlock()
@@ -91,7 +92,7 @@ func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("id != ? AND score >= ? AND role = ? AND status = ?", userID, userScore, core.USER_ROLES["contestant"], 0).Find(&users)
+	tx := Db.Where("id != ? AND score >= ? AND role == ? AND status == ?", userID, userScore, core.USER_ROLES["contestant"], 0).Find(&users)
 
 	for _, user := range users {
 		if user.Score > userScore {
@@ -128,7 +129,7 @@ func CreateUserEntry(user *User) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction", tx.Error)
+		return fmt.Errorf("error while starting transaction: %s", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(user, *user).Error; err != nil {
@@ -165,13 +166,12 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 // Check whether challenge is submitted by the user
 func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	var userChallenges []UserChallenges
-	var count int64
-	count = 0
+	var count int64 = 0
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("user_id = ? AND challenge_id = ?", userId, challId).Find(&userChallenges).Count(&count)
+	tx := Db.Where("user_id == ? AND challenge_id == ? AND solved == ?", userId, challId, true).Find(&userChallenges).Count(&count)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return false, nil
@@ -186,7 +186,7 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 		return nil
 	}
 	if err := addToAuthorizedKeys(user); err != nil {
-		return fmt.Errorf("Error while adding userized_keys : %s", err)
+		return fmt.Errorf("error while adding userized_keys : %s", err)
 	}
 	return nil
 }
@@ -201,18 +201,18 @@ func (user *User) AfterUpdate(tx *gorm.DB) error {
 	if _, ok := updatedAttr["ssh_key"]; ok {
 		err := deleteFromAuthorizedKeys(user)
 		if err != nil {
-			return fmt.Errorf("Error while deleting from userized_keys : %s", err)
+			return fmt.Errorf("error while deleting from userized_keys : %s", err)
 		}
 		if user.SshKey == "" {
 			return nil
 		}
 		err = addToAuthorizedKeys(user)
 		if err != nil {
-			return fmt.Errorf("Error while adding userized_keys : %s", err)
+			return fmt.Errorf("error while adding userized_keys : %s", err)
 		}
 		err = updateScript(user)
 		if err != nil {
-			return fmt.Errorf("Error while updating script : %s", err)
+			return fmt.Errorf("error while updating script : %s", err)
 		}
 	}
 	return nil
@@ -244,12 +244,12 @@ func generateContentAuthorizedKeyFile(user *User) ([]byte, error) {
 	var authKey bytes.Buffer
 	authKeyTemplate, err := template.New("authKey").Parse(tools.AUTHORIZED_KEY_TEMPLATE)
 	if err != nil {
-		return []byte(""), fmt.Errorf("Error while parsing script template :: %s", err)
+		return []byte(""), fmt.Errorf("error while parsing script template :: %s", err)
 	}
 
 	err = authKeyTemplate.Execute(&authKey, data)
 	if err != nil {
-		return []byte(""), fmt.Errorf("Error while executing script template :: %s", err)
+		return []byte(""), fmt.Errorf("error while executing script template :: %s", err)
 	}
 
 	return authKey.Bytes(), nil
@@ -264,7 +264,7 @@ func addToAuthorizedKeys(user *User) error {
 
 	f, err := os.OpenFile(config.Cfg.AuthorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("Error while opening userized keys file : %s", err)
+		return fmt.Errorf("error while opening userized keys file : %s", err)
 	}
 	defer f.Close()
 
@@ -276,7 +276,7 @@ func addToAuthorizedKeys(user *User) error {
 	authBytes = bytes.Replace(authBytes, []byte("&#43;"), []byte("+"), -1)
 
 	if _, err := f.Write(authBytes); err != nil {
-		return fmt.Errorf("Error while appending key to userized keys file : %s", err)
+		return fmt.Errorf("error while appending key to userized keys file : %s", err)
 	}
 	return nil
 }
@@ -290,7 +290,7 @@ func deleteFromAuthorizedKeys(user *User) error {
 
 	keys, err := ioutil.ReadFile(config.Cfg.AuthorizedKeysFile)
 	if err != nil {
-		return fmt.Errorf("Error while reading auth file : %s", err)
+		return fmt.Errorf("error while reading auth file : %s", err)
 	}
 
 	regex := "(?m)[\r\n]+^.*\"SSH_USER=" + strconv.Itoa(int(user.ID)) + "\".*$"
@@ -300,7 +300,55 @@ func deleteFromAuthorizedKeys(user *User) error {
 
 	err = ioutil.WriteFile(config.Cfg.AuthorizedKeysFile, newKeys, 0644)
 	if err != nil {
-		return fmt.Errorf("Error while writing to auth file : %s", err)
+		return fmt.Errorf("error while writing to auth file : %s", err)
 	}
 	return nil
+}
+
+func QueryTopUsersByScore(limit int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role == ? AND status == ?", core.USER_ROLES["contestant"], 0).
+		Order("score desc, updated_at asc").
+		Limit(limit).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryUsersByScoreOffsetLimit(limit, offset int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role == ? AND status == ?", core.USER_ROLES["contestant"], 0).
+		Order("score desc, updated_at asc").
+		Limit(limit).
+		Offset(offset).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func GetUserCount() (int64, error) {
+	var count int64
+	DBMux.Lock()
+	defer DBMux.Unlock()
+	tx := Db.Model(&User{}).Where("role == ?", "contestant").Count(&count)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return 0, nil
+	}
+	return count, tx.Error
 }

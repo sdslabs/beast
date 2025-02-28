@@ -15,7 +15,6 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 
-
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -53,7 +52,6 @@ type ChallengePreview struct {
 	Category        string
 	Tags            []string
 	Ports           []database.Port
-	Hints           string
 	Assets          []string
 	AdditionalLinks []string
 	Desc            string
@@ -199,12 +197,15 @@ func getCommandAndModifierForWebChall(language, framework, webRoot, port string)
 }
 
 // This function provides the run command and image for a particular type of web challenge
-//  * webRoot:  relative path to web challenge directory
-//  * port:     web port
-//  * challengeInfo
 //
-//  It returns the run command for challenge
-//  and the docker base image corresponding to language
+//   - webRoot:  relative path to web challenge directory
+//
+//   - port:     web port
+//
+//   - challengeInfo
+//
+//     It returns the run command for challenge
+//     and the docker base image corresponding to language
 func GetWebChallSetup(webRoot, port string, challengeInfo []string) (string, string, func(*BeastBareDockerfile)) {
 	length := len(challengeInfo)
 	reqLength := 4
@@ -347,6 +348,10 @@ func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.B
 	log.Debug("Adding additional required file context to docker context.")
 	// If the challenge type is service, we need to add xinetd configuration to the
 	// docker directory context.
+	if config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
+		log.Debug("Add provided xinetd.conf")
+		additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = config.Challenge.Env.XinetdConf
+	}
 	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
 		log.Debug("Challenge type is service, trying to embed xinetd configuration.")
 		file, err := ioutil.TempFile("", "xinetd.conf.*")
@@ -457,6 +462,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
+			userEntry = newUser
 			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
@@ -501,11 +507,13 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Status:          core.DEPLOY_STATUS["undeployed"],
 			ContainerId:     coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:         coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			MaxAttemptLimit: config.Challenge.Metadata.MaxAttemptLimit,
+			PreReqs:         strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
+			DynamicFlag:     config.Challenge.Metadata.DynamicFlag,
 			Flag:            config.Challenge.Metadata.Flag,
 			Type:            config.Challenge.Metadata.Type,
 			Sidecar:         config.Challenge.Metadata.Sidecar,
 			Description:     config.Challenge.Metadata.Description,
-			Hints:           strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
 			Assets:          strings.Join(assetsURL, core.DELIMITER),
 			AdditionalLinks: strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),
 			Points:          config.Challenge.Metadata.Points,
@@ -517,6 +525,19 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		err = database.CreateChallengeEntry(challEntry)
 		if err != nil {
 			return fmt.Errorf("error while creating chall entry with config : %s : %v", err, challEntry)
+		}
+
+		for _, hint := range config.Challenge.Metadata.Hints {
+			hintEntry := database.Hint{
+				ChallengeID: challEntry.ID,
+				Points:      hint.Points,
+				Description: hint.Text,
+			}
+
+			err := database.CreateHintEntry(&hintEntry)
+			if err != nil {
+				return fmt.Errorf("Error while creating hint entry: %v", err)
+			}
 		}
 
 		database.Db.Model(challEntry).Association("Tags").Append(tags)
@@ -716,7 +737,6 @@ func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 			return "", err
 		}
 	}
-
 	return targetDir, nil
 }
 
@@ -883,7 +903,7 @@ func UpdateChallenges(defaultauthorpassword string) {
 	log.Debugf("Challenges updated in Db")
 }
 
-func ValidateFlag(flag, challenge_name string)  error{
+func ValidateFlag(flag, challenge_name string) error {
 	if challenge_name == "" {
 		log.Errorf("Challenge name is empty")
 		return fmt.Errorf("challenge name is empty")
@@ -896,7 +916,7 @@ func ValidateFlag(flag, challenge_name string)  error{
 
 	dynamicflag := database.DynamicFlag{
 		Name: challenge_name,
-		Flag:          flag,
+		Flag: flag,
 	}
 	err := database.CreateDynamicFlagEntry(&dynamicflag)
 

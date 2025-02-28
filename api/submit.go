@@ -98,13 +98,12 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
-		if err != nil {
+		if err != nil || len(chall) == 0 {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
-
 		challenge := chall[0]
 		if challenge.Status != core.DEPLOY_STATUS["deployed"] {
 			c.JSON(http.StatusOK, FlagSubmitResp{
@@ -113,6 +112,56 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+
+		if challenge.PreReqs != "" {
+			preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+
+			if !preReqsStatus {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have not solved the prerequisites of this challenge.",
+					Success: false,
+				})
+				return
+			}
+		}
+
+		if challenge.MaxAttemptLimit > 0 {
+			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request."})
+				return
+			}
+
+			if previousTries >= challenge.MaxAttemptLimit {
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "You have reached the maximum number of tries for this challenge.",
+					Success: false,
+				})
+				return
+			}
+		}
+
+		// Increase user tries by 1
+		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		currentTime := time.Now()
+		msg := "User " + username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " | TimeStamp: " + currentTime.Format("20060102150405")
+		go coreUtils.LogFlag(msg, challenge.Name)
 
 		// If the challenge is dynamic, then the flag is not stored in the database
 		if challenge.DynamicFlag {
@@ -154,17 +203,14 @@ func submitFlagHandler(c *gin.Context) {
 					subuser, _ := database.QueryUserById(submissions[0].UserID)
 					msg := "User " + subuser.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by another user " + user.Username
 					go notify.SendNotification(notify.Warning, msg)
-					c.JSON(http.StatusOK, FlagSubmitResp{
-						Message: "Your flag is incorrect",
-						Success: false,
-					})
+					go coreUtils.LogCheating(msg)
 				} else {
 					c.JSON(http.StatusOK, FlagSubmitResp{
 						Message: "You have already solved this challenge",
 						Success: false,
 					})
+					return
 				}
-				return
 			}
 		} else {
 			if challenge.Flag != flag {
@@ -214,8 +260,11 @@ func submitFlagHandler(c *gin.Context) {
 				challengePoints = newPoints
 			}
 		}
-
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + challengePoints})
+		newScore := user.Score + challengePoints
+		if  newScore <= 0 {
+			newScore =0
+		}
+		err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
@@ -223,10 +272,15 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		if len(leaderboardCache) < core.LEADERBOARD_SIZE || (len(leaderboardCache) > 0 && newScore > leaderboardCache[len(leaderboardCache)-1].Score) {
+			leaderboardStale = true
+		}
+
 		UserChallengesEntry := database.UserChallenges{
 			CreatedAt:   time.Time{},
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
+			Solved:      true,
 		}
 		if challenge.DynamicFlag {
 			UserChallengesEntry.Flag = flag
@@ -266,7 +320,11 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 			return err
 		}
 		if user.Role == "contestant" {
-			err = database.UpdateUser(&user, map[string]interface{}{"Score": user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)})
+			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
+			if newScore <= 0{
+				newScore = 0
+			}
+			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
 			if err != nil {
 				return err
 			}

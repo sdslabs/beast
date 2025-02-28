@@ -3,7 +3,7 @@
 echo -e "Setting up sample environment for beast..."
 
 # Creating required directories
-mkdir -p "/home/$USER/.beast" "/home/$USER/.beast/assets/logo" "/home/$USER/.beast/remote" "/home/$USER/.beast/uploads" "/home/$USER/.beast/secrets" "/home/$USER/.beast/scripts" "/home/$USER/.beast/staging"
+mkdir -p "/home/$USER/.beast" "/home/$USER/.beast/assets/logo" "/home/$USER/.beast/assets/mailTemplates" "/home/$USER/.beast/remote" "/home/$USER/.beast/uploads" "/home/$USER/.beast/secrets" "/home/$USER/.beast/scripts" "/home/$USER/.beast/staging"
 
 # Creating random authorized_keys and secret.key files
 echo -e "auth_keys" >/home/$USER/.beast/authorized_keys
@@ -17,12 +17,12 @@ if [ -f "$BEAST_GLOBAL_CONFIG" ]; then
 else
     if [ -f "$EXAMPLE_CONFIG_FILE" ]; then
         echo -e "Copying example config file"
-        mv ./_examples/example.config.toml $BEAST_GLOBAL_CONFIG
+        cp ./_examples/example.config.toml $BEAST_GLOBAL_CONFIG
     else
         echo -e '\e[93mCould not find example.config.toml'
         echo -e 'Downloading example.config.toml'
         wget https://raw.githubusercontent.com/sdslabs/beast/master/_examples/example.config.toml
-        mv ./example.config.toml $BEAST_GLOBAL_CONFIG
+        cp ./example.config.toml $BEAST_GLOBAL_CONFIG
         exit
     fi
     sed -i "s/vsts/$USER/g" $BEAST_GLOBAL_CONFIG

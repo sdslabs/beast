@@ -7,7 +7,15 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "docker-type"
 flag = "FLAG{r3GEx_i5_3vi1!!}"
 type = "docker"
-hints = ["simple_hint_1", "simple_hint_2"]
+points = 200
+
+[[challenge.metadata.hints]]
+text = "simple_hint_1"
+points = 10
+
+[[challenge.metadata.hints]]
+text = "simple_hint_2"
+points = 20
 
 [challenge.env]
 docker_context = "docker-file"

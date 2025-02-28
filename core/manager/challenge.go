@@ -680,18 +680,33 @@ func undeployChallenge(challengeName string, purge bool) error {
 
 		err = coreUtils.CleanupChallengeIfExist(cfg)
 		if err != nil {
-			return fmt.Errorf("Error while cleaning up the challenge: %s", err)
+			return fmt.Errorf("error while cleaning up the challenge: %s", err)
 		}
 
 		log.Infof("Purging the challenge : %s", challenge.Name)
 		err = unstageChallenge(challenge.Name)
 		if err != nil {
-			return fmt.Errorf("Error while purging in unstage step: %s", err)
+			return fmt.Errorf("error while purging in unstage step: %s", err)
+		}
+
+		log.Info("Subtracting user points")
+		err = database.SubtractScoreFromSolvers(challenge.ID);
+
+		if err != nil {
+			return fmt.Errorf("error while subtracting user points: %s", err)
 		}
 
 		log.Info("Deleting database entry")
-		if err := coreUtils.DeleteChallengeEntryWithPorts(challenge.Name); err != nil {
-			log.Error(err)
+		if err := coreUtils.DeleteChallengeEntryWithPorts(challenge.Name); 
+		err != nil {
+			return fmt.Errorf("error while deleting challenge entry: %s", err)
+		}
+
+		log.Info("Deleting challenge entry from user challenge database")
+		err = database.DeleteAllUserChallenges(challenge.ID);
+
+		if err != nil {
+			return fmt.Errorf("error while subtracting user points: %s", err)
 		}
 
 		log.Infof("Challenge purge successful")

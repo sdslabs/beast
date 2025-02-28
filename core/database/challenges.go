@@ -8,11 +8,13 @@ import (
 	"html/template"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
 	tools "github.com/sdslabs/beastv4/templates"
-	// _ "gorm.io/driver/sqlite"
+
+	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -45,8 +47,9 @@ type Challenge struct {
 	DynamicFlag     bool   `gorm:"not null;default:false"`
 	Flag            string `gorm:"type:text"`
 	Type            string `gorm:"type:varchar(64)"`
+	MaxAttemptLimit int    `gorm:"default:-1"`
+	PreReqs         string `gorm:"type:text"`
 	Sidecar         string `gorm:"type:varchar(64)"`
-	Hints           string `gorm:"type:text"`
 	Assets          string `gorm:"type:text"`
 	AdditionalLinks string `gorm:"type:text"`
 	Description     string `gorm:"type:text"`
@@ -69,6 +72,8 @@ type UserChallenges struct {
 	CreatedAt   time.Time
 	UserID      uint
 	ChallengeID uint
+	Tries       uint
+	Solved      bool
 	Flag        string
 }
 
@@ -95,7 +100,7 @@ func CreateChallengeEntry(challenge *Challenge) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction", tx.Error)
+		return fmt.Errorf("error while starting transaction: %s", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(challenge, *challenge).Error; err != nil {
@@ -134,7 +139,7 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 
 	tx := Db.Preload("Tags").Preload("Ports").Where(queryKey, value).Find(&challenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return nil, nil
+		return nil, errors.New("no challenge entry found")
 	}
 
 	if tx.Error != nil {
@@ -179,6 +184,77 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 	return challenges[0], nil
 }
 
+// Check Pre Reqs Status
+func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
+	// Split the PreReqs field to get the list of prerequisite challenge names
+	preReqChallengeNames := strings.Split(challenge.PreReqs, core.DELIMITER)
+
+	// Check if all prerequisite challenges are solved
+	for _, preReq := range preReqChallengeNames {
+		var preReqChallenge Challenge
+		err := Db.Where("name = ?", preReq).First(&preReqChallenge).Error
+		if err != nil {
+			return false, err
+		}
+
+		var userChallenge UserChallenges
+		err = Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userID, preReqChallenge.ID, true).First(&userChallenge).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+
+	return true, nil
+}
+
+// Get User Related Challenges
+func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
+	var userChallenges UserChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Return true  if no record is found
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	return int(userChallenges.Tries), nil
+}
+
+func UpdateUserChallengeTries(userID uint, challengeID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	var userChallenges UserChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Create a new record if not found
+			userChallenges = UserChallenges{
+				UserID:      userID,
+				ChallengeID: challengeID,
+				Tries:       1,
+				Solved:      false,
+			}
+			return Db.Create(&userChallenges).Error
+		}
+		return err
+	}
+
+	updates := map[string]interface{}{
+		"created_at": time.Now(),
+		"tries":      userChallenges.Tries + 1,
+	}
+
+	tx := Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
+
+	return tx.Error
+}
+
 // Update an entry for the challenge in the Challenge table
 func UpdateChallenge(chall *Challenge, m map[string]interface{}) error {
 
@@ -202,7 +278,7 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 
 	tx := Db.Where(whereMap).First(&challenge)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return fmt.Errorf("No challenge entry to update : WhereClause : %s", whereMap)
+		return fmt.Errorf("no challenge entry to update : WhereClause : %s", whereMap)
 	}
 
 	if tx.Error != nil {
@@ -236,7 +312,10 @@ func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(challenge).Association("Users").Find(&users); err != nil {
+	// Query users who have solved this challenge by checking the user_challenges table
+	if err := Db.Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
+		Where("user_challenges.challenge_id = ? AND user_challenges.solved = ?", challenge.ID, true).
+		Find(&users).Error; err != nil {
 		return users, err
 	}
 
@@ -250,7 +329,7 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
+		return fmt.Errorf("error while starting transaction : %s", tx.Error)
 	}
 
 	if err := tx.Unscoped().Delete(challenge).Error; err != nil {
@@ -367,7 +446,7 @@ func updateScript(user *User) error {
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
 	challs, err := GetRelatedChallenges(user)
 	if err != nil {
-		return fmt.Errorf("Error while getting related challenges : %v", err)
+		return fmt.Errorf("error while getting related challenges : %v", err)
 	}
 
 	mapOfChall := make(map[string]string)
@@ -384,12 +463,12 @@ func updateScript(user *User) error {
 	var script bytes.Buffer
 	scriptTemplate, err := template.New("script").Parse(tools.SSH_LOGIN_SCRIPT_TEMPLATE)
 	if err != nil {
-		return fmt.Errorf("Error while parsing script template :: %s", err)
+		return fmt.Errorf("error while parsing script template :: %s", err)
 	}
 
 	err = scriptTemplate.Execute(&script, data)
 	if err != nil {
-		return fmt.Errorf("Error while executing script template :: %s", err)
+		return fmt.Errorf("error while executing script template :: %s", err)
 	}
 
 	return ioutil.WriteFile(scriptPath, script.Bytes(), 0755)
@@ -429,3 +508,56 @@ func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, er
 
 	return dynamicFlags, tx.Error
 }
+
+func SubtractScoreFromSolvers(challengeID uint) error {
+    DBMux.Lock()
+    defer DBMux.Unlock()
+
+    tx := Db.Begin()
+    if tx.Error != nil {
+        return fmt.Errorf("error while starting transaction: %v", tx.Error)
+    }
+
+    var challenge Challenge
+    if err := tx.Where("id = ?", challengeID).First(&challenge).Error; err != nil {
+        tx.Rollback()
+        return fmt.Errorf("error fetching challenge: %v", err)
+    }
+
+    pointsToSubtract := challenge.Points
+
+    var solvers []UserChallenges
+    if err := tx.Where("challenge_id = ? AND solved = ?", challengeID, true).Find(&solvers).Error; err != nil {
+        tx.Rollback()
+        return fmt.Errorf("error fetching solvers: %v", err)
+    }
+
+    for _, solver := range solvers {
+        if err := tx.Model(&User{}).Where("id = ?", solver.UserID).
+		UpdateColumn("score", gorm.Expr("CASE WHEN score - ? < 0 THEN 0 ELSE score - ? END", pointsToSubtract, pointsToSubtract)).Error; err != nil {
+            tx.Rollback()
+            return fmt.Errorf("error updating score for user %d: %v", solver.UserID, err)
+        }
+    }
+
+    return tx.Commit().Error
+}
+
+func DeleteAllUserChallenges(challengeID uint) error {
+    DBMux.Lock()
+    defer DBMux.Unlock()
+
+    tx := Db.Begin()
+    if tx.Error != nil {
+        return fmt.Errorf("error while starting transaction: %v", tx.Error)
+    }
+
+    if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserChallenges{}).Error; err != nil {
+        tx.Rollback()
+        return fmt.Errorf("error deleting user challenge entries: %v", err)
+    }
+
+    return tx.Commit().Error
+}
+
+

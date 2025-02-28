@@ -83,8 +83,11 @@ func init() {
 		log.Fatalf("Cannot create related models: %s", err)
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &DynamicFlag{})
+	if err := Db.SetupJoinTable(&User{}, "Hints", &UserHint{}); err != nil {
+		log.Fatalf("Cannot create related models: %s", err)
+	}
 
+	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{}, &OTP{})
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
 		log.Errorf("Error while checking dummy user entry.")
@@ -246,3 +249,21 @@ func RestoreDatabase(backupFile string) error {
 	log.Println("Database restored successfully from:", backupFile)
 	return nil
 }
+
+// func BackupDatabase() {
+// 	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
+// 	beastRemoteDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
+// 	beastStagingDir := filepath.Join(BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+// 	err := utils.CopyFile(beastDb, beastDb+time.Now().Format("20060102150405")+".bak")
+// 	if err != nil {
+// 		log.Errorf("Error while backing up database: %s", err)
+// 	}
+// 	err = utils.CopyDirectory(beastRemoteDir, beastRemoteDir+time.Now().Format("20060102150405")+".bak")
+// 	if err != nil {
+// 		log.Errorf("Error while backing up remote dir: %s", err)
+// 	}
+// 	err = utils.CopyDirectory(beastStagingDir, beastStagingDir+time.Now().Format("20060102150405")+".bak")
+// 	if err != nil {
+// 		log.Errorf("Error while backing up staging dir: %s", err)
+// 	}
+// }

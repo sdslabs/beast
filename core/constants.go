@@ -18,6 +18,8 @@ const ( //names
 	CHALLENGE_CONFIG_FILE_NAME  string = "beast.toml"
 	BEAST_CONFIG_FILE_NAME      string = "config.toml"
 	BEAST_LOG_FILE              string = "beast.log"
+	BEAST_CHEAT_LOG_FILE        string = "cheat.log"
+	BEAST_FLAG_LOG_FILE         string = "flag.log"
 	BEAST_DATABASE              string = "beast.db"
 	DEFAULT_CHALLENGE_NAME      string = "Backdoor-Challenge"
 	DEFAULT_AUTHOR_NAME         string = "ghost"
@@ -32,7 +34,7 @@ const ( //names
 	ISSUER                      string = "beast-sds"
 	DELIMITER                   string = "::::"
 	LOCALHOST                   string = "localhost"
-	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast"			// This should always be used for remote only.
+	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
 )
 
 const ( //paths
@@ -46,13 +48,15 @@ const ( //paths
 	BEAST_UPLOADS_DIR              string = "uploads"
 	BEAST_ASSETS_DIR               string = "assets"
 	BEAST_LOGO_DIR                 string = "logo"
+	BEAST_EMAIL_TEMPLATE_DIR       string = "mailTemplates"
 )
 
 const ( //chall types
-	STATIC_CHALLENGE_TYPE_NAME  string = "static"
-	SERVICE_CHALLENGE_TYPE_NAME string = "service"
-	DOCKER_CHALLENGE_TYPE_NAME  string = "docker"
-	BARE_CHALLENGE_TYPE_NAME    string = "bare"
+	STATIC_CHALLENGE_TYPE_NAME         string = "static"
+	SERVICE_CHALLENGE_TYPE_NAME        string = "service"
+	DOCKER_CHALLENGE_TYPE_NAME         string = "docker"
+	SERVICE_DOCKER_CHALLENGE_TYPE_NAME string = "service_docker"
+	BARE_CHALLENGE_TYPE_NAME           string = "bare"
 )
 
 const ( // chall actions
@@ -135,7 +139,7 @@ var SIDECAR_ENV_PREFIX = map[string]string{
 }
 
 // Available challenge types
-var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, DOCKER_CHALLENGE_TYPE_NAME}
+var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, DOCKER_CHALLENGE_TYPE_NAME, SERVICE_DOCKER_CHALLENGE_TYPE_NAME}
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	"php": {
@@ -199,3 +203,7 @@ var USER_STATUS = map[string]string{
 	"ban":   "ban",
 	"unban": "unban",
 }
+
+const (
+	LEADERBOARD_SIZE = 25
+)

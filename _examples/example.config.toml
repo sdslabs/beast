@@ -100,6 +100,12 @@ ssh_key = "$HOME/.beast/secrets/key.priv"
 # If it is set to false then that remote git repository will not be used
 active = false
 
+[mail_config]
+from = "your-email@example.com"
+password = "your-email-password"
+smtpHost = "smtp.example.com"
+smtpPort = "587"
+
 # Configuration to connect to Postgresql database 
 [psql_config]
 
@@ -141,3 +147,4 @@ logo_url = ""
 
 # Dynamic scoring for challenges
 dynamic_score = false
+
