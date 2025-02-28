@@ -12,7 +12,6 @@ import (
 	"net/smtp"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -156,6 +155,9 @@ func sendEmail(email, otp string) error {
 }
 
 func sendOTPHandler(c *gin.Context) {
+	if config.SkipAuthorization {
+		return
+	}
 	email := c.PostForm("email")
 	email = strings.TrimSpace(strings.ToLower(email))
 
@@ -166,16 +168,6 @@ func sendOTPHandler(c *gin.Context) {
 		log.Printf("WARNING: %s", "SMTP not configured")
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "SMTP not configured",
-		})
-		return
-	}
-
-	re := regexp.MustCompile(`^.*@.*iitr\.ac\.in$`)
-	isIITR := re.MatchString(email)
-
-	if !isIITR {
-		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Email should be of IITR domain",
 		})
 		return
 	}
@@ -240,62 +232,63 @@ func verifyOTPHandler(c *gin.Context) {
 	otp := strings.TrimSpace(c.PostForm("otp"))
 	email = strings.TrimSpace(strings.ToLower(email))
 
-	smtpHost := config.Cfg.MailConfig.SMTPHost
-	smtpPort := config.Cfg.MailConfig.SMTPPort
+	if !config.SkipAuthorization {
+		smtpHost := config.Cfg.MailConfig.SMTPHost
+		smtpPort := config.Cfg.MailConfig.SMTPPort
 
-	if smtpHost == "" || smtpPort == "" {
-		log.Printf("WARNING: %s", "SMTP not configured")
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "SMTP not configured",
-		})
-		return
-	}
-
-	otpEntry, err := database.QueryOTPEntry(email)
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "OTP not found",
-			})
-		} else {
-			log.Println("Failed to query OTP:", err)
+		if smtpHost == "" || smtpPort == "" {
+			log.Printf("WARNING: %s", "SMTP not configured")
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "Failed to send OTP",
+				Error: "SMTP not configured",
+			})
+			return
+		}
+
+		otpEntry, err := database.QueryOTPEntry(email)
+
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+					Error: "OTP not found",
+				})
+			} else {
+				log.Println("Failed to query OTP:", err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "Failed to send OTP",
+				})
+				return
+			}
+		}
+
+		if otpEntry.Verified {
+			c.JSON(http.StatusOK, HTTPPlainResp{
+				Message: "Email already verified",
+			})
+			return
+		}
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Failed to verify OTP",
+			})
+			return
+		}
+
+		if otpEntry.Code != otp {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Invalid OTP",
+			})
+			return
+		}
+
+		if time.Now().After(otpEntry.Expiry) {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "OTP expired",
 			})
 			return
 		}
 	}
-
-	if otpEntry.Verified {
-		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "Email already verified",
-		})
-		return
-	}
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "Failed to verify OTP",
-		})
-		return
-	}
-
-	if otpEntry.Code != otp {
-		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-			Error: "Invalid OTP",
-		})
-		return
-	}
-
-	if time.Now().After(otpEntry.Expiry) {
-		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-			Error: "OTP expired",
-		})
-		return
-	}
-
-	err = database.VerifyOTPEntry(email)
+	err := database.VerifyOTPEntry(email)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -310,6 +303,9 @@ func verifyOTPHandler(c *gin.Context) {
 }
 
 func sendOTPForForgetHandler(c *gin.Context) {
+	if config.SkipAuthorization {
+		return
+	}
 	email := c.PostForm("email")
 	email = strings.TrimSpace(strings.ToLower(email))
 
@@ -320,16 +316,6 @@ func sendOTPForForgetHandler(c *gin.Context) {
 		log.Printf("WARNING: %s", "SMTP not configured")
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "SMTP not configured",
-		})
-		return
-	}
-
-	re := regexp.MustCompile(`^.*@.*iitr\.ac\.in$`)
-	isIITR := re.MatchString(email)
-
-	if !isIITR {
-		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Email should be of IITR domain",
 		})
 		return
 	}
@@ -386,47 +372,47 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	otp := strings.TrimSpace(c.PostForm("otp"))
 	email = strings.TrimSpace(strings.ToLower(email))
+	if !config.SkipAuthorization {
+		smtpHost := config.Cfg.MailConfig.SMTPHost
+		smtpPort := config.Cfg.MailConfig.SMTPPort
 
-	smtpHost := config.Cfg.MailConfig.SMTPHost
-	smtpPort := config.Cfg.MailConfig.SMTPPort
-
-	if smtpHost == "" || smtpPort == "" {
-		log.Printf("WARNING: %s", "SMTP not configured")
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "SMTP not configured",
-		})
-		return
-	}
-
-	otpEntry, err := database.QueryOTPEntry(email)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "OTP not found",
-			})
-		} else {
-			log.Println("Failed to query OTP:", err)
+		if smtpHost == "" || smtpPort == "" {
+			log.Printf("WARNING: %s", "SMTP not configured")
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "Failed to verify OTP",
+				Error: "SMTP not configured",
 			})
+			return
 		}
-		return
-	}
 
-	if otpEntry.Code != otp {
-		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-			Error: "Invalid OTP",
-		})
-		return
-	}
+		otpEntry, err := database.QueryOTPEntry(email)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+					Error: "OTP not found",
+				})
+			} else {
+				log.Println("Failed to query OTP:", err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "Failed to verify OTP",
+				})
+			}
+			return
+		}
 
-	if time.Now().After(otpEntry.Expiry) {
-		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-			Error: "OTP expired",
-		})
-		return
-	}
+		if otpEntry.Code != otp {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Invalid OTP",
+			})
+			return
+		}
 
+		if time.Now().After(otpEntry.Expiry) {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "OTP expired",
+			})
+			return
+		}
+	}
 	userEntry, err := database.QueryFirstUserEntry("email", email)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
