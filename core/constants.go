@@ -54,7 +54,7 @@ const ( //paths
 const ( //chall types
 	STATIC_CHALLENGE_TYPE_NAME  string = "static"
 	SERVICE_CHALLENGE_TYPE_NAME string = "service"
-	DOCKER_CHALLENGE_TYPE_NAME  string = "docker"
+	WEB_CHALLENGE_TYPE_NAME     string = "web"
 	BARE_CHALLENGE_TYPE_NAME    string = "bare"
 )
 
@@ -138,7 +138,7 @@ var SIDECAR_ENV_PREFIX = map[string]string{
 }
 
 // Available challenge types
-var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, DOCKER_CHALLENGE_TYPE_NAME}
+var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, WEB_CHALLENGE_TYPE_NAME}
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	"php": {
