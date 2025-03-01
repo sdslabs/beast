@@ -20,3 +20,6 @@ points = 20
 maxPoints = 100
 minPoints = 50
 tags = ["easy", "web"]
+
+[challenge.env]
+static_dir = "static"
