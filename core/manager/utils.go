@@ -349,38 +349,40 @@ func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.B
 	// If the challenge type is service, we need to add xinetd configuration to the
 	// docker directory context.
 	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
-		log.Debug("Challenge type is service, trying to embed xinetd configuration.")
-		file, err := ioutil.TempFile("", "xinetd.conf.*")
-		if err != nil {
-			return fmt.Errorf("error while creating a tempfile for xinetdconf :: %s", err)
-		}
-		defer file.Close()
+		if additionalCtx[core.DEFAULT_XINETD_CONF_FILE] == "" {
+			log.Debug("Challenge type is service, trying to embed xinetd configuration.")
+			file, err := ioutil.TempFile("", "xinetd.conf.*")
+			if err != nil {
+				return fmt.Errorf("error while creating a tempfile for xinetdconf :: %s", err)
+			}
+			defer file.Close()
 
-		var xinetd bytes.Buffer
-		xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
-		if err != nil {
-			return fmt.Errorf("error while parsing Xinetd config template :: %s", err)
-		}
+			var xinetd bytes.Buffer
+			xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
+			if err != nil {
+				return fmt.Errorf("error while parsing Xinetd config template :: %s", err)
+			}
 
-		port := config.Challenge.Env.GetDefaultPort()
+			port := config.Challenge.Env.GetDefaultPort()
 
-		data := BeastXinetdConf{
-			Port:        fmt.Sprintf("%d", port),
-			ServiceName: config.Challenge.Metadata.Name,
-			ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
-		}
-		err = xinetdTemplate.Execute(&xinetd, data)
-		if err != nil {
-			return fmt.Errorf("error while executing Xinetd Config template :: %s", err)
-		}
+			data := BeastXinetdConf{
+				Port:        fmt.Sprintf("%d", port),
+				ServiceName: config.Challenge.Metadata.Name,
+				ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
+			}
+			err = xinetdTemplate.Execute(&xinetd, data)
+			if err != nil {
+				return fmt.Errorf("error while executing Xinetd Config template :: %s", err)
+			}
 
-		_, err = file.WriteString(xinetd.String())
-		if err != nil {
-			return fmt.Errorf("error while writing xinetd config to file :: %s", err)
-		}
+			_, err = file.WriteString(xinetd.String())
+			if err != nil {
+				return fmt.Errorf("error while writing xinetd config to file :: %s", err)
+			}
 
-		log.Debugf("Successfully added xinetd config context in docker context.")
-		additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = file.Name()
+			log.Debugf("Successfully added xinetd config context in docker context.")
+			additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = file.Name()
+		}
 	}
 
 	return nil

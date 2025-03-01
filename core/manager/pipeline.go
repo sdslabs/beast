@@ -41,15 +41,18 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	challengeConfig := filepath.Join(contextDir, core.CHALLENGE_CONFIG_FILE_NAME)
 	log.Debugf("Reading challenge config from : %s", challengeConfig)
 
-	var dockerfileCtx string
+	var dockerfileCtx, serviceConfig string
+	dockerfileProvided := false
 
-	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME {
+	if config.Challenge.Env.DockerCtx != "" {
+		dockerfileProvided = true
 		dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
 		err := utils.ValidateFileExists(dockerfileCtx)
 		if err != nil {
 			return err
 		}
 	} else {
+		config.Challenge.Env.DockerCtx = core.DEFAULT_DOCKER_FILE
 		dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
 		if err != nil {
 			return err
@@ -57,8 +60,18 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 		log.Debug("Got dockerfile context from the challenge config")
 	}
 
+	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
+		if config.Challenge.Env.ServiceConfig != "" {
+			serviceConfig = filepath.Join(challengeConfig, config.Challenge.Env.ServiceConfig)
+			err := utils.ValidateFileExists(serviceConfig)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	additionalCtx := make(map[string]string)
 	additionalCtx["Dockerfile"] = dockerfileCtx
+	additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = serviceConfig
 
 	// Here we try to add all the additional context that are required like xinetd.conf
 	// instead of mounting these files inside the container, since we want reproducibility
@@ -87,7 +100,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
 
-	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME {
+	if !dockerfileProvided {
 		delete(additionalCtx, "Dockerfile")
 	}
 	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir, filepath.Join(contextDir, core.HIDDEN)})
