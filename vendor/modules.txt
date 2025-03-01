@@ -17,8 +17,8 @@ github.com/araddon/dateparse
 github.com/cpuguy83/go-md2man/md2man
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible
 github.com/dgrijalva/jwt-go
-# github.com/docker/distribution v2.6.2+incompatible
-github.com/docker/distribution/digest
+# github.com/docker/distribution v2.8.0+incompatible
+github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
 # github.com/docker/docker v1.13.1 => github.com/docker/engine v1.13.1
 github.com/docker/docker/api/types
@@ -124,6 +124,8 @@ github.com/modern-go/reflect2
 github.com/mohae/struct2csv
 # github.com/olekukonko/tablewriter v0.0.5
 github.com/olekukonko/tablewriter
+# github.com/opencontainers/go-digest v1.0.0
+github.com/opencontainers/go-digest
 # github.com/pelletier/go-buffruneio v0.2.0
 github.com/pelletier/go-buffruneio
 # github.com/pkg/errors v0.8.0

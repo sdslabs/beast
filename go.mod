@@ -11,7 +11,7 @@ require (
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20180901172138-1eb28afdf9b6 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/docker/distribution v2.6.2+incompatible // indirect
+	github.com/docker/distribution v2.8.0+incompatible // indirect
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.3.3 // indirect
@@ -38,6 +38,7 @@ require (
 	github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/gomega v1.4.2 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pelletier/go-buffruneio v0.2.0 // indirect
 	github.com/pkg/errors v0.8.0 // indirect
 	github.com/sergi/go-diff v1.0.0 // indirect
@@ -45,7 +46,6 @@ require (
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.2 // indirect
 	github.com/src-d/gcfg v1.3.0 // indirect
-	github.com/stevvooe/resumable v0.0.0-20180830230917-22b14a53ba50 // indirect
 	github.com/swaggo/gin-swagger v1.0.0
 	github.com/swaggo/swag v1.7.0
 	github.com/xanzy/ssh-agent v0.2.0 // indirect
