@@ -204,16 +204,13 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # Dependencies required by challenge, installed using default package manager of base image apt for most cases.
 // apt_deps = ["", ""]
 //
-//
 // # A list of setup scripts to run for building challenge enviroment.
 // # Keep in mind that these are only for building the challenge environment and are executed
 // # in the iamge building step of the deployment pipeline.
 // setup_scripts = ["", ""]
 //
-//
 // # A directory containing any of the static assets for the challenge, exposed by beast static endpoint.
 // static_dir = ""
-//
 //
 // # Command to execute inside the container, if a predefined type is being used try to
 // # use an existing field to let beast automatically calculate what command to run.
@@ -221,42 +218,38 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # of the service using service_path field.
 // run_cmd = ""
 //
-//
 // # Similar to run_cmd but in this case you have the entire container to yourself
 // # and everything you are doing is done using root permissions inside the container
 // # When using this keep in mind you are root inside the container.
 // entrypoint = ""
-//
 //
 // # Relative path to binary which needs to be executed when the specified
 // # Type for the challenge is service.
 // # This can be anything which can be exeucted, a python file, a binary etc.
 // service_path = ""
 //
-//
 // # Relative directory corresponding to root of the challenge where the root
 // # of the web application lies.
 // web_root = ""
-//
 //
 // # Any custom base image you might want to use for your particular challenge.
 // # Exists for flexibility reasons try to use existing base iamges wherever possible.
 // base_image = ""
 //
-//
 // # Docker file name for specific type challenge - `docker`.
 // # Helps to build flexible images for specific user-custom challenges
 // docket_context = ""
 //
-//
 // # Environment variables that can be used in the application code.
 // [[var]]
-//     key = ""
-//     value = ""
+//
+//	key = ""
+//	value = ""
 //
 // [[var]]
-//     key = ""
-//     value = ""
+//
+//	key = ""
+//	value = ""
 //
 // Type of traffic to expose through the port mapping provided.
 // traffic = "udp" / "tcp"
@@ -274,6 +267,7 @@ type ChallengeEnv struct {
 	ServicePath      string           `toml:"service_path"`
 	Entrypoint       string           `toml:"entrypoint"`
 	DockerCtx        string           `toml:"docker_context"`
+	ServiceConfig    string           `toml:"service_config"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
 	Traffic          string           `toml:"traffic"`
 }
@@ -459,7 +453,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 				log.Warnf("Service path file %s does not exist", config.ServicePath)
 			}
 		}
-	} else if strings.HasPrefix(challType, "web") {
+	} else if strings.HasPrefix(challType, core.WEB_CHALLENGE_TYPE_NAME) {
 		// Challenge type is web.
 		if config.WebRoot == "" {
 			return errors.New("web root can not be empty for web challenges")
@@ -496,17 +490,6 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		}
 	}
 
-	if challType == core.DOCKER_CHALLENGE_TYPE_NAME {
-		if config.DockerCtx == "" {
-			return errors.New("docker Context file not provided in docker-type challenge")
-		} else if filepath.IsAbs(config.DockerCtx) {
-			return fmt.Errorf("for challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file")
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
-			return fmt.Errorf("file : %s does not exist", config.DockerCtx)
-		}
-	} else {
-		config.DockerCtx = core.DEFAULT_DOCKER_FILE
-	}
 
 	if config.Traffic != "" && !cr.IsValidTrafficType(config.Traffic) {
 		return fmt.Errorf("not a valid traffic type provided, required (%v), got %s", cr.GetValidTrafficTypes(), config.Traffic)
@@ -517,10 +500,10 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 // Metadata related to author of the challenge, this structure includes
 //
-// * Name - Name of the author of the challenge
-// * Email - Email of the author
-// * SSHKey - Public SSH key for the challenge author, to give the access
-//		to the challenge container.
+//   - Name - Name of the author of the challenge
+//   - Email - Email of the author
+//   - SSHKey - Public SSH key for the challenge author, to give the access
+//     to the challenge container.
 //
 // ```toml
 // # Optional fields
