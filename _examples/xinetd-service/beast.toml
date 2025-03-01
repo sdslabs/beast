@@ -1,13 +1,13 @@
 [author]
-name = "fristonio"
-email = "contact+fristonio@sdslabs.co.in"
+name = "contact"
+email = "contact@sdslabs.co.in"
 ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
 name = "xinetd-service"
-flag = "CTF{sample_flag}"
+flag = "CTF{not_the_flag}"
 type = "service"
-points = 100
+points = 500
 max_attempt_limit=10
 
 [[challenge.metadata.hints]]
