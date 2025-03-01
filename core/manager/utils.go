@@ -36,6 +36,7 @@ type BeastBareDockerfile struct {
 	EnvironmentVariables map[string]string
 	MountVolume          string
 	XinetdService        bool
+	XinetdConf           string
 	RunRoot              bool
 	Entrypoint           string
 	SetupCommand         string
@@ -245,6 +246,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	setupScripts := config.Challenge.Env.SetupScripts
 	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
 	var xinetdService bool = false
+	xinetdConf := core.DEFAULT_XINETD_CONF_FILE
 	var executables []string
 	modifier := emptyFunction
 
@@ -288,6 +290,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		RunCmd:               runCmd,
 		MountVolume:          filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
 		XinetdService:        xinetdService,
+		XinetdConf:           xinetdConf,
 		RunRoot:              xinetdService,
 		Executables:          executables,
 		Entrypoint:           entrypoint,
