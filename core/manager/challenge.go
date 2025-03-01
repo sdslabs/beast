@@ -327,7 +327,6 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			Info: info,
 		}, nil
 	}
-	return nil, nil
 }
 
 // Handle multiple challenges simultaneously.
