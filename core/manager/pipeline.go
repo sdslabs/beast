@@ -79,7 +79,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	// files inside the tar itself will make the tar build to be reproducible anywhere.
 	err = appendAdditionalFileContexts(additionalCtx, config)
 	if err != nil {
-		return fmt.Errorf("Error while adding additional context : %s", err)
+		return fmt.Errorf("error while adding additional context : %s", err)
 	}
 
 	// Copy those additional contexts to the staging area, so we can provide them for
@@ -111,7 +111,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	log.Debugf("Copying challenge config to staging directory")
 	err = utils.CopyFile(challengeConfig, filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME))
 	if err != nil {
-		return fmt.Errorf("Error while copying challenge config to staging : %s", err)
+		return fmt.Errorf("error while copying challenge config to staging : %s", err)
 	}
 
 	log.Debugf("Staging for challenge %s complete", filepath.Base(challengeDir))
@@ -171,7 +171,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 		if err != nil {
 			log.Errorf("Error while writing logs to file : %s", logFilePath)
-			return fmt.Errorf("Error logs generated on image build failure could not be written to the logfile")
+			return fmt.Errorf("error logs generated on image build failure could not be written to the logfile")
 		}
 		defer logFile.Close()
 
@@ -185,11 +185,11 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 	if imageId == "" {
 		log.Error("Error while creating image logs written to the logfile")
-		return fmt.Errorf("Error while getting imageId for the commited challenge")
+		return fmt.Errorf("error while getting imageId for the commited challenge")
 	}
 
 	if err = database.UpdateChallenge(challenge, map[string]interface{}{"ImageId": imageId}); err != nil {
-		return fmt.Errorf("Error while writing imageId to database : %s", err)
+		return fmt.Errorf("error while writing imageId to database : %s", err)
 	}
 
 	log.Infof("Image build for `%s` done", challengeName)
@@ -250,13 +250,15 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	log.Debugf("Container config for challenge %s are: CPU(%d), Memory(%d), PidsLimit(%d)",
 		config.Challenge.Metadata.Name,
 		config.Resources.CPUShares,
-		config.Resources.PidsLimit)
+		config.Resources.Memory,
+		config.Resources.PidsLimit,
+	)
 
 	// Since till this point we have already valiadated the challenge config this is highly
 	// unlikely to fail.
 	portMapping, err := config.Challenge.Env.GetPortMappings()
 	if err != nil {
-		return fmt.Errorf("Error while parsing port mapping for the challenge %s: %s", config.Challenge.Metadata.Name, err)
+		return fmt.Errorf("error while parsing port mapping for the challenge %s: %s", config.Challenge.Metadata.Name, err)
 	}
 
 	containerConfig := cr.CreateContainerConfig{
@@ -345,7 +347,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	if !skipStage {
 		err = config.ValidateRequiredFields(challengeDir)
 		if err != nil {
-			return fmt.Errorf("An error occured while validating the config file : %s, cannot continue with pipeline.", err)
+			return fmt.Errorf("an error occured while validating the config file : %s, cannot continue with pipeline", err)
 		}
 	}
 
@@ -457,7 +459,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	} else {
 		if challenge.ImageId == "" {
 			database.UpdateChallenge(&challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["undeployed"]})
-			return fmt.Errorf("COMMIT ERROR: Cannot skip commit step, no Image ID found for challenge.")
+			return fmt.Errorf("COMMIT ERROR: Cannot skip commit step, no Image ID found for challenge")
 		}
 		log.Debugf("Skipping commit phase")
 	}

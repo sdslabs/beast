@@ -472,15 +472,8 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		users[len(config.Maintainers)] = &userEntry
 
-		var assetsURL = make([]string, len(config.Challenge.Metadata.Assets))
-
-		for index, asset := range config.Challenge.Metadata.Assets {
-			// beastStaticAssetUrl, _ := url.Parse(cfg.Cfg.BeastStaticUrl)
-			// beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER, asset)
-			// assetsURL[index] = beastStaticAssetUrl.String()
-
-			assetsURL[index] = asset
-		}
+		assetsURL := make([]string, len(config.Challenge.Metadata.Assets))
+		copy(assetsURL, config.Challenge.Metadata.Assets)
 		if config.Challenge.Metadata.MaxPoints > 0 {
 			log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
 			config.Challenge.Metadata.Points = config.Challenge.Metadata.MaxPoints
@@ -533,7 +526,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 			err := database.CreateHintEntry(&hintEntry)
 			if err != nil {
-				return fmt.Errorf("Error while creating hint entry: %v", err)
+				return fmt.Errorf("error while creating hint entry: %v", err)
 			}
 		}
 
