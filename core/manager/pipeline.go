@@ -100,7 +100,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
 
-	if !dockerfileProvided {
+	if dockerfileProvided {
 		delete(additionalCtx, "Dockerfile")
 	}
 	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir, filepath.Join(contextDir, core.HIDDEN)})
