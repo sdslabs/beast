@@ -267,7 +267,7 @@ type ChallengeEnv struct {
 	ServicePath      string           `toml:"service_path"`
 	Entrypoint       string           `toml:"entrypoint"`
 	DockerCtx        string           `toml:"docker_context"`
-	ServiceConfig    string           `toml:"service_config"`
+	XinetdConf       string           `toml:"xinetd_conf"`
 	EnvironmentVars  []EnvironmentVar `toml:"var"`
 	Traffic          string           `toml:"traffic"`
 }
@@ -489,7 +489,6 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			return fmt.Errorf("file %s does not exist", config.Entrypoint)
 		}
 	}
-
 
 	if config.Traffic != "" && !cr.IsValidTrafficType(config.Traffic) {
 		return fmt.Errorf("not a valid traffic type provided, required (%v), got %s", cr.GetValidTrafficTypes(), config.Traffic)

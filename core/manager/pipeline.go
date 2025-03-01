@@ -61,8 +61,8 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	}
 
 	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
-		if config.Challenge.Env.ServiceConfig != "" {
-			serviceConfig = filepath.Join(challengeConfig, config.Challenge.Env.ServiceConfig)
+		if config.Challenge.Env.XinetdConf != "" {
+			serviceConfig = filepath.Join(challengeDir, config.Challenge.Env.XinetdConf)
 			err := utils.ValidateFileExists(serviceConfig)
 			if err != nil {
 				return err
