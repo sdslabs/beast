@@ -273,7 +273,7 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
-		if len(leaderboardCache) < core.LEADERBOARD_SIZE || (len(leaderboardCache) > 0 && newScore > leaderboardCache[len(leaderboardCache)-1].Score) {
+		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE || (len(adminLeaderboardCache) > 0 && newScore > adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
 			leaderboardStale = true
 			adminLeaderboardStale = true
 		}
