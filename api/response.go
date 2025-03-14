@@ -153,6 +153,7 @@ type SubmissionResp struct {
 	Category  string    `json:"category" example:"web"`
 	Tags      []string  `json:"tags" example:"['pwn','misc']"`
 	Points    uint      `json:"points" example:"50"`
+	Flag      string    `json:"flag" example:"flag{@#$}"`
 	SolvedAt  time.Time `json:"solvedAt"`
 }
 

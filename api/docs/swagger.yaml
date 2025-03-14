@@ -186,6 +186,9 @@ definitions:
       username:
         example: fristonio
         type: string
+      flag:
+        example: flag{@#$}
+        type: string
     type: object
   api.UserResp:
     properties:
