@@ -36,13 +36,9 @@ func init() {
 
 	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
 	Db, dberr = gorm.Open(sqlite.Open(beastDb), &gorm.Config{})
-
 	if dberr != nil {
-		log.WithFields(log.Fields{
-			"LOCATION": beastDb,
-		}).Fatal(dberr)
+		log.Error("Error while initializing the database.", dberr)
 	}
-
 	if err := Db.SetupJoinTable(&Challenge{}, "Users", &UserChallenges{}); err != nil {
 		log.Fatalf("Cannot create related models: %s", err)
 	}

@@ -68,5 +68,4 @@ func banUserHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: fmt.Sprintf("Successfully %sned the user with id %s", action, userId),
 	})
-	return
 }
