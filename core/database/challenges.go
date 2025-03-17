@@ -211,8 +211,8 @@ func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
 
 // Get User Related Challenges
 func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
-	var userChallenges UserChallenges
-	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	var teamChallenges TeamChallenges
+	err := Db.Where("team_id = ? AND challenge_id = ?", userID, challengeID).First(&teamChallenges).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Return true  if no record is found
@@ -221,35 +221,34 @@ func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
 		return 0, err
 	}
 
-	return int(userChallenges.Tries), nil
+	return int(teamChallenges.Tries), nil
 }
 
-func UpdateUserChallengeTries(userID uint, challengeID uint) error {
+func UpdateUserChallengeTries(teamID uint, challengeID uint) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	var userChallenges UserChallenges
-	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	var teamChallenges TeamChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", teamID, challengeID).First(&teamChallenges).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Create a new record if not found
-			userChallenges = UserChallenges{
-				UserID:      userID,
+			teamChallenges = TeamChallenges{
+				TeamID:      teamID,
 				ChallengeID: challengeID,
-				Tries:       1,
-				Solved:      false,
+				Tries:       teamChallenges.Tries + 1,
 			}
-			return Db.Create(&userChallenges).Error
+			return Db.Create(&teamChallenges).Error
 		}
 		return err
 	}
 
 	updates := map[string]interface{}{
 		"created_at": time.Now(),
-		"tries":      userChallenges.Tries + 1,
+		"tries":      teamChallenges.Tries + 1,
 	}
 
-	tx := Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
+	tx := Db.Model(&TeamChallenges{}).Where("team_id = ? AND challenge_id = ?", teamID, challengeID).Updates(updates)
 
 	return tx.Error
 }
@@ -509,54 +508,52 @@ func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, er
 }
 
 func SubtractScoreFromSolvers(challengeID uint) error {
-    DBMux.Lock()
-    defer DBMux.Unlock()
+	DBMux.Lock()
+	defer DBMux.Unlock()
 
-    tx := Db.Begin()
-    if tx.Error != nil {
-        return fmt.Errorf("error while starting transaction: %v", tx.Error)
-    }
+	tx := Db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("error while starting transaction: %v", tx.Error)
+	}
 
-    var challenge Challenge
-    if err := tx.Where("id = ?", challengeID).First(&challenge).Error; err != nil {
-        tx.Rollback()
-        return fmt.Errorf("error fetching challenge: %v", err)
-    }
+	var challenge Challenge
+	if err := tx.Where("id = ?", challengeID).First(&challenge).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error fetching challenge: %v", err)
+	}
 
-    pointsToSubtract := challenge.Points
+	pointsToSubtract := challenge.Points
 
-    var solvers []UserChallenges
-    if err := tx.Where("challenge_id = ? AND solved = ?", challengeID, true).Find(&solvers).Error; err != nil {
-        tx.Rollback()
-        return fmt.Errorf("error fetching solvers: %v", err)
-    }
+	var solvers []UserChallenges
+	if err := tx.Where("challenge_id = ? AND solved = ?", challengeID, true).Find(&solvers).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error fetching solvers: %v", err)
+	}
 
-    for _, solver := range solvers {
-        if err := tx.Model(&User{}).Where("id = ?", solver.UserID).
-		UpdateColumn("score", gorm.Expr("CASE WHEN score - ? < 0 THEN 0 ELSE score - ? END", pointsToSubtract, pointsToSubtract)).Error; err != nil {
-            tx.Rollback()
-            return fmt.Errorf("error updating score for user %d: %v", solver.UserID, err)
-        }
-    }
+	for _, solver := range solvers {
+		if err := tx.Model(&User{}).Where("id = ?", solver.UserID).
+			UpdateColumn("score", gorm.Expr("CASE WHEN score - ? < 0 THEN 0 ELSE score - ? END", pointsToSubtract, pointsToSubtract)).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("error updating score for user %d: %v", solver.UserID, err)
+		}
+	}
 
-    return tx.Commit().Error
+	return tx.Commit().Error
 }
 
 func DeleteAllUserChallenges(challengeID uint) error {
-    DBMux.Lock()
-    defer DBMux.Unlock()
+	DBMux.Lock()
+	defer DBMux.Unlock()
 
-    tx := Db.Begin()
-    if tx.Error != nil {
-        return fmt.Errorf("error while starting transaction: %v", tx.Error)
-    }
+	tx := Db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("error while starting transaction: %v", tx.Error)
+	}
 
-    if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserChallenges{}).Error; err != nil {
-        tx.Rollback()
-        return fmt.Errorf("error deleting user challenge entries: %v", err)
-    }
+	if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserChallenges{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting user challenge entries: %v", err)
+	}
 
-    return tx.Commit().Error
+	return tx.Commit().Error
 }
-
-

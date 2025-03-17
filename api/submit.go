@@ -142,7 +142,7 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		if challenge.MaxAttemptLimit > 0 {
-			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
+			previousTries, err := database.GetUserPreviousTries(user.TeamID, challenge.ID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 					Error: "DATABASE ERROR while processing the request."})
@@ -159,7 +159,7 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		// Increase user tries by 1
-		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
+		err = database.UpdateUserChallengeTries(user.TeamID, challenge.ID)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{

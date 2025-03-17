@@ -10,12 +10,12 @@ import (
 
 type Team struct {
 	gorm.Model
-	Name         string    `gorm:"not null;unique"`
-	Score        uint      `gorm:"default:0"`
-	Members      []*User   `gorm:"foreignKey:TeamID"`
-	InviteCode   string    `gorm:"unique"`
+	Name         string  `gorm:"not null;unique"`
+	Score        uint    `gorm:"default:0"`
+	Members      []*User `gorm:"foreignKey:TeamID"`
+	InviteCode   string  `gorm:"unique"`
 	InviteExpiry time.Time
-	Status       uint      `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Status       uint         `gorm:"not null;default:0"`         // 0 for unbanned, 1 for banned
 	Challenges   []*Challenge `gorm:"many2many:team_challenges;"` // Solved challenges
 }
 
@@ -26,6 +26,7 @@ type TeamChallenges struct {
 	SolverID    uint      `gorm:"not null"` // ID of the team member who solved it
 	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
 	Solver      User      `gorm:"foreignKey:SolverID"`
+	Tries       uint      `gorm:"default:0"`
 }
 
 // QueryTeamEntries queries all teams where the column matches the value
