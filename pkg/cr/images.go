@@ -68,7 +68,7 @@ func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, err
 func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, dockerCtxFile string, noCache bool) (*bytes.Buffer, string, error) {
 	builderContext, err := os.Open(tarContextPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("Error while opening staged file :: %s", tarContextPath)
+		return nil, "", fmt.Errorf("error while opening staged file :: %s", tarContextPath)
 	}
 	defer builderContext.Close()
 
@@ -81,13 +81,13 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
-		return nil, "", fmt.Errorf("Error while creating a docker client for beast: %s", err)
+		return nil, "", fmt.Errorf("error while creating a docker client for beast: %s", err)
 	}
 
 	log.Debug("Image build in process")
 	imageBuildResp, err := dockerClient.ImageBuild(context.Background(), builderContext, buildOptions)
 	if err != nil {
-		return nil, "", fmt.Errorf("An error while build image for challenge %s :: %s", challengeName, err)
+		return nil, "", fmt.Errorf("an error while build image for challenge %s :: %s", challengeName, err)
 	}
 	defer imageBuildResp.Body.Close()
 
