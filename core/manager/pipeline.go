@@ -41,37 +41,46 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	challengeConfig := filepath.Join(contextDir, core.CHALLENGE_CONFIG_FILE_NAME)
 	log.Debugf("Reading challenge config from : %s", challengeConfig)
 
-	var dockerfileCtx, serviceConfig string
+	var dockerfileCtx, serviceConfig, dockerCompose string
 	dockerfileProvided := false
 
-	if config.Challenge.Env.DockerCtx != "" {
-		dockerfileProvided = true
-		dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
-		err := utils.ValidateFileExists(dockerfileCtx)
+	if config.Challenge.Env.DockerCompose != "" {
+		dockerCompose = filepath.Join(challengeDir, config.Challenge.Env.DockerCompose)
+		err := utils.ValidateFileExists(dockerCompose)
 		if err != nil {
 			return err
 		}
+		log.Debug("Got docker-compose file from the challenge config")
 	} else {
-		config.Challenge.Env.DockerCtx = core.DEFAULT_DOCKER_FILE
-		dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
-		if err != nil {
-			return err
-		}
-		log.Debug("Got dockerfile context from the challenge config")
-	}
 
-	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
-		if config.Challenge.Env.XinetdConf != "" {
-			serviceConfig = filepath.Join(challengeDir, config.Challenge.Env.XinetdConf)
-			err := utils.ValidateFileExists(serviceConfig)
+		if config.Challenge.Env.DockerCtx != "" {
+			dockerfileProvided = true
+			dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
+			err := utils.ValidateFileExists(dockerfileCtx)
 			if err != nil {
 				return err
+			}
+		} else {
+			config.Challenge.Env.DockerCtx = core.DEFAULT_DOCKER_FILE
+			dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
+			if err != nil {
+				return err
+			}
+			log.Debug("Got dockerfile context from the challenge config")
+		}
+
+		if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
+			if config.Challenge.Env.XinetdConf != "" {
+				serviceConfig = filepath.Join(challengeDir, config.Challenge.Env.XinetdConf)
+				err := utils.ValidateFileExists(serviceConfig)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
 	additionalCtx := make(map[string]string)
 	additionalCtx["Dockerfile"] = dockerfileCtx
-	additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = serviceConfig
 
 	// Here we try to add all the additional context that are required like xinetd.conf
 	// instead of mounting these files inside the container, since we want reproducibility
