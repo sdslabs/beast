@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+
 	"gorm.io/gorm"
 )
 
@@ -19,6 +20,7 @@ type UserHint struct {
 	HintID      uint      `gorm:"not null"`
 	Hint        Hint      `gorm:"foreignKey:HintID;references:HintID"`
 	Challenge   Challenge `gorm:"foreignKey:ChallengeID;references:ID"`
+	TeamID      uint      `gorm:"not null"`
 }
 
 func CreateHintEntry(hint *Hint) error {
@@ -74,8 +76,14 @@ func UserHasTakenHint(userID, hintID uint) (bool, error) {
 		return false, fmt.Errorf("error while starting transaction: %w", tx.Error)
 	}
 
+	var user User
+	if err := tx.First(&user, "id = ?", userID).Error; err != nil {
+		tx.Rollback()
+		return false, err
+	}
+
 	var userHint UserHint
-	if err := tx.Where("user_id = ? AND hint_id = ?", userID, hintID).First(&userHint).Error; err != nil {
+	if err := tx.Where("team_id = ? AND hint_id = ?", user.TeamID, hintID).First(&userHint).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			tx.Rollback()
 			return false, nil
@@ -123,8 +131,22 @@ func SaveUserHint(userID, challengeID, hintID uint) error {
 	// Deduct points from user
 	user.Score -= hint.Points
 
+	var team Team
+	if err := tx.First(&team, "id = ?", user.TeamID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	team.Score -= hint.Points
+
 	// Update user's score
 	if err := tx.Save(&user).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Update team's score
+	if err := tx.Save(&team).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -134,6 +156,7 @@ func SaveUserHint(userID, challengeID, hintID uint) error {
 		UserID:      userID,
 		ChallengeID: challengeID,
 		HintID:      hintID,
+		TeamID:      user.TeamID,
 	}
 
 	if err := tx.Create(&userHint).Error; err != nil {

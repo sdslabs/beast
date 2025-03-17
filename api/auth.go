@@ -236,7 +236,7 @@ func register(c *gin.Context) {
 		Email:     email,
 		SshKey:    sshKey,
 	}
-	
+
 	// skip otp verif if -n flag is enabled
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
