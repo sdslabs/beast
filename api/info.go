@@ -699,6 +699,7 @@ func getUserCountHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer"
+// @Param sort, order, filter
 // @Success 200 {object} api.UserResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
@@ -774,6 +775,12 @@ func getAllUsersInfoHandler(c *gin.Context) {
 		} else if filterParam == "active" {
 			for _, user := range availableUsers {
 				if user.Status == 0 {
+					filteredUsers = append(filteredUsers, user)
+				}
+			}
+		} else if filterParam == "hidden" {
+			for _, user := range availableUsers {
+				if user.Status == 2 {
 					filteredUsers = append(filteredUsers, user)
 				}
 			}
@@ -1026,6 +1033,29 @@ func serveAssets(c *gin.Context) {
 
 }
 
+// This route returns the number of users in the databse with role=contestant
+// @Summary Returns the number of users in the database with role=contestant
+// @Description Returns the number of users in the database with role=contestant
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.UserCountResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/usercount [get]
+func getUserCountHandler(c *gin.Context) {
+	count, err := database.GetUserCount()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, UserCountResp{
+		UserCount: count,
+	})
+}
+
 // Returns leaderboard
 // @Summary Returns leaderboard
 // @Description Returns leaderboard of all users
@@ -1067,7 +1097,7 @@ func leaderboardHandler(c *gin.Context) {
 				}
 				var leaderboard []UserResp
 				for index, user := range users {
-					if user.Status == 1 || user.Role != core.USER_ROLES["contestant"] {
+					if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
 						continue
 					}
 					resp := UserResp{
@@ -1097,7 +1127,7 @@ func leaderboardHandler(c *gin.Context) {
 		var leaderboard []UserResp
 		rankOffset := offset
 		for index, user := range users {
-			if user.Status == 1 || user.Role != core.USER_ROLES["contestant"] {
+			if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
 				continue
 			}
 			resp := UserResp{
@@ -1125,7 +1155,7 @@ func leaderboardHandler(c *gin.Context) {
 			}
 			var leaderboard []UserResp
 			for index, user := range users {
-				if user.Status == 1 || user.Role != core.USER_ROLES["contestant"] {
+				if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
 					continue
 				}
 				resp := UserResp{
@@ -1155,7 +1185,7 @@ func leaderboardHandler(c *gin.Context) {
 	var leaderboard []UserResp
 	rankOffset := offset
 	for index, user := range users {
-		if user.Status == 1 || user.Role != core.USER_ROLES["contestant"] {
+		if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
 			continue
 		}
 		resp := UserResp{
@@ -1207,7 +1237,7 @@ func adminLeaderboardHandler(c *gin.Context) {
 			}
 			var leaderboard []UserResp
 			for index, user := range users {
-				if user.Status == 1 {
+				if user.Status != 0 {
 					continue
 				}
 				resp := UserResp{
@@ -1238,7 +1268,7 @@ func adminLeaderboardHandler(c *gin.Context) {
 	var leaderboard []UserResp
 	rankOffset := offset
 	for index, user := range users {
-		if user.Status == 1 {
+		if user.Status != 0 {
 			continue
 		}
 		resp := UserResp{

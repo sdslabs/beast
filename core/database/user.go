@@ -385,13 +385,13 @@ func QueryUsersByFrozenScoreOffsetLimit(limit, offset int) ([]User, error) {
 func UpdateFrozenScores() error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
-	return Db.Model(&User{}).UpdateColumn("frozen_score", gorm.Expr("score")).Error
+	return Db.Exec("UPDATE users SET frozen_score = score").Error
 }
 
 func ResetFrozenScores() error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
-	return Db.Model(&User{}).UpdateColumn("frozen_score", 0).Error
+	return Db.Exec("UPDATE users SET frozen_score = 0").Error
 }
 
 func IsFrozenScoreSet() (bool, error) {

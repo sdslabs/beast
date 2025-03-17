@@ -85,6 +85,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/logs", challengeLogsHandler)
 			infoGroup.GET("/user/:username", userInfoHandler)
 			infoGroup.GET("/users", getAllUsersInfoHandler)
+			infoGroup.GET("/leaderboard", leaderboardHandler)
 			infoGroup.GET("/usercount", getUserCountHandler)
 			infoGroup.GET("/submissions", submissionsHandler)
 			infoGroup.GET("/tags", tagHandler)
@@ -121,7 +122,7 @@ func initGinRouter() *gin.Engine {
 
 		adminPanelGroup := apiGroup.Group("/admin", adminAuthorize)
 		{
-			adminPanelGroup.POST("/users/:action/:id", banUserHandler)
+			adminPanelGroup.POST("/users/:action/:id", userActionHandler)
 			adminPanelGroup.GET("/statistics", getUsersStatisticsHandler)
 			adminPanelGroup.GET("/leaderboard", adminLeaderboardHandler)
 			adminPanelGroup.POST("/freezeLeaderboard", freezeLeaderboardHandler)
