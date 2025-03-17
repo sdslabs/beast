@@ -76,6 +76,16 @@ type UserChallenges struct {
 	Flag        string
 }
 
+type UserChallengeDetails struct {
+	CreatedAt time.Time
+	UserID    uint
+	Solved    bool
+	Flag      string
+	UserName  string
+	Role      string
+	Status    uint
+}
+
 // The `DynamicFlags` table has the following columns
 // name
 // flag
@@ -304,21 +314,21 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	return tags, nil
 }
 
-// Get Related Users
-func GetRelatedUsers(challenge *Challenge) ([]User, error) {
-	var users []User
+// Get all Related Submissions
+func GetRelatedSubmissions(challenge *Challenge) ([]UserChallengeDetails, error) {
+	var submissionDetails []UserChallengeDetails
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	// Query users who have solved this challenge by checking the user_challenges table
-	if err := Db.Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
-		Where("user_challenges.challenge_id = ? AND user_challenges.solved = ?", challenge.ID, true).
-		Find(&users).Error; err != nil {
-		return users, err
+	if err := Db.Table("user_challenges").
+		Select("user_challenges.created_at, user_challenges.solved, user_challenges.flag, users.name as user_name, users.role, users.status").
+		Joins("JOIN users ON users.id = user_challenges.user_id").
+		Where("user_challenges.challenge_id = ?", challenge.ID).
+		Find(&submissionDetails).Error; err != nil {
+		return submissionDetails, err
 	}
-
-	return users, nil
+	return submissionDetails, nil
 }
 
 func DeleteChallengeEntry(challenge *Challenge) error {

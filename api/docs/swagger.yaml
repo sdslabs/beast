@@ -225,6 +225,11 @@ definitions:
       username:
         example: fristonio
         type: string
+      flag:
+        example: flag{@#$}
+        type: string
+      status:
+        type: bool
     type: object
   api.UsersStatisticsResp:
     properties:

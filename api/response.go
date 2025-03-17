@@ -93,9 +93,11 @@ type ChallengeSolveResp struct {
 }
 
 type UserSolveResp struct {
-	UserID   uint      `json:"id" example:"5"`
-	Username string    `json:"username" example:"fristonio"`
-	SolvedAt time.Time `json:"solvedAt"`
+	UserID        uint      `json:"id" example:"5"`
+	Username      string    `json:"username" example:"fristonio"`
+	SolvedAt      time.Time `json:"solvedAt"`
+	FlagSubmitted string    `json:"flag" example:"flag{@#$}"`
+	Status 		bool 		`json:status` 		
 }
 
 type HintInfo struct {

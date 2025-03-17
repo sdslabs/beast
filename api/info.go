@@ -179,7 +179,7 @@ func challengeInfoHandler(c *gin.Context) {
 	if len(challenges) > 0 {
 		challenge := challenges[0]
 
-		users, err := database.GetRelatedUsers(&challenge)
+		users, err := database.GetRelatedSubmissions(&challenge)
 		if err != nil {
 			log.Error(err)
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -198,9 +198,11 @@ func challengeInfoHandler(c *gin.Context) {
 		for _, user := range users {
 			if user.Role == core.USER_ROLES["contestant"] {
 				userResp := UserSolveResp{
-					UserID:   user.ID,
-					Username: user.Username,
-					SolvedAt: user.CreatedAt,
+					UserID:        user.UserID,
+					Username:      user.UserName,
+					SolvedAt:      user.CreatedAt,
+					FlagSubmitted: user.Flag,
+					Status:        user.Solved,
 				}
 				challengeUser = append(challengeUser, userResp)
 				challSolves++
@@ -410,7 +412,7 @@ func challengesInfoHandler(c *gin.Context) {
 		}
 
 		for index, challenge := range challenges {
-			users, err := database.GetRelatedUsers(&challenge)
+			users, err := database.GetRelatedSubmissions(&challenge)
 			if err != nil {
 				log.Error(err)
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -430,9 +432,11 @@ func challengesInfoHandler(c *gin.Context) {
 			for _, user := range users {
 				if user.Role == core.USER_ROLES["contestant"] {
 					userResp := UserSolveResp{
-						UserID:   user.ID,
-						Username: user.Username,
-						SolvedAt: user.CreatedAt,
+						UserID:        user.UserID,
+						Username:      user.UserName,
+						SolvedAt:      user.CreatedAt,
+						FlagSubmitted: user.Flag,
+						Status:        user.Solved,
 					}
 					challengeUser = append(challengeUser, userResp)
 					challSolves++
