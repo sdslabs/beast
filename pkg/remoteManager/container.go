@@ -73,7 +73,7 @@ func StopAndRemoveContainerRemote(containerId string, server config.AvailableSer
 				log.Debugf("no container with container id %s present", containerId)
 				return nil
 			}
-			return fmt.Errorf("DATABASE ERROR while fetching user details.")
+			return fmt.Errorf("DATABASE ERROR while fetching user details")
 		}
 		if len(chall) > 0 {
 			server = config.Cfg.AvailableServers[chall[0].ServerDeployed]
@@ -193,4 +193,43 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 	}
 	imageID := strings.TrimSpace(output)
 	return imageID, nil
+}
+
+func DeployContainerFromComposeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
+	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
+	upCommand := fmt.Sprintf("cd %s && docker compose up -d",extractDir)
+	log.Debugf("Deploying challenge %s using docker compose remotely: %s", challengeName, upCommand)
+	upOutput, err := RunCommandOnServer(server, upCommand)
+	if err != nil {
+		log.Errorf("docker compose up failed for challenge %s. Output:\n%s", challengeName, upOutput)
+		return fmt.Errorf("error while running docker compose up on remote: %v", err)
+	}
+
+	return nil
+}
+
+func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableServer) error {
+	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
+	downCommand := fmt.Sprintf("cd %s && docker compose down",extractDir)
+	log.Debugf("Stopping challenge %s using docker compose remotely: %s", challengeName, downCommand)
+	downOutput, err := RunCommandOnServer(server, downCommand)
+	if err != nil {
+		log.Errorf("docker compose down failed for challenge %s. Output:\n%s", challengeName, downOutput)
+		return fmt.Errorf("error while running docker compose down on remote: %v", err)
+	}
+
+	return nil
+}
+
+func ComposePurgeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
+	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
+	purgeCommand := fmt.Sprintf("cd %s && docker compose down --volumes --remove-orphans --rmi all", extractDir)
+	log.Debugf("Purge challenge %s using docker compose remotely: %s", challengeName, purgeCommand)
+	purgeOutput, err := RunCommandOnServer(server, purgeCommand)
+	if err != nil {
+		log.Errorf("docker compose purge failed for challenge %s. Output:\n%s", challengeName, purgeOutput)
+		return fmt.Errorf("error while running docker compose purge on remote: %v", err)
+	}
+
+	return nil
 }
