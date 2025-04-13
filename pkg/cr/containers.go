@@ -1,9 +1,13 @@
 package cr
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
+	"os/exec"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -279,4 +283,66 @@ func CommitContainer(containerId string) (string, error) {
 	}
 
 	return commitResp.ID, nil
+}
+
+func DeployContainerFromCompose(challengeName, stagedPath string) error {
+	extractDir := filepath.Join(stagedPath, challengeName)
+	log.Debugf("Deploying challenge %s using docker-compose at %s", challengeName,extractDir )
+	upCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose up -d", extractDir))
+	var upOutput bytes.Buffer
+	upCmd.Stdout = &upOutput
+	upCmd.Stderr = &upOutput
+
+	if err := upCmd.Run(); err != nil {
+		log.Errorf("docker-compose up failed for challenge %s. Output:\n%s", challengeName, upOutput.String())
+		return fmt.Errorf("error while running docker compose up: %v", err)
+	}
+	log.Infof("docker-compose up succeeded for challenge %s. Output:\n%s", challengeName, upOutput.String())
+
+	var psOutput bytes.Buffer
+	checkCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose ps", extractDir))
+	checkCmd.Stdout = &psOutput
+	checkCmd.Stderr = &psOutput
+	if err := checkCmd.Run(); err != nil {
+		return fmt.Errorf("error checking container status after compose up for challenge %s. Output:\n%s", challengeName, psOutput.String())
+	}
+	if !strings.Contains(psOutput.String(), "Up") {
+		return fmt.Errorf("container not running after compose up for challenge %s. Output:\n%s", challengeName, psOutput.String())
+	}
+
+	return nil
+}
+
+func ComposeDown(challengeName, stagedDir string) error {
+	log.Debugf("Stopping challenge %s using docker-compose", challengeName)
+	extractDir := filepath.Join(stagedDir, challengeName)
+	downCmd := exec.Command("bash", "-c",fmt.Sprintf("cd %s && docker compose down", extractDir))
+
+	var downOutput bytes.Buffer
+	downCmd.Stdout = &downOutput
+	downCmd.Stderr = &downOutput
+
+	if err := downCmd.Run(); err != nil {
+		log.Errorf("docker-compose down failed for challenge %s. Output:\n%s", challengeName, downOutput.String())
+		return fmt.Errorf("error while running docker compose down: %v", err)
+	}
+	log.Infof("docker-compose down succeeded for challenge %s. Output:\n%s", challengeName, downOutput.String())
+	return nil
+}
+
+func ComposePurge(challengeName, stagedDir string) error {
+	log.Debugf("Purging challenge %s using docker-compose", challengeName)
+	extractDir := filepath.Join(stagedDir, challengeName)
+	purgeCmd := exec.Command("bash","-c",fmt.Sprintf("cd %s && docker compose down --remove-orphans --volumes --rmi all", extractDir))
+
+	var purgeOutput bytes.Buffer
+	purgeCmd.Stdout = &purgeOutput
+	purgeCmd.Stderr = &purgeOutput
+
+	if err := purgeCmd.Run(); err != nil {
+		log.Errorf("docker-compose purge failed for challenge %s. Output:\n%s", challengeName, purgeOutput.String())
+		return fmt.Errorf("error while running docker compose purge: %v", err)
+	}
+
+	return nil
 }
