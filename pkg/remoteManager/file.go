@@ -103,3 +103,24 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 	}
 	return []byte(output), strings.TrimSpace(imageID), nil
 }
+
+func BuildImagesFromComposeRemote(challengeName, imageTag, stagedDir string, server config.AvailableServer, noCache bool) ([]byte, error) {
+	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
+	_, err := RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", remoteExtractPath, stagedDir, remoteExtractPath))
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to extract tar: %s", err)
+	}
+	cmdBase := "docker compose build"
+	if noCache {
+		cmdBase += " --no-cache"
+	}
+	dockerComposeBuildCmd := fmt.Sprintf("cd %s && %s", remoteExtractPath, cmdBase)
+
+	// Execute the command on the remote server
+	output, err := RunCommandOnServer(server, dockerComposeBuildCmd)
+	if err != nil {
+		return []byte(output), fmt.Errorf("failed to build docker compose images remotely: %s\nOutput: %s", err, output)
+	}
+
+	return []byte(output), nil
+}
