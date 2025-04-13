@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="create-container cyberpunk-container">
+    <h1 class="cyberpunk-title">Create Note</h1>
+    <p class="cyberpunk-subtitle">Create and share the notes</p>
+    <form id="note-form" class="cyberpunk-form">
+        {{ form.hidden_tag() }}
+        <div class="form-group">
+            {{ form.content.label(class="cyberpunk-label") }}
+            {{ form.content(class="form-control non-resizable cyberpunk-textarea", rows=10, cols=50, id="note-content") }}
+        </div>
+        <div class="form-group">
+            <button type="button" class="btn cyberpunk-btn" id="submit-button">Create Note</button>
+        </div>
+    </form>
+    <div id="note-id-section" class="note-id-section cyberpunk-note-id" style="display: none;">
+        <h3 class="cyberpunk-subtitle">Your Note ID</h3>
+        <h3 id="note-id" class="cyberpunk-highlight">Your Note ID</h3>
+        <p class="cyberpunk-subtext">Your note has been successfully saved</p>
+        <div class="note-link">
+            <a href="" id="view-note-link" class="btn cyberpunk-btn-secondary" target="_blank">View Note</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const csrf_token = "{{ csrf_token() }}";
+
+    document.getElementById("submit-button").addEventListener("click", function () {
+        const rawContent = document.getElementById("note-content").value;
+
+        if (!rawContent) {
+            alert("Note content cannot be empty!");
+            return;
+        }
+
+        const sanitizedContent = rawContent;
+
+        fetch("/api/notes/store", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrf_token,
+            },
+            body: JSON.stringify({
+                content: sanitizedContent,
+            }),
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.success) {
+                    const noteId = data.note_id;
+                    document.getElementById("note-id").innerHTML = noteId;
+                    document.getElementById("note-id-section").style.display = "block";
+                    document.getElementById("view-note-link").href = "/view?note=" + noteId;
+                } else {
+                    alert("Error: " + data.error);
+                }
+            });
+    });
+</script>
+
+<style>
+    .cyberpunk-container {
+        padding: 20px;
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 255, 255, 0.5);
+        color: #00ffff;
+        font-family: 'Orbitron', sans-serif;
+    }
+
+    .cyberpunk-title {
+        font-family: 'Orbitron', sans-serif;
+        color: #0ff;
+        text-align: center;
+        text-transform: uppercase;
+        text-shadow: 0 0 20px #00ffff;
+    }
+
+    .cyberpunk-subtitle {
+        font-family: 'Roboto', sans-serif;
+        color: #80dfff;
+        text-align: center;
+    }
+
+    .cyberpunk-label {
+        font-family: 'Roboto Mono', monospace;
+        color: #0ff;
+        font-size: 1.2em;
+    }
+
+    .cyberpunk-textarea {
+        border-radius: 5px;
+        border: 2px solid #00ffff;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #00ffff;
+        font-family: 'Courier New', monospace;
+        box-shadow: inset 0 2px 8px rgba(0, 255, 255, 0.5);
+    }
+
+    .cyberpunk-btn {
+        background: linear-gradient(135deg, #0f0c29, #24243e);
+        color: #00ffff;
+        border: none;
+        font-family: 'Roboto', sans-serif;
+        border-radius: 5px;
+        box-shadow: 0 4px 20px rgba(0, 255, 255, 0.5);
+        transition: all 0.3s ease;
+    }
+
+    .cyberpunk-btn:hover {
+        background: linear-gradient(135deg, #0c0a24, #2e295f);
+        box-shadow: 0 6px 25px rgba(0, 255, 255, 0.7);
+        transform: scale(1.05);
+    }
+
+    .cyberpunk-note-id {
+        text-align: center;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 20px;
+        box-shadow: 0 4px 20px rgba(0, 255, 255, 0.5);
+    }
+
+    .cyberpunk-highlight {
+        color: #0ff;
+        font-size: 1.5em;
+        font-family: 'Orbitron', sans-serif;
+        text-shadow: 0 0 20px #00ffff;
+    }
+
+    .cyberpunk-subtext {
+        font-family: 'Roboto', sans-serif;
+        color: #80dfff;
+    }
+
+    .cyberpunk-btn-secondary {
+        background: rgba(0, 0, 0, 0.8);
+        color: #00ffff;
+        border-radius: 5px;
+        box-shadow: 0 4px 20px rgba(0, 255, 255, 0.5);
+        font-family: 'Roboto', sans-serif;
+        transition: all 0.3s ease;
+    }
+
+    .cyberpunk-btn-secondary:hover {
+        background: rgba(0, 0, 0, 0.9);
+        box-shadow: 0 6px 25px rgba(0, 255, 255, 0.7);
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}

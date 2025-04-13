@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5 cyberpunk-container">
+    <h2 class="cyberpunk-title">View Note</h2>
+    <p class="cyberpunk-subtitle">
+        You can view stored notes securely here by entering the Note ID.
+    </p>
+
+    <form id="view-note-form" action="{{ url_for('main.view_note') }}" class="note-form">
+        <div class="form-group">
+            <label for="note-id-input">Enter Note ID:</label>
+            <input type="text" name="note_id" id="note-id-input" class="form-control cyberpunk-input" value="{{ note_id }}" />
+        </div>
+        <div class="form-group">
+            <button type="button" class="btn cyberpunk-btn btn-lg" id="fetch-note-button">
+                View Note
+            </button>
+        </div>
+    </form>
+
+    <div id="note-content-section" style="display: none" class="note-panel mt-4">
+        <h3 class="cyberpunk-subtitle">Note Content</h3>
+        <div id="note-content" class="cyberpunk-note-content"></div>
+    </div>
+
+    <div id="error-section" style="display: none; margin-top: 20px;">
+        <strong><span class="cyberpunk-error" id="error-span"></span></strong>
+    </div>
+
+    <div class="text-center mt-4">
+        <a href="{{ url_for('main.home') }}" class="btn cyberpunk-btn-secondary btn-lg mx-2">
+            <i class="fas fa-arrow-left"></i> Back to Home
+        </a>
+    </div>
+
+</div>
+
+<script>
+    const csrf_token = "{{ csrf_token() }}";
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const noteId = urlParams.get("note");
+
+    if (noteId) {
+        fetchNoteById(noteId);
+    }
+
+    function decodeHTMLentities(text) {
+        const textarea = document.createElement("textarea");
+        textarea.innerHTML = text;
+        return textarea.value;
+    }
+
+    function fetchNoteById(noteId) {
+        fetch("/api/notes/fetch/" + decodeURIComponent(noteId), {
+            method: "GET",
+            headers: {
+                "X-CSRFToken": csrf_token,
+            },
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Failed to fetch the note. Server error.");
+                }
+                return response.json();
+            })
+            .then((data) => {
+                if (!data.content) {
+                    throw new Error("Note content is missing or invalid.");
+                }
+                const noteContentSection = document.getElementById("note-content-section");
+                noteContentSection.style.display = "block";
+                console.log()
+                document.getElementById("note-content").innerHTML = decodeHTMLentities(data.content);
+            })
+            .catch((error) => {
+                document.getElementById("error-section").style.display = "block";
+                document.getElementById("error-span").textContent = error.message;
+                clearNoteContent();
+            });
+    }
+
+    function clearNoteContent() {
+        const noteContentElement = document.getElementById("note-content");
+        const noteContentSection = document.getElementById("note-content-section");
+        noteContentElement.textContent = "";
+        noteContentSection.style.display = "none";
+    }
+
+    window.addEventListener("load", function () {
+        if (noteId) {
+            document.getElementById("note-id-input").value = noteId;
+        }
+    });
+</script>
+
+<style>
+    .cyberpunk-container {
+        padding: 20px;
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 255, 255, 0.5);
+        color: #00ffff;
+        font-family: 'Orbitron', sans-serif;
+    }
+
+    .cyberpunk-title {
+        color: #0ff;
+        text-transform: uppercase;
+        text-shadow: 0 0 20px #00ffff;
+        text-align: center;
+    }
+
+    .cyberpunk-subtitle {
+        color: #80dfff;
+        text-align: center;
+        font-family: 'Roboto', sans-serif;
+    }
+
+    .cyberpunk-input {
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid #00ffff;
+        color: #00ffff;
+        border-radius: 5px;
+        padding: 10px;
+        font-family: 'Roboto', sans-serif;
+    }
+
+    .cyberpunk-note-content {
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid #00ffff;
+        color: #00ffff;
+        font-family: 'Roboto Mono', monospace;
+        white-space: pre-wrap;
+    }
+
+    .cyberpunk-error {
+        color: #ff4040;
+    }
+
+    .cyberpunk-btn {
+        background: linear-gradient(135deg, #0f0c29, #24243e);
+        color: #00ffff;
+        border: none;
+        border-radius: 5px;
+        box-shadow: 0 4px 20px rgba(0, 255, 255, 0.5);
+        transition: all 0.3s ease;
+    }
+
+    .cyberpunk-btn:hover {
+        background: linear-gradient(135deg, #0c0a24, #2e295f);
+        box-shadow: 0 6px 25px rgba(0, 255, 255, 0.7);
+        transform: scale(1.05);
+    }
+
+    .cyberpunk-btn-secondary {
+        background: rgba(0, 0, 0, 0.8);
+        color: #00ffff;
+        border-radius: 5px;
+        box-shadow: 0 4px 20px rgba(0, 255, 255, 0.5);
+        transition: all 0.3s ease;
+    }
+
+    .cyberpunk-btn-secondary:hover {
+        background: rgba(0, 0, 0, 0.9);
+        box-shadow: 0 6px 25px rgba(0, 255, 255, 0.7);
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}

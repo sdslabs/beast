@@ -1,0 +1,73 @@
+form {
+    background: #fff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin: 20px auto;
+    max-width: 500px;
+    animation: fadeIn 0.7s ease-in-out;
+    position: relative;
+    transition: box-shadow 0.3s ease;
+}
+
+form:focus-within {
+    box-shadow: 0 0 20px rgba(51, 51, 51, 0.2);
+}
+
+form .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+form .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #444;
+}
+
+form .form-group input,
+form .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+form .form-group input:focus,
+form .form-group textarea:focus {
+    border-color: #1e88e5;
+    box-shadow: 0 0 10px rgba(30, 136, 229, 0.2);
+    outline: none;
+}
+
+form .form-group button {
+    width: 100%;
+    padding: 12px;
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+form .form-group button:hover {
+    background: #0056b3;
+    transform: scale(1.03);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

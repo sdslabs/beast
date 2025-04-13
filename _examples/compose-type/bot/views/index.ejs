@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Home</title>
+    <link rel="stylesheet" href="/styles.css">  
+</head>
+<body>
+    <header>
+        <h1>Welcome to the Bot Service</h1>
+    </header>
+    
+    <main>
+        <p>Hello, <%= name %>!</p>  
+
+        <h2>Request to visit a URL</h2>
+        <form action="/" method="POST">
+            <label for="url">URL to visit:</label>
+            <input type="text" id="url" name="url" required>
+            <button type="submit">Visit URL</button>
+        </form>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Bot Service</p>
+    </footer>
+</body>
+</html>

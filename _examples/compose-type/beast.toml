@@ -1,0 +1,23 @@
+[author]
+name = "contact"
+email = "contact@sdslabs.co.in"
+ssh_key = "ssh-rsa AAAAB3NzaC1y"
+
+[challenge.metadata]
+name = "compose-type"
+flag = "winterhack{w45_th15_y0ur_f1r5t_4dm1n_b07_ch4ll}"
+type = "web"
+points = 200
+
+[[challenge.metadata.hints]]
+text = "simple_hint_1"
+points = 10
+
+[[challenge.metadata.hints]]
+text = "simple_hint_2"
+points = 20
+
+[challenge.env]
+docker_compose = "docker-compose.yml"
+web_root = "web"
+ports = [10005]

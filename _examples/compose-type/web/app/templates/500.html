@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5 error-container">
+    <h1 class="text-center error-title">500 - Internal Server Error</h1>
+    <p class="text-center error-subtitle">
+        Something went wrong on our end. Please try again later or contact support if the issue persists.
+    </p>
+    <div class="text-center">
+        <a href="{{ url_for('main.home') }}" class="btn error-btn">Go Back to Home</a>
+    </div>
+</div>
+
+<style>
+    .error-container {
+        padding: 20px;
+        background: linear-gradient(135deg, #420d09, #6a1a14);
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(255, 69, 0, 0.5);
+        color: #ff4500;
+        font-family: 'Orbitron', sans-serif;
+    }
+
+    .error-title {
+        font-family: 'Orbitron', sans-serif;
+        color: #ff6347;
+        text-align: center;
+        text-transform: uppercase;
+        text-shadow: 0 0 20px #ff4500;
+    }
+
+    .error-subtitle {
+        font-family: 'Roboto', sans-serif;
+        color: #ff7f50;
+        text-align: center;
+    }
+
+    .error-btn {
+        background: linear-gradient(135deg, #420d09, #6a1a14);
+        color: #ff4500;
+        border: none;
+        font-family: 'Roboto', sans-serif;
+        border-radius: 5px;
+        box-shadow: 0 4px 20px rgba(255, 69, 0, 0.5);
+        transition: all 0.3s ease;
+        padding: 10px 20px;
+        text-decoration: none;
+    }
+
+    .error-btn:hover {
+        background: linear-gradient(135deg, #3b0b08, #5e1512);
+        box-shadow: 0 6px 25px rgba(255, 69, 0, 0.7);
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}

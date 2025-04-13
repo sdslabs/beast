@@ -1,0 +1,33 @@
+version: "3"
+services:
+    web:
+        build: ./web
+        ports:
+            - "80:80"
+            - "5432"
+            - "8000"
+        environment:
+            POSTGRES_HOST: "0.0.0.0"
+            POSTGRES_DB: notes_db
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: pa55word
+            SECRET_KEY: hard_to_guess
+            BASE_URL: http://0.0.0.0
+            BOT_URL: http://0.0.0.0:8000
+    db:
+        image: postgres:latest
+        environment:
+            POSTGRES_HOST: "0.0.0.0"
+            POSTGRES_DB: notes_db
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: pa55word
+        network_mode: service:web
+    bot:
+        build: ./bot
+        environment:
+            FLAG: winterhack{w45_th15_y0ur_f1r5t_4dm1n_b07_ch4ll}
+            BASE_URL: http://0.0.0.0
+        network_mode: service:web
+
+
+
