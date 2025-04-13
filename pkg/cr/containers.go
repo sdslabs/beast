@@ -297,7 +297,6 @@ func DeployContainerFromCompose(challengeName, stagedPath string) error {
 		log.Errorf("docker-compose up failed for challenge %s. Output:\n%s", challengeName, upOutput.String())
 		return fmt.Errorf("error while running docker compose up: %v", err)
 	}
-	log.Infof("docker-compose up succeeded for challenge %s. Output:\n%s", challengeName, upOutput.String())
 
 	var psOutput bytes.Buffer
 	checkCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose ps", extractDir))
@@ -326,7 +325,7 @@ func ComposeDown(challengeName, stagedDir string) error {
 		log.Errorf("docker-compose down failed for challenge %s. Output:\n%s", challengeName, downOutput.String())
 		return fmt.Errorf("error while running docker compose down: %v", err)
 	}
-	log.Infof("docker-compose down succeeded for challenge %s. Output:\n%s", challengeName, downOutput.String())
+
 	return nil
 }
 
