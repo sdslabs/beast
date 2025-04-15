@@ -159,11 +159,8 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	challengeTag := coreUtils.EncodeID(challengeName)
 	log.Printf("== Server for challenge %s : %s", challengeName, challenge.ServerDeployed)
 	if config.Challenge.Env.DockerCompose != "" {
-		composeFilePath := filepath.Join(challengeStagingDir, config.Challenge.Env.DockerCompose)
 
-		if err := utils.ValidateFileExists(composeFilePath); err != nil {
-			return fmt.Errorf("docker-compose file not found: %s", composeFilePath)
-		}
+		//  Should add some validation for the compose file
 
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 
@@ -171,7 +168,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			logBytes, buildErr = remoteManager.BuildImagesFromComposeRemote(
 				challengeName,
 				challengeTag,
-				composeFilePath,
+				stagedPath,
 				server,
 				noCache,
 			)
