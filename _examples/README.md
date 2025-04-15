@@ -13,7 +13,9 @@
 * [PHP Web challenge](./web-php)
 * [PHP Web challenge with MySQL](./web-php-mysql)
 * [Challenge with Static files only](./static-chall)
-* [Xinted Service challenge](./xinetd-service)
+* [Xinted Service challenge with custom xinetd config](./xinetd-service)
+* [Service challenge with auto-generated xinetd config](./service)
+* [A bare challenge using docker](./docker-type)
 
 To test any of the above challenges, cd to \_example directory and use the below command:
 
