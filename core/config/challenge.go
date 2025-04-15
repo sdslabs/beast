@@ -430,7 +430,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	// Run command is only a required value in case of bare challenge types.
-	if config.RunCmd == "" && config.Entrypoint == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
+	if config.RunCmd == "" && config.Entrypoint == "" && config.DockerCtx=="" && challType == core.BARE_CHALLENGE_TYPE_NAME {
 		return fmt.Errorf("a valid run_cmd should be provided for the challenge environment")
 	}
 
@@ -455,8 +455,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		}
 	} else if strings.HasPrefix(challType, core.WEB_CHALLENGE_TYPE_NAME) {
 		// Challenge type is web.
-		if config.WebRoot == "" {
-			return errors.New("web root can not be empty for web challenges")
+		if config.WebRoot == "" && config.DockerCtx == "" {
+			return errors.New("web root can not be empty for web challenges without custom dockerfile")
 		} else if config.WebRoot != "" {
 			if filepath.IsAbs(config.WebRoot) {
 				return fmt.Errorf("web Root directory path should be relative to challenge directory root")
