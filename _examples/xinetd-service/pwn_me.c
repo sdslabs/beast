@@ -17,6 +17,8 @@ int sample()
 
 void test()
 {	char input[50];
+	printf("Please enter your name: ");
+	fflush(stdout);
 	gets(input);
 	sleep(1);
 	fprintf(stderr, "ECHO: %s\n",input); 

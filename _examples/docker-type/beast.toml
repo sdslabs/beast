@@ -6,7 +6,7 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 [challenge.metadata]
 name = "docker-type"
 flag = "FLAG{r3GEx_i5_3vi1!!}"
-type = "docker"
+type = "bare"
 points = 200
 
 [[challenge.metadata.hints]]

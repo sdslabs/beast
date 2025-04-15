@@ -23,4 +23,4 @@ points = 20
 apt_deps = ["gcc", "socat"]
 setup_scripts = ["setup.sh"]
 service_path = "pwn"
-ports = [10003]
+ports = [10004]
