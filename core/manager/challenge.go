@@ -181,7 +181,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 			remoteContainers, err = remoteManager.SearchRunningContainerByFilterRemote(map[string]string{"id": challenge.ContainerId}, server)
 			if err != nil {
-				log.Errorf("error while searching for rmote container with id %s", challenge.ContainerId)
+				log.Errorf("error while searching for remote container with id %s", challenge.ContainerId)
 				return nil, errors.New("CONTAINER RUNTIME ERROR")
 			}
 		} else {
