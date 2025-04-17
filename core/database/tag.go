@@ -11,7 +11,7 @@ import (
 type Tag struct {
 	gorm.Model
 
-	Challenges []*Challenge `gorm:"many2many:tag_challenges;"`
+	Challenges []*Challenge `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	TagName    string       `gorm:"not null;unique"`
 }
 

@@ -162,11 +162,6 @@ func updateChallengeInfoHandler(c *gin.Context) {
 		"Name": name,
 	}
 
-	hints, exist := c.GetPostForm("hints")
-	if exist {
-		configInfo["Hints"] = hints
-	}
-
 	desc, exist := c.GetPostForm("desc")
 	if exist {
 		configInfo["Description"] = desc

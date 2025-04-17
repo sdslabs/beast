@@ -14,7 +14,6 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	tools "github.com/sdslabs/beastv4/templates"
 
-	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -63,18 +62,21 @@ type Challenge struct {
 	MaxPoints       uint   `gorm:"default:0"`
 	MinPoints       uint   `gorm:"default:0"`
 	Ports           []Port
-	Tags            []*Tag  `gorm:"many2many:tag_challenges;"`
+	Tags            []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Users           []*User `gorm:"many2many:user_challenges;"`
 	ServerDeployed  string  `gorm:"type:varchar(64)"`
 }
 
 type UserChallenges struct {
-	CreatedAt   time.Time
-	UserID      uint
+	CreatedAt time.Time
+	User      User `gorm:"foreignKey:UserID"`
+	UserID    uint
+
+	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
 	ChallengeID uint
-	Tries       uint
-	Solved      bool
-	Flag        string
+	Tries       uint   `gorm:"not null;default:0"`
+	Solved      bool   `gorm:"not null;default:false;index"`
+	Flag        string `gorm:"type:text"`
 }
 
 // The `DynamicFlags` table has the following columns

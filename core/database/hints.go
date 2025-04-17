@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+
 	"gorm.io/gorm"
 )
 
@@ -14,11 +15,14 @@ type Hint struct {
 }
 
 type UserHint struct {
-	UserID      uint      `gorm:"not null"`
-	ChallengeID uint      `gorm:"not null"`
-	HintID      uint      `gorm:"not null"`
-	Hint        Hint      `gorm:"foreignKey:HintID;references:HintID"`
-	Challenge   Challenge `gorm:"foreignKey:ChallengeID;references:ID"`
+	UserID uint
+	User   User `gorm:"foreignKey:UserID"`
+
+	HintID uint
+	Hint   Hint `gorm:"foreignKey:HintID"`
+
+	ChallengeID uint
+	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
 }
 
 func CreateHintEntry(hint *Hint) error {
