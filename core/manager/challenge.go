@@ -454,7 +454,9 @@ func HandleAll(action string, user string) []string {
 		if err != nil {
 			break
 		}
-
+		for _, deployChallName := range challenges {
+			challsNameList = append(challsNameList, deployChallName.Name)
+		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 
 	case core.MANAGE_ACTION_REDEPLOY:
@@ -465,7 +467,9 @@ func HandleAll(action string, user string) []string {
 		if err != nil {
 			break
 		}
-
+		for _, deployChallName := range challenges {
+			challsNameList = append(challsNameList, deployChallName.Name)
+		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 
 	case core.MANAGE_ACTION_PURGE:
@@ -474,7 +478,9 @@ func HandleAll(action string, user string) []string {
 		if err != nil {
 			break
 		}
-
+		for _, deployChallName := range challenges {
+			challsNameList = append(challsNameList, deployChallName.Name)
+		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 	}
 
