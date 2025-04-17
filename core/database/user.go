@@ -31,7 +31,7 @@ type User struct {
 	SshKey      string
 	Status      uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score       uint    `gorm:"default:0"`
-	FrozenScore uint    `gorm:"default:0`
+	FrozenScore uint    `gorm:"default:0"`
 	Hints       []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
