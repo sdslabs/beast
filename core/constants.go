@@ -204,3 +204,7 @@ var USER_STATUS = map[string]string{
 	"hide":   "hide",
 	"unhide": "unhide",
 }
+
+const (
+	LEADERBOARD_SIZE = 25
+)
