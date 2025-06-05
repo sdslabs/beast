@@ -4,10 +4,10 @@ email = "contact+fristonio@sdslabs.co.in"
 ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
-name = "static-chall"
-flag = "BACKDOOR{SAMPLE_FLAG}"
-type = "static"
-points=150
+name = "docker-type"
+flag = "FLAG{r3GEx_i5_3vi1!!}"
+type = "bare"
+points = 200
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
@@ -17,9 +17,6 @@ points = 10
 text = "simple_hint_2"
 points = 20
 
-maxPoints = 100
-minPoints = 50
-tags = ["easy", "web"]
-
 [challenge.env]
-static_dir = "static"
+docker_context = "docker-file"
+ports = [10005]

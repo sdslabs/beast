@@ -53,8 +53,8 @@ func CommitChallengeContainer(challName string) error {
 	}
 
 	if chall.Status != core.DEPLOY_STATUS["deployed"] || !coreUtils.IsContainerIdValid(chall.ContainerId) {
-		log.Errorf("Challenge : %s not deployed", err.Error())
-		return fmt.Errorf("Challenge is not deployed")
+		log.Errorf("Challenge : %s not deployed", challName)
+		return fmt.Errorf("challenge is not deployed")
 	}
 	var imageId string
 	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
@@ -181,13 +181,13 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 			remoteContainers, err = remoteManager.SearchRunningContainerByFilterRemote(map[string]string{"id": challenge.ContainerId}, server)
 			if err != nil {
-				log.Error("Error while searching for rmote container with id %s", challenge.ContainerId)
+				log.Errorf("error while searching for remote container with id %s", challenge.ContainerId)
 				return nil, errors.New("CONTAINER RUNTIME ERROR")
 			}
 		} else {
 			containers, err = cr.SearchRunningContainerByFilter(map[string]string{"id": challenge.ContainerId})
 			if err != nil {
-				log.Error("Error while searching for container with id %s", challenge.ContainerId)
+				log.Errorf("error while searching for container with id %s", challenge.ContainerId)
 				return nil, errors.New("CONTAINER RUNTIME ERROR")
 			}
 		}
@@ -199,7 +199,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 
 		if len(containers) == 1 {
 			log.Debugf("Found an already running instance of the challenge with container ID %s", challenge.ContainerId)
-			return nil, fmt.Errorf("Challenge already deployed")
+			return nil, fmt.Errorf("challenge already deployed")
 		} else {
 			if err = database.UpdateChallenge(&challenge, map[string]interface{}{"ContainerId": coreUtils.GetTempContainerId(challengeName)}); err != nil {
 				log.Errorf("Error while saving challenge state in database : %s", err)
@@ -291,7 +291,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 		}
 		if err := ValidateChallengeDir(challengeDir); err != nil {
 			log.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
-			return nil, fmt.Errorf("Error validating the challenge directory %s : %s", challengeDir, err)
+			return nil, fmt.Errorf("error validating the challenge directory %s : %s", challengeDir, err)
 		}
 		/// TODO : remove multiple validation while deploying challenge
 
@@ -327,7 +327,6 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			Info: info,
 		}, nil
 	}
-	return nil, nil
 }
 
 // Handle multiple challenges simultaneously.
@@ -378,12 +377,12 @@ func HandleTagRelatedChallenges(action string, tag string, user string) []string
 	// exist the provided tag, simply skip doing anything.
 	err := database.QueryOrCreateTagEntry(tagEntry)
 	if err != nil {
-		return []string{fmt.Sprintf("DATABASE_ERROR")}
+		return []string{"DATABASE_ERROR"}
 	}
 
 	challs, err := database.QueryRelatedChallenges(tagEntry)
 	if err != nil {
-		return []string{fmt.Sprintf("DATABASE_ERROR")}
+		return []string{"DATABASE_ERROR"}
 	}
 
 	var challsNameList []string
@@ -429,7 +428,7 @@ func HandleAll(action string, user string) []string {
 			// is up to date. This ignores this error.
 			if !strings.Contains(err.Error(), "already up-to-date") {
 				log.Warnf("Error while syncing beast for DEPLOY_ALL : %s ...", err)
-				return []string{fmt.Sprintf("GIT_REMOTE_SYNC_ERROR")}
+				return []string{"GIT_REMOTE_SYNC_ERROR"}
 			}
 		}
 		log.Debugf("Sync for beast remote done for DEPLOY_ALL")
@@ -440,37 +439,48 @@ func HandleAll(action string, user string) []string {
 
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		challsNameList, err := GetAvailableChallenges()
-		if err != nil || len(challsNameList) == 0 {
+		var deployChalls []string
+		deployChalls, err = GetAvailableChallenges()
+		if err != nil || len(deployChalls) == 0 {
 			return []string{"No challenge available"}
 		}
+		challsNameList = deployChalls
 
 	case core.MANAGE_ACTION_UNDEPLOY:
-		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
+		var challenges []database.Challenge
+		challenges, err = database.QueryChallengeEntriesMap(map[string]any{
 			"Status": core.DEPLOY_STATUS["deployed"],
 		})
 		if err != nil {
 			break
 		}
-
+		for _, deployChallName := range challenges {
+			challsNameList = append(challsNameList, deployChallName.Name)
+		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 
 	case core.MANAGE_ACTION_REDEPLOY:
-		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
+		var challenges []database.Challenge
+		challenges, err = database.QueryChallengeEntriesMap(map[string]any{
 			"Status": core.DEPLOY_STATUS["deployed"],
 		})
 		if err != nil {
 			break
 		}
-
+		for _, deployChallName := range challenges {
+			challsNameList = append(challsNameList, deployChallName.Name)
+		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 
 	case core.MANAGE_ACTION_PURGE:
-		challenges, err := database.QueryAllChallenges()
+		var challenges []database.Challenge
+		challenges, err = database.QueryAllChallenges()
 		if err != nil {
 			break
 		}
-
+		for _, deployChallName := range challenges {
+			challsNameList = append(challsNameList, deployChallName.Name)
+		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 	}
 
@@ -603,7 +613,7 @@ func unstageChallenge(challengeName string) error {
 
 	err = utils.RemoveDirRecursively(challengeStagedDir)
 	if err != nil {
-		return fmt.Errorf("Error while removing staged directory : %s", err)
+		return fmt.Errorf("error while removing staged directory : %s", err)
 	}
 
 	return nil
@@ -647,7 +657,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 			// This should not return from here, this should assume that
 			// the container instance does not exist and hence should update the database
 			// with the container ID.
-			p := fmt.Errorf("Error while removing challenge instance : %s", err)
+			p := fmt.Errorf("error while removing challenge instance : %s", err)
 			log.Error(p.Error())
 		}
 	}
@@ -659,7 +669,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 
 	if err != nil {
 		log.Error(err)
-		return fmt.Errorf("Error while updating the challenge : %s", err)
+		return fmt.Errorf("error while updating the challenge : %s", err)
 	}
 
 	log.Infof("Challenge undeploy successful for %s", challenge.Name)
@@ -690,20 +700,19 @@ func undeployChallenge(challengeName string, purge bool) error {
 		}
 
 		log.Info("Subtracting user points")
-		err = database.SubtractScoreFromSolvers(challenge.ID);
+		err = database.SubtractScoreFromSolvers(challenge.ID)
 
 		if err != nil {
 			return fmt.Errorf("error while subtracting user points: %s", err)
 		}
 
 		log.Info("Deleting database entry")
-		if err := coreUtils.DeleteChallengeEntryWithPorts(challenge.Name); 
-		err != nil {
+		if err := coreUtils.DeleteChallengeEntryWithPorts(challenge.Name); err != nil {
 			return fmt.Errorf("error while deleting challenge entry: %s", err)
 		}
 
 		log.Info("Deleting challenge entry from user challenge database")
-		err = database.DeleteAllUserChallenges(challenge.ID);
+		err = database.DeleteAllUserChallenges(challenge.ID)
 
 		if err != nil {
 			return fmt.Errorf("error while subtracting user points: %s", err)

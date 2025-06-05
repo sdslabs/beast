@@ -32,7 +32,7 @@ func configureSidecar(config *cfg.BeastChallengeConfig) error {
 
 	err = sidecarAgent.Bootstrap(configPath)
 	if err != nil {
-		return fmt.Errorf("Error while bootstrapping sidecar configuration: %s", err)
+		return fmt.Errorf("error while bootstrapping sidecar configuration: %s", err)
 	}
 
 	log.Infof("Sidecar configuration bootstrap complete.")
@@ -62,7 +62,7 @@ func cleanSidecar(config *cfg.BeastChallengeConfig) error {
 
 	err = sidecarAgent.Destroy(configPath)
 	if err != nil {
-		return fmt.Errorf("Error while destroying sidecar configuration: %s", err)
+		return fmt.Errorf("error while destroying sidecar configuration: %s", err)
 	}
 
 	log.Infof("Sidecar configuration cleanup complete.")
