@@ -273,6 +273,11 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE || (len(adminLeaderboardCache) > 0 && newScore > adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
+			leaderboardStale = true
+			adminLeaderboardStale = true
+		}
+
 		UserChallengesEntry := database.UserChallenges{
 			CreatedAt:   time.Time{},
 			UserID:      user.ID,
