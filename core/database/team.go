@@ -205,11 +205,10 @@ func CheckTeamSolvedChallenge(teamID uint, challengeID uint) (bool, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	// Join users and user_challenges to check if any team member has solved it
 	var count int64
 	err := Db.Model(&User{}).
 		Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
-		Where("users.team_id = ? AND user_challenges.challenge_id = ?", teamID, challengeID).
+		Where("users.team_id = ? AND user_challenges.challenge_id = ? AND user_challenges.solved = true", teamID, challengeID).
 		Count(&count).Error
 	if err != nil {
 		return false, err

@@ -138,3 +138,4 @@ logo_url = ""
 # Dynamic scoring for challenges
 dynamic_score = false
 
+team_size = 4

@@ -463,8 +463,8 @@ func challengesInfoHandler(c *gin.Context) {
 					Points: hint.Points,
 				}
 			}
-			// Get previous tries for the current user and challenge
-			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
+			// Get previous tries for the team and challenge
+			previousTries, err := database.GetTeamTotalTries(user.TeamID, challenge.ID)
 			if err != nil {
 				log.Error(err)
 				previousTries = 0

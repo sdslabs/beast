@@ -224,6 +224,25 @@ func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
 	return int(userChallenges.Tries), nil
 }
 
+func GetTeamTotalTries(teamID uint, challengeID uint) (int, error) {
+	members, err := GetTeamMembers(teamID)
+	if err != nil {
+		return 0, err
+	}
+
+	totalTries := 0
+
+	for _, member := range members {
+		tries, err := GetUserPreviousTries(member.ID, challengeID)
+		if err != nil {
+			return 0, err
+		}
+		totalTries += tries
+	}
+
+	return totalTries, nil
+}
+
 func UpdateUserChallengeTries(userID uint, challengeID uint) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
