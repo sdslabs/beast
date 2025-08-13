@@ -846,6 +846,7 @@ func submissionsHandler(c *gin.Context) {
 				Tags:      challengeTags,
 				Points:    challenge[0].Points,
 				SolvedAt:  submission.CreatedAt,
+				Flag:      submission.Flag,
 			}
 			submissionsResp = append(submissionsResp, singleSubmissionResp)
 		}
