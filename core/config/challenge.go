@@ -140,7 +140,7 @@ type ChallengeMetadata struct {
 		Text   string `toml:"text"`
 		Points uint   `toml:"points"`
 	} `toml:"hints"`
-	MaxAttemptLimit int      `toml:"max_attempt_limit"`
+	MaxAttemptLimit int      `toml:"maxAttemptLimit"`
 	PreReqs         []string `toml:"preReqs"`
 	DynamicFlag     bool     `toml:"dynamic_flag"`
 	Points          uint     `toml:"points"`
