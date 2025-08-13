@@ -26,13 +26,14 @@ type User struct {
 	gorm.Model
 	auth.AuthModel
 
-	Challenges []*Challenge `gorm:"many2many:user_challenges;"`
-	Name       string       `gorm:"not null"`
-	Email      string       `gorm:"non null;unique"`
-	SshKey     string
-	Status     uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
-	Score      uint    `gorm:"default:0"`
-	Hints      []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
+	Challenges  []*Challenge `gorm:"many2many:user_challenges;"`
+	Name        string       `gorm:"not null"`
+	Email       string       `gorm:"non null;unique"`
+	SshKey      string
+	Status      uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
+	Score       uint    `gorm:"default:0"`
+	FrozenScore uint    `gorm:"default:0`
+	Hints       []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
 // Queries all the users entries where the column represented by key
@@ -342,6 +343,66 @@ func QueryUsersByScoreOffsetLimit(limit, offset int) ([]User, error) {
 	}
 
 	return users, tx.Error
+}
+
+func QueryTopUsersByFrozenScore(limit int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
+		Order("frozen_score desc, updated_at asc").
+		Limit(limit).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryUsersByFrozenScoreOffsetLimit(limit, offset int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
+		Order("frozen_score desc, updated_at asc").
+		Limit(limit).
+		Offset(offset).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func UpdateFrozenScores() error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+	return Db.Exec("UPDATE users SET frozen_score = score").Error
+}
+
+func ResetFrozenScores() error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+	return Db.Exec("UPDATE users SET frozen_score = 0").Error
+}
+
+func IsFrozenScoreSet() (bool, error) {
+	var count int64
+	DBMux.Lock()
+	defer DBMux.Unlock()
+	err := Db.Model(&User{}).Where("frozen_score != 0").Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func GetUserCount() (int64, error) {

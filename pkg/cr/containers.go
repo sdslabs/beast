@@ -185,7 +185,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	resources := container.Resources{
 		CPUShares: containerConfig.CPUShares,
 		Memory:    containerConfig.Memory,
-		PidsLimit: containerConfig.PidsLimit,
+		PidsLimit: &containerConfig.PidsLimit,
 	}
 
 	hostConfig := &container.HostConfig{
@@ -195,7 +195,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		Resources:    resources,
 	}
 
-	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, containerName)
+	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
 	if err != nil {
 		log.Error("Error while creating the container with name %s", containerName)
 		return "", err
