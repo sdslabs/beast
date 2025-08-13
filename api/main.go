@@ -66,7 +66,6 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 	remoteManager.Init()
 	database.Init()
-	
 	runBeastApiBootsteps(defaultauthorpassword)
 
 	// Initialize Gin router.

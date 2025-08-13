@@ -41,15 +41,18 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	challengeConfig := filepath.Join(contextDir, core.CHALLENGE_CONFIG_FILE_NAME)
 	log.Debugf("Reading challenge config from : %s", challengeConfig)
 
-	var dockerfileCtx string
+	var dockerfileCtx, serviceConfig string
+	dockerfileProvided := false
 
-	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME || config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
+	if config.Challenge.Env.DockerCtx != "" {
+		dockerfileProvided = true
 		dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
 		err := utils.ValidateFileExists(dockerfileCtx)
 		if err != nil {
 			return err
 		}
 	} else {
+		config.Challenge.Env.DockerCtx = core.DEFAULT_DOCKER_FILE
 		dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
 		if err != nil {
 			return err
@@ -57,8 +60,18 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 		log.Debug("Got dockerfile context from the challenge config")
 	}
 
+	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
+		if config.Challenge.Env.XinetdConf != "" {
+			serviceConfig = filepath.Join(challengeDir, config.Challenge.Env.XinetdConf)
+			err := utils.ValidateFileExists(serviceConfig)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	additionalCtx := make(map[string]string)
 	additionalCtx["Dockerfile"] = dockerfileCtx
+	additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = serviceConfig
 
 	// Here we try to add all the additional context that are required like xinetd.conf
 	// instead of mounting these files inside the container, since we want reproducibility
@@ -66,17 +79,12 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	// files inside the tar itself will make the tar build to be reproducible anywhere.
 	err = appendAdditionalFileContexts(additionalCtx, config)
 	if err != nil {
-		return fmt.Errorf("Error while adding additional context : %s", err)
+		return fmt.Errorf("error while adding additional context : %s", err)
 	}
 
 	// Copy those additional contexts to the staging area, so we can provide them for
 	// user to download.
 	copyAdditionalContextToStaging(additionalCtx, stagingDir)
-
-	// Copy everything from chall folder into staging folder
-	if config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
-		CopyDir(challengeDir, stagingDir)
-	} 
 
 	log.Debug("Copying Content to Static Folder")
 
@@ -92,7 +100,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	log.Debug("Starting to build Tar file for the challenge to stage")
 
-	if config.Challenge.Metadata.Type == core.DOCKER_CHALLENGE_TYPE_NAME || config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
+	if dockerfileProvided {
 		delete(additionalCtx, "Dockerfile")
 	}
 	err = utils.Tar(contextDir, utils.Gzip, stagingDir, additionalCtx, []string{staticContentDir, filepath.Join(contextDir, core.HIDDEN)})
@@ -103,7 +111,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	log.Debugf("Copying challenge config to staging directory")
 	err = utils.CopyFile(challengeConfig, filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME))
 	if err != nil {
-		return fmt.Errorf("Error while copying challenge config to staging : %s", err)
+		return fmt.Errorf("error while copying challenge config to staging : %s", err)
 	}
 
 	log.Debugf("Staging for challenge %s complete", filepath.Base(challengeDir))
@@ -163,7 +171,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 		if err != nil {
 			log.Errorf("Error while writing logs to file : %s", logFilePath)
-			return fmt.Errorf("Error logs generated on image build failure could not be written to the logfile")
+			return fmt.Errorf("error logs generated on image build failure could not be written to the logfile")
 		}
 		defer logFile.Close()
 
@@ -177,11 +185,11 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 	if imageId == "" {
 		log.Error("Error while creating image logs written to the logfile")
-		return fmt.Errorf("Error while getting imageId for the commited challenge")
+		return fmt.Errorf("error while getting imageId for the commited challenge")
 	}
 
 	if err = database.UpdateChallenge(challenge, map[string]interface{}{"ImageId": imageId}); err != nil {
-		return fmt.Errorf("Error while writing imageId to database : %s", err)
+		return fmt.Errorf("error while writing imageId to database : %s", err)
 	}
 
 	log.Infof("Image build for `%s` done", challengeName)
@@ -242,13 +250,15 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	log.Debugf("Container config for challenge %s are: CPU(%d), Memory(%d), PidsLimit(%d)",
 		config.Challenge.Metadata.Name,
 		config.Resources.CPUShares,
-		config.Resources.PidsLimit)
+		config.Resources.Memory,
+		config.Resources.PidsLimit,
+	)
 
 	// Since till this point we have already valiadated the challenge config this is highly
 	// unlikely to fail.
 	portMapping, err := config.Challenge.Env.GetPortMappings()
 	if err != nil {
-		return fmt.Errorf("Error while parsing port mapping for the challenge %s: %s", config.Challenge.Metadata.Name, err)
+		return fmt.Errorf("error while parsing port mapping for the challenge %s: %s", config.Challenge.Metadata.Name, err)
 	}
 
 	containerConfig := cr.CreateContainerConfig{
@@ -337,7 +347,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	if !skipStage {
 		err = config.ValidateRequiredFields(challengeDir)
 		if err != nil {
-			return fmt.Errorf("An error occured while validating the config file : %s, cannot continue with pipeline.", err)
+			return fmt.Errorf("an error occured while validating the config file : %s, cannot continue with pipeline", err)
 		}
 	}
 

@@ -13,7 +13,6 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	tools "github.com/sdslabs/beastv4/templates"
-
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -102,7 +101,7 @@ func CreateChallengeEntry(challenge *Challenge) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("error while starting transaction: %s", tx.Error)
+		return fmt.Errorf("Error while starting transaction", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(challenge, *challenge).Error; err != nil {
@@ -141,7 +140,7 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 
 	tx := Db.Preload("Tags").Preload("Ports").Where(queryKey, value).Find(&challenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return nil, errors.New("no challenge entry found")
+		return nil, nil
 	}
 
 	if tx.Error != nil {
@@ -280,7 +279,7 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 
 	tx := Db.Where(whereMap).First(&challenge)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return fmt.Errorf("no challenge entry to update : WhereClause : %s", whereMap)
+		return fmt.Errorf("No challenge entry to update : WhereClause : %s", whereMap)
 	}
 
 	if tx.Error != nil {
@@ -331,7 +330,7 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("error while starting transaction : %s", tx.Error)
+		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
 	}
 
 	if err := tx.Unscoped().Delete(challenge).Error; err != nil {
@@ -448,7 +447,7 @@ func updateScript(user *User) error {
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
 	challs, err := GetRelatedChallenges(user)
 	if err != nil {
-		return fmt.Errorf("error while getting related challenges : %v", err)
+		return fmt.Errorf("Error while getting related challenges : %v", err)
 	}
 
 	mapOfChall := make(map[string]string)
@@ -465,12 +464,12 @@ func updateScript(user *User) error {
 	var script bytes.Buffer
 	scriptTemplate, err := template.New("script").Parse(tools.SSH_LOGIN_SCRIPT_TEMPLATE)
 	if err != nil {
-		return fmt.Errorf("error while parsing script template :: %s", err)
+		return fmt.Errorf("Error while parsing script template :: %s", err)
 	}
 
 	err = scriptTemplate.Execute(&script, data)
 	if err != nil {
-		return fmt.Errorf("error while executing script template :: %s", err)
+		return fmt.Errorf("Error while executing script template :: %s", err)
 	}
 
 	return ioutil.WriteFile(scriptPath, script.Bytes(), 0755)

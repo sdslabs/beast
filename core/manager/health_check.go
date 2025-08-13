@@ -32,7 +32,7 @@ func CheckStaticChallenge(chall database.Challenge) error {
 		filepath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, chall.Name, core.BEAST_STATIC_FOLDER, asset)
 		err := utils.ValidateFileExists(filepath)
 		if err != nil {
-			err = fmt.Errorf("static chall: %s not staged. Asset: %s Missing!", chall.Name, asset)
+			err = fmt.Errorf("static chall: %s not staged. Asset: %s Missing", chall.Name, asset)
 			log.Error(err)
 			return err
 		}

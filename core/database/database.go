@@ -75,7 +75,6 @@ func Init() {
 			log.Error("Error while initializing the database.", dberr)
 		}
 	}
-
 	if err := Db.SetupJoinTable(&Challenge{}, "Users", &UserChallenges{}); err != nil {
 		log.Fatalf("Cannot create related models: %s", err)
 	}

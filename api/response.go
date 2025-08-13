@@ -9,7 +9,7 @@ type HTTPPlainResp struct {
 }
 
 type HTTPPlainMapResp struct {
-	Messages map[string]string `json:"messages" example:"["name1": "message1"],["name2": "message2"]"`
+	Messages map[string]string `json:"messages" example:"{\"name1\": \"message1\", \"name2\": \"message2\"}"`
 }
 
 type HTTPErrorResp struct {
@@ -30,7 +30,7 @@ type AvailableImagesResp struct {
 type PortsInUseResp struct {
 	MinPortValue uint32   `json:"port_min_value" example:"10000"`
 	MaxPortValue uint32   `json:"port_max_value" example:"20000"`
-	PortsInUse   []uint32 `json:"ports_in_use" example:[100001, 100003, 10010]`
+	PortsInUse   []uint32 `json:"ports_in_use" example:"[100001, 100003, 10010]"`
 }
 
 type ChallengeStatusResp struct {
@@ -119,7 +119,7 @@ type ChallengeInfoResp struct {
 	Status          string          `json:"status" example:"deployed"`
 	MaxAttemptLimit int             `json:"maxAttemptLimit" example:"5"`
 	PreReqs         []string        `json:"preReqs" example:"['web-php','simple']"`
-	Ports           []uint32        `json:"ports" example:[3001, 3002]`
+	Ports           []uint32        `json:"ports" example:"[3001, 3002]"`
 	Hints           []HintInfo      `json:"hints"`
 	Desc            string          `json:"description" example:"A simple web challenge"`
 	Points          uint            `json:"points" example:"50"`
@@ -139,7 +139,7 @@ type ChallengePreviewResp struct {
 	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
 	MaxAttemptLimit int      `json:"maxAttemptLimit" example:"5"`
 	PreReqs         []string `json:"preReqs" example:"['web-php','simple']"`
-	Ports           []uint32 `json:"ports" example:[3001, 3002]`
+	Ports           []uint32 `json:"ports" example:"[3001, 3002]"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
 	DeployedLink    string   `json:"deployedLink" example:"beast.sdslabs.co"`
@@ -153,6 +153,7 @@ type SubmissionResp struct {
 	Category  string    `json:"category" example:"web"`
 	Tags      []string  `json:"tags" example:"['pwn','misc']"`
 	Points    uint      `json:"points" example:"50"`
+	Flag      string    `json:"flag" example:"flag{@#$}"`
 	SolvedAt  time.Time `json:"solvedAt"`
 }
 

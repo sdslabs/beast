@@ -98,12 +98,13 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
-		if err != nil || len(chall) == 0 {
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
+
 		challenge := chall[0]
 		if challenge.Status != core.DEPLOY_STATUS["deployed"] {
 			c.JSON(http.StatusOK, FlagSubmitResp{
@@ -158,10 +159,21 @@ func submitFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
 
-		currentTime := time.Now()
-		msg := "User " + username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " | TimeStamp: " + currentTime.Format("20060102150405")
-		go coreUtils.LogFlag(msg, challenge.Name)
+		if solved {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Challenge has already been solved.",
+				Success: false,
+			})
+			return
+		}
 
 		// If the challenge is dynamic, then the flag is not stored in the database
 		if challenge.DynamicFlag {
@@ -214,6 +226,20 @@ func submitFlagHandler(c *gin.Context) {
 			}
 		} else {
 			if challenge.Flag != flag {
+				UserChallengesEntry := database.UserChallenges{
+					CreatedAt:   time.Time{},
+					UserID:      user.ID,
+					ChallengeID: challenge.ID,
+					Solved:      false,
+					Flag:        flag,
+				}
+				err = database.SaveFlagSubmission(&UserChallengesEntry)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+						Error: "DATABASE ERROR while processing the request.",
+					})
+					return
+				}
 				c.JSON(http.StatusOK, FlagSubmitResp{
 					Message: "Your flag is incorrect",
 					Success: false,
@@ -221,22 +247,6 @@ func submitFlagHandler(c *gin.Context) {
 				return
 			}
 		}
-		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if solved {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Challenge has already been solved.",
-				Success: false,
-			})
-			return
-		}
-
 		challengePoints := challenge.Points
 		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
 		if config.Cfg.CompetitionInfo.DynamicScore {
@@ -261,8 +271,8 @@ func submitFlagHandler(c *gin.Context) {
 			}
 		}
 		newScore := user.Score + challengePoints
-		if  newScore <= 0 {
-			newScore =0
+		if newScore <= 0 {
+			newScore = 0
 		}
 		err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
 		if err != nil {
@@ -272,8 +282,9 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
-		if len(leaderboardCache) < core.LEADERBOARD_SIZE || (len(leaderboardCache) > 0 && newScore > leaderboardCache[len(leaderboardCache)-1].Score) {
+		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE || (len(adminLeaderboardCache) > 0 && newScore > adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
 			leaderboardStale = true
+			adminLeaderboardStale = true
 		}
 
 		UserChallengesEntry := database.UserChallenges{
@@ -281,9 +292,7 @@ func submitFlagHandler(c *gin.Context) {
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
 			Solved:      true,
-		}
-		if challenge.DynamicFlag {
-			UserChallengesEntry.Flag = flag
+			Flag:        flag,
 		}
 
 		err = database.SaveFlagSubmission(&UserChallengesEntry)
@@ -321,7 +330,7 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 		}
 		if user.Role == "contestant" {
 			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
-			if newScore <= 0{
+			if newScore <= 0 {
 				newScore = 0
 			}
 			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})

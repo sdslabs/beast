@@ -32,7 +32,7 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 	}
 
 	if compression != Gzip {
-		return errors.New("Only Gzipped compression is available")
+		return errors.New("only Gzipped compression is available")
 	}
 
 	outFile := fmt.Sprintf("%s.tar.gz", filepath.Base(contextDir))
@@ -43,13 +43,13 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 		log.Warnf("The tar target you are trying to create already exists(%s), overriding", target)
 		remErr := os.Remove(target)
 		if remErr != nil {
-			return errors.New("Error while removing existing tar")
+			return errors.New("error while removing existing tar")
 		}
 	}
 
 	targetFile, err := os.Create(target)
 	if err != nil {
-		return fmt.Errorf("Error while creating tar :: %s", target)
+		return fmt.Errorf("error while creating tar :: %s", target)
 	}
 	defer targetFile.Close()
 
@@ -148,7 +148,7 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 			log.Errorf("Error while removing the corrupted tar file")
 		}
 
-		return fmt.Errorf("Error while creating Tar :: %s", err)
+		return fmt.Errorf("error while creating Tar :: %s", err)
 	}
 
 	return nil

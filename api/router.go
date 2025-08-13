@@ -122,8 +122,9 @@ func initGinRouter() *gin.Engine {
 
 		adminPanelGroup := apiGroup.Group("/admin", adminAuthorize)
 		{
-			adminPanelGroup.POST("/users/:action/:id", banUserHandler)
+			adminPanelGroup.POST("/users/:action/:id", userActionHandler)
 			adminPanelGroup.GET("/statistics", getUsersStatisticsHandler)
+			adminPanelGroup.GET("/leaderboard", adminLeaderboardHandler)
 			adminPanelGroup.POST("/freezeLeaderboard", freezeLeaderboardHandler)
 			adminPanelGroup.POST("/unfreezeLeaderboard", unfreezeLeaderboardHandler)
 		}

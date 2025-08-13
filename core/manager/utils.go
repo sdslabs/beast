@@ -36,6 +36,7 @@ type BeastBareDockerfile struct {
 	EnvironmentVariables map[string]string
 	MountVolume          string
 	XinetdService        bool
+	XinetdConf           string
 	RunRoot              bool
 	Entrypoint           string
 	SetupCommand         string
@@ -245,6 +246,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	setupScripts := config.Challenge.Env.SetupScripts
 	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
 	var xinetdService bool = false
+	xinetdConf := core.DEFAULT_XINETD_CONF_FILE
 	var executables []string
 	modifier := emptyFunction
 
@@ -288,6 +290,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		RunCmd:               runCmd,
 		MountVolume:          filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
 		XinetdService:        xinetdService,
+		XinetdConf:           xinetdConf,
 		RunRoot:              xinetdService,
 		Executables:          executables,
 		Entrypoint:           entrypoint,
@@ -348,43 +351,41 @@ func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.B
 	log.Debug("Adding additional required file context to docker context.")
 	// If the challenge type is service, we need to add xinetd configuration to the
 	// docker directory context.
-	if config.Challenge.Metadata.Type == core.SERVICE_DOCKER_CHALLENGE_TYPE_NAME {
-		log.Debug("Add provided xinetd.conf")
-		additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = config.Challenge.Env.XinetdConf
-	}
 	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
-		log.Debug("Challenge type is service, trying to embed xinetd configuration.")
-		file, err := ioutil.TempFile("", "xinetd.conf.*")
-		if err != nil {
-			return fmt.Errorf("error while creating a tempfile for xinetdconf :: %s", err)
-		}
-		defer file.Close()
+		if additionalCtx[core.DEFAULT_XINETD_CONF_FILE] == "" {
+			log.Debug("Challenge type is service, trying to embed xinetd configuration.")
+			file, err := ioutil.TempFile("", "xinetd.conf.*")
+			if err != nil {
+				return fmt.Errorf("error while creating a tempfile for xinetdconf :: %s", err)
+			}
+			defer file.Close()
 
-		var xinetd bytes.Buffer
-		xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
-		if err != nil {
-			return fmt.Errorf("error while parsing Xinetd config template :: %s", err)
-		}
+			var xinetd bytes.Buffer
+			xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
+			if err != nil {
+				return fmt.Errorf("error while parsing Xinetd config template :: %s", err)
+			}
 
-		port := config.Challenge.Env.GetDefaultPort()
+			port := config.Challenge.Env.GetDefaultPort()
 
-		data := BeastXinetdConf{
-			Port:        fmt.Sprintf("%d", port),
-			ServiceName: config.Challenge.Metadata.Name,
-			ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
-		}
-		err = xinetdTemplate.Execute(&xinetd, data)
-		if err != nil {
-			return fmt.Errorf("error while executing Xinetd Config template :: %s", err)
-		}
+			data := BeastXinetdConf{
+				Port:        fmt.Sprintf("%d", port),
+				ServiceName: config.Challenge.Metadata.Name,
+				ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
+			}
+			err = xinetdTemplate.Execute(&xinetd, data)
+			if err != nil {
+				return fmt.Errorf("error while executing Xinetd Config template :: %s", err)
+			}
 
-		_, err = file.WriteString(xinetd.String())
-		if err != nil {
-			return fmt.Errorf("error while writing xinetd config to file :: %s", err)
-		}
+			_, err = file.WriteString(xinetd.String())
+			if err != nil {
+				return fmt.Errorf("error while writing xinetd config to file :: %s", err)
+			}
 
-		log.Debugf("Successfully added xinetd config context in docker context.")
-		additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = file.Name()
+			log.Debugf("Successfully added xinetd config context in docker context.")
+			additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = file.Name()
+		}
 	}
 
 	return nil
@@ -462,7 +463,6 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
-			userEntry = newUser
 			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
@@ -475,15 +475,8 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		users[len(config.Maintainers)] = &userEntry
 
-		var assetsURL = make([]string, len(config.Challenge.Metadata.Assets))
-
-		for index, asset := range config.Challenge.Metadata.Assets {
-			// beastStaticAssetUrl, _ := url.Parse(cfg.Cfg.BeastStaticUrl)
-			// beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER, asset)
-			// assetsURL[index] = beastStaticAssetUrl.String()
-
-			assetsURL[index] = asset
-		}
+		assetsURL := make([]string, len(config.Challenge.Metadata.Assets))
+		copy(assetsURL, config.Challenge.Metadata.Assets)
 		if config.Challenge.Metadata.MaxPoints > 0 {
 			log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
 			config.Challenge.Metadata.Points = config.Challenge.Metadata.MaxPoints
@@ -536,7 +529,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 			err := database.CreateHintEntry(&hintEntry)
 			if err != nil {
-				return fmt.Errorf("Error while creating hint entry: %v", err)
+				return fmt.Errorf("error while creating hint entry: %v", err)
 			}
 		}
 

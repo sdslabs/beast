@@ -52,11 +52,10 @@ const ( //paths
 )
 
 const ( //chall types
-	STATIC_CHALLENGE_TYPE_NAME         string = "static"
-	SERVICE_CHALLENGE_TYPE_NAME        string = "service"
-	DOCKER_CHALLENGE_TYPE_NAME         string = "docker"
-	SERVICE_DOCKER_CHALLENGE_TYPE_NAME string = "service_docker"
-	BARE_CHALLENGE_TYPE_NAME           string = "bare"
+	STATIC_CHALLENGE_TYPE_NAME  string = "static"
+	SERVICE_CHALLENGE_TYPE_NAME string = "service"
+	WEB_CHALLENGE_TYPE_NAME     string = "web"
+	BARE_CHALLENGE_TYPE_NAME    string = "bare"
 )
 
 const ( // chall actions
@@ -139,7 +138,7 @@ var SIDECAR_ENV_PREFIX = map[string]string{
 }
 
 // Available challenge types
-var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, DOCKER_CHALLENGE_TYPE_NAME, SERVICE_DOCKER_CHALLENGE_TYPE_NAME}
+var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, WEB_CHALLENGE_TYPE_NAME}
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	"php": {
@@ -200,8 +199,10 @@ var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 }
 
 var USER_STATUS = map[string]string{
-	"ban":   "ban",
-	"unban": "unban",
+	"ban":    "ban",
+	"unban":  "unban",
+	"hide":   "hide",
+	"unhide": "unhide",
 }
 
 const (

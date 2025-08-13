@@ -39,6 +39,10 @@ func DeployStaticContentContainer() error {
 	}
 
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.BEAST_STATIC_CONTAINER_NAME)})
+	if err != nil {
+		log.Errorf("Error searching for static content image: %s", err)
+		return errors.New("IMAGE_SEARCH_ERROR")
+	}
 	if len(images) == 0 {
 		log.Debugf("Static content image does not exist, build image manually")
 		return errors.New("IMAGE_NOT_FOUND_ERROR")
