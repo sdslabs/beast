@@ -87,6 +87,7 @@ active = false
 # URL of the remote git repository, this should be user@host:<git_repository> format
 url = "git@github.com:sdslabs/hack-test.git"
 
+
 # Name of the remote
 name = "hack-test"
 
@@ -115,7 +116,6 @@ dbname = "beast"
 host = "localhost"
 port = "5432"
 sslmode = "prefer"
-
 
 # The following fields are required only while hosting a competition on beast
 # This section contains information about the competition to be hosted
