@@ -67,7 +67,7 @@ func ConnectDatabase() error {
 // Postgresql database for beast. The Db variable is the connection variable for the
 // database, which is not closed after creating a connection here and can
 // be used further after this.
-func init() {
+func Init() {
 	DBMux = &sync.Mutex{}
 	if Db == nil {
 		dberr = ConnectDatabase()
@@ -236,11 +236,12 @@ func TerminateDatabaseConnections() error {
 	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
 
 	output, err := terminateCmd.CombinedOutput()
+	outputStr := string(output)
 	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", string(output))
+		log.Errorf("Terminate connections error: %s\n", outputStr)
 		return err
 	}
-	log.Debug(output)
+	log.Debug(outputStr)
 	return nil
 }
 
