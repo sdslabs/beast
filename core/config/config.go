@@ -112,8 +112,7 @@ import (
 // dbname = "beast"
 // host = "localhost"
 // port = "5432"
-// sslmode = "disable"
-//
+// sslmode = "prefer" 
 // ```
 type BeastConfig struct {
 	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
@@ -337,7 +336,7 @@ func (config *PsqlConfig) ValidatePsqlConfig() error {
 	}
 	if config.SslMode == "" {
 		log.Warn("Ssl Mode not set. Disabling it.")
-		config.SslMode = "disable"
+		config.SslMode = "prefer"
 	}
 	return nil
 }

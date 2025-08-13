@@ -60,6 +60,7 @@ func ConnectDatabase() error {
 		return dberr
 	}
 	log.Debug("Database initialized")
+	return nil
 }
 
 // Set up the initial bootstrapping for interacting with the
