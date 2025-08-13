@@ -711,7 +711,6 @@ func undeployChallenge(challengeName string, purge bool) error {
 
 		log.Info("Deleting database entry")
 		if err := coreUtils.DeleteChallengeEntryWithPorts(challenge.Name); err != nil {
-		if err := coreUtils.DeleteChallengeEntryWithPorts(challenge.Name); err != nil {
 			return fmt.Errorf("error while deleting challenge entry: %s", err)
 		}
 
