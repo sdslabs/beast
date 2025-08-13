@@ -23,6 +23,10 @@ var HEALTH_CHECKER = false
 // At the time of writing, Beast deploys assets to localhost only.
 // So it will check only on localhost
 func CheckStaticChallenge(chall database.Challenge) error {
+	if chall.Assets == "" {
+		return nil
+	}
+
 	assets := strings.Split(chall.Assets, core.DELIMITER)
 	for _, asset := range assets {
 		filepath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, chall.Name, core.BEAST_STATIC_FOLDER, asset)
@@ -60,7 +64,7 @@ func containerProber(chall database.Challenge) error {
 func ChallengesHealthProber(waitTime int) {
 	log.Info("Starting Challenge Health Check prober.")
 	challs, err := database.QueryChallengeEntriesMap(map[string]interface{}{
-		"Status":       core.DEPLOY_STATUS["deployed"],
+		"status":       core.DEPLOY_STATUS["deployed"],
 		"health_check": 1,
 	})
 

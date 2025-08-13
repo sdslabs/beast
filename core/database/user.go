@@ -18,7 +18,6 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
-	_ "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -32,14 +31,14 @@ type User struct {
 	SshKey      string
 	Status      uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score       uint    `gorm:"default:0"`
-	FrozenScore uint    `gorm:"default:0`
+	FrozenScore uint    `gorm:"default:0"`
 	Hints       []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
 // Queries all the users entries where the column represented by key
 // have the value in value.
 func QueryUserEntries(key string, value string) ([]User, error) {
-	queryKey := fmt.Sprintf("%s == ?", key)
+	queryKey := fmt.Sprintf("%s = ?", key)
 	var users []User
 
 	DBMux.Lock()
@@ -94,7 +93,7 @@ func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("id != ? AND score >= ? AND role == ? AND status == ?", userID, userScore, core.USER_ROLES["contestant"], 0).Find(&users)
+	tx := Db.Where("id != ? AND score >= ? AND role = ? AND status = ?", userID, userScore, core.USER_ROLES["contestant"], 0).Find(&users)
 
 	for _, user := range users {
 		if user.Score > userScore {
@@ -174,7 +173,7 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("user_id == ? AND challenge_id == ? AND solved == ?", userId, challId, true).Find(&userChallenges).Count(&count)
+	tx := Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userId, challId, true).Find(&userChallenges).Count(&count)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return false, nil
@@ -314,7 +313,7 @@ func QueryTopUsersByScore(limit int) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("role == ? AND status == ?", core.USER_ROLES["contestant"], 0).
+	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
 		Order("score desc, updated_at asc").
 		Limit(limit).
 		Find(&users)
@@ -332,7 +331,7 @@ func QueryUsersByScoreOffsetLimit(limit, offset int) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Where("role == ? AND status == ?", core.USER_ROLES["contestant"], 0).
+	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
 		Order("score desc, updated_at asc").
 		Limit(limit).
 		Offset(offset).
@@ -409,7 +408,7 @@ func GetUserCount() (int64, error) {
 	var count int64
 	DBMux.Lock()
 	defer DBMux.Unlock()
-	tx := Db.Model(&User{}).Where("role == ?", "contestant").Count(&count)
+	tx := Db.Model(&User{}).Where("role = ?", "contestant").Count(&count)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return 0, nil
 	}

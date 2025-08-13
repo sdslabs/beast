@@ -2,8 +2,11 @@ package main
 
 import (
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/sdslabs/beastv4/api"
+	"github.com/sdslabs/beastv4/core/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +23,14 @@ var runCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		api.RunBeastApiServer(Port, DefaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		go api.RunBeastApiServer(Port, DefaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
+		<-sigChan
+
+		log.Infoln("\nShutdown signal received.")
+		utils.Cleanup()
+		log.Infoln("Server stopped gracefully.")
 	},
 }

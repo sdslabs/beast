@@ -104,6 +104,15 @@ import (
 // password = ""
 // smtpHost = ""
 // smtpPort = ""
+//
+// # Configuration to connect to Postgresql database
+// [psql_config]
+// user = "beast"
+// password = "12345678"
+// dbname = "beast"
+// host = "localhost"
+// port = "5432"
+// sslmode = "prefer" 
 // ```
 type BeastConfig struct {
 	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
@@ -112,6 +121,7 @@ type BeastConfig struct {
 	AvailableSidecars    []string                   `toml:"available_sidecars"`
 	AvailableServers     map[string]AvailableServer `toml:"available_servers"`
 	GitRemotes           []GitRemote                `toml:"remote"`
+	PsqlConf             PsqlConfig                 `toml:"psql_config"`
 	JWTSecret            string                     `toml:"jwt_secret"`
 	NotificationWebhooks []NotificationWebhook      `toml:"notification_webhooks"`
 	CompetitionInfo      CompetitionInfo            `toml:"competition_info"`
@@ -160,6 +170,11 @@ func (config *BeastConfig) ValidateConfig() error {
 		}
 	}
 
+	err := config.PsqlConf.ValidatePsqlConfig()
+	if err != nil {
+		return fmt.Errorf("error while validating db config : %s", err)
+	}
+
 	if len(config.AvailableServers) == 0 {
 		log.Warn("No available servers provided for challenges. Using default localhost")
 		config.AvailableServers = map[string]AvailableServer{
@@ -181,7 +196,7 @@ func (config *BeastConfig) ValidateConfig() error {
 		}
 	}
 
-	_, err := url.Parse(config.BeastStaticUrl)
+	_, err = url.Parse(config.BeastStaticUrl)
 
 	if err != nil {
 		return fmt.Errorf("invalid beast static URL provided : %s", config.BeastStaticUrl)
@@ -302,6 +317,27 @@ func (config *GitRemote) ValidateGitConfig() error {
 		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.Secret, err)
 	}
 
+	return nil
+}
+
+type PsqlConfig struct {
+	User     string `toml:"user"`
+	Password string `toml:"password"`
+	Dbname   string `toml:"dbname"`
+	Host     string `toml:"host"`
+	Port     string `toml:"port"`
+	SslMode  string `toml:"sslmode"`
+}
+
+func (config *PsqlConfig) ValidatePsqlConfig() error {
+	if config.User == "" || config.Password == "" || config.Dbname == "" || config.Host == "" || config.Port == "" {
+		log.Error("One of username, password, dbname, hostname, port is missing in the config")
+		return errors.New("psql config not valid, config parameters missing")
+	}
+	if config.SslMode == "" {
+		log.Warn("Ssl Mode not set. Disabling it.")
+		config.SslMode = "prefer"
+	}
 	return nil
 }
 

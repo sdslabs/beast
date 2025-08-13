@@ -227,7 +227,7 @@ func submitFlagHandler(c *gin.Context) {
 		} else {
 			if challenge.Flag != flag {
 				UserChallengesEntry := database.UserChallenges{
-					CreatedAt:   time.Time{},
+					CreatedAt:   time.Now(),
 					UserID:      user.ID,
 					ChallengeID: challenge.ID,
 					Solved:      false,
@@ -288,7 +288,7 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		UserChallengesEntry := database.UserChallenges{
-			CreatedAt:   time.Time{},
+			CreatedAt:   time.Now(),
 			UserID:      user.ID,
 			ChallengeID: challenge.ID,
 			Solved:      true,

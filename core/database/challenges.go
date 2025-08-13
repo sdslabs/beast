@@ -13,7 +13,7 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	tools "github.com/sdslabs/beastv4/templates"
-	_ "gorm.io/driver/sqlite"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -62,18 +62,21 @@ type Challenge struct {
 	MaxPoints       uint   `gorm:"default:0"`
 	MinPoints       uint   `gorm:"default:0"`
 	Ports           []Port
-	Tags            []*Tag  `gorm:"many2many:tag_challenges;"`
+	Tags            []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Users           []*User `gorm:"many2many:user_challenges;"`
 	ServerDeployed  string  `gorm:"type:varchar(64)"`
 }
 
 type UserChallenges struct {
-	CreatedAt   time.Time
-	UserID      uint
+	CreatedAt time.Time
+	User      User `gorm:"foreignKey:UserID"`
+	UserID    uint
+
+	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
 	ChallengeID uint
-	Tries       uint
-	Solved      bool
-	Flag        string
+	Tries       uint   `gorm:"not null;default:0"`
+	Solved      bool   `gorm:"not null;default:false;index"`
+	Flag        string `gorm:"type:text"`
 }
 
 // The `DynamicFlags` table has the following columns
@@ -509,54 +512,52 @@ func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, er
 }
 
 func SubtractScoreFromSolvers(challengeID uint) error {
-    DBMux.Lock()
-    defer DBMux.Unlock()
+	DBMux.Lock()
+	defer DBMux.Unlock()
 
-    tx := Db.Begin()
-    if tx.Error != nil {
-        return fmt.Errorf("error while starting transaction: %v", tx.Error)
-    }
+	tx := Db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("error while starting transaction: %v", tx.Error)
+	}
 
-    var challenge Challenge
-    if err := tx.Where("id = ?", challengeID).First(&challenge).Error; err != nil {
-        tx.Rollback()
-        return fmt.Errorf("error fetching challenge: %v", err)
-    }
+	var challenge Challenge
+	if err := tx.Where("id = ?", challengeID).First(&challenge).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error fetching challenge: %v", err)
+	}
 
-    pointsToSubtract := challenge.Points
+	pointsToSubtract := challenge.Points
 
-    var solvers []UserChallenges
-    if err := tx.Where("challenge_id = ? AND solved = ?", challengeID, true).Find(&solvers).Error; err != nil {
-        tx.Rollback()
-        return fmt.Errorf("error fetching solvers: %v", err)
-    }
+	var solvers []UserChallenges
+	if err := tx.Where("challenge_id = ? AND solved = ?", challengeID, true).Find(&solvers).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error fetching solvers: %v", err)
+	}
 
-    for _, solver := range solvers {
-        if err := tx.Model(&User{}).Where("id = ?", solver.UserID).
-		UpdateColumn("score", gorm.Expr("CASE WHEN score - ? < 0 THEN 0 ELSE score - ? END", pointsToSubtract, pointsToSubtract)).Error; err != nil {
-            tx.Rollback()
-            return fmt.Errorf("error updating score for user %d: %v", solver.UserID, err)
-        }
-    }
+	for _, solver := range solvers {
+		if err := tx.Model(&User{}).Where("id = ?", solver.UserID).
+			UpdateColumn("score", gorm.Expr("CASE WHEN score - ? < 0 THEN 0 ELSE score - ? END", pointsToSubtract, pointsToSubtract)).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("error updating score for user %d: %v", solver.UserID, err)
+		}
+	}
 
-    return tx.Commit().Error
+	return tx.Commit().Error
 }
 
 func DeleteAllUserChallenges(challengeID uint) error {
-    DBMux.Lock()
-    defer DBMux.Unlock()
+	DBMux.Lock()
+	defer DBMux.Unlock()
 
-    tx := Db.Begin()
-    if tx.Error != nil {
-        return fmt.Errorf("error while starting transaction: %v", tx.Error)
-    }
+	tx := Db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("error while starting transaction: %v", tx.Error)
+	}
 
-    if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserChallenges{}).Error; err != nil {
-        tx.Rollback()
-        return fmt.Errorf("error deleting user challenge entries: %v", err)
-    }
+	if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserChallenges{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting user challenge entries: %v", err)
+	}
 
-    return tx.Commit().Error
+	return tx.Commit().Error
 }
-
-
