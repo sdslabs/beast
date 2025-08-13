@@ -59,8 +59,7 @@ func ConnectDatabase() error {
 		log.Error("Error while initializing the database.", dberr)
 		return dberr
 	}
-	log.Debug("Databse initialized")
-	return nil
+	log.Debug("Database initialized")
 }
 
 // Set up the initial bootstrapping for interacting with the
