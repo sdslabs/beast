@@ -46,6 +46,7 @@ type Challenge struct {
 	DynamicFlag     bool   `gorm:"not null;default:false"`
 	Flag            string `gorm:"type:text"`
 	Type            string `gorm:"type:varchar(64)"`
+	Difficulty      string  `gorm:"not null;default:'medium'"`
 	MaxAttemptLimit int    `gorm:"default:-1"`
 	PreReqs         string `gorm:"type:text"`
 	Sidecar         string `gorm:"type:varchar(64)"`
@@ -77,6 +78,14 @@ type UserChallenges struct {
 	Tries       uint   `gorm:"not null;default:0"`
 	Solved      bool   `gorm:"not null;default:false;index"`
 	Flag        string `gorm:"type:text"`
+}
+
+type ChallengeAttempt struct {
+	Id       uint      `json:"id"`
+	Username string    `json:"username"`
+	SolvedAt time.Time `json:"solvedAt"`
+	Flag     string    `json:"flag"`
+	Correct  bool      `json:"correct"`
 }
 
 // The `DynamicFlags` table has the following columns
@@ -129,6 +138,23 @@ func QueryAllChallenges() ([]Challenge, error) {
 	return challenges, tx.Error
 }
 
+func QueryAllChallengesMetadata() ([]Challenge, error) {
+	var challenges []Challenge
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Select("id", "name", "created_at", "points", "difficulty").
+		Preload("Tags").
+		Find(&challenges)
+
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	return challenges, tx.Error
+}
+
 // Queries all the challenges entries where the column represented by key
 // have the value in value.
 func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
@@ -140,6 +166,32 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Preload("Tags").Preload("Ports").Where(queryKey, value).Find(&challenges)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	if tx.Error != nil {
+		return challenges, tx.Error
+	}
+
+	return challenges, nil
+}
+
+// QueryChallengeEntriesMetadata returns only selected columns: Name, ID, Tags, CreatedAt, Points, Difficulty
+func QueryChallengeEntriesMetadata(key string, value string) ([]Challenge, error) {
+	queryKey := fmt.Sprintf("%s = ?", key)
+
+	var challenges []Challenge
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	// Only select the required columns, but preload Tags for tag names
+	tx := Db.Select("id", "name", "created_at", "points", "difficulty").
+		Preload("Tags").
+		Where(queryKey, value).
+		Find(&challenges)
+
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -322,6 +374,39 @@ func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	}
 
 	return users, nil
+}
+
+// Function fetches total number of solves for a challenge and
+// Did the user solve this challenge
+func GetChallengeSolveInfo(challengeID uint, userID uint) (uint16, bool, error) {
+	type result struct {
+		TotalSolves int64
+		UserSolved  bool
+	}
+	var res result
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	err := Db.Raw(`
+		SELECT 
+			COUNT(*) FILTER (WHERE uc.solved = true) AS total_solves,
+			EXISTS (
+				SELECT 1
+				FROM user_challenges uc2
+				JOIN users u2 ON u2.id = uc2.user_id
+				WHERE uc2.challenge_id = ? AND uc2.user_id = ? AND uc2.solved = true AND u2.role = 'contestant'
+			) AS user_solved
+		FROM user_challenges uc
+		JOIN users u ON u.id = uc.user_id
+		WHERE uc.challenge_id = ? AND u.role = 'contestant'
+	`, challengeID, userID, challengeID).Scan(&res).Error
+
+	if err != nil {
+		return 0, false, err
+	}
+
+	return uint16(res.TotalSolves), res.UserSolved, nil
 }
 
 func DeleteChallengeEntry(challenge *Challenge) error {
@@ -560,4 +645,25 @@ func DeleteAllUserChallenges(challengeID uint) error {
 	}
 
 	return tx.Commit().Error
+}
+
+// QueryChallAttempts queries all attempts for a given challenge ID
+func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
+	var attempts []ChallengeAttempt
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	err := Db.Table("user_challenges").
+		Select("user_challenges.id as id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct").
+		Joins("JOIN users ON users.id = user_challenges.user_id").
+		Where("user_challenges.challenge_id = ?", chall_id).
+		Order("user_challenges.created_at ASC").
+		Scan(&attempts).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return attempts, nil
 }

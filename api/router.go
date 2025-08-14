@@ -36,8 +36,8 @@ func initGinRouter() *gin.Engine {
 		authGroup.POST("/login", login)
 		authGroup.POST("/reset-password", authorize, resetPasswordHandler)
 		authGroup.POST("/send-otp", sendOTPHandler)
-		authGroup.POST("/send-otp-forget", sendOTPForForgetHandler)
 		authGroup.POST("/verify-otp", verifyOTPHandler)
+		authGroup.POST("/send-otp-forget", sendOTPForForgetHandler)
 		authGroup.POST("/verify-otp-forget", verifyOTPForForgetHandler)
 	}
 
@@ -65,6 +65,7 @@ func initGinRouter() *gin.Engine {
 			manageGroup.POST("/schedule/:action", manageScheduledAction)
 			manageGroup.POST("/challenge/upload", manageUploadHandler)
 			manageGroup.POST("/challenge/validateflag", validateFlagHandler)
+			manageGroup.GET("/logs", challengeLogsHandler)
 		}
 
 		// Status route group
@@ -79,10 +80,9 @@ func initGinRouter() *gin.Engine {
 		infoGroup := apiGroup.Group("/info")
 		{
 			infoGroup.GET("/challenge/:name", challengeInfoHandler)
-			infoGroup.GET("/challenges", challengesInfoHandler)
-			infoGroup.GET("/images/available", availableImagesHandler)
-			infoGroup.GET("/ports/used", usedPortsInfoHandler)
-			infoGroup.GET("/logs", challengeLogsHandler)
+			infoGroup.GET("/challenges", challengesMetadataHandler)
+			// infoGroup.GET("/images/available", availableImagesHandler)
+			// infoGroup.GET("/ports/used", usedPortsInfoHandler)
 			infoGroup.GET("/user/:username", userInfoHandler)
 			infoGroup.GET("/users", getAllUsersInfoHandler)
 			infoGroup.GET("/leaderboard", leaderboardHandler)
@@ -127,6 +127,8 @@ func initGinRouter() *gin.Engine {
 			adminPanelGroup.GET("/leaderboard", adminLeaderboardHandler)
 			adminPanelGroup.POST("/freezeLeaderboard", freezeLeaderboardHandler)
 			adminPanelGroup.POST("/unfreezeLeaderboard", unfreezeLeaderboardHandler)
+			adminPanelGroup.GET("/challenges/:challenge_id/attempts", getChallengeAttempts)
+
 		}
 	}
 

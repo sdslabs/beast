@@ -8,7 +8,7 @@ name = "xinetd-service"
 flag = "CTF{not_the_flag}"
 type = "service"
 points = 500
-max_attempt_limit=10
+maxAttemptLimit = 10
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
@@ -19,7 +19,6 @@ text = "simple_hint_2"
 points = 20
 
 preReqs = ["simple", "web-php"]
-
 
 
 [challenge.env]
