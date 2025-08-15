@@ -25,6 +25,8 @@ var (
 	leaderboardStale      = true
 	adminLeaderboardCache []UserResp
 	adminLeaderboardStale = true
+	graphCache []database.UserLeaderboardResp
+	graphCacheStale = true
 )
 
 // Returns port in use by beast.
@@ -992,7 +994,7 @@ func getUserCountHandler(c *gin.Context) {
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/leaderboard [get]
-func leaderboardHandler(c *gin.Context) {
+func getLeaderboardHandler(c *gin.Context) {
 	pageStr := c.Query("page")
 	log.Print(pageStr)
 	if pageStr == "" {
@@ -1229,6 +1231,7 @@ func freezeLeaderboardHandler(c *gin.Context) {
 		})
 	}
 	leaderboardStale = true
+	graphCacheStale = true
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User leaderboard frozen successfully",
 	})
@@ -1254,6 +1257,7 @@ func unfreezeLeaderboardHandler(c *gin.Context) {
 		})
 	}
 	leaderboardStale = true
+	graphCacheStale = true
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User leaderboard unfrozen successfully",
 	})
@@ -1303,4 +1307,36 @@ func getChallengeAttempts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func getLeaderboardGraphHandler(c *gin.Context) {
+	var topUsers []uint
+	// TODO: Add a check for leaderboard stale to prevent stale graphs
+	// Try if graphCache and leaderboardCache can be merged. 
+	// Right now graph cache gets invalidated whenver leaderboardCache gets invalidated even if no user under top 10 are changed. Fix later. 
+	if leaderboardStale {
+		users, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
+		if err == nil {
+			for i := 0; i < 10 && i < len(users); i++ {
+				user := users[i]
+				topUsers = append(topUsers, user.ID)
+			}
+		}
+		} else {
+			for i := 0; i < 10 && i < len(leaderboardCache); i++ {
+				user := leaderboardCache[i]
+				topUsers = append(topUsers, user.Id)
+			}
+		}
+	// If leaderboard is frozen then directly send the last graph instance without updating
+	isLeaderboardFrozen, _ := database.IsFrozenScoreSet()
+	if !graphCacheStale || isLeaderboardFrozen   {
+		c.JSON(http.StatusOK, graphCache)
+	} else {
+		// TODO: Add a fallback for frozen leaderboard as graphcache is in memory and not persistent. SO, might get lost if server got down in between.  
+		graphCache = database.QueryTimeSeriesForTopUsers(topUsers)
+		graphCacheStale = false
+		c.JSON(http.StatusOK, graphCache)
+	}
+	
 }

@@ -39,11 +39,6 @@ type ChallengeStatusResp struct {
 	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }
 
-type ChallengesResp struct {
-	Message    string
-	Challenges []string
-}
-
 type LogsInfoResp struct {
 	Stdout string `json:"stdout" example:"[INFO] Challenge is starting to deploy"`
 	Stderr string `json:"stderr" example:"[ERROR] Challenge deployment failed."`
@@ -139,8 +134,8 @@ type Challenge struct {
 // ChallengeDetails is an extended struct for admin use, containing additional fields.
 type AdminChallenge struct {
 	Challenge
-	DynamicFlag    bool   `json:"dynamicFlag" example:"true"`
-	Flag           string `json:"flag"`
+	DynamicFlag bool   `json:"dynamicFlag" example:"true"`
+	Flag        string `json:"flag"`
 }
 
 type ChallengePreviewResp struct {
