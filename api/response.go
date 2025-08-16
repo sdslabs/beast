@@ -39,11 +39,6 @@ type ChallengeStatusResp struct {
 	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
 }
 
-type ChallengesResp struct {
-	Message    string
-	Challenges []string
-}
-
 type LogsInfoResp struct {
 	Stdout string `json:"stdout" example:"[INFO] Challenge is starting to deploy"`
 	Stderr string `json:"stderr" example:"[ERROR] Challenge deployment failed."`
@@ -93,9 +88,11 @@ type ChallengeSolveResp struct {
 }
 
 type UserSolveResp struct {
-	UserID   uint      `json:"id" example:"5"`
+	Id       uint      `json:"id" example:"5"`
 	Username string    `json:"username" example:"fristonio"`
 	SolvedAt time.Time `json:"solvedAt"`
+	Flag     string    `json:"flag" example:"flag{example_flag}"`
+	Correct  bool      `json:"correct" example:"true"`
 }
 
 type HintInfo struct {
@@ -108,27 +105,37 @@ type HintResponse struct {
 	Points      uint   `json:"points" example:"10"`
 }
 
-type ChallengeInfoResp struct {
-	Name            string          `json:"name" example:"Web Challenge"`
-	ChallId         uint            `json:"id" example:"0"`
-	Category        string          `json:"category" example:"bare"`
-	Tags            []string        `json:"tags" example:"['pwn','misc']"`
-	Assets          []string        `json:"assets" example:"['image1.png', 'zippy.zip']"`
-	AdditionalLinks []string        `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
-	CreatedAt       time.Time       `json:"createdAt"`
-	Status          string          `json:"status" example:"deployed"`
-	MaxAttemptLimit int             `json:"maxAttemptLimit" example:"5"`
-	PreReqs         []string        `json:"preReqs" example:"['web-php','simple']"`
-	Ports           []uint32        `json:"ports" example:"[3001, 3002]"`
-	Hints           []HintInfo      `json:"hints"`
-	Desc            string          `json:"description" example:"A simple web challenge"`
-	Points          uint            `json:"points" example:"50"`
-	SolvesNumber    int             `json:"solvesNumber" example:"100"`
-	Solves          []UserSolveResp `json:"solves"`
-	PreviousTries   int             `json:"previous_tries" example:"3"`
-	DynamicFlag     bool            `json:"dynamicFlag" example:"true"`
-	Flag            string          `json:"flag"`
-	DeployedLink    string          `json:"deployedLink" example:"beast.sdslabs.co"`
+type ChallengeMetadata struct {
+	ChallId        uint      `json:"id" example:"0"`
+	Name           string    `json:"name" example:"Web Challenge"`
+	Tags           []string  `json:"tags" example:"['pwn','misc']"`
+	Points         uint      `json:"points" example:"50"`
+	Difficulty     string    `json:"difficulty" example:"easy"` // e.g., "easy", "medium", "hard"
+	SolvesNumber   uint16    `json:"solvesNumber" example:"100"`
+	SolveStatus    bool      `json:"solveStatus" example:"True"` // e.g., True: "solved", False: "unsolved"
+	CreatedAt      time.Time `json:"createdAt"`
+	DeployedStatus string    `json:"deployedStatus" example:"deployed"`
+	PreRequisite   []string  `json:"preRequisite" example:"['chall1', chall2]"`
+}
+
+type Challenge struct {
+	ChallengeMetadata
+
+	Description     string     `json:"description" example:"A simple web challenge"`
+	Hints           []HintInfo `json:"hints"`
+	Category        string     `json:"category" example:"web"`
+	Assets          []string   `json:"assets" example:"['image1.png', 'zippy.zip']"`
+	AdditionalLinks []string   `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
+	PreviousTries   int        `json:"previousTries" example:"3"`
+	MaxAttemptLimit int        `json:"maxAttemptLimit" example:"5"`
+	DeployedLink    string     `json:"deployedLink" example:"beast.sdslabs.co or ip:port"`
+}
+
+// ChallengeDetails is an extended struct for admin use, containing additional fields.
+type AdminChallenge struct {
+	Challenge
+	DynamicFlag bool   `json:"dynamicFlag" example:"true"`
+	Flag        string `json:"flag"`
 }
 
 type ChallengePreviewResp struct {
@@ -138,7 +145,7 @@ type ChallengePreviewResp struct {
 	Assets          []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
 	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
 	MaxAttemptLimit int      `json:"maxAttemptLimit" example:"5"`
-	PreReqs         []string `json:"preReqs" example:"['web-php','simple']"`
+	PreReqs         []string `json:"preRequisite" example:"['web-php','simple']"`
 	Ports           []uint32 `json:"ports" example:"[3001, 3002]"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`

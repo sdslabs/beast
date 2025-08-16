@@ -140,14 +140,15 @@ type ChallengeMetadata struct {
 		Text   string `toml:"text"`
 		Points uint   `toml:"points"`
 	} `toml:"hints"`
-	MaxAttemptLimit int      `toml:"max_attempt_limit"`
+	MaxAttemptLimit int      `toml:"maxAttemptLimit"`
 	PreReqs         []string `toml:"preReqs"`
-	DynamicFlag     bool     `toml:"dynamic_flag"`
+	DynamicFlag     bool     `toml:"dynamicFlag"`
 	Points          uint     `toml:"points"`
 	MaxPoints       uint     `toml:"maxPoints"`
 	MinPoints       uint     `toml:"minPoints"`
 	Assets          []string `toml:"assets"`
 	AdditionalLinks []string `toml:"additionalLinks"`
+	Difficulty      string   `toml:"difficulty"`
 }
 
 // In this validation returned boolean value represents if the challenge type is
@@ -430,7 +431,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	// Run command is only a required value in case of bare challenge types.
-	if config.RunCmd == "" && config.Entrypoint == "" && config.DockerCtx=="" && challType == core.BARE_CHALLENGE_TYPE_NAME {
+	if config.RunCmd == "" && config.Entrypoint == "" && config.DockerCtx == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
 		return fmt.Errorf("a valid run_cmd should be provided for the challenge environment")
 	}
 

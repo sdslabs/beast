@@ -50,6 +50,27 @@ func QueryRelatedChallenges(tag *Tag) ([]Challenge, error) {
 	return challenges, nil
 }
 
+// Query Related Challenges Metadata
+func QueryRelatedChallengesMetadata(tag *Tag) ([]Challenge, error) {
+	var challenges []Challenge
+	var tagName Tag
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
+
+	if err := Db.Model(&tagName).
+		Select("id", "name", "created_at", "points", "difficulty").
+		Preload("Tags").
+		Association("Challenges").
+		Find(&challenges); err != nil {
+		return challenges, err
+	}
+
+	return challenges, nil
+}
+
 // Query using map
 func QueryTags(whereMap map[string]interface{}) ([]*Tag, error) {
 	var tags []*Tag

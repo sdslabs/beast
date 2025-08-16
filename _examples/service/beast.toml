@@ -8,7 +8,7 @@ name = "service"
 flag = "CTF{sample_flag}"
 type = "service"
 points = 100
-max_attempt_limit=10
+maxAttemptLimit = 10
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"

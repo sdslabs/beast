@@ -493,6 +493,10 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
 			availableServerHostname = availableServer.Host
 		}
+		if config.Challenge.Metadata.Difficulty == "" {
+			log.Debug("Setting difficulty to default(medium)")
+			config.Challenge.Metadata.Difficulty = "medium"
+		}
 		*challEntry = database.Challenge{
 			Name:            config.Challenge.Metadata.Name,
 			AuthorID:        userEntry.ID,
@@ -512,6 +516,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			Points:          config.Challenge.Metadata.Points,
 			MinPoints:       config.Challenge.Metadata.MinPoints,
 			MaxPoints:       config.Challenge.Metadata.MaxPoints,
+			Difficulty:      config.Challenge.Metadata.Difficulty,
 			ServerDeployed:  availableServerHostname,
 		}
 

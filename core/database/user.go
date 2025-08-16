@@ -414,3 +414,17 @@ func GetUserCount() (int64, error) {
 	}
 	return count, tx.Error
 }
+
+func QueryAllUniqueTags() ([]string, error) {
+	var tags []string
+	DBMux.Lock()
+	defer DBMux.Unlock()
+	
+	tx := Db.Model(&Challenge{}).Distinct().Pluck("tag", &tags)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	return tags, nil
+}
+
+

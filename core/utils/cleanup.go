@@ -28,6 +28,7 @@ func Cleanup() {
 	// - Clean up temporary files
 	// - Close network connections
 	// - Stop background goroutines
+	// - Store leaderboard cache and graph cache if leaderboard is frozen and competition not ended. and make sure to fill it abck on restart.
 
 	// Backup the database to ensure no data loss
 	err := database.BackupDatabase()
