@@ -25,8 +25,8 @@ var (
 	leaderboardStale      = true
 	adminLeaderboardCache []UserResp
 	adminLeaderboardStale = true
-	graphCache []database.UserLeaderboardResp
-	graphCacheStale = true
+	graphCache            []database.UserLeaderboardResp
+	graphCacheStale       = true
 )
 
 // Returns port in use by beast.
@@ -186,7 +186,6 @@ func challengeInfoHandler(c *gin.Context) {
 		return
 	}
 
-	// Get user ID from token
 	authHeader := c.GetHeader("Authorization")
 	username, err := coreUtils.GetUser(authHeader)
 	if err != nil {
@@ -204,34 +203,8 @@ func challengeInfoHandler(c *gin.Context) {
 		return
 	}
 
-	if len(challenges) > 0 || challenges[0].Status == "Undeployed" {
+	if len(challenges) > 0 && challenges[0].Status != "Undeployed" {
 		challenge := challenges[0]
-		// users, err := database.GetRelatedUsers(&challenge)
-		// if err != nil {
-		// 	log.Error(err)
-		// 	c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-		// 		Error: "DATABASE ERROR while processing the request.",
-		// 	})
-		// 	return
-		// }
-
-		// var challSolves int
-		// solveStatus := false
-		// challengeUser := make([]UserSolveResp, 0)
-		// for _, usr := range users {
-		// 	if usr.Role == core.USER_ROLES["contestant"] {
-		// 		userResp := UserSolveResp{
-		// 			UserID:   usr.ID,
-		// 			Username: usr.Username,
-		// 			SolvedAt: usr.CreatedAt,
-		// 		}
-		// 		if usr.ID == user.ID {
-		// 			solveStatus = true
-		// 		}
-		// 		challengeUser = append(challengeUser, userResp)
-		// 		challSolves++
-		// 	}
-		// }
 		totalSolves, solveStatus, err := database.GetChallengeSolveInfo(challenge.ID, user.ID)
 		if err != nil {
 			log.Error(err)
@@ -262,7 +235,6 @@ func challengeInfoHandler(c *gin.Context) {
 			}
 		}
 
-		// Get previous tries for the current user and challenge
 		previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
 		if err != nil {
 			log.Error(err)
@@ -404,7 +376,6 @@ func challengesMetadataHandler(c *gin.Context) {
 		availableChallenges := make([]ChallengeMetadata, len(challenges))
 
 		authHeader := c.GetHeader("Authorization")
-		// Get user ID from token
 		username, err := coreUtils.GetUser(authHeader)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
@@ -490,7 +461,7 @@ func challengeLogsHandler(c *gin.Context) {
 	chall := c.Query("challenge")
 	if chall == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Challenge name cannot be empty"),
+			Message: fmt.Sprint("challenge name cannot be empty"),
 		})
 		return
 	}
@@ -1293,27 +1264,24 @@ func getChallengeAttempts(c *gin.Context) {
 		})
 		return
 	}
-	var NewUserSolveResp UserSolveResp
 	resp := make([]UserSolveResp, 0, len(attempts))
 	for _, attempt := range attempts {
-		NewUserSolveResp = UserSolveResp{
+		resp = append(resp, UserSolveResp{
 			Id:       attempt.Id,
 			Username: attempt.Username,
 			SolvedAt: attempt.SolvedAt,
 			Flag:     attempt.Flag,
 			Correct:  attempt.Correct,
-		}
-		resp = append(resp, NewUserSolveResp)
+		})
 	}
-
 	c.JSON(http.StatusOK, resp)
 }
 
 func getLeaderboardGraphHandler(c *gin.Context) {
 	var topUsers []uint
 	// TODO: Add a check for leaderboard stale to prevent stale graphs
-	// Try if graphCache and leaderboardCache can be merged. 
-	// Right now graph cache gets invalidated whenver leaderboardCache gets invalidated even if no user under top 10 are changed. Fix later. 
+	// Try if graphCache and leaderboardCache can be merged.
+	// Right now graph cache gets invalidated whenver leaderboardCache gets invalidated even if no user under top 10 are changed. Fix later.
 	if leaderboardStale {
 		users, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
 		if err == nil {
@@ -1322,21 +1290,21 @@ func getLeaderboardGraphHandler(c *gin.Context) {
 				topUsers = append(topUsers, user.ID)
 			}
 		}
-		} else {
-			for i := 0; i < 10 && i < len(leaderboardCache); i++ {
-				user := leaderboardCache[i]
-				topUsers = append(topUsers, user.Id)
-			}
+	} else {
+		for i := 0; i < 10 && i < len(leaderboardCache); i++ {
+			user := leaderboardCache[i]
+			topUsers = append(topUsers, user.Id)
 		}
+	}
 	// If leaderboard is frozen then directly send the last graph instance without updating
 	isLeaderboardFrozen, _ := database.IsFrozenScoreSet()
-	if !graphCacheStale || isLeaderboardFrozen   {
+	if !graphCacheStale || isLeaderboardFrozen {
 		c.JSON(http.StatusOK, graphCache)
 	} else {
-		// TODO: Add a fallback for frozen leaderboard as graphcache is in memory and not persistent. SO, might get lost if server got down in between.  
+		// TODO: Add a fallback for frozen leaderboard as graphcache is in memory and not persistent. SO, might get lost if server got down in between.
 		graphCache = database.QueryTimeSeriesForTopUsers(topUsers)
 		graphCacheStale = false
 		c.JSON(http.StatusOK, graphCache)
 	}
-	
+
 }

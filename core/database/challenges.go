@@ -10,11 +10,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
 	"github.com/araddon/dateparse"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
+	log "github.com/sirupsen/logrus"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -102,6 +104,7 @@ type TimeSeries struct {
 }
 
 type TimeAggBucket int
+
 const (
 	LessThan10Min TimeAggBucket = iota
 	Between10And100Min
@@ -135,7 +138,7 @@ func CreateChallengeEntry(challenge *Challenge) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("error while starting transaction %e", tx.Error)
+		return fmt.Errorf("error while starting transaction %w", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(challenge, *challenge).Error; err != nil {
@@ -700,14 +703,16 @@ func timeElapsed() TimeAggBucket {
 	// e.g. "16:31:23 UTC: +05:30, 03 February 2025"
 	parts := strings.Split(startStr, ",")
 	if len(parts) < 2 {
-		panic("Invalid StartingTime format")
+		log.Errorf("invalid StartingTime format: %s", startStr)
+		return Between1MonthAnd1Year
 	}
 	startTimePart := strings.TrimSpace(parts[0])
 	startDatePart := strings.TrimSpace(parts[1])
 	startParseStr := startTimePart + ", " + startDatePart
 	start, err := dateparse.ParseLocal(startParseStr)
 	if err != nil {
-		panic("Failed to parse StartingTime: " + err.Error())
+		log.Errorf("failed to parse StartingTime: %v", err)
+		return Between1MonthAnd1Year
 	}
 	end := time.Now()
 	diff := end.Sub(start)
@@ -773,13 +778,12 @@ func aggregateTimeSeries(ts []TimeSeries, bucket TimeAggBucket) []TimeSeries {
 			lastAdded = point.Timestamp
 		}
 	}
-	
+
 	if len(agg) == 0 || !agg[len(agg)-1].Timestamp.Equal(ts[len(ts)-1].Timestamp) {
 		agg = append(agg, ts[len(ts)-1])
 	}
 	return agg
 }
-
 
 /*
 QueryTimeSeriesForTopUsers returns a slice of UserLeaderboardResp for the given list of user IDs,
@@ -788,13 +792,13 @@ containing each user's cumulative score time series data.
 Time Buckets:
 - The function uses time buckets to aggregate time series data for each user, reducing the number of data points for visualization.
 - The time buckets are determined by the timeElapsed() function, which calculates the elapsed time since the competition started and selects a bucket:
-    - LessThan10Min: No aggregation, all points shown.
-    - Between10And100Min: 10-minute intervals.
-    - Between100MinAnd12Hr: 1-hour intervals.
-    - Between12HrAnd24Hr: 2-hour intervals.
-    - Between1DayAnd1Month: 3-day intervals.
-    - Between1MonthAnd1Year: 1-month intervals.
-    - MoreThan1Year: 1-year intervals.
+  - LessThan10Min: No aggregation, all points shown.
+  - Between10And100Min: 10-minute intervals.
+  - Between100MinAnd12Hr: 1-hour intervals.
+  - Between12HrAnd24Hr: 2-hour intervals.
+  - Between1DayAnd1Month: 3-day intervals.
+  - Between1MonthAnd1Year: 1-month intervals.
+  - MoreThan1Year: 1-year intervals.
 
 This approach ensures that the returned time series is concise and suitable for plotting, while still reflecting the user's progress over time.
 */
