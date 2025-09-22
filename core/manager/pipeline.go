@@ -243,16 +243,17 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 	log.Infof("Image build for `%s` done", challengeName)
 
-	if config.Challenge.Metadata.Sidecar != "" {
-		// Need to configure the sidecar container, so we can use the configuration
-		// during deployment. We don't want sidecar configuration to change each time we
-		// make a deployment, so we are doing it in commit phase, so unless the challenge is purged
-		// we can use the same sidecar configuration.
-		err = configureSidecar(&config)
-		if err != nil {
-			return err
-		}
-	}
+	// TODO: remove sidecars completely
+	// if config.Challenge.Metadata.Sidecar != "" {
+	// 	// Need to configure the sidecar container, so we can use the configuration
+	// 	// during deployment. We don't want sidecar configuration to change each time we
+	// 	// make a deployment, so we are doing it in commit phase, so unless the challenge is purged
+	// 	// we can use the same sidecar configuration.
+	// 	err = configureSidecar(&config)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }
@@ -317,11 +318,16 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 	var containerEnv []string
 	var containerNetwork string
-	if config.Challenge.Metadata.Sidecar != "" {
-		env := getSidecarEnv(&config)
-		containerEnv = append(containerEnv, env...)
-		containerNetwork = getSidecarNetwork(config.Challenge.Metadata.Sidecar)
-	}
+	// TODO: remove sidecars completely
+	// if config.Challenge.Metadata.Sidecar != "" {
+	// 	// We need to configure the sidecar for the challenge container.
+	// 	// Push the environment variables to the container and link to the sidecar.
+	// 	env := getSidecarEnv(&config)
+	// 	containerEnv = append(containerEnv, env...)
+
+	// 	containerNetwork = getSidecarNetwork(config.Challenge.Metadata.Sidecar)
+	// }
+
 	for _, env := range config.Challenge.Env.EnvironmentVars {
 		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)))
 	}

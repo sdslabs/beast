@@ -11,9 +11,10 @@ scripts_dir = "$HOME/.beast/scripts"
 # Base OS image that beast allows the challenges to use.
 allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
 
+# DEPRECATED
 # The sidecar that we support with beast, currently we only support two MySQL and
 # MongoDB.
-available_sidecars = ["mysql", "mongodb"]
+# available_sidecars = ["mysql", "mongodb"]
 
 # For authentication purposes beast uses JWT based authentication, this is the
 # key used for encrypting the claims of a user. Keep this strong.

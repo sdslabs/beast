@@ -51,9 +51,9 @@ fi
 
 GOBIN=$PWD go "${GO_CMD}" -o "${GOPATH}/bin/beast" ${GO_FLAGS} -ldflags "${ldflags}" "${main_package}"
 
-echo ">>> Build beast sidecar agents..."
-GOBIN=$PWD go "${GO_CMD}" -o "${CWD}/extras/sidecars/mysql/beast_agent" ${GO_FLAGS} "${mysql_agent}"
-GOBIN=$PWD go "${GO_CMD}" -o "${CWD}/extras/sidecars/mongo/beast_agent" ${GO_FLAGS} "${mongo_agent}"
+# echo ">>> Build beast sidecar agents..."
+# GOBIN=$PWD go "${GO_CMD}" -o "${CWD}/extras/sidecars/mysql/beast_agent" ${GO_FLAGS} "${mysql_agent}"
+# GOBIN=$PWD go "${GO_CMD}" -o "${CWD}/extras/sidecars/mongo/beast_agent" ${GO_FLAGS} "${mongo_agent}"
 
 echo "[*] Build Complete."
 exit 0

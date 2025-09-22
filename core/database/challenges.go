@@ -53,7 +53,7 @@ type Challenge struct {
 	Difficulty      string `gorm:"not null;default:'medium'"`
 	MaxAttemptLimit int    `gorm:"default:-1"`
 	PreReqs         string `gorm:"type:text"`
-	Sidecar         string `gorm:"type:varchar(64)"`
+	// Sidecar         string `gorm:"type:varchar(64)"` TODO: remove sidecars completely
 	Assets          string `gorm:"type:text"`
 	AdditionalLinks string `gorm:"type:text"`
 	Description     string `gorm:"type:text"`

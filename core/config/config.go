@@ -118,7 +118,7 @@ type BeastConfig struct {
 	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
 	BeastScriptsDir      string                     `toml:"scripts_dir"`
 	AllowedBaseImages    []string                   `toml:"allowed_base_images"`
-	AvailableSidecars    []string                   `toml:"available_sidecars"`
+	// AvailableSidecars    []string                   `toml:"available_sidecars"`
 	AvailableServers     map[string]AvailableServer `toml:"available_servers"`
 	GitRemotes           []GitRemote                `toml:"remote"`
 	PsqlConf             PsqlConfig                 `toml:"psql_config"`
