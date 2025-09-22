@@ -1,4 +1,4 @@
-# Sidecars
+# Sidecars [DEPRECATED]
 
 Sidecar container in beast are the container that provide additional functionality to existing challenge containers. For a challenge you can specify one or more sidecar containers, which your container can then access with the variables injected in container Environment Variables. As a example let's take MySQL sidecar for web challenges as an instance.
 

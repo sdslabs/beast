@@ -46,7 +46,7 @@ If you're looking for the source code of playCTF, the frontend powered by Beast,
 - An optional automated health check service to periodically check the status of challenges and report if there is some sort of problem with one.
 - Single source of truth for all the static content related to all the challenges making it easy to debug, monitor and manage
   static content through a single interface.
-- Use of sidecar mechanism for stateful workloads which can be shared by multiple challenges at once, MySQL for example.
+- **[DEPRECATED]** Use of sidecar mechanism for stateful workloads which can be shared by multiple challenges at once, MySQL for example.
 - Support for various notification channels like slack, discord.
 - Everything embedded to a single go binary which can be easily used anywhere.
 

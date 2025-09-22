@@ -180,7 +180,7 @@ The `web_root` is the base directory for the php server to locate the files.
 
 The type of challenge consist of the following format - `web:php:<PHP Version>:<cil/apache>`
 
-### PHP challenge with MySQL database
+### PHP challenge with MySQL database [DEPRECATED]
 
 For deploying a challenge with database requirement beast sidecars needs to be used.
 

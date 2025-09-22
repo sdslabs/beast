@@ -14,4 +14,4 @@ Move over to any of the below pages to know more about beast.
 * [Authentication Flow](./APIAuth.md)
 * [Challenge Configuration](./ChallConfig.md)
 * [Deployment](./Deployment.md)
-* [Sidecars](./Sidecars.md)
+* **[DEPRECATED]** [Sidecars](./Sidecars.md)

@@ -60,7 +60,7 @@ environments.
 - Single source of truth for all the static content related to all the challenges making it easy to debug, monitor and manage
   static content through a single interface.
 
-- Use of sidecar mechanism for stateful workloads which can be shared by multiple challenges at once, MySQL for example.
+~~- Use of sidecar mechanism for stateful workloads which can be shared by multiple challenges at once, MySQL for example.~~
 
 - Support for various notification channels like slack, discord.
 
