@@ -90,8 +90,8 @@ func initBeastConfig() error {
 }
 
 func checkDockerDaemon() error {
-	cmd := exec.Command("docker", "info")
-	return cmd.Run()
+	_, err := os.Stat(core.DOCKER_PID)
+	return err
 }
 
 func installAir() error {
@@ -128,11 +128,12 @@ func installAir() error {
 }
 
 func promptYesNo(promptLabel string) bool {
+	log.Println("hello there")
 	log.Println(promptLabel)
 
 	prompt := promptui.Select{
 		Label: fmt.Sprintf("%s (y/n)", promptLabel),
-		Items: []string{"y", "yes", "n", "no"},
+		Items: []string{"y", "n"},
 	}
 
 	_, result, err := prompt.Run()
@@ -141,7 +142,7 @@ func promptYesNo(promptLabel string) bool {
 		return false
 	}
 
-	return strings.HasPrefix(strings.ToLower(result), "y")
+	return result == "y"
 }
 
 func initDb() error {
@@ -202,6 +203,7 @@ func runBeastBootsteps() error {
 	}
 
 	if err := checkDockerDaemon(); err != nil {
+		log.Errorln(err.Error())
 		return errors.New("docker daemon not running... Please start docker daemon and try again... Aborting")
 	}
 
@@ -229,13 +231,14 @@ var initCmd = &cobra.Command{
 		err := runBeastBootsteps()
 
 		if err != nil {
-			fmt.Println("\u001B[92mPlease run beast server by following command:-\u001B[0m")
-			fmt.Println("******************")
-			fmt.Println("*  \u001B[5mbeast run -v\u001B[25m  *")
-			fmt.Println("******************")
+			log.Errorln(err.Error())
+			log.Errorln("beast init failed... fix above errors and try again")
 			return
 		}
 
-		log.Errorln("beast init failed... fix above errors and try again")
+		log.Infoln("\u001B[92mPlease run beast server by following command:-\u001B[0m")
+		log.Infoln("******************")
+		log.Infoln("*  \u001B[5mbeast run -v\u001B[25m  *")
+		log.Infoln("******************")
 	},
 }

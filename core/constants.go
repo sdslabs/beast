@@ -36,6 +36,7 @@ const ( //names
 	DELIMITER                   string = "::::"
 	LOCALHOST                   string = "localhost"
 	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
+	DOCKER_PID                  string = "/var/run/docker.pid"
 )
 
 const ( //paths
