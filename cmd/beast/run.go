@@ -2,9 +2,9 @@ package main
 
 import (
 	"errors"
+	"github.com/sdslabs/beastv4/core"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/sdslabs/beastv4/api"
@@ -19,14 +19,8 @@ var runCmd = &cobra.Command{
 	Long:  "Run beast API server using beast/api/server, optionally an argument can be provided to specify the port to run the server on.",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			log.WithField("error", err.Error()).Errorf("Error trying to get home directory")
-			os.Exit(1)
-		}
-
-		if _, err := os.Stat(filepath.Join(home, ".beast")); errors.Is(err, os.ErrNotExist) {
-			log.Infoln(".beast directory not found... running Beast bootsteps")
+		if _, err := os.Stat(core.BEAST_GLOBAL_DIR); errors.Is(err, os.ErrNotExist) {
+			log.Infoln(".beast directory not found... running Beast bootsteps...")
 
 			if err := runBeastBootsteps(); err != nil {
 				log.Error("Error while running Beast bootsteps.")
