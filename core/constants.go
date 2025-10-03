@@ -209,7 +209,7 @@ var USER_STATUS = map[string]string{
 }
 
 const (
-	LEADERBOARD_SIZE = 25
+	LEADERBOARD_SIZE       = 25
 	LEADERBOARD_GRAPH_SIZE = 12
 )
 
