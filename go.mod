@@ -14,6 +14,7 @@ require (
 	github.com/golang/protobuf v1.3.3
 	github.com/jinzhu/gorm v1.9.1
 	github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae
+	github.com/nmrshll/go-cp v0.0.0-20180115193924-61436d3b7cfa
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v0.0.3
