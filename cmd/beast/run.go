@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"github.com/sdslabs/beastv4/core"
 	"os"
 	"os/signal"
