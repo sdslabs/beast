@@ -40,7 +40,7 @@ const ( //names
 const ( //paths
 	BEAST_DOCKER_CHALLENGE_DIR     string = "/challenge"
 	BEAST_CHALLENGE_LOGS_DIR       string = "logs"
-	DEFAULT_AUTH_KEYS_FILE         string = ".ssh/authorized_keys"
+	DEFAULT_AUTH_KEYS_FILE         string = "authorized_keys"
 	BEAST_STAGING_DIR              string = "staging"
 	BEAST_SCRIPTS_DIR              string = "scripts"
 	BEAST_REMOTES_DIR              string = "remote"
