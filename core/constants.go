@@ -212,3 +212,9 @@ const (
 	LEADERBOARD_SIZE = 25
 	LEADERBOARD_GRAPH_SIZE = 12
 )
+
+const (
+	BEAST_DEFAULT_DB_USER     string = "beast"
+	BEAST_DEFAULT_DB_DATABASE string = "beast"
+	BEAST_DEFAULT_DB_PASSWORD string = "12345678"
+)
