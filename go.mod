@@ -13,6 +13,8 @@ require (
 	github.com/go-sql-driver/mysql v1.4.0
 	github.com/golang/protobuf v1.3.3
 	github.com/jinzhu/gorm v1.9.1
+	github.com/lib/pq v1.0.0
+	github.com/manifoldco/promptui v0.9.0
 	github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae
 	github.com/nmrshll/go-cp v0.0.0-20180115193924-61436d3b7cfa
 	github.com/olekukonko/tablewriter v0.0.5
@@ -22,6 +24,7 @@ require (
 	github.com/swaggo/swag v1.16.4
 	golang.org/x/crypto v0.29.0
 	golang.org/x/net v0.31.0
+	golang.org/x/term v0.26.0
 	google.golang.org/grpc v1.19.0
 	gopkg.in/src-d/go-git.v4 v4.7.0
 	gorm.io/driver/postgres v1.5.11
@@ -34,6 +37,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/alcortesm/tgz v0.0.0-20161220082320-9c5fe88206d7 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 // indirect
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20180901172138-1eb28afdf9b6 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
@@ -62,7 +66,6 @@ require (
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20180830205328-81db2a75821e // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
-	github.com/lib/pq v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-runewidth v0.0.10 // indirect

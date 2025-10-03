@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
+	"github.com/manifoldco/promptui"
 	"github.com/nmrshll/go-cp"
 	"github.com/sdslabs/beastv4/core"
 	log "github.com/sirupsen/logrus"
@@ -126,8 +127,28 @@ func installAir() error {
 	return cmd.Run()
 }
 
+func promptYesNo(promptLabel string) bool {
+	log.Println(promptLabel)
+
+	prompt := promptui.Select{
+		Label: fmt.Sprintf("%s (y/n)", promptLabel),
+		Items: []string{"y", "yes", "n", "no"},
+	}
+
+	_, result, err := prompt.Run()
+	if err != nil {
+		log.Errorln("prompt failed to execute, defaulting to no...")
+		return false
+	}
+
+	return strings.HasPrefix(strings.ToLower(result), "y")
+}
+
 func initDb() error {
-	log.Println("Create default beast postgres user and database (y/n)?")
+	if result := promptYesNo("Create default beast postgres user and database?"); !result {
+		log.Infoln("not setting up beast postgres user and database... please do so manually or beast will not run... continuing...")
+		return nil
+	}
 
 	log.Println("Enter postgres super user password (leave blank if none):")
 	passwordBytes, err := term.ReadPassword(syscall.Stdin)
@@ -190,6 +211,10 @@ func runBeastBootsteps() error {
 
 	if err := initDb(); err != nil {
 		return err
+	}
+
+	if result := promptYesNo("prompt creation of an administrative user?"); result {
+		return createAdminCmd.Execute()
 	}
 
 	return nil
