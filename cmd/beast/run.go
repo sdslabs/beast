@@ -19,7 +19,7 @@ var runCmd = &cobra.Command{
 	Long:  "Run beast API server using beast/api/server, optionally an argument can be provided to specify the port to run the server on.",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		if _, err := os.Stat(core.BEAST_GLOBAL_DIR); errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Stat(core.BEAST_GLOBAL_DIR); os.IsNotExist(err) {
 			log.Infoln(".beast directory not found... running Beast bootsteps...")
 
 			if err := runBeastBootsteps(); err != nil {
