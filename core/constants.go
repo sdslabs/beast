@@ -17,6 +17,7 @@ const ( //names
 	BEAST_LOCAL_SERVER          string = "BEAST_LOCAL_SERVER"
 	CHALLENGE_CONFIG_FILE_NAME  string = "beast.toml"
 	BEAST_CONFIG_FILE_NAME      string = "config.toml"
+	BEAST_EX_CONFIG_FILE_NAME   string = "example.config.toml"
 	BEAST_LOG_FILE              string = "beast.log"
 	BEAST_CHEAT_LOG_FILE        string = "cheat.log"
 	BEAST_FLAG_LOG_FILE         string = "flag.log"
