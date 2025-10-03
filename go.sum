@@ -148,6 +148,8 @@ github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae h1:XkVa4UfBLQVUW3
 github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae/go.mod h1:S/j6rsWsm/FJNLTW9ILO/SC65LKeKcr67q5zwmoGiJs=
 github.com/morikuni/aec v1.0.0 h1:nP9CBfwrvYnBRgY6qfDQkygYDmYwOilePFkwzv4dU8A=
 github.com/morikuni/aec v1.0.0/go.mod h1:BbKIizmSmc5MMPqRYbxO4ZU0S0+P200+tUnFx7PXmsc=
+github.com/nmrshll/go-cp v0.0.0-20180115193924-61436d3b7cfa h1:/SRdH7jdcIW6WBtZO1BlpI+6TxqpOiMqLZJ10Uhk0k0=
+github.com/nmrshll/go-cp v0.0.0-20180115193924-61436d3b7cfa/go.mod h1:/Uh/WFiWYXoTKVsM302U10XnogAldY7up/xErXmt1FA=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
