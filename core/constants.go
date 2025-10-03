@@ -49,6 +49,7 @@ const ( //paths
 	BEAST_ASSETS_DIR               string = "assets"
 	BEAST_LOGO_DIR                 string = "logo"
 	BEAST_EMAIL_TEMPLATE_DIR       string = "mailTemplates"
+	BEAST_SECRETS_DIR              string = "secrets"
 )
 
 const ( //chall types
