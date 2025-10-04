@@ -163,7 +163,7 @@ func initBeastConfig() error {
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Run interactive beast configuration setup",
-	Long:  "Creates the Global Beast Config file while prompting the user interactively whenever needed.",
+	Long:  "Creates the default Authorized Keys File and Global Beast Config file while prompting the user interactively whenever needed.",
 
 	Run: func(cmd *cobra.Command, args []string) {
 		err := initBeastConfig()
