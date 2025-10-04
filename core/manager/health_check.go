@@ -19,6 +19,45 @@ import (
 
 var HEALTH_CHECKER = false
 
+func RestartChallenge(chall *database.Challenge) error {
+	const maxRetries = 3;
+	success := false
+	var newContainerId string
+	var restartErr error
+
+	for i:=0; i<maxRetries; i++ {
+		log.Infof("Restart attempt %d/%d for challenge '%s'", i+1, maxRetries, chall.Name)
+		newContainerId ,restartErr = cr.RestartContainer(chall.ContainerId, chall.Name)
+		if restartErr==nil {
+			success = true
+			break
+		}
+	}
+	if (success) {
+		msg := fmt.Sprintf("Container restarted successfully! : %s",chall.Name)
+		log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+		}).Info(msg)
+
+		chall.ContainerId = newContainerId
+
+		err := database.UpdateChallenge(chall, map[string]interface{}{"container_id": newContainerId})
+		if err != nil {
+			return fmt.Errorf("CRITICAL: created new container but failed to update database: %w", err)
+		}
+
+	} else
+	 {
+		msg := fmt.Sprintf("Container restart failed! : %s",chall.Name)
+		log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+		}).Error(msg)
+	}
+
+    return nil
+    
+}
+
 // Check for static challenegs' assets to be present on staging server.
 // At the time of writing, Beast deploys assets to localhost only.
 // So it will check only on localhost
@@ -90,8 +129,8 @@ func containerProber(chall database.Challenge) error {
 		"ChallName": chall.Name,
 	}).Infof("CPU Shares Limit: %d", cpu_shares_limit)
 
-	if memory_perc > 100 {
-		err = fmt.Errorf("Memory limit exceeded for container with id %s ", chall.ContainerId)
+	if memory_perc > 1 {
+		err := fmt.Errorf("Memory limit exceeded for container with id %s ", chall.ContainerId)
 		return err
 	}
 
@@ -112,15 +151,6 @@ func ChallengesHealthProber(waitTime int) {
 	}
 
 	for _, chall := range challs {
-		// err := containerProber(chall)
-		// if err!=nil {
-		// 	msg := fmt.Sprintf("CONTAINER HEALTH CHECK %s: %s", chall.Name, err)
-		// 	log.WithFields(log.Fields{
-		// 		"ChallName": chall.Name,
-		// 	}).Error(msg)
-		// 	go notify.SendNotification(notify.Error, msg)
-		// }
-
 		if chall.Format != core.STATIC_CHALLENGE_TYPE_NAME {
 			allocatedPorts, err := database.GetAllocatedPorts(chall)
 			if err != nil {
@@ -148,7 +178,8 @@ func ChallengesHealthProber(waitTime int) {
 				}
 				err = containerProber(chall)
 				if err != nil {
-					msg := fmt.Sprintf("CONTAINER HEALTH CHECK %s: %s : %s", result, chall.Name, err)
+					go RestartChallenge(&chall)
+ 					msg := fmt.Sprintf("CONTAINER HEALTH CHECK %s: %s : %s", result, chall.Name, err)
 					log.WithFields(log.Fields{
 						"ChallName": chall.Name,
 					}).Error(msg)
@@ -162,6 +193,7 @@ func ChallengesHealthProber(waitTime int) {
 		} else {
 			err := CheckStaticChallenge(chall)
 			if err != nil {
+				go RestartChallenge(&chall)
 				msg := fmt.Sprintf("HEALTHCHECK Failure: %s : %s", chall.Name, err)
 				log.WithFields(log.Fields{
 					"ChallName": chall.Name,

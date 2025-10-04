@@ -12,7 +12,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sdslabs/beastv4/pkg/defaults"
-
+	"time"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
@@ -335,3 +335,71 @@ func GetContainerLimits(containerId string) (int64, int64, error) {
 
 	return memory_limit, cpu_shares, nil
 }
+
+func RestartContainer(containerId string, name string) (string,error) {
+	log.Infof("Attempting to restart container for challenge: %s (ID: %s)", name, containerId)
+
+	cli, err := client.NewClientWithOpts()
+    if err != nil {
+        return "", fmt.Errorf("could not create docker client: %w", err)
+    }
+
+	oldContainer, err := cli.ContainerInspect(context.Background(), containerId)
+    if err != nil {
+        return "", fmt.Errorf("could not inspect old container %s: %w", containerId, err)
+    }
+
+	err = StopAndRemoveContainer(containerId)
+	if err!=nil {
+		return "", err
+	}
+
+	mountsMap := make(map[string]string)
+    for _, m := range oldContainer.HostConfig.Mounts {
+        if m.Type == mount.TypeBind {
+            mountsMap[m.Source] = m.Target
+        }
+    }
+
+    var portMappings []PortMapping
+    for containerPort, hostBindings := range oldContainer.HostConfig.PortBindings {
+        if len(hostBindings) > 0 {
+            hostPortStr := hostBindings[0].HostPort
+            hostPort, _ := strconv.ParseUint(hostPortStr, 10, 32)
+            containerPortInt, _ := strconv.ParseUint(containerPort.Port(), 10, 32)
+            
+            portMappings = append(portMappings, PortMapping{
+                HostPort:      uint32(hostPort),
+                ContainerPort: uint32(containerPortInt),
+            })
+        }
+    }
+    
+    newName := fmt.Sprintf("%s-restarted-%d", name, time.Now().Unix())
+
+    config := &CreateContainerConfig{
+        ImageId:          oldContainer.Config.Image,
+        ContainerName:    newName,
+        ContainerEnv:     oldContainer.Config.Env,
+        ContainerNetwork: string(oldContainer.HostConfig.NetworkMode),
+        MountsMap:        mountsMap,
+        PortMapping:      portMappings,
+        Memory:           oldContainer.HostConfig.Resources.Memory,
+        CPUShares:        oldContainer.HostConfig.Resources.CPUShares,
+    }
+    if oldContainer.HostConfig.Resources.PidsLimit != nil {
+        config.PidsLimit = *oldContainer.HostConfig.Resources.PidsLimit
+    }
+
+    newContainerId, err := CreateContainerFromImage(config)
+    if err != nil {
+        return "", fmt.Errorf("failed to create new container: %w", err)
+    }
+    log.Infof("Successfully created new container %s for challenge %s", newContainerId, name)
+
+    return newContainerId, nil
+}
+
+
+
+
