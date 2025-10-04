@@ -219,3 +219,8 @@ const (
 	BEAST_DEFAULT_DB_DATABASE string = "beast"
 	BEAST_DEFAULT_DB_PASSWORD string = "12345678"
 )
+
+var NOTIFCIATION_SERVICES = []string{
+	"discord",
+	"slack",
+}
