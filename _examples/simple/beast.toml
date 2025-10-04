@@ -22,3 +22,6 @@ apt_deps = ["gcc", "socat"]
 setup_scripts = ["setup.sh"]
 run_cmd = "socat tcp-l:10005,fork,reuseaddr exec:./pwn"
 ports = [10005]
+
+[resource]
+memory_limit = 67108864

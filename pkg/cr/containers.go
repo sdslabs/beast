@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
-
+	"encoding/json"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -278,4 +278,60 @@ func CommitContainer(containerId string) (string, error) {
 	}
 
 	return commitResp.ID, nil
+}
+
+func GetContainerStats(containerId string) (int64, float64, error) {
+	ctx := context.Background()
+	var data1 types.StatsJSON
+	var data2 types.StatsJSON
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		log.Error("Failed to connect to docker sdk")
+		return 0, 0, err
+	}
+	defer cli.Close()
+
+	stats, err := cli.ContainerStats(ctx, containerId, true)
+	if err != nil {
+		log.Error("Failed to fetch container stats : ", containerId)
+		return 0, 0, err
+	}
+	defer stats.Body.Close()
+
+	json.NewDecoder(stats.Body).Decode(&data1)
+	json.NewDecoder(stats.Body).Decode(&data2)
+
+	memoryUsage := data2.MemoryStats.Usage
+
+	cpuDelta := data2.CPUStats.CPUUsage.TotalUsage - data1.CPUStats.CPUUsage.TotalUsage
+	systemDelta := data2.CPUStats.SystemUsage - data1.CPUStats.SystemUsage
+	numCPUs := float64(len(data2.CPUStats.CPUUsage.PercpuUsage))
+	cpuPercent := 0.0
+	if systemDelta > 0 && cpuDelta > 0 {
+		cpuPercent = (float64(cpuDelta) / float64(systemDelta)) * numCPUs * 100
+	}
+
+	return int64(memoryUsage), cpuPercent, nil
+
+}
+
+func GetContainerLimits(containerId string) (int64, int64, error) {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		log.Error("Failed to connect to docker sdk")
+		return 0, 0, err
+	}
+	defer cli.Close()
+
+	stats, err := cli.ContainerInspect(ctx, containerId)
+	if err != nil {
+		log.Error("Failed to fetch container stats : ", containerId)
+		return 0, 0, err
+	}
+
+	memory_limit := stats.HostConfig.Resources.Memory
+	cpu_shares := stats.HostConfig.Resources.CPUShares
+
+	return memory_limit, cpu_shares, nil
 }

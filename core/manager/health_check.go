@@ -57,6 +57,44 @@ func containerProber(chall database.Challenge) error {
 			return err
 		}
 	}
+
+	memory_usage, cpu_percent, err := cr.GetContainerStats(chall.ContainerId)
+	if err != nil {
+		err = fmt.Errorf("error while fetching container stats with id %s ", chall.ContainerId)
+		return err
+	}
+
+	memory_limit, cpu_shares_limit, err := cr.GetContainerLimits(chall.ContainerId)
+	if err != nil {
+		err = fmt.Errorf("error while fetching container limits with id %s ", chall.ContainerId)
+		return err
+	}
+	memory_perc := (float64(memory_usage) / float64(memory_limit)) * 100
+
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("Container ID: %s", chall.ContainerId)
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("Memory Usage: %.2f MB", float64(memory_usage)/1024/1024)
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("Memory Limit: %.2f MB", float64(memory_limit)/1024/1024)
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("Memory Usage Percentage: %.2f%%", memory_perc)
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("CPU Percent Usage: %.2f%%", cpu_percent)
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("CPU Shares Limit: %d", cpu_shares_limit)
+
+	if memory_perc > 100 {
+		err = fmt.Errorf("Memory limit exceeded for container with id %s ", chall.ContainerId)
+		return err
+	}
+
 	return nil
 }
 
@@ -74,6 +112,15 @@ func ChallengesHealthProber(waitTime int) {
 	}
 
 	for _, chall := range challs {
+		// err := containerProber(chall)
+		// if err!=nil {
+		// 	msg := fmt.Sprintf("CONTAINER HEALTH CHECK %s: %s", chall.Name, err)
+		// 	log.WithFields(log.Fields{
+		// 		"ChallName": chall.Name,
+		// 	}).Error(msg)
+		// 	go notify.SendNotification(notify.Error, msg)
+		// }
+
 		if chall.Format != core.STATIC_CHALLENGE_TYPE_NAME {
 			allocatedPorts, err := database.GetAllocatedPorts(chall)
 			if err != nil {
