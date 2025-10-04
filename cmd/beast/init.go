@@ -20,6 +20,13 @@ import (
 	"syscall"
 )
 
+const (
+	COLOR_GREEN string = "\u001B[92m"
+	RESET       string = "\u001B[0m"
+	BLINK_ON    string = "\u001B[5m"
+	BLINK_OFF   string = "\u001B[25m"
+)
+
 func initDirectories() error {
 	log.Infoln("Creating beast directories")
 
@@ -127,7 +134,6 @@ func installAir() error {
 }
 
 func promptYesNo(promptLabel string) bool {
-	log.Println("hello there")
 	log.Println(promptLabel)
 
 	prompt := promptui.Select{
@@ -235,9 +241,9 @@ var initCmd = &cobra.Command{
 			return
 		}
 
-		log.Infoln("\u001B[92mPlease run beast server by following command:-\u001B[0m")
+		log.Infoln(COLOR_GREEN + "Please run beast server by following command:-")
 		log.Infoln("******************")
-		log.Infoln("*  \u001B[5mbeast run -v\u001B[25m  *")
-		log.Infoln("******************")
+		log.Infoln("*  " + BLINK_ON + "beast run -v" + BLINK_OFF + "  *")
+		log.Infoln("******************" + RESET)
 	},
 }
