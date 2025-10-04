@@ -19,7 +19,7 @@ var runCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		if _, err := os.Stat(core.BEAST_GLOBAL_DIR); os.IsNotExist(err) {
-			log.Infoln(".beast directory not found... running Beast bootsteps...")
+			log.Infof("%s directory not found... running Beast bootsteps...\n", core.BEAST_GLOBAL_DIR)
 
 			if err := runBeastBootsteps(); err != nil {
 				log.Error("Error while running Beast bootsteps.")
