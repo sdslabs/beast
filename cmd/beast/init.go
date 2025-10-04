@@ -40,8 +40,7 @@ func initDirectories() error {
 		}
 	}
 
-	log.Infoln("Created .beast directory")
-
+	log.Infof("Created %s directory\n", core.BEAST_GLOBAL_DIR)
 	return nil
 }
 
