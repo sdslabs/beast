@@ -221,6 +221,6 @@ const (
 )
 
 var NOTIFCIATION_SERVICES = []string{
-	"discord",
 	"slack",
+	"discord",
 }
