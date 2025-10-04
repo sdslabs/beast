@@ -25,6 +25,8 @@ var runCmd = &cobra.Command{
 				log.Error("Error while running Beast bootsteps.")
 				os.Exit(1)
 			}
+
+			log.Infoln("beast bootsteps complete... starting beast server")
 		}
 
 		sigChan := make(chan os.Signal, 1)
