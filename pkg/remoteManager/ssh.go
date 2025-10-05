@@ -83,6 +83,7 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %s", err)
 	}
+	defer client.Close()
 	defer session.Close()
 
 	output, err := session.CombinedOutput(cmd)
