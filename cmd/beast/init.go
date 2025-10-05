@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
@@ -111,7 +111,7 @@ func initDb() error {
 
 	password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
 	dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func initDb() error {
 		return err
 	}
 
-	log.Infoln(fmt.Sprintf("Granted all privellages on database: %s to user: %s", core.BEAST_DEFAULT_DB_DATABASE, core.DEFAULT_USER_EMAIL))
+	log.Infoln(fmt.Sprintf("Granted all privellages on database: %s to user: %s", core.BEAST_DEFAULT_DB_DATABASE, core.BEAST_DEFAULT_DB_USER))
 	return nil
 }
 
@@ -219,9 +219,9 @@ var initCmd = &cobra.Command{
 			return
 		}
 
-		log.Infoln(COLOR_GREEN + "Please run beast server by following command:-")
-		log.Infoln("******************")
-		log.Infoln("*  " + BLINK_ON + "beast run -v" + BLINK_OFF + "  *")
-		log.Infoln("******************" + RESET)
+		log.Infoln(COLOR_GREEN + "Please run beast server by following command:-" + RESET)
+		log.Infoln(COLOR_GREEN + "******************" + RESET)
+		log.Infoln(COLOR_GREEN + "*  " + BLINK_ON + "beast run -v" + BLINK_OFF + "  *" + RESET)
+		log.Infoln(COLOR_GREEN + "******************" + RESET)
 	},
 }
