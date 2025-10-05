@@ -19,7 +19,7 @@ var (
 	AUTHORIZED_KEYS_FILE = filepath.Join(core.BEAST_GLOBAL_DIR, core.DEFAULT_AUTH_KEYS_FILE)
 
 	BEAST_GLOBAL_CONFIG  = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
-	BEAST_EXAMPLE_CONFIG = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_EXAMPLE_DIR, core.BEAST_EX_CONFIG_FILE_NAME)
+	BEAST_EXAMPLE_CONFIG = filepath.Join(core.BEAST_EXAMPLE_DIR, core.BEAST_EX_CONFIG_FILE_NAME)
 )
 
 func initAuthorizedKeysFile() error {
@@ -28,6 +28,8 @@ func initAuthorizedKeysFile() error {
 }
 
 func downloadExampleBeastConfig() error {
+	log.Println("Downloading example config file from GitHub...")
+
 	response, err := http.Get("https://raw.githubusercontent.com/sdslabs/beast/master/_examples/example.config.toml")
 	if err != nil {
 		return err
@@ -122,12 +124,21 @@ func tryCopyExampleConfig() error {
 	var configuration config.BeastConfig
 
 	if _, err := os.Stat(BEAST_EXAMPLE_CONFIG); os.IsNotExist(err) {
+		log.Println("No example config file found...")
+
 		if err = downloadExampleBeastConfig(); err != nil {
 			return err
 		}
 	}
 
-	if _, err := toml.Decode(BEAST_EXAMPLE_CONFIG, &configuration); err != nil {
+	log.Println("Reading example config file at", BEAST_EXAMPLE_CONFIG)
+
+	data, err := os.ReadFile(BEAST_EXAMPLE_CONFIG)
+	if err != nil {
+		return err
+	}
+
+	if _, err = toml.Decode(string(data), &configuration); err != nil {
 		return err
 	}
 
@@ -174,6 +185,6 @@ var configCmd = &cobra.Command{
 			return
 		}
 
-		log.Infoln(fmt.Sprintf("Created global beast configuration file: %s", BEAST_GLOBAL_CONFIG))
+		log.Infoln(fmt.Sprintf("Beast global config file initiliased at %s", BEAST_GLOBAL_CONFIG))
 	},
 }
