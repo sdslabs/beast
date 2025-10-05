@@ -17,7 +17,7 @@ var binaryOptions = []string{
 }
 
 func PromptString(prompt string) string {
-	log.Infoln(prompt)
+	log.Println(prompt)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
@@ -41,7 +41,7 @@ func PromptSecret(prompt string) string {
 }
 
 func PromptInt64(prompt string, defaultValue int64) int64 {
-	log.Infoln(fmt.Sprintf("%s (defaults to %v)", prompt, defaultValue))
+	log.Println(fmt.Sprintf("%s (defaults to %v)", prompt, defaultValue))
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
