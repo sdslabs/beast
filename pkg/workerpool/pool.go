@@ -53,10 +53,9 @@ func (q *Queue) Pop(ID string) {
 }
 
 func (q *Queue) startConcurrentWorker(i int, worker Worker) {
-	var newTask *Task
 	for {
 		w := <-q.TaskQueue
-		newTask = worker.PerformTask(w)
+		newTask := worker.PerformTask(w)
 
 		q.Pop(w.ID)
 
