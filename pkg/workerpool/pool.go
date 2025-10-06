@@ -2,6 +2,7 @@ package Taskerpool
 
 import (
 	"fmt"
+	"github.com/sdslabs/beastv4/core/manager"
 	"runtime"
 	"sync"
 
@@ -50,6 +51,19 @@ func (q *Queue) Pop(ID string) {
 		q.CompletionChannel <- true
 	}
 	q.Mux.Unlock()
+}
+
+func (q *Queue) Stop() {
+	ids := make([]string, len(manager.Q.InQueue))
+	i := 0
+	for id, _ := range manager.Q.InQueue {
+		ids[i] = id
+		i++
+	}
+
+	for _, id := range ids {
+		manager.Q.Pop(id)
+	}
 }
 
 func (q *Queue) startConcurrentWorker(i int, worker Worker) {
