@@ -25,3 +25,12 @@ func Init() {
 		}
 	}
 }
+
+func Stop() {
+	for {
+		_, err := ServerQueue.Pop()
+		if err == nil {
+			break
+		}
+	}
+}
