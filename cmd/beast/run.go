@@ -130,10 +130,10 @@ func cleanup() {
 	stopWorkerQueue()
 	stopRemoteManagers()
 
+	saveLeaderboardCache()
+
 	cleanUpRunningContainers()
 	cleanUpDatabaseConnections()
-
-	saveLeaderboardCache()
 
 	// - Clean up temporary files: found no files to be cleared as of now
 	// - Close network connections: all ssh connections are already closed and no new network connections as of now
