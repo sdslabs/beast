@@ -6,7 +6,6 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
-	"github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"os"
 	"os/signal"
@@ -109,16 +108,6 @@ func saveLeaderboardCache() {
 	graphFresh := database.QueryTimeSeriesForTopUsers(topUsers)
 	if err = writeJson(graphFresh, BEAST_GRAPH_CACHE); err != nil {
 		log.Errorln(fmt.Sprintf("Failed to write to leaderboard cache: %s", err.Error()))
-	}
-}
-
-func storeLoaderBoardCache() {
-	err, i := utils.CheckTime()
-
-	if err != nil {
-		log.Errorln("Error checking time for competition... saving Graph Data")
-	} else if i == 2 {
-		// save graph data
 	}
 }
 
