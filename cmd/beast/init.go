@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/BurntSushi/toml"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -88,26 +90,32 @@ func installAir() error {
 	return cmd.Run()
 }
 
-func crateBeastDbUser(db *sql.DB) error {
+func crateBeastDbUser(db *sql.DB, configuration *config.PsqlConfig) error {
 	if result := utils.PromptBinary("Create default beast postgres user?"); !result {
 		return errors.New("failed to create database")
 	}
 
-	_, err := db.Exec(fmt.Sprintf("CREATE USER %s WITH PASSWORD '%s';", core.BEAST_DEFAULT_DB_USER, core.BEAST_DEFAULT_DB_PASSWORD))
+	_, err := db.Exec(fmt.Sprintf("CREATE USER %s WITH PASSWORD '%s';", configuration.User, configuration.Password))
 	return err
 }
 
-func createBeastDatabase(db *sql.DB) error {
+func createBeastDatabase(db *sql.DB, configuration *config.PsqlConfig) error {
 	if result := utils.PromptBinary("Create default beast postgres database?"); !result {
 		return errors.New("failed to create database")
 	}
 
-	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s;", core.BEAST_DEFAULT_DB_DATABASE))
+	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s;", configuration.Dbname))
 	return err
 }
 
 func initDb() error {
 	log.Infoln("Initializing database...")
+
+	var configuration config.BeastConfig
+	_, err := toml.DecodeFile(BEAST_GLOBAL_CONFIG, &configuration)
+	if err != nil {
+		return err
+	}
 
 	password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
 	dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
@@ -118,34 +126,34 @@ func initDb() error {
 	defer db.Close()
 
 	var exists int
-	err = db.QueryRow(fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname = '%s'", core.BEAST_DEFAULT_DB_USER)).Scan(&exists)
+	err = db.QueryRow(fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname = '%s'", configuration.PsqlConf.User)).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		if err = crateBeastDbUser(db); err != nil {
+		if err = crateBeastDbUser(db, &configuration.PsqlConf); err != nil {
 			return err
 		}
 	} else if err != nil {
 		return err
 	} else {
-		log.Infoln(fmt.Sprintf("User %s already exists", core.BEAST_DEFAULT_DB_USER))
+		log.Infoln(fmt.Sprintf("User %s already exists", configuration.PsqlConf.User))
 	}
 
-	err = db.QueryRow(fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s'", core.BEAST_DEFAULT_DB_DATABASE)).Scan(&exists)
+	err = db.QueryRow(fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s'", configuration.PsqlConf.Dbname)).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		if err = createBeastDatabase(db); err != nil {
+		if err = createBeastDatabase(db, &configuration.PsqlConf); err != nil {
 			return err
 		}
 	} else if err != nil {
 		return err
 	} else {
-		log.Infoln(fmt.Sprintf("Database %s already exists", core.BEAST_DEFAULT_DB_DATABASE))
+		log.Infoln(fmt.Sprintf("Database %s already exists", configuration.PsqlConf.Dbname))
 	}
 
-	_, err = db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s;", core.BEAST_DEFAULT_DB_DATABASE, core.BEAST_DEFAULT_DB_USER))
+	_, err = db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s;", configuration.PsqlConf.Dbname, configuration.PsqlConf.User))
 	if err != nil {
 		return err
 	}
 
-	log.Infoln(fmt.Sprintf("Granted all privellages on database: %s to user: %s", core.BEAST_DEFAULT_DB_DATABASE, core.BEAST_DEFAULT_DB_USER))
+	log.Infoln(fmt.Sprintf("Granted all privellages on database: %s to user: %s", configuration.PsqlConf.Dbname, configuration.PsqlConf.User))
 	return nil
 }
 

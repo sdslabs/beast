@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 var (
@@ -112,9 +113,23 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 	}
 }
 
+func promptDatabaseDetails(configuration *config.BeastConfig) {
+	configuration.PsqlConf.User = utils.PromptString("Enter Postgres User Name (this user will be created if does not exist)")
+	configuration.PsqlConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Postgres User %s Password", configuration.PsqlConf.User))
+	configuration.PsqlConf.Host = utils.PromptString("Enter Postgres Host Name")
+	configuration.PsqlConf.Port = strconv.FormatInt(utils.PromptInt64("Enter Postgres Port", 5432), 10)
+	configuration.PsqlConf.SslMode = utils.PromptSelection("Enter Postgres SSL Mode", []string{
+		"disable",
+		"allow",
+		"prefer",
+		"require",
+	})
+}
+
 func promptBeastConfiguration(configuration *config.BeastConfig) {
 	promptServerDetails(configuration)
 	promptResourceLimits(configuration)
+	promptDatabaseDetails(configuration)
 	promptRemoteRepository(configuration)
 	promptCompetitionDetails(configuration)
 	promptNotificationWebhooks(configuration)
