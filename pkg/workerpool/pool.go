@@ -2,7 +2,6 @@ package Taskerpool
 
 import (
 	"fmt"
-	"github.com/sdslabs/beastv4/core/manager"
 	"runtime"
 	"sync"
 
@@ -54,15 +53,15 @@ func (q *Queue) Pop(ID string) {
 }
 
 func (q *Queue) Stop() {
-	ids := make([]string, len(manager.Q.InQueue))
+	ids := make([]string, len(q.InQueue))
 	i := 0
-	for id, _ := range manager.Q.InQueue {
+	for id, _ := range q.InQueue {
 		ids[i] = id
 		i++
 	}
 
 	for _, id := range ids {
-		manager.Q.Pop(id)
+		q.Pop(id)
 	}
 }
 
