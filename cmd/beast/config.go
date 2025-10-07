@@ -103,8 +103,8 @@ func promptCompetitionDetails(configuration *config.BeastConfig) {
 	var endTime time.Time
 
 	for {
-		startTime = utils.PromptDateTime("Enter Competition Start Time Text")
-		endTime = utils.PromptDateTime("Enter Competition End Time Text")
+		startTime = utils.PromptDateTime("Enter Competition Start Time")
+		endTime = utils.PromptDateTime("Enter Competition End Time")
 
 		if startTime.Before(endTime) {
 			break
@@ -132,7 +132,10 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 func promptDatabaseDetails(configuration *config.BeastConfig) {
 	configuration.PsqlConf.User = utils.PromptString("Enter Postgres User Name (this user will be created if does not exist)")
 	configuration.PsqlConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Postgres User %s Password", configuration.PsqlConf.User))
-	configuration.PsqlConf.Host = utils.PromptString("Enter Postgres Host Name")
+	configuration.PsqlConf.Host = utils.PromptString("Enter Postgres Host Name, leave empty for localhost")
+	if configuration.PsqlConf.Host == "" {
+		configuration.PsqlConf.Host = "localhost"
+	}
 	configuration.PsqlConf.Port = strconv.FormatInt(utils.PromptInt64("Enter Postgres Port", 5432), 10)
 	configuration.PsqlConf.SslMode = utils.PromptSelection("Enter Postgres SSL Mode", []string{
 		"disable",

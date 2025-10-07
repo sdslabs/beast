@@ -125,11 +125,17 @@ func PromptDateTime(prompt string) time.Time {
 		return now
 	}
 
-	parsedYear, err := strconv.Atoi(selectedYear)
+	parsedYear, _ := strconv.Atoi(selectedYear)
+
+	numDays := daysIn(selectedMonth, parsedYear)
+	days := make([]int, numDays)
+	for i := 0; i < numDays; i++ {
+		days[i] = i + 1
+	}
 
 	daySelection := promptui.Select{
 		Label: "Enter Day",
-		Items: daysIn(selectedMonth, parsedYear),
+		Items: days,
 		Size:  5,
 	}
 
