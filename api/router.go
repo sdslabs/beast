@@ -74,6 +74,7 @@ func initGinRouter() *gin.Engine {
 			statusGroup.GET("/challenge/:name", challengeStatusHandler)
 			statusGroup.GET("/all", statusHandler)
 			statusGroup.GET("/all/:filter", statusHandler)
+			statusGroup.GET("/health/:name", ChallengeHealthHandler)
 		}
 
 		// Info route group
@@ -92,6 +93,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/tags", tagHandler)
 			infoGroup.GET("/hint/:hintID", hintHandler)
 			infoGroup.POST("/hint/:hintID", hintHandler)
+			
 		}
 
 		// Notification route group

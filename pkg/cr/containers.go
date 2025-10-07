@@ -291,15 +291,25 @@ func GetContainerStats(containerId string) (int64, float64, error) {
 	}
 	defer cli.Close()
 
-	stats, err := cli.ContainerStats(ctx, containerId, true)
+	stats, err := cli.ContainerStats(ctx, containerId, false)
+	if err != nil {
+		log.Error("Failed to fetch container stats : ", containerId)
+		return 0, 0, err
+	}
+	time.Sleep(1 * time.Second)
+	stats2, err := cli.ContainerStats(ctx, containerId, false)
 	if err != nil {
 		log.Error("Failed to fetch container stats : ", containerId)
 		return 0, 0, err
 	}
 	defer stats.Body.Close()
 
-	json.NewDecoder(stats.Body).Decode(&data1)
-	json.NewDecoder(stats.Body).Decode(&data2)
+	if err := json.NewDecoder(stats.Body).Decode(&data1); err != nil {
+		return 0, 0, err
+	}
+	if err := json.NewDecoder(stats2.Body).Decode(&data2); err != nil {
+		return 0, 0, err
+	}
 
 	memoryUsage := data2.MemoryStats.Usage
 
