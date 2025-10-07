@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 var binaryOptions = []string{
@@ -62,7 +63,6 @@ func PromptInt64(prompt string, defaultValue int64) int64 {
 }
 
 func PromptSelection(prompt string, items []string) string {
-	log.Println(prompt)
 	selection := promptui.Select{
 		Label: fmt.Sprintf("%s", prompt),
 		Items: items,
@@ -78,7 +78,6 @@ func PromptSelection(prompt string, items []string) string {
 }
 
 func PromptBinary(prompt string) bool {
-	log.Println(prompt)
 	selection := promptui.Select{
 		Label: fmt.Sprintf("%s", prompt),
 		Items: binaryOptions,
@@ -91,4 +90,84 @@ func PromptBinary(prompt string) bool {
 	}
 
 	return result == "yes"
+}
+
+func PromptDateTime(prompt string) time.Time {
+	log.Println(prompt)
+
+	now := time.Now()
+	year := now.Year()
+
+	yearSelection := promptui.Select{
+		Label: "Enter Year",
+		Items: []int{
+			year,
+			year + 1,
+			year + 2,
+		},
+	}
+
+	_, selectedYear, err := yearSelection.Run()
+	if err != nil {
+		log.Errorln("Failed to read input... defaulting to now...")
+		return now
+	}
+
+	monthSelection := promptui.Select{
+		Label: "Enter Month",
+		Items: months,
+		Size:  5,
+	}
+
+	_, selectedMonth, err := monthSelection.Run()
+	if err != nil {
+		log.Errorln("Failed to read input... defaulting to now...")
+		return now
+	}
+
+	parsedYear, err := strconv.Atoi(selectedYear)
+
+	daySelection := promptui.Select{
+		Label: "Enter Day",
+		Items: daysIn(selectedMonth, parsedYear),
+		Size:  5,
+	}
+
+	_, selectedDay, err := daySelection.Run()
+	if err != nil {
+		log.Errorln("Failed to read input... defaulting to now...")
+		return now
+	}
+
+	hourSelection := promptui.Select{
+		Label: "Enter Hour",
+		Items: hours,
+		Size:  5,
+	}
+
+	_, selectedHour, err := hourSelection.Run()
+	if err != nil {
+		log.Errorln("Failed to read input... defaulting to now...")
+		return now
+	}
+
+	minuteSelection := promptui.Select{
+		Label: "Enter Minute",
+		Items: minutes,
+		Size:  5,
+	}
+
+	_, selectedMinute, err := minuteSelection.Run()
+	if err != nil {
+		log.Errorln("Failed to read input... defaulting to now...")
+		return now
+	}
+
+	timezone := PromptSelection("Select timezone", timezones)
+
+	parsedDay, _ := strconv.Atoi(selectedDay)
+	parsedHour, _ := strconv.Atoi(selectedHour)
+	parsedMinute, _ := strconv.Atoi(selectedMinute)
+
+	return getTime(parsedYear, selectedMonth, parsedDay, parsedHour, parsedMinute, timezone == timezones[0])
 }

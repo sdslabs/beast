@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 )
 
 var (
@@ -95,10 +96,25 @@ func promptCompetitionDetails(configuration *config.BeastConfig) {
 	configuration.CompetitionInfo.Name = utils.PromptString("Enter Competition Name")
 	configuration.CompetitionInfo.About = utils.PromptString("Enter Competition About Text")
 	configuration.CompetitionInfo.Prizes = utils.PromptString("Enter Competition Prizes Text")
-	configuration.CompetitionInfo.StartingTime = utils.PromptString("Enter Competition Start Time Text")
-	configuration.CompetitionInfo.EndingTime = utils.PromptString("Enter Competition End Time Text")
 	configuration.CompetitionInfo.LogoURL = utils.PromptString("Enter Competition Logo URL")
 	configuration.CompetitionInfo.DynamicScore = utils.PromptBinary("Enable Dynamic Scoring")
+
+	var startTime time.Time
+	var endTime time.Time
+
+	for {
+		startTime = utils.PromptDateTime("Enter Competition Start Time Text")
+		endTime = utils.PromptDateTime("Enter Competition End Time Text")
+
+		if startTime.Before(endTime) {
+			break
+		}
+
+		log.Errorln("Competition start time is after end time")
+	}
+
+	configuration.CompetitionInfo.StartingTime = utils.FormatTime(startTime)
+	configuration.CompetitionInfo.EndingTime = utils.FormatTime(endTime)
 }
 
 func promptNotificationWebhooks(configuration *config.BeastConfig) {
