@@ -54,7 +54,10 @@ func PromptInt64(prompt string, defaultValue int64) int64 {
 
 	temp := scanner.Text()
 	tempInt, err := strconv.ParseInt(temp, 10, 64)
-	if err != nil {
+
+	if temp == "" {
+		log.Warnln(fmt.Sprintf("Input empty.. defaulting to %v...", defaultValue))
+	} else if err != nil {
 		log.Errorln(fmt.Sprintf("Failed to read input... defaulting to %v...", defaultValue))
 		return defaultValue
 	}
