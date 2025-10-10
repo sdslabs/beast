@@ -19,45 +19,6 @@ import (
 
 var HEALTH_CHECKER = false
 
-func RestartChallenge(chall *database.Challenge) error {
-	const maxRetries = 3;
-	success := false
-	var newContainerId string
-	var restartErr error
-
-	for i:=0; i<maxRetries; i++ {
-		log.Infof("Restart attempt %d/%d for challenge '%s'", i+1, maxRetries, chall.Name)
-		newContainerId ,restartErr = cr.RestartContainer(chall.ContainerId, chall.Name)
-		if restartErr==nil {
-			success = true
-			break
-		}
-	}
-	if (success) {
-		msg := fmt.Sprintf("Container restarted successfully! : %s",chall.Name)
-		log.WithFields(log.Fields{
-		"ChallName": chall.Name,
-		}).Info(msg)
-
-		chall.ContainerId = newContainerId
-
-		err := database.UpdateChallenge(chall, map[string]interface{}{"container_id": newContainerId})
-		if err != nil {
-			return fmt.Errorf("CRITICAL: created new container but failed to update database: %w", err)
-		}
-
-	} else
-	 {
-		msg := fmt.Sprintf("Container restart failed! : %s",chall.Name)
-		log.WithFields(log.Fields{
-		"ChallName": chall.Name,
-		}).Error(msg)
-	}
-
-    return nil
-    
-}
-
 // Check for static challenegs' assets to be present on staging server.
 // At the time of writing, Beast deploys assets to localhost only.
 // So it will check only on localhost
