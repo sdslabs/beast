@@ -97,6 +97,7 @@ func initGinRouter() *gin.Engine {
 		// Notification route group
 		notificationGroup := apiGroup.Group("/notification")
 		{
+			notificationGroup.GET("/stream", streamNotificationHandler)
 			notificationGroup.GET("/available", availableNotificationHandler)
 			notificationGroup.POST("/add", adminAuthorize, addNotification)
 			notificationGroup.PUT("/update", adminAuthorize, updateNotifications)
