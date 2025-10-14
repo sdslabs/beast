@@ -840,6 +840,71 @@ func getUsersStatisticsHandler(c *gin.Context) {
 	return
 }
 
+// Handles submissions for a specific user.
+// @Summary Get all submissions for a specific user
+// @Description Get all submissions for a specific user by their ID.
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param id path int true "User ID"
+// @Success 200 {object} []SubmissionResp
+// @Failure 400 {object} HTTPErrorResp
+// @Failure 500 {object} HTTPErrorResp
+// @Router /api/info/submissions/user/{id} [get]
+func userSubmissionsHandler(c *gin.Context) {
+	userIDStr := c.Param("id")
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: "Invalid user ID"})
+		return
+	}
+
+	submissions, err := database.GetSubmissionsByUser(uint(userID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+		return
+	}
+
+	submissionsResp := make([]SubmissionResp, 0, len(submissions))
+	for _, submission := range submissions {
+		submissionUser, err := database.QueryUserById(submission.UserID)
+		if err != nil {
+			log.Warnf("Could not find user with ID %d for submission %d", submission.UserID, submission.ID)
+			continue
+		}
+
+		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
+		if err != nil || len(challenge) == 0 {
+			log.Warnf("Could not find challenge with ID %d for submission %d", submission.ChallengeID, submission.ID)
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge[0].Tags))
+		for index, tags := range challenge[0].Tags {
+			challengeTags[index] = tags.TagName
+		}
+
+		resp := SubmissionResp{
+			UserId:      submission.UserID,
+			Username:    submissionUser.Username,
+			ChallId:     submission.ChallengeID,
+			ChallName:   challenge[0].Name,
+			Category:    challenge[0].Type,
+			Tags:        challengeTags,
+			Points:      challenge[0].Points,
+			SubmittedAt: submission.CreatedAt,
+			Success:     submission.Success,
+			Flag:        submission.Flag,
+		}
+
+		submissionsResp = append(submissionsResp, resp)
+	}
+
+	c.JSON(http.StatusOK, submissionsResp)
+	return
+}
+
 // Handles submissions for a specific challenge, accessible only by admins.
 // @Summary Get all submissions for a specific challenge
 // @Description Get all submissions for a specific challenge by its name.

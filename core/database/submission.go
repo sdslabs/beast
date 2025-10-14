@@ -48,6 +48,21 @@ func GetAllSubmissions() ([]Submission, error) {
 	return submissions, nil
 }
 
+func GetSubmissionsByUser(userID uint) ([]Submission, error) {
+	var submissions []Submission
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("user_id = ?", userID).Find(&submissions)
+
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+
+	return submissions, nil
+}
+
 func GetAllCorrectSubmissions() ([]Submission, error) {
 	var submissions []Submission
 

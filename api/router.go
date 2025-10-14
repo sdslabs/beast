@@ -89,6 +89,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("leaderboard-graph", getLeaderboardGraphHandler)
 			infoGroup.GET("/usercount", getUserCountHandler)
 			infoGroup.GET("/submissions", submissionsHandler)
+			infoGroup.GET("/submissions/user/:id", adminAuthorize, userSubmissionsHandler)
 			infoGroup.GET("/submissions/challenge/:name", adminAuthorize, challengeSubmissionsHandler)
 			infoGroup.GET("/tags", tagHandler)
 			infoGroup.GET("/hint/:hintID", hintHandler)
