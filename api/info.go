@@ -727,70 +727,66 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/submissions [get]
 func submissionsHandler(c *gin.Context) {
-
-	submissions, err := database.QueryAllSubmissions()
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
 		})
 		return
 	}
-	submissionsResp := make([]SubmissionResp, 0)
 
-	for _, submission := range submissions {
-		user, err := database.QueryUserById(submission.UserID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while fetching user details.",
-			})
-			return
-		}
-
-		if user.Role == core.USER_ROLES["contestant"] {
-			challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while fetching user details.",
-				})
-			}
-			if len(challenge) == 0 {
-				continue
-			}
-
-			challengeTags := make([]string, len(challenge[0].Tags))
-
-			for index, tags := range challenge[0].Tags {
-				challengeTags[index] = tags.TagName
-			}
-
-			singleSubmissionResp := SubmissionResp{
-				UserId:    user.ID,
-				Username:  user.Username,
-				ChallId:   challenge[0].ID,
-				ChallName: challenge[0].Name,
-				Category:  challenge[0].Type,
-				Tags:      challengeTags,
-				Points:    challenge[0].Points,
-				SolvedAt:  submission.CreatedAt,
-				Flag:      submission.Flag,
-			}
-			submissionsResp = append(submissionsResp, singleSubmissionResp)
-		}
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
 	}
 
-	format := c.Query("format")
-	if format == "csv" {
-		buff, err := utils.StructToCSV(c, submissionsResp, "submissions.csv")
+	var submissions []database.Submission
 
+	if user.Role == core.USER_ROLES["admin"] {
+		submissions, err = database.GetAllSubmissions()
+	} else {
+		submissions, err = database.GetAllCorrectSubmissions()
+	}
+
+	submissionsResp := make([]SubmissionResp, 0, len(submissions))
+	for _, submission := range submissions {
+		submissionUser, err := database.QueryUserById(submission.UserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "CSV ERROR while processing the request.",
-			})
-			return
+			log.Warnf("Could not find user with ID %d for submission %d", submission.UserID, submission.ID)
+			continue
 		}
 
-		c.Data(http.StatusOK, "text/csv", buff.Bytes())
-		return
+		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
+		if err != nil || len(challenge) == 0 {
+			log.Warnf("Could not find challenge with ID %d for submission %d", submission.ChallengeID, submission.ID)
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge[0].Tags))
+		for index, tags := range challenge[0].Tags {
+			challengeTags[index] = tags.TagName
+		}
+
+		resp := SubmissionResp{
+			UserId:      submission.UserID,
+			Username:    submissionUser.Username,
+			ChallId:     submission.ChallengeID,
+			ChallName:   challenge[0].Name,
+			Category:    challenge[0].Type,
+			Tags:        challengeTags,
+			Points:      challenge[0].Points,
+			SubmittedAt: submission.CreatedAt,
+			Success:     submission.Success,
+		}
+
+		if user.Role == core.USER_ROLES["admin"] {
+			resp.Flag = submission.Flag
+		}
+
+		submissionsResp = append(submissionsResp, resp)
 	}
 
 	c.JSON(http.StatusOK, submissionsResp)

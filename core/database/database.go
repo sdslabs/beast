@@ -86,7 +86,7 @@ func Init() {
 		log.Fatalf("Cannot create related models: %s", err)
 	}
 
-	err := Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{}, &OTP{})
+	err := Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{}, &OTP{}, &Submission{})
 	if err != nil {
 		log.Fatalf("failed to migrate database with error: %s", err)
 	}

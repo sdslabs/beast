@@ -175,6 +175,12 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
+		submission := database.Submission{
+			UserID:      user.ID,
+			ChallengeID: uint(parsedChallId),
+			Flag:        flag,
+		}
+
 		// If the challenge is dynamic, then the flag is not stored in the database
 		if challenge.DynamicFlag {
 			whereMap := map[string]interface{}{
@@ -191,6 +197,8 @@ func submitFlagHandler(c *gin.Context) {
 
 			// flag not present in validFlags table
 			if len(validFlags) == 0 {
+				submission.Success = false
+				database.CreateSubmissionEntry(&submission)
 				c.JSON(http.StatusOK, FlagSubmitResp{
 					Message: "Your flag is incorrect",
 					Success: false,
@@ -240,6 +248,8 @@ func submitFlagHandler(c *gin.Context) {
 					})
 					return
 				}
+				submission.Success = false
+				database.CreateSubmissionEntry(&submission)
 				c.JSON(http.StatusOK, FlagSubmitResp{
 					Message: "Your flag is incorrect",
 					Success: false,
@@ -247,6 +257,26 @@ func submitFlagHandler(c *gin.Context) {
 				return
 			}
 		}
+
+		submission.Success = true
+		database.CreateSubmissionEntry(&submission)
+
+		solved, err = database.CheckPreviousSubmissions(user.ID, challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		if solved {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Challenge has already been solved.",
+				Success: false,
+			})
+			return
+		}
+
 		challengePoints := challenge.Points
 		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
 		if config.Cfg.CompetitionInfo.DynamicScore {
