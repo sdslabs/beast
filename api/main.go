@@ -17,6 +17,7 @@ import (
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/pkg/scheduler"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
+	"github.com/sdslabs/beastv4/plugins"
 )
 
 const (
@@ -66,7 +67,7 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 	remoteManager.Init()
 	database.Init()
-	
+
 	runBeastApiBootsteps(defaultauthorpassword)
 
 	// Initialize Gin router.
@@ -75,6 +76,9 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	// Setup gin middlewares
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+
+	// Initialize all plugins
+	plugins.InitPlugins(router)
 
 	router.GET("/api/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/", func(c *gin.Context) {
