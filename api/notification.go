@@ -1,12 +1,18 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/database"
 	log "github.com/sirupsen/logrus"
 )
+
+type ClientChan chan string
+
+var clients = make(map[ClientChan]bool)
 
 // Adds notifications
 // @Summary Adds notifications
@@ -43,6 +49,8 @@ func addNotification(c *gin.Context) {
 		})
 		return
 	}
+	data, _ := json.Marshal(notify)
+	broadcastMessage(string(data))
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "Notification successfully added",
 	})
@@ -196,4 +204,40 @@ func availableNotificationHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 	return
+}
+
+// SSE endpoint for clients to listen to notifications
+func streamNotificationHandler(c *gin.Context) {
+	clientChan := make(ClientChan)
+	clients[clientChan] = true
+	defer func() {
+		delete(clients, clientChan)
+		close(clientChan)
+	}()
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+
+	// Keep connection open and stream messages
+	for {
+		if msg, ok := <-clientChan; ok {
+			fmt.Fprintf(c.Writer, "data: %s\n\n", msg)
+			c.Writer.Flush()
+		} else {
+			break
+		}
+	}
+}
+
+// Function to Broadcast message to all connected clients
+func broadcastMessage(message string) {
+	for client := range clients {
+		select {
+		case client <- message:
+		default:
+			close(client)
+			delete(clients, client)
+		}
+	}
 }
