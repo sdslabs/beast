@@ -840,6 +840,76 @@ func getUsersStatisticsHandler(c *gin.Context) {
 	return
 }
 
+// Handles submissions for a specific challenge, accessible only by admins.
+// @Summary Get all submissions for a specific challenge
+// @Description Get all submissions for a specific challenge by its name.
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param name path string true "Challenge Name"
+// @Success 200 {object} []SubmissionResp
+// @Failure 400 {object} HTTPErrorResp
+// @Failure 404 {object} HTTPErrorResp
+// @Failure 500 {object} HTTPErrorResp
+// @Router /api/info/submissions/challenge/{name} [get]
+func challengeSubmissionsHandler(c *gin.Context) {
+	challengeName := c.Param("name")
+	if challengeName == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: "Challenge name cannot be empty"})
+		return
+	}
+
+	challenges, err := database.QueryChallengeEntries("name", challengeName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while fetching challenge."})
+		return
+	}
+	if len(challenges) == 0 {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{Error: "Challenge not found"})
+		return
+	}
+	challenge := challenges[0]
+
+	submissions, err := database.GetSubmissionsByChallenge(challenge.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+		return
+	}
+
+	submissionsResp := make([]SubmissionResp, 0, len(submissions))
+	for _, submission := range submissions {
+		submissionUser, err := database.QueryUserById(submission.UserID)
+		if err != nil {
+			log.Warnf("Could not find user with ID %d for submission %d", submission.UserID, submission.ID)
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge.Tags))
+		for index, tags := range challenge.Tags {
+			challengeTags[index] = tags.TagName
+		}
+
+		resp := SubmissionResp{
+			UserId:      submission.UserID,
+			Username:    submissionUser.Username,
+			ChallId:     submission.ChallengeID,
+			ChallName:   challenge.Name,
+			Category:    challenge.Type,
+			Tags:        challengeTags,
+			Points:      challenge.Points,
+			SubmittedAt: submission.CreatedAt,
+			Success:     submission.Success,
+			Flag:        submission.Flag,
+		}
+
+		submissionsResp = append(submissionsResp, resp)
+	}
+
+	c.JSON(http.StatusOK, submissionsResp)
+	return
+}
+
 // Returns competition information
 // @Summary returns competition info
 // @Description returns various information about the competition which are used to control competition
