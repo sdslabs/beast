@@ -47,6 +47,19 @@ func usedPortsInfoHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Get or purchase challenge hint
+// @Description Retrieve or purchase a hint for a specific challenge
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param hintID path string true "ID of the hint"
+// @Param Authorization header string true "Bearer token"
+// @Success 200 {object} HintResponse "Hint details"
+// @Failure 400 {object} HTTPPlainResp "Invalid hint ID"
+// @Failure 404 {object} HTTPPlainResp "Hint not found"
+// @Failure 403 {object} HTTPPlainResp "Insufficient points"
+// @Router /api/info/hint/{hintID} [get]
+// @Router /api/info/hint/{hintID} [post]
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
 

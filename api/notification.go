@@ -206,7 +206,14 @@ func availableNotificationHandler(c *gin.Context) {
 	return
 }
 
-// SSE endpoint for clients to listen to notifications
+// @Summary Stream real-time notifications
+// @Description Establishes a Server-Sent Events (SSE) connection for real-time notifications
+// @Tags notification
+// @Accept json
+// @Produce text/event-stream
+// @Success 200 {string} string
+// @Failure 401 {object} HTTPErrorResp
+// @Router /api/notification/stream [get]
 func streamNotificationHandler(c *gin.Context) {
 	clientChan := make(ClientChan)
 	clients[clientChan] = true
