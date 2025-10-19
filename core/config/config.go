@@ -112,7 +112,7 @@ import (
 // dbname = "beast"
 // host = "localhost"
 // port = "5432"
-// sslmode = "prefer" 
+// sslmode = "prefer"
 // ```
 type BeastConfig struct {
 	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
@@ -136,7 +136,8 @@ type BeastConfig struct {
 	PidsLimit int64 `toml:"default_pids_limit"`
 
 	// For SMTP Configuration
-	MailConfig MailConfig `toml:"mail_config"`
+	MailConfig  MailConfig        `toml:"mail_config"`
+	EmailVerify EmailVerifyConfig `toml:"emailverify"`
 }
 
 func (config *BeastConfig) ValidateConfig() error {
@@ -363,6 +364,10 @@ type MailConfig struct {
 	Password string `toml:"password"`
 	SMTPHost string `toml:"smtpHost"`
 	SMTPPort string `toml:"smtpPort"`
+}
+
+type EmailVerifyConfig struct {
+	AllowedDomains []string `toml:"allowed_domains"`
 }
 
 func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {
