@@ -164,7 +164,7 @@ func hintHandler(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer"
 // @Param name query string true "Name of challenge"
-// @Success 200 {object} api.ChallengeInfoResp
+// @Success 200 {object} api.AdminChallenge
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
@@ -290,7 +290,7 @@ func challengeInfoHandler(c *gin.Context) {
 // @Param filter query string false "Filter parameter by which challenges are filtered"
 // @Param value query string false "Value of filtered parameter"
 // @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.ChallengeInfoResp
+// @Success 200 {object} api.ChallengeMetadata
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/challenges [get]
@@ -602,7 +602,9 @@ func userInfoHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer"
-// @Param sort, order, filter
+// @Param   sort    query    string  false  "Sort field"
+// @Param   order   query    string  false  "Sort order (asc or desc)"
+// @Param   filter  query    string  false  "Filter string"
 // @Success 200 {object} api.UserResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp

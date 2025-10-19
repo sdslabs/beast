@@ -425,6 +425,7 @@ func manageScheduledAction(c *gin.Context) {
 // @Produce json
 // @Param file formData file true ".zip file to be uploaded to fetch challenge info"
 // @Success 200 {object} api.ChallengePreviewResp
+// @Example 200 {object} api.ChallengePreviewResp "Example response" {"ports": [3001, 3002]}
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/manage/challenge/upload [post]
