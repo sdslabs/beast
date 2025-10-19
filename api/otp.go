@@ -154,6 +154,16 @@ func sendEmail(email, otp string) error {
 	return nil
 }
 
+// @Summary Send OTP for email verification
+// @Description Sends a one-time password to the specified email address for verification
+// @Tags auth
+// @Accept x-www-form-urlencoded
+// @Produce json
+// @Param email formData string true "User's email address"
+// @Success 200 {object} api.HTTPPlainResp "OTP sent successfully"
+// @Success 200 {object} api.HTTPPlainResp "Email already verified"
+// @Failure 500 {object} api.HTTPErrorResp "SMTP not configured or Failed to send/store OTP"
+// @Router /auth/send-otp [post]
 func sendOTPHandler(c *gin.Context) {
 	if config.SkipAuthorization {
 		return
@@ -227,6 +237,17 @@ func sendOTPHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Verify email OTP
+// @Description Verifies the OTP sent to user's email
+// @Tags auth
+// @Accept x-www-form-urlencoded
+// @Produce json
+// @Param email formData string true "User's email address"
+// @Param otp formData string true "OTP received in email"
+// @Success 200 {object} api.HTTPPlainResp "OTP verified successfully"
+// @Failure 400 {object} api.HTTPErrorResp "Invalid or expired OTP"
+// @Failure 500 {object} api.HTTPErrorResp "SMTP not configured or verification failed"
+// @Router /auth/verify-otp [post]
 func verifyOTPHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	otp := strings.TrimSpace(c.PostForm("otp"))
@@ -302,6 +323,16 @@ func verifyOTPHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Send OTP for password reset
+// @Description Sends a one-time password to email for password reset flow
+// @Tags auth
+// @Accept x-www-form-urlencoded
+// @Produce json
+// @Param email formData string true "User's email address"
+// @Success 200 {object} HTTPPlainResp "OTP sent successfully"
+// @Failure 404 {object} HTTPErrorResp "User not found"
+// @Failure 500 {object} HTTPErrorResp "Failed to send OTP or SMTP not configured"
+// @Router /auth/send-otp-forget [post]
 func sendOTPForForgetHandler(c *gin.Context) {
 	if config.SkipAuthorization {
 		return
@@ -368,6 +399,19 @@ func sendOTPForForgetHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Verify OTP for password reset
+// @Description Verifies the OTP sent for password reset and updates the password
+// @Tags auth
+// @Accept x-www-form-urlencoded
+// @Produce json
+// @Param email formData string true "User's email address"
+// @Param otp formData string true "OTP received in email"
+// @Param new_password formData string true "New password to set"
+// @Success 200 {object} HTTPPlainResp "Password reset successful"
+// @Failure 400 {object} HTTPErrorResp "Invalid or expired OTP"
+// @Failure 404 {object} HTTPErrorResp "User not found"
+// @Failure 500 {object} HTTPErrorResp "Verification failed"
+// @Router /auth/verify-otp-forget [post]
 func verifyOTPForForgetHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	otp := strings.TrimSpace(c.PostForm("otp"))

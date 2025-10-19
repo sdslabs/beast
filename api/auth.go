@@ -236,7 +236,7 @@ func register(c *gin.Context) {
 		Email:     email,
 		SshKey:    sshKey,
 	}
-	
+
 	// skip otp verif if -n flag is enabled
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
@@ -287,6 +287,12 @@ func register(c *gin.Context) {
 // @Description Resets password for the user
 // @Tags auth
 // @Produce json
+// @Summary Resets password for the user
+// @Description Resets password for the user
+// @Tags auth
+// @Accept x-www-form-urlencoded
+// @Produce json
+// @Param Authorization header string true "Bearer token"
 // @Param new_pass formData string true "New Password"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 401 {object} api.HTTPPlainResp
