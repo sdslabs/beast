@@ -9,6 +9,7 @@ import (
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/plugins"
 )
 
 func dummyHandler(c *gin.Context) {
@@ -29,6 +30,10 @@ func initGinRouter() *gin.Engine {
 	}
 	router.Use(cors.New(corsConfig))
 	router.GET("/dummy", dummyHandler)
+
+	// Initialize all plugins
+	plugins.InitPlugins(router)
+
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
