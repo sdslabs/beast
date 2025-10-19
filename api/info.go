@@ -181,7 +181,7 @@ func hintHandler(c *gin.Context) {
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/challenge/info [get]
+// @Router /api/info/challenge/{name} [get]
 func challengeInfoHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
@@ -504,7 +504,7 @@ func challengeLogsHandler(c *gin.Context) {
 // @Success 200 {object} api.UserResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/user [get]
+// @Router /api/info/user/{username} [get]
 func userInfoHandler(c *gin.Context) {
 	userId := c.PostForm("user_id")
 	username := c.Param("username")
@@ -999,7 +999,7 @@ func challengeSubmissionsHandler(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.CompetitionInfoResp
 // @Failure 400 {object} api.HTTPErrorResp
-// @Router /api/admin/statistics [get]
+// @Router /api/info/competition-info [get]
 func competitionInfoHandler(c *gin.Context) {
 	competitionInfo, err := config.GetCompetitionInfo()
 	if err != nil {
@@ -1031,7 +1031,7 @@ func competitionInfoHandler(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.TagInfoResp
 // @Failure 400 {object} api.HTTPErrorResp
-// @Router /api/admin/statistics [get]
+// @Router /api/info/tags [get]
 func tagHandler(c *gin.Context) {
 	// Optimized: Query unique tags directly from the database
 	tags, err := database.QueryAllUniqueTags()

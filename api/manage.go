@@ -30,7 +30,7 @@ import (
 // @Param tag query string false "Tag for a group of challenges"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/multiple/:action [post]
+// @Router /api/manage/multiple/{action} [post]
 func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// If no tags are provided we by default we apply the action to all
 	// the challenges.
@@ -235,7 +235,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // @Param action query string true "Action to apply on the beast static content provider"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/static/:action [post]
+// @Router /api/manage/static/{action} [post]
 func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
 	identifier := core.BEAST_STATIC_CONTAINER_NAME
@@ -304,7 +304,7 @@ func commitChallenge(c *gin.Context) {
 // @Param challenge query string true "Name of the challenge to verify the deployment configuration for."
 // @Success 200 {object} api.HTTPPlainResp
 // @Success 200 {object} api.HTTPErrorResp
-// @Router /api/manage/commit/ [post]
+// @Router /api/manage/challenge/verify [post]
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
 	challengeRemoteDir := coreUtils.GetChallengeDir(challengeName)
@@ -341,7 +341,7 @@ func verifyHandler(c *gin.Context) {
 // @Param after query string false "Time after which the action on the selector should be executed should be of duration format as in '1m20s' etc."
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/schedule/:action [post]
+// @Router /api/manage/schedule/{action} [post]
 func manageScheduledAction(c *gin.Context) {
 	action := c.Param("action")
 	challenge := c.PostForm("challenge")

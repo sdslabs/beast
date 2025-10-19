@@ -172,7 +172,7 @@ func updateNotifications(c *gin.Context) {
 // @Produce json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/available [post]
+// @Router /api/notification/available [get]
 func availableNotificationHandler(c *gin.Context) {
 	notifications, err := database.QueryAllNotification()
 	if err != nil {

@@ -22,7 +22,7 @@ import (
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 500 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/status/challenge/:name [get]
+// @Router /api/status/challenge/{name} [get]
 func challengeStatusHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
@@ -67,7 +67,7 @@ func challengeStatusHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Success 200 {array} api.ChallengeStatusResp
-// @Router /api/status/all/:filter [get]
+// @Router /api/status/all/{filter} [get]
 func statusHandler(c *gin.Context) {
 	filter := c.Param("filter")
 
