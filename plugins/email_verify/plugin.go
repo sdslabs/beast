@@ -49,6 +49,7 @@ func (p *EmailVerifyPlugin) isAllowedEmail(email string) bool {
 	for _, allowedDomain := range p.AllowedDomains {
 		log.Debugf("Checking domain: %s against allowed domain: %s", domain, allowedDomain)
 		if domain == allowedDomain {
+			log.Infof("Email domain allowed: %s", domain)
 			return true
 		}
 	}
