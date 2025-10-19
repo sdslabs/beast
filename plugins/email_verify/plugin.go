@@ -52,6 +52,7 @@ func (p *EmailVerifyPlugin) isAllowedEmail(email string) bool {
 			return true
 		}
 	}
+	log.Warnf("Email domain not allowed: %s", domain)
 	return false
 }
 
@@ -84,7 +85,6 @@ func (p *EmailVerifyPlugin) verifyEmailRegister(c *gin.Context, checkFlag bool) 
 	}
 	if checkFlag {
 		if !p.isAllowedEmail(email) {
-			log.Warnf("Email domain not allowed: %s", email)
 			c.JSON(http.StatusForbidden, gin.H{
 				"error": "Registration restricted to organization emails only",
 			})
