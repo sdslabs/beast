@@ -40,9 +40,6 @@ func (p *EmailVerifyPlugin) Init(router *gin.Engine) error {
 	if len(cfg.EmailVerify.AllowedDomains) > 0 {
 		p.AllowedDomains = cfg.EmailVerify.AllowedDomains
 		checkFlag = true
-	} else {
-		// fallback for dev/testing
-		p.AllowedDomains = []string{"iitroorkee.ac.in"}
 	}
 	authGroup := router.Group("/auth")
 	authGroup.Use(func(c *gin.Context) {
