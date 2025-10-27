@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
@@ -23,9 +24,22 @@ func Register(p Plugin) {
 
 }
 
-func InitPlugins(router *gin.Engine) {
+func isPluginEnabled(pluginName string) bool {
+	enabledPlugins := config.Cfg.PluginsEnabled.EnabledPlugins
+	for _, name := range enabledPlugins {
+		if name == pluginName {
+			return true
+		}
+	}
+	return false
+}
 
+func InitPlugins(router *gin.Engine) {
 	for _, p := range loadedPlugins {
+		if !isPluginEnabled(p.Name()) {
+			log.Warnf("%s is not enabled, skipping initialization", p.Name())
+			continue
+		}
 		log.Infof("Intializing plugin: %s", p.Name())
 		err := p.Init(router)
 		if err != nil {

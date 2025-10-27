@@ -136,7 +136,12 @@ type BeastConfig struct {
 	PidsLimit int64 `toml:"default_pids_limit"`
 
 	// For SMTP Configuration
-	MailConfig  MailConfig        `toml:"mail_config"`
+	MailConfig MailConfig `toml:"mail_config"`
+
+	// Plugins configuration
+	PluginsEnabled PluginsConfig `toml:"plugins_config"`
+
+	// Email verification plugin configuration
 	EmailVerify EmailVerifyConfig `toml:"emailverify"`
 }
 
@@ -364,6 +369,10 @@ type MailConfig struct {
 	Password string `toml:"password"`
 	SMTPHost string `toml:"smtpHost"`
 	SMTPPort string `toml:"smtpPort"`
+}
+
+type PluginsConfig struct {
+	EnabledPlugins []string `toml:"enabled_plugins"`
 }
 
 type EmailVerifyConfig struct {
