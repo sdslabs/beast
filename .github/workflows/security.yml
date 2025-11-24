@@ -1,0 +1,565 @@
+name: Security Scan
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare artifacts directory
+        run: mkdir -p artifacts/security
+
+      - name: Extract exclude paths from config
+        id: exclude-paths
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import json
+          import os
+
+          exclude_paths = []
+
+          try:
+              if os.path.exists('security-config.yml'):
+                  with open('security-config.yml') as f:
+                      config = yaml.safe_load(f)
+                      if config and 'exclude_paths' in config:
+                          exclude_paths = config['exclude_paths'] or []
+                  print(f"Loaded exclude_paths: {exclude_paths}")
+              else:
+                  print("No security-config.yml found, no exclusions")
+          except Exception as e:
+              print(f"Error reading config: {e}")
+
+          # Build exclusion flags for different tools
+          semgrep_excludes = ' '.join([f'--exclude {p}' for p in exclude_paths])
+          gitleaks_excludes = ','.join(exclude_paths) if exclude_paths else ''
+
+          # Write to GitHub Actions output
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"semgrep_excludes={semgrep_excludes}\n")
+              f.write(f"gitleaks_excludes={gitleaks_excludes}\n")
+              f.write(f"exclude_paths={json.dumps(exclude_paths)}\n")
+          EOF
+          pip install pyyaml
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Install dependencies
+        run: go mod download
+      - name: Set up Python for Semgrep
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Semgrep (CLI JSON)
+        run: |
+          pip install semgrep
+          semgrep --config p/ci ${{ steps.exclude-paths.outputs.semgrep_excludes }} --json > artifacts/security/semgrep-report.json || true
+      - name: Create Gitleaks config with exclusions
+        if: steps.exclude-paths.outputs.gitleaks_excludes != ''
+        run: |
+          cat > .gitleaks.toml << 'EOF'
+          [allowlist]
+          paths = [
+            '''${{ steps.exclude-paths.outputs.gitleaks_excludes }}'''
+          ]
+          EOF
+          sed -i "s/'''/\"/g" .gitleaks.toml
+          sed -i 's/,/",\n    "/g' .gitleaks.toml
+          echo "Generated .gitleaks.toml:"
+          cat .gitleaks.toml
+
+      - name: Install Gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.1/gitleaks_8.18.1_linux_x64.tar.gz | tar -xz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Run Gitleaks
+        run: |
+          if [ -f .gitleaks.toml ]; then
+            gitleaks detect --report-format json --report-path artifacts/security/gitleaks-report.json --config .gitleaks.toml --exit-code 0 || true
+          else
+            gitleaks detect --report-format json --report-path artifacts/security/gitleaks-report.json --exit-code 0 || true
+          fi
+      - name: Run Trivy FS Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          format: json
+          output: artifacts/security/trivy-fs.json
+          severity: HIGH,CRITICAL
+          skip-dirs: ${{ steps.exclude-paths.outputs.gitleaks_excludes }}
+
+      - name: Check for Dockerfile
+        id: docker-check
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "has_docker=true" >> $GITHUB_OUTPUT
+            echo "✓ Dockerfile detected, will scan Docker image"
+          else
+            echo "has_docker=false" >> $GITHUB_OUTPUT
+            echo "No Dockerfile found, skipping image scan"
+          fi
+
+      - name: Build Docker image for scanning
+        if: steps.docker-check.outputs.has_docker == 'true'
+        run: |
+          # Build image with a temporary tag for scanning
+          docker build -t devsecops-scan-temp:latest .
+          echo "Built Docker image: devsecops-scan-temp:latest"
+
+      - name: Run Trivy Image Scan
+        if: steps.docker-check.outputs.has_docker == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: devsecops-scan-temp:latest
+          format: json
+          output: artifacts/security/trivy-image.json
+          severity: HIGH,CRITICAL
+
+      - name: Extract fail_on thresholds from config
+        if: always()
+        run: |
+          pip install pyyaml
+          python3 << 'EOF'
+          import yaml
+          import json
+          import os
+
+          # Default thresholds
+          fail_on = {
+              'gitleaks': 0,
+              'semgrep': 10,
+              'trivy_critical': 0,
+              'trivy_high': 5,
+              'trivy_medium': -1,
+              'trivy_low': -1
+          }
+
+          # Try to read from security-config.yml
+          try:
+              if os.path.exists('security-config.yml'):
+                  with open('security-config.yml') as f:
+                      config = yaml.safe_load(f)
+                      if config and 'fail_on' in config:
+                          fail_on.update(config['fail_on'])
+                  print(f"Loaded fail_on config: {fail_on}")
+              else:
+                  print("No security-config.yml found, using defaults")
+          except Exception as e:
+              print(f"Error reading config, using defaults: {e}")
+
+          # Write to JSON for GitHub script to read
+          os.makedirs('artifacts/security', exist_ok=True)
+          with open('artifacts/security/fail-on.json', 'w') as out:
+              json.dump(fail_on, out)
+          EOF
+
+      - name: Generate security summary (JSON)
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const dir = 'artifacts/security';
+            const summaryPath = path.join(dir, 'summary.json');
+
+            if (!fs.existsSync(dir)) {
+              fs.mkdirSync(dir, { recursive: true });
+            }
+
+            function readJson(file) {
+              if (!fs.existsSync(file)) return null;
+              const raw = fs.readFileSync(file, 'utf8');
+              try { return JSON.parse(raw); }
+              catch { return null; }
+            }
+
+            // Read fail_on thresholds from extracted config
+            const failOnPath = path.join(dir, 'fail-on.json');
+            const failOn = readJson(failOnPath) || {
+              gitleaks: 0,
+              semgrep: 10,
+              trivy_critical: 0,
+              trivy_high: 5,
+              trivy_medium: -1,
+              trivy_low: -1
+            };
+            core.info(`Using fail_on thresholds: ${JSON.stringify(failOn)}`);
+
+            const result = {
+              version: "0.3.0",
+              status: "PASS",
+              blocking_count: 0,
+              summary: {},
+              findings: []
+            };
+
+            //
+            // GITLEAKS
+            //
+            const gitleaksPath = path.join(dir, 'gitleaks-report.json');
+            const gitleaks = readJson(gitleaksPath);
+            if (gitleaks) {
+              let count = 0;
+              if (Array.isArray(gitleaks)) count = gitleaks.length;
+              else if (Array.isArray(gitleaks.findings)) count = gitleaks.findings.length;
+              result.summary.gitleaks = { total: count };
+
+              // Check fail gate
+              if (failOn.gitleaks >= 0 && count > failOn.gitleaks) {
+                result.blocking_count += count - failOn.gitleaks;
+                core.warning(`Gitleaks: ${count} secrets found (threshold: ${failOn.gitleaks})`);
+              }
+            }
+
+            //
+            // TRIVY FS
+            //
+            const trivyFsPath = path.join(dir, 'trivy-fs.json');
+            const trivy = readJson(trivyFsPath);
+            if (trivy?.Results) {
+              const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+              for (const r of trivy.Results) {
+                for (const v of (r.Vulnerabilities || [])) {
+                  const sev = (v.Severity || "").toLowerCase();
+                  if (counts[sev] !== undefined) counts[sev]++;
+                }
+              }
+              result.summary.trivy_fs = counts;
+
+              // Check fail gates for each severity
+              const severities = {
+                critical: 'trivy_critical',
+                high: 'trivy_high',
+                medium: 'trivy_medium',
+                low: 'trivy_low'
+              };
+
+              for (const [sev, configKey] of Object.entries(severities)) {
+                const threshold = failOn[configKey];
+                const count = counts[sev] || 0;
+                if (threshold >= 0 && count > threshold) {
+                  result.blocking_count += count - threshold;
+                  core.warning(`Trivy ${sev}: ${count} vulnerabilities (threshold: ${threshold})`);
+                }
+              }
+            }
+
+            //
+            // TRIVY IMAGE
+            //
+            const trivyImagePath = path.join(dir, 'trivy-image.json');
+            const trivyImage = readJson(trivyImagePath);
+            if (trivyImage?.Results) {
+              const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+              for (const r of trivyImage.Results) {
+                for (const v of (r.Vulnerabilities || [])) {
+                  const sev = (v.Severity || "").toLowerCase();
+                  if (counts[sev] !== undefined) counts[sev]++;
+                }
+              }
+              result.summary.trivy_image = counts;
+              core.info(`Trivy Image scan: ${JSON.stringify(counts)}`);
+
+              // Check fail gates for image scan (use same thresholds as FS)
+              const severities = {
+                critical: 'trivy_critical',
+                high: 'trivy_high',
+                medium: 'trivy_medium',
+                low: 'trivy_low'
+              };
+
+              for (const [sev, configKey] of Object.entries(severities)) {
+                const threshold = failOn[configKey];
+                const count = counts[sev] || 0;
+                if (threshold >= 0 && count > threshold) {
+                  result.blocking_count += count - threshold;
+                  core.warning(`Trivy Image ${sev}: ${count} vulnerabilities (threshold: ${threshold})`);
+                }
+              }
+            }
+
+            //
+            // SEMGREP
+            //
+            const semgrepPath = path.join(dir, 'semgrep-report.json');
+            const semgrep = readJson(semgrepPath);
+            if (semgrep) {
+              let results = [];
+
+              if (Array.isArray(semgrep)) {
+                results = semgrep;
+              } else if (Array.isArray(semgrep.results)) {
+                results = semgrep.results;
+              }
+
+              const count = results.length;
+              result.summary.semgrep = { total: count };
+              core.info(`Semgrep findings: ${count}`);
+
+              // Check fail gate
+              if (failOn.semgrep >= 0 && count > failOn.semgrep) {
+                result.blocking_count += count - failOn.semgrep;
+                core.warning(`Semgrep: ${count} findings (threshold: ${failOn.semgrep})`);
+              }
+            } else {
+              core.info("No semgrep-report.json found, skipping Semgrep summary.");
+            }
+
+            // Set final status
+            result.status = result.blocking_count > 0 ? "FAIL" : "PASS";
+
+            if (result.blocking_count > 0) {
+              core.warning(`Security scan FAILED: ${result.blocking_count} issue(s) exceed thresholds`);
+            } else {
+              core.info("Security scan PASSED: All checks within thresholds");
+            }
+
+            fs.writeFileSync(summaryPath, JSON.stringify(result, null, 2));
+            core.info("Wrote summary.json");
+
+      - name: Post PR Security Summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- devsecops-kit-security-summary -->';
+            const summaryPath = 'artifacts/security/summary.json';
+
+            let summary = null;
+            try { summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8')); }
+            catch { core.warning("No summary.json available."); }
+
+            let body = `${marker}\n### 🔐 DevSecOps Kit Security Summary\n\n`;
+
+            if (!summary) {
+              body += "_No summary available._\n";
+            } else {
+              const leaks = summary.summary?.gitleaks?.total ?? 0;
+              const trivyFs = summary.summary?.trivy_fs ?? {};
+              const trivyImage = summary.summary?.trivy_image ?? {};
+              const semgrep = summary.summary?.semgrep ?? null;
+
+              body += `- **Gitleaks:** ${leaks} leak(s)\n`;
+
+              if (Object.keys(trivyFs).length > 0) {
+                body += `- **Trivy FS:**\n`;
+                for (const sev of Object.keys(trivyFs)) {
+                  body += `  - ${sev.toUpperCase()}: ${trivyFs[sev]}\n`;
+                }
+              }
+
+              if (Object.keys(trivyImage).length > 0) {
+                body += `- **Trivy Image:**\n`;
+                for (const sev of Object.keys(trivyImage)) {
+                  body += `  - ${sev.toUpperCase()}: ${trivyImage[sev]}\n`;
+                }
+              }
+
+              if (semgrep) {
+                body += `- **Semgrep:** ${semgrep.total} finding(s)\n`;
+              }
+
+              // Use status from summary.json
+              const status = summary.status || "UNKNOWN";
+              const blockingCount = summary.blocking_count || 0;
+
+              body += `\n**Status:** ${status === "FAIL" ? '🚨 **FAIL**' : '✅ **PASS**'}\n`;
+              if (blockingCount > 0) {
+                body += `_${blockingCount} issue(s) exceed configured thresholds_\n`;
+              }
+            }
+
+            const { owner, repo } = context.repo;
+            const pr = context.issue.number;
+
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number: pr });
+            const existing = comments.data.find(c => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: pr,
+                body
+              });
+            }
+
+      - name: Post detailed fix-it comments
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const dir = 'artifacts/security';
+            const { owner, repo } = context.repo;
+            const pr = context.issue.number;
+
+            function readJson(file) {
+              if (!fs.existsSync(file)) return null;
+              try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+              catch { return null; }
+            }
+
+            // Get PR files to validate comments are on changed files
+            const { data: prFiles } = await github.rest.pulls.listFiles({ owner, repo, pull_number: pr });
+            const changedFiles = new Set(prFiles.map(f => f.filename));
+
+            // Get the commit SHA for review comments
+            const { data: prData } = await github.rest.pulls.get({ owner, repo, pull_number: pr });
+            const commitId = prData.head.sha;
+
+            const comments = [];
+
+            //
+            // SEMGREP FINDINGS
+            //
+            const semgrepPath = path.join(dir, 'semgrep-report.json');
+            const semgrep = readJson(semgrepPath);
+            if (semgrep) {
+              let results = [];
+              if (Array.isArray(semgrep)) results = semgrep;
+              else if (Array.isArray(semgrep.results)) results = semgrep.results;
+
+              for (const finding of results.slice(0, 10)) { // Limit to 10 comments
+                const filePath = finding.path;
+                const line = finding.start?.line || finding.line || 1;
+                const message = finding.extra?.message || finding.check_id || 'Security issue detected';
+                const severity = finding.extra?.severity || 'WARNING';
+                const fixRegex = finding.extra?.fix_regex;
+
+                if (!changedFiles.has(filePath)) continue; // Only comment on changed files
+
+                let body = `**🔍 Semgrep [${severity}]**\n\n`;
+                body += `${message}\n\n`;
+                body += `**Rule:** \`${finding.check_id}\`\n`;
+
+                if (fixRegex) {
+                  body += `\n**Suggested fix:** Apply the regex replacement suggested by Semgrep.\n`;
+                }
+
+                if (finding.extra?.metadata?.references) {
+                  body += `\n**References:**\n`;
+                  for (const ref of finding.extra.metadata.references.slice(0, 3)) {
+                    body += `- ${ref}\n`;
+                  }
+                }
+
+                comments.push({ path: filePath, line, body });
+              }
+            }
+
+            //
+            // GITLEAKS FINDINGS
+            //
+            const gitleaksPath = path.join(dir, 'gitleaks-report.json');
+            const gitleaks = readJson(gitleaksPath);
+            if (gitleaks) {
+              let leaks = [];
+              if (Array.isArray(gitleaks)) leaks = gitleaks;
+              else if (Array.isArray(gitleaks.findings)) leaks = gitleaks.findings;
+
+              for (const leak of leaks.slice(0, 5)) { // Limit to 5 secrets
+                const filePath = leak.File || leak.file;
+                const line = leak.StartLine || leak.line || 1;
+                const secret = leak.Secret || leak.match || '';
+                const rule = leak.RuleID || leak.rule || 'Secret detected';
+
+                if (!changedFiles.has(filePath)) continue;
+
+                let body = `**🚨 Secret Detected**\n\n`;
+                body += `**Rule:** \`${rule}\`\n`;
+                body += `**Match:** \`${secret.substring(0, 20)}...\`\n\n`;
+                body += `⚠️ **Action Required:** Remove this secret immediately and:\n`;
+                body += `1. Rotate the compromised credential\n`;
+                body += `2. Use environment variables or secret management\n`;
+                body += `3. Never commit secrets to version control\n`;
+
+                comments.push({ path: filePath, line, body });
+              }
+            }
+
+            // Post review comments (batch API)
+            if (comments.length > 0) {
+              try {
+                await github.rest.pulls.createReview({
+                  owner,
+                  repo,
+                  pull_number: pr,
+                  commit_id: commitId,
+                  event: 'COMMENT',
+                  comments: comments.map(c => ({
+                    path: c.path,
+                    line: c.line,
+                    body: c.body
+                  }))
+                });
+                core.info(`Posted ${comments.length} fix-it comment(s)`);
+              } catch (error) {
+                core.warning(`Failed to post review comments: ${error.message}`);
+              }
+            } else {
+              core.info("No findings in changed files, skipping fix-it comments");
+            }
+
+      - name: Upload security artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: artifacts/security/
+
+      - name: Check fail gates
+        if: always()
+        run: |
+          if [ ! -f artifacts/security/summary.json ]; then
+            echo "No summary.json found, skipping fail gate check"
+            exit 0
+          fi
+
+          STATUS=$(cat artifacts/security/summary.json | python3 -c "import sys, json; print(json.load(sys.stdin).get('status', 'UNKNOWN'))")
+          BLOCKING_COUNT=$(cat artifacts/security/summary.json | python3 -c "import sys, json; print(json.load(sys.stdin).get('blocking_count', 0))")
+
+          echo "Security scan status: $STATUS"
+          echo "Blocking issues: $BLOCKING_COUNT"
+
+          if [ "$STATUS" = "FAIL" ]; then
+            echo "❌ Security scan FAILED: $BLOCKING_COUNT issue(s) exceed configured thresholds"
+            echo "Review the security summary above and artifacts for details"
+            exit 1
+          else
+            echo "✅ Security scan PASSED: All findings within acceptable thresholds"
+            exit 0
+          fi
