@@ -1,5 +1,0 @@
-
-command="/home/kartik/.beast/scripts/60ced46738be4be3655bc289164df893f12fe67390d541621d9dae65849519b0",environment="SSH_USER=2",no-agent-forwarding,no-port-forwarding,no-X11-forwarding hi 
-command="/home/kartik/.beast/scripts/8027ef0d2bdea68f0c2e04e2e5dbc4d649bfaba68d7baa2f7223a04cd6c41edf",environment="SSH_USER=4",no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-rsa AAAAB3NzaC1y 
-command="/home/kartik/.beast/scripts/8027ef0d2bdea68f0c2e04e2e5dbc4d649bfaba68d7baa2f7223a04cd6c41edf",environment="SSH_USER=4",no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-rsa AAAAB3NzaC1y 
-command="/home/kartik/.beast/scripts/169c1d8053fee22df8553f8eb0957cf8cad6dca68fd77c2adf5ca10fe94fb2af",environment="SSH_USER=6",no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-rsa AAAAB3NzaC1y 

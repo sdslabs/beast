@@ -50,7 +50,8 @@ func initGinRouter() *gin.Engine {
 	router.GET("/api/info/download", serveAssets)
 
 	// API routes group
-	apiGroup := router.Group("/api", authorize)
+	apiGroup := router.Group("/api", 
+)
 	{
 		// Deploy route group
 		manageGroup := apiGroup.Group("/manage", managerAuthorize)
