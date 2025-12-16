@@ -111,6 +111,10 @@ func saveLeaderboardCache() {
 	}
 }
 
+// NOTE: Why this function is not in 'core/utils/cleanup.go'
+// 1. 'database', 'manager' and 'remoteManager' depend on utils so moving these inside utils will create cycle dependencies.
+// 2. 'core/utils/cleanup.go' contains functions to clean up challenges, while this function does a more broad cleanup.
+
 func cleanup() {
 	log.Info("Starting graceful shutdown cleanup...")
 
