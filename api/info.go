@@ -158,6 +158,10 @@ func hintHandler(c *gin.Context) {
 		return
 	}
 
+	leaderboardStale = true
+	adminLeaderboardStale = true
+	graphCacheStale = true
+
 	// Return the hint description after successfully taking it
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: hint.Description,

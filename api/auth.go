@@ -277,6 +277,10 @@ func register(c *gin.Context) {
 		return
 	}
 
+	leaderboardStale = true
+	adminLeaderboardStale = true
+	graphCacheStale = true
+
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User created successfully",
 	})
