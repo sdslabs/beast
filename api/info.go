@@ -104,6 +104,14 @@ func hintHandler(c *gin.Context) {
 		return
 	}
 
+	if user.Role == core.USER_ROLES["admin"] {
+		c.JSON(http.StatusOK, HintResponse{
+			Description: hint.Description,
+			Points:      hint.Points,
+		})
+		return
+	}
+
 	// Check if the user has already taken the hint
 	hasTakenHint, err := database.UserHasTakenHint(user.ID, uint(hintID))
 	if err != nil {
@@ -139,7 +147,7 @@ func hintHandler(c *gin.Context) {
 	// Save user hint if not already taken
 	if err := database.SaveUserHint(user.ID, hint.ChallengeID, hint.HintID); err != nil {
 		if err.Error() == "Not enough points to take this hint" {
-			c.JSON(http.StatusForbidden, HTTPErrorResp{
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 				Error: "You don't have enough points to take this hint",
 			})
 			return
