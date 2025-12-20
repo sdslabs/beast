@@ -210,7 +210,7 @@ func DeployContainerFromComposeRemote(challengeName, stagedDir string, server co
 
 func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableServer) error {
 	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
-	downCommand := fmt.Sprintf("cd %s && docker compose down",extractDir)
+	downCommand := fmt.Sprintf("cd %s && docker compose down", extractDir)
 	log.Debugf("Stopping challenge %s using docker compose remotely: %s", challengeName, downCommand)
 	downOutput, err := RunCommandOnServer(server, downCommand)
 	if err != nil {
@@ -223,7 +223,7 @@ func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableS
 
 func ComposePurgeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
 	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
-	purgeCommand := fmt.Sprintf("cd %s && docker compose down --volumes --remove-orphans --rmi all", extractDir)
+	purgeCommand := fmt.Sprintf("cd %s && docker compose down --remove-orphans --volumes --rmi all", extractDir)
 	log.Debugf("Purge challenge %s using docker compose remotely: %s", challengeName, purgeCommand)
 	purgeOutput, err := RunCommandOnServer(server, purgeCommand)
 	if err != nil {

@@ -337,7 +337,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			}
 
 		} else {
-			// local deplyoment
+			// local deployment
 			err := cr.DeployContainerFromCompose(challengeName, stagingDir)
 			if err != nil {
 				return fmt.Errorf("error while deploying challenge with docker-compose: %v", err)

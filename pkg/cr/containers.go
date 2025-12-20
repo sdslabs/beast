@@ -287,7 +287,7 @@ func CommitContainer(containerId string) (string, error) {
 
 func DeployContainerFromCompose(challengeName, stagedPath string) error {
 	extractDir := filepath.Join(stagedPath, challengeName)
-	log.Debugf("Deploying challenge %s using docker-compose at %s", challengeName,extractDir )
+	log.Debugf("Deploying challenge %s using docker-compose at %s", challengeName, extractDir)
 	upCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose up -d", extractDir))
 	var upOutput bytes.Buffer
 	upCmd.Stdout = &upOutput
@@ -315,7 +315,7 @@ func DeployContainerFromCompose(challengeName, stagedPath string) error {
 func ComposeDown(challengeName, stagedDir string) error {
 	log.Debugf("Stopping challenge %s using docker-compose", challengeName)
 	extractDir := filepath.Join(stagedDir, challengeName)
-	downCmd := exec.Command("bash", "-c",fmt.Sprintf("cd %s && docker compose down", extractDir))
+	downCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose down", extractDir))
 
 	var downOutput bytes.Buffer
 	downCmd.Stdout = &downOutput
@@ -332,7 +332,7 @@ func ComposeDown(challengeName, stagedDir string) error {
 func ComposePurge(challengeName, stagedDir string) error {
 	log.Debugf("Purging challenge %s using docker-compose", challengeName)
 	extractDir := filepath.Join(stagedDir, challengeName)
-	purgeCmd := exec.Command("bash","-c",fmt.Sprintf("cd %s && docker compose down --remove-orphans --volumes --rmi all", extractDir))
+	purgeCmd := exec.Command("bash","-c", fmt.Sprintf("cd %s && docker compose down --remove-orphans --volumes --rmi all", extractDir))
 
 	var purgeOutput bytes.Buffer
 	purgeCmd.Stdout = &purgeOutput
