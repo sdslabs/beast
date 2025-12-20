@@ -266,6 +266,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
 		ContainerName:    coreUtils.EncodeID(config.Challenge.Metadata.Name),
+		ChallengeName:    config.Challenge.Metadata.Name,
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
 		Traffic:          config.Challenge.Env.TrafficType(),

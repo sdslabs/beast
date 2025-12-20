@@ -56,6 +56,7 @@ type CreateContainerConfig struct {
 	MountsMap        map[string]string
 	ImageId          string
 	ContainerName    string
+	ChallengeName    string
 	ContainerEnv     []string
 	ContainerNetwork string
 	Traffic          TrafficType
@@ -141,7 +142,7 @@ func StopAndRemoveContainer(containerId string) error {
 }
 
 func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
-	containerName := containerConfig.ContainerName
+	containerName := fmt.Sprintf("beast_%s_%s", containerConfig.ChallengeName, containerConfig.ContainerName[:3])
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	if err != nil {
