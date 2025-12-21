@@ -162,6 +162,7 @@ func initDb() error {
 			return errors.New("failed to initialize database")
 		}
 	}
+
 	defer db.Close()
 
 	var exists int
