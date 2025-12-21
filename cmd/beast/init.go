@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -108,6 +109,15 @@ func createBeastDatabase(db *sql.DB, configuration *config.PsqlConfig) error {
 	return err
 }
 
+func dbUserCheck() (bool, error) {
+	current, err := user.Current()
+	if err != nil {
+		return false, err
+	}
+
+	return current.Name == core.POSTGRES_SUPER_USER, nil
+}
+
 func initDb() error {
 	log.Infoln("Initializing database...")
 
@@ -117,12 +127,39 @@ func initDb() error {
 		return err
 	}
 
-	password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
-	dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
-	db, err := sql.Open("pgx", dsn)
+	isPostgres, err := dbUserCheck()
 	if err != nil {
 		return err
 	}
+
+	var db *sql.DB
+	if isPostgres {
+		log.Infoln("Attempting to connect to postgres as postgres super user...")
+
+		dsn := fmt.Sprintf("user=%s dbname=%s sslmode=%s", "postgres", "postgres", "disable")
+		db, err = sql.Open("pgx", dsn)
+
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Warnln("Current user is not postgres super user...")
+
+		if utils.PromptBinary("Do you use password authentication for the postgres super user?") {
+			password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
+
+			dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
+			db, err = sql.Open("pgx", dsn)
+
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Errorln("Cannot continue with postgres setup... Please run this command as the postgres super user (preferred) or use password authentication.")
+			return errors.New("failed to initialize database")
+		}
+	}
+
 	defer db.Close()
 
 	var exists int
