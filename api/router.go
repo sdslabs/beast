@@ -49,6 +49,9 @@ func initGinRouter() *gin.Engine {
 	router.GET("/api/info/competition-info", competitionInfoHandler)
 	router.GET("/api/info/download", serveAssets)
 
+	router.GET("/api/health/:name", adminAuthorize, ChallengeHealthHandler)
+
+
 	// API routes group
 	apiGroup := router.Group("/api", 
 )
@@ -75,7 +78,6 @@ func initGinRouter() *gin.Engine {
 			statusGroup.GET("/challenge/:name", challengeStatusHandler)
 			statusGroup.GET("/all", statusHandler)
 			statusGroup.GET("/all/:filter", statusHandler)
-			statusGroup.GET("/health/:name", ChallengeHealthHandler)
 		}
 
 		// Info route group
