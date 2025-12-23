@@ -115,7 +115,7 @@ func dbUserCheck() (bool, error) {
 		return false, err
 	}
 
-	return current.Name == core.POSTGRES_SUPER_USER, nil
+	return current.Username == core.POSTGRES_SUPER_USER, nil
 }
 
 func initDb() error {
