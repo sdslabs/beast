@@ -157,8 +157,7 @@ func ShowFilteredChallengesInfo(cmd *cobra.Command, args []string) error {
 		}
 		filteredChallenges = filterChallenges(challenges, status, tagsArray)
 	} else {
-		fmt.Errorf("No challenges present in the database.")
-		return nil
+		return fmt.Errorf("No challenges present in the database.")
 	}
 
 	if len(filteredChallenges) > 0 {
@@ -168,7 +167,7 @@ func ShowFilteredChallengesInfo(cmd *cobra.Command, args []string) error {
 		tData := getTableDataFromChallenges(filteredChallenges)
 		utils.LogTable(tConfigs, tData)
 	} else {
-		fmt.Errorf("No challenges found for the provided filters.")
+		return fmt.Errorf("No challenges found for the provided filters.")
 	}
 
 	return nil
@@ -179,7 +178,7 @@ func ShowFilteredChallengesInfo(cmd *cobra.Command, args []string) error {
 func tagsIntersection(tagsInput []string, tags []*database.Tag) bool {
 	for _, tagIn := range tagsInput {
 		for _, tag := range tags {
-			if strings.ToLower(tagIn) == strings.ToLower(tag.TagName) {
+			if strings.EqualFold(tagIn, tag.TagName) {
 				return true
 			}
 		}

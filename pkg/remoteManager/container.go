@@ -197,7 +197,7 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 
 func DeployContainerFromComposeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
 	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
-	upCommand := fmt.Sprintf("cd %s && docker compose up -d",extractDir)
+	upCommand := fmt.Sprintf("cd %s && docker compose up -d", extractDir)
 	log.Debugf("Deploying challenge %s using docker compose remotely: %s", challengeName, upCommand)
 	upOutput, err := RunCommandOnServer(server, upCommand)
 	if err != nil {

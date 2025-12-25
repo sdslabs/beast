@@ -57,13 +57,13 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 	var err error
 	containers, err = cr.SearchContainerByFilter(map[string]string{filter: filterVal})
 	if err != nil {
-		log.Error("Error while searching for container with %s : ", filter, filterVal)
+		log.Errorf("Error while searching for container with %s : %s", filter, filterVal)
 		return err
 	}
 	server := config.AvailableServer{}
 	remoteContainers, err := remoteManager.SearchContainerByFilterRemote(map[string]string{filter: filterVal}, server)
 	if err != nil {
-		log.Error("Error while searching for remote container with %s : ", filter, filterVal)
+		log.Errorf("Error while searching for remote container with %s : %s", filter, filterVal)
 		return err
 	}
 
@@ -115,13 +115,13 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 		server := config.Cfg.AvailableServers[chall.ServerDeployed]
 		err := remoteManager.RemoveImageRemote(chall.ImageId, server)
 		if err != nil {
-			log.Error("Error while cleaning up image on remote %s with id ", chall.ServerDeployed, chall.ImageId)
+			log.Errorf("Error while cleaning up image on remote %s with id %s", chall.ServerDeployed, chall.ImageId)
 			return err
 		}
 	} else {
 		err := cr.RemoveImage(chall.ImageId)
 		if err != nil {
-			log.Error("Error while cleaning up image with id ", chall.ImageId)
+			log.Errorf("Error while cleaning up image with id %s", chall.ImageId)
 			return err
 		}
 	}
