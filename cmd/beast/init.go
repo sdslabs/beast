@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/BurntSushi/toml"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/utils"
@@ -96,7 +97,7 @@ func crateBeastDbUser(db *sql.DB, configuration *config.PsqlConfig) error {
 		return errors.New("failed to create database")
 	}
 
-	_, err := db.Exec(fmt.Sprintf("CREATE USER %s WITH PASSWORD '%s';", configuration.User, configuration.Password))
+	_, err := db.Exec(fmt.Sprintf("CREATE USER %s WITH PASSWORD $1;", pq.QuoteIdentifier(configuration.User)), configuration.Password)
 	return err
 }
 
@@ -105,7 +106,7 @@ func createBeastDatabase(db *sql.DB, configuration *config.PsqlConfig) error {
 		return errors.New("failed to create database")
 	}
 
-	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s;", configuration.Dbname))
+	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s", pq.QuoteIdentifier(configuration.Dbname)))
 	return err
 }
 
@@ -163,7 +164,7 @@ func initDb() error {
 	defer db.Close()
 
 	var exists int
-	err = db.QueryRow(fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname = '%s'", configuration.PsqlConf.User)).Scan(&exists)
+	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.PsqlConf.User).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
 		if err = crateBeastDbUser(db, &configuration.PsqlConf); err != nil {
 			return err
@@ -174,7 +175,7 @@ func initDb() error {
 		log.Infoln(fmt.Sprintf("User %s already exists", configuration.PsqlConf.User))
 	}
 
-	err = db.QueryRow(fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s'", configuration.PsqlConf.Dbname)).Scan(&exists)
+	err = db.QueryRow("SELECT 1 FROM pg_database WHERE datname = $1", configuration.PsqlConf.Dbname).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
 		if err = createBeastDatabase(db, &configuration.PsqlConf); err != nil {
 			return err
@@ -185,7 +186,7 @@ func initDb() error {
 		log.Infoln(fmt.Sprintf("Database %s already exists", configuration.PsqlConf.Dbname))
 	}
 
-	_, err = db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s;", configuration.PsqlConf.Dbname, configuration.PsqlConf.User))
+	_, err = db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s;", pq.QuoteIdentifier(configuration.PsqlConf.Dbname), pq.QuoteIdentifier(configuration.PsqlConf.User)))
 	if err != nil {
 		return err
 	}
