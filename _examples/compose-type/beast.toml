@@ -1,23 +1,21 @@
 [author]
-name = "contact"
-email = "contact@sdslabs.co.in"
+name = "example"
+email = "example@local"
 ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
-name = "compose-type"
-flag = "winterhack{w45_th15_y0ur_f1r5t_4dm1n_b07_ch4ll}"
-type = "web"
+name = "compose-php-mysql"
+flag = "CTF{sample_flag}"
+# Compose challenges are typically easiest to express as docker-type.
+type = "docker"
 points = 200
 
-[[challenge.metadata.hints]]
-text = "simple_hint_1"
-points = 10
-
-[[challenge.metadata.hints]]
-text = "simple_hint_2"
-points = 20
-
 [challenge.env]
+# Beast still requires ports/default_port for validation and metadata.
+ports = [10020]
+default_port = 10020
+
+# Enables Compose mode.
+# NOTE: Beast currently runs `docker compose build/up` without `-f`, so use a standard
+# compose filename (like docker-compose.yml) in the challenge root.
 docker_compose = "docker-compose.yml"
-web_root = "web"
-ports = [10005]

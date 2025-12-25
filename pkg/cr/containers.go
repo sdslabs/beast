@@ -332,7 +332,7 @@ func ComposeDown(challengeName, stagedDir string) error {
 func ComposePurge(challengeName, stagedDir string) error {
 	log.Debugf("Purging challenge %s using docker-compose", challengeName)
 	extractDir := filepath.Join(stagedDir, challengeName)
-	purgeCmd := exec.Command("bash","-c", fmt.Sprintf("cd %s && docker compose down --remove-orphans --volumes --rmi all", extractDir))
+	purgeCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose down --remove-orphans --volumes --rmi all", extractDir))
 
 	var purgeOutput bytes.Buffer
 	purgeCmd.Stdout = &purgeOutput
