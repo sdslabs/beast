@@ -92,7 +92,7 @@ func installAir() error {
 	return cmd.Run()
 }
 
-func crateBeastDbUser(db *sql.DB, configuration *config.PsqlConfig) error {
+func createBeastDbUser(db *sql.DB, configuration *config.PsqlConfig) error {
 	if result := utils.PromptBinary("Create default beast postgres user?"); !result {
 		return errors.New("failed to create database")
 	}
@@ -166,7 +166,7 @@ func initDb() error {
 	var exists int
 	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.PsqlConf.User).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		if err = crateBeastDbUser(db, &configuration.PsqlConf); err != nil {
+		if err = createBeastDbUser(db, &configuration.PsqlConf); err != nil {
 			return err
 		}
 	} else if err != nil {
@@ -191,7 +191,7 @@ func initDb() error {
 		return err
 	}
 
-	log.Infoln(fmt.Sprintf("Granted all privellages on database: %s to user: %s", configuration.PsqlConf.Dbname, configuration.PsqlConf.User))
+	log.Infoln(fmt.Sprintf("Granted all privileges on database: %s to user: %s", configuration.PsqlConf.Dbname, configuration.PsqlConf.User))
 	return nil
 }
 
@@ -222,7 +222,7 @@ func runBeastBootsteps() error {
 		return err
 	}
 
-	log.Infoln(fmt.Sprintf("Beast global config file initiliased at %s", BEAST_GLOBAL_CONFIG))
+	log.Infoln(fmt.Sprintf("Beast global config file initiliazed at %s", BEAST_GLOBAL_CONFIG))
 
 	if err := checkDockerDaemon(); err != nil {
 		return err

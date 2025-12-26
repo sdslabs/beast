@@ -215,7 +215,7 @@ const (
 	LEADERBOARD_GRAPH_SIZE = 12
 )
 
-var NOTIFCIATION_SERVICES = []string{
+var NOTIFICATION_SERVICES = []string{
 	"slack",
 	"discord",
 }

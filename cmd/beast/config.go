@@ -121,7 +121,7 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 	for utils.PromptBinary("Configure a Notification Webhook?") {
 		var notification config.NotificationWebhook
 
-		notification.ServiceName = utils.PromptSelection("Notification Service", core.NOTIFCIATION_SERVICES)
+		notification.ServiceName = utils.PromptSelection("Notification Service", core.NOTIFICATION_SERVICES)
 		notification.URL = utils.PromptString("Notification Service URL")
 		notification.Active = utils.PromptBinary("Enable this webhook?")
 
@@ -220,6 +220,6 @@ var configCmd = &cobra.Command{
 			return
 		}
 
-		log.Infoln(fmt.Sprintf("Beast global config file initiliased at %s", BEAST_GLOBAL_CONFIG))
+		log.Infoln(fmt.Sprintf("Beast global config file initiliazed at %s", BEAST_GLOBAL_CONFIG))
 	},
 }
