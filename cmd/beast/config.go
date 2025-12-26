@@ -129,7 +129,7 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 	}
 }
 
-func promptDatabaseDetails(configuration *config.BeastConfig) {
+func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {
 	configuration.PsqlConf.User = utils.PromptString("Enter Postgres User Name (this user will be created if does not exist)")
 	configuration.PsqlConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Postgres User %s Password", configuration.PsqlConf.User))
 	configuration.PsqlConf.Host = utils.PromptString("Enter Postgres Host Name, leave empty for localhost")
@@ -148,10 +148,10 @@ func promptDatabaseDetails(configuration *config.BeastConfig) {
 func promptBeastConfiguration(configuration *config.BeastConfig) {
 	promptServerDetails(configuration)
 	promptResourceLimits(configuration)
-	promptDatabaseDetails(configuration)
 	promptRemoteRepository(configuration)
 	promptCompetitionDetails(configuration)
 	promptNotificationWebhooks(configuration)
+	promptDatabaseConnectionDetails(configuration)
 }
 
 func tryCopyExampleConfig() error {
