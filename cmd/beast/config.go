@@ -131,6 +131,7 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 
 func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {
 	configuration.PsqlConf.User = utils.PromptString("Enter Postgres User Name (this user will be created if does not exist)")
+	configuration.PsqlConf.Dbname = utils.PromptString("Enter Postgres Database Name")
 	configuration.PsqlConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Postgres User %s Password", configuration.PsqlConf.User))
 	configuration.PsqlConf.Host = utils.PromptString("Enter Postgres Host Name, leave empty for localhost")
 	if configuration.PsqlConf.Host == "" {
