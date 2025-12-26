@@ -64,7 +64,7 @@ func PromptInt64(prompt string, defaultValue int64) int64 {
 
 func PromptSelection(prompt string, items []string) string {
 	selection := promptui.Select{
-		Label: fmt.Sprintf("%s", prompt),
+		Label: prompt,
 		Items: items,
 	}
 
@@ -79,7 +79,7 @@ func PromptSelection(prompt string, items []string) string {
 
 func PromptBinary(prompt string) bool {
 	selection := promptui.Select{
-		Label: fmt.Sprintf("%s", prompt),
+		Label: prompt,
 		Items: binaryOptions,
 	}
 
