@@ -497,6 +497,12 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			log.Debug("Setting difficulty to default(medium)")
 			config.Challenge.Metadata.Difficulty = "medium"
 		}
+
+		deploymentType := core.DEPLOYMENT_TYPES["standard_docker"]
+		if config.Challenge.Env.DockerCompose != "" {
+			deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
+		}
+
 		*challEntry = database.Challenge{
 			Name:            config.Challenge.Metadata.Name,
 			AuthorID:        userEntry.ID,
@@ -518,6 +524,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			MaxPoints:       config.Challenge.Metadata.MaxPoints,
 			Difficulty:      config.Challenge.Metadata.Difficulty,
 			ServerDeployed:  availableServerHostname,
+			DeploymentType:  deploymentType,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)

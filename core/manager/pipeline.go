@@ -51,7 +51,7 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 		if err != nil {
 			return err
 		}
-		// additionalCtx["docker-compose.yml"] = dockerCompose
+		additionalCtx["docker-compose.yml"] = dockerCompose
 		log.Debug("Got docker-compose file from the challenge config")
 	} else {
 
@@ -62,13 +62,14 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 			if err != nil {
 				return err
 			}
+			log.Debug("Got dockerfile context from the challenge config")
 		} else {
 			config.Challenge.Env.DockerCtx = core.DEFAULT_DOCKER_FILE
 			dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
 			if err != nil {
 				return err
 			}
-			log.Debug("Got dockerfile context from the challenge config")
+			log.Debug("Generated dockerfile context for the challenge")
 		}
 
 		if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
@@ -81,8 +82,8 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 				additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = serviceConfig
 			}
 		}
+		additionalCtx["Dockerfile"] = dockerfileCtx
 	}
-	additionalCtx["Dockerfile"] = dockerfileCtx
 
 	// Here we try to add all the additional context that are required like xinetd.conf
 	// instead of mounting these files inside the container, since we want reproducibility
@@ -181,10 +182,10 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			} else {
 				logBytes = []byte("BuildImagesFromCompose returned nil buffer")
 			}
-			// For Docker Compose challenges, ensure ImageId is empty in the database
-			if err := database.UpdateChallenge(challenge, map[string]interface{}{"ImageId": ""}); err != nil {
-				return fmt.Errorf("error while setting empty ImageId for Docker Compose challenge: %s", err)
-			}
+		}
+		// For Docker Compose challenges, ensure ImageId is empty in the database
+		if err := database.UpdateChallenge(challenge, map[string]any{"ImageId": ""}); err != nil {
+			return fmt.Errorf("error while setting empty ImageId for Docker Compose challenge: %s", err)
 		}
 	} else {
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
@@ -331,9 +332,12 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 				return fmt.Errorf("error while deploying challenge with docker-compose on remote: %v", err)
 			}
 
-			// For Docker Compose challenges on remote servers, ensure ContainerId is empty in the database
-			if err := database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": ""}); err != nil {
-				return fmt.Errorf("error while setting empty ContainerId for Docker Compose challenge: %s", err)
+			// For Docker Compose challenges on remote servers, set ContainerId to empty and DeploymentType
+			if err := database.UpdateChallenge(challenge, map[string]any{
+				"ContainerId":    "",
+				"DeploymentType": core.DEPLOYMENT_TYPES["docker_compose"],
+			}); err != nil {
+				return fmt.Errorf("error while updating Docker Compose challenge metadata: %s", err)
 			}
 
 		} else {
@@ -343,9 +347,12 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 				return fmt.Errorf("error while deploying challenge with docker-compose: %v", err)
 			}
 
-			// For Docker Compose challenges, ensure ContainerId is empty in the database
-			if err := database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": ""}); err != nil {
-				return fmt.Errorf("error while setting empty ContainerId for Docker Compose challenge: %s", err)
+			// For Docker Compose challenges, set ContainerId to empty and DeploymentType
+			if err := database.UpdateChallenge(challenge, map[string]any{
+				"ContainerId":    "",
+				"DeploymentType": core.DEPLOYMENT_TYPES["docker_compose"],
+			}); err != nil {
+				return fmt.Errorf("error while updating Docker Compose challenge metadata: %s", err)
 			}
 		}
 
@@ -419,7 +426,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 		if err != nil {
 			if containerId != "" {
-				if e := database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": containerId}); e != nil {
+				if e := database.UpdateChallenge(challenge, map[string]any{"ContainerId": containerId}); e != nil {
 					return fmt.Errorf("error while starting container : %s and saving database : %s", err, e)
 				}
 
@@ -429,7 +436,10 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			return fmt.Errorf("error while trying to create a container for the challenge: %s", err)
 		}
 
-		if err = database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": containerId}); err != nil {
+		if err = database.UpdateChallenge(challenge, map[string]any{
+			"ContainerId":    containerId,
+			"DeploymentType": core.DEPLOYMENT_TYPES["standard_docker"],
+		}); err != nil {
 			return fmt.Errorf("error while saving containerId to database : %s", err)
 		}
 	}

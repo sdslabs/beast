@@ -117,6 +117,11 @@ var DEPLOY_STATUS = map[string]string{
 	"queued":     "Queued",
 }
 
+var DEPLOYMENT_TYPES = map[string]string{
+	"docker_compose":  "docker_compose",
+	"standard_docker": "standard_docker",
+}
+
 var USER_ROLES = map[string]string{
 	"contestant": "contestant",
 	"admin":      "admin",

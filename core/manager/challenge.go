@@ -173,9 +173,13 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	}
 
 	// Check if a container for the challenge is already deployed.
-	// If the challange is already deployed, return an error.
-	// If not then start the deploy pipeline for the challenge.
-	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
+
+	if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		if challenge.Status == core.DEPLOY_STATUS["deployed"] {
+			log.Debugf("Found an already deployed docker-compose challenge: %s", challengeName)
+			return nil, fmt.Errorf("challenge already deployed")
+		}
+	} else if coreUtils.IsContainerIdValid(challenge.ContainerId) {
 		var containers, remoteContainers []containerType.Container
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
@@ -636,9 +640,8 @@ func undeployChallenge(challengeName string, purge bool) error {
 		return fmt.Errorf("ChallengeName %s not valid", challengeName)
 	}
 
-	// ContainerId is empty => docker compose
-	if challenge.ContainerId == "" {
-		log.Debugf("Detected Docker Compose for challenge %s", challengeName)
+	if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		log.Debugf("Detected Docker Compose deployment for challenge %s", challengeName)
 
 		stagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
