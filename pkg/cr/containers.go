@@ -2,6 +2,7 @@ package cr
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os/exec"
@@ -299,16 +300,51 @@ func DeployContainerFromCompose(challengeName, stagedPath string) error {
 	}
 
 	var psOutput bytes.Buffer
-	checkCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose ps", extractDir))
+	checkCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose ps --format json", extractDir))
 	checkCmd.Stdout = &psOutput
 	checkCmd.Stderr = &psOutput
 	if err := checkCmd.Run(); err != nil {
 		return fmt.Errorf("error checking container status after compose up for challenge %s. Output:\n%s", challengeName, psOutput.String())
 	}
-	if !strings.Contains(psOutput.String(), "Up") {
-		return fmt.Errorf("container not running after compose up for challenge %s. Output:\n%s", challengeName, psOutput.String())
+
+	output := strings.TrimSpace(psOutput.String())
+	if output == "" {
+		return fmt.Errorf("no services found after compose up for challenge %s", challengeName)
 	}
 
+	type ComposeService struct {
+		ID      string `json:"ID"`
+		Name    string `json:"Name"`
+		Service string `json:"Service"`
+		State   string `json:"State"`
+		Status  string `json:"Status"`
+	}
+
+	hasRunningService := false
+	for _, line := range strings.Split(output, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		var service ComposeService
+		if err := json.Unmarshal([]byte(line), &service); err != nil {
+			log.Warnf("Failed to parse compose service JSON: %v. Line: %s", err, line)
+			continue
+		}
+
+		if service.State == "running" || strings.HasPrefix(service.Status, "Up") {
+			log.Debugf("Service %s (name: %s) is running with status: %s", service.Service, service.Name, service.Status)
+			hasRunningService = true
+			break
+		}
+	}
+
+	if !hasRunningService {
+		log.Warnf("No running services detected for challenge %s. Service status:\n%s", challengeName, output)
+		return fmt.Errorf("no running services after compose up for challenge %s", challengeName)
+	}
+
+	log.Debugf("Verified challenge %s services are running", challengeName)
 	return nil
 }
 

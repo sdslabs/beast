@@ -2,7 +2,9 @@ package remoteManager
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -73,7 +75,7 @@ func StopAndRemoveContainerRemote(containerId string, server config.AvailableSer
 				log.Debugf("no container with container id %s present", containerId)
 				return nil
 			}
-			return fmt.Errorf("DATABASE ERROR while fetching user details")
+			return fmt.Errorf("DATABASE ERROR while fetching challenge details")
 		}
 		if len(chall) > 0 {
 			server = config.Cfg.AvailableServers[chall[0].ServerDeployed]
@@ -196,7 +198,7 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 }
 
 func DeployContainerFromComposeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
-	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
+	extractDir := filepath.Join(stagedDir, challengeName)
 	upCommand := fmt.Sprintf("cd %s && docker compose up -d", extractDir)
 	log.Debugf("Deploying challenge %s using docker compose remotely: %s", challengeName, upCommand)
 	upOutput, err := RunCommandOnServer(server, upCommand)
@@ -205,11 +207,57 @@ func DeployContainerFromComposeRemote(challengeName, stagedDir string, server co
 		return fmt.Errorf("error while running docker compose up on remote: %v", err)
 	}
 
+	psCommand := fmt.Sprintf("cd %s && docker compose ps --format json", extractDir)
+	log.Debugf("Verifying docker compose services for challenge %s: %s", challengeName, psCommand)
+	psOutput, err := RunCommandOnServer(server, psCommand)
+	if err != nil {
+		log.Errorf("docker compose ps failed for challenge %s. Output:\n%s", challengeName, psOutput)
+		return fmt.Errorf("error while verifying docker compose services on remote: %v", err)
+	}
+
+	output := strings.TrimSpace(psOutput)
+	if output == "" {
+		return fmt.Errorf("no services found after compose up for challenge %s", challengeName)
+	}
+
+	type ComposeService struct {
+		ID      string `json:"ID"`
+		Name    string `json:"Name"`
+		Service string `json:"Service"`
+		State   string `json:"State"`
+		Status  string `json:"Status"`
+	}
+
+	hasRunningService := false
+	for _, line := range strings.Split(output, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		var service ComposeService
+		if err := json.Unmarshal([]byte(line), &service); err != nil {
+			log.Warnf("Failed to parse compose service JSON on remote: %v. Line: %s", err, line)
+			continue
+		}
+
+		if service.State == "running" || strings.HasPrefix(service.Status, "Up") {
+			log.Debugf("Remote service %s (name: %s) is running with status: %s", service.Service, service.Name, service.Status)
+			hasRunningService = true
+			break
+		}
+	}
+
+	if !hasRunningService {
+		log.Warnf("No running services detected for challenge %s. Service status:\n%s", challengeName, output)
+		return fmt.Errorf("no running services after compose up for challenge %s", challengeName)
+	}
+
+	log.Debugf("Verified challenge %s services are running on remote", challengeName)
 	return nil
 }
 
 func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableServer) error {
-	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
+	extractDir := filepath.Join(stagedDir, challengeName)
 	downCommand := fmt.Sprintf("cd %s && docker compose down", extractDir)
 	log.Debugf("Stopping challenge %s using docker compose remotely: %s", challengeName, downCommand)
 	downOutput, err := RunCommandOnServer(server, downCommand)
@@ -222,7 +270,7 @@ func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableS
 }
 
 func ComposePurgeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
-	extractDir := fmt.Sprintf("%s/%s", stagedDir, challengeName)
+	extractDir := filepath.Join(stagedDir, challengeName)
 	purgeCommand := fmt.Sprintf("cd %s && docker compose down --remove-orphans --volumes --rmi all", extractDir)
 	log.Debugf("Purge challenge %s using docker compose remotely: %s", challengeName, purgeCommand)
 	purgeOutput, err := RunCommandOnServer(server, purgeCommand)

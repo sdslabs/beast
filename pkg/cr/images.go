@@ -117,12 +117,12 @@ func BuildImagesFromCompose(challengeName, challengeTag, stagedPath, ComposeFile
 	if err != nil {
 		return nil, fmt.Errorf("error while extracting tar file %s to %s: %v", stagedPath, extractPath, err)
 	}
-	chngDir := fmt.Sprintf("cd %s", extractPath)
+
 	cmdArgs := []string{"compose", "build"}
 	if noCache {
 		cmdArgs = append(cmdArgs, "--no-cache")
 	}
-	composeCmd := fmt.Sprintf("%s && docker %s", chngDir, strings.Join(cmdArgs, " "))
+	composeCmd := fmt.Sprintf("docker %s", strings.Join(cmdArgs, " "))
 	log.Debugf("Building image for challenge %s with tag %s", challengeName, challengeTag)
 	log.Debugf("Running the command: docker %v", cmdArgs)
 
