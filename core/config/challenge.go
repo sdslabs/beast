@@ -431,8 +431,43 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		return fmt.Errorf("run_cmd cannot be non empty when entrypoint is provided")
 	}
 
+	if config.DockerCompose != "" {
+		if filepath.IsAbs(config.DockerCompose) {
+			return fmt.Errorf("docker_compose path should be relative to challenge directory root")
+		}
+		if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCompose)); err != nil {
+			return fmt.Errorf("docker_compose file does not exist: %s", config.DockerCompose)
+		}
+
+		// Warn if other configuration fields are specified when docker_compose is provided
+		if config.RunCmd != "" {
+			log.Warn("run_cmd will be ignored when docker_compose is specified")
+		}
+		if config.Entrypoint != "" {
+			log.Warn("entrypoint will be ignored when docker_compose is specified")
+		}
+		if config.DockerCtx != "" {
+			log.Warn("docker_context will be ignored when docker_compose is specified")
+		}
+		if config.BaseImage != core.DEFAULT_BASE_IMAGE {
+			log.Warn("base_image will be ignored when docker_compose is specified")
+		}
+		if config.WebRoot != "" {
+			log.Warn("web_root will be ignored when docker_compose is specified")
+		}
+		if config.ServicePath != "" {
+			log.Warn("service_path will be ignored when docker_compose is specified")
+		}
+		if len(config.AptDeps) > 0 {
+			log.Warn("apt_deps will be ignored when docker_compose is specified")
+		}
+		if len(config.SetupScripts) > 0 {
+			log.Warn("setup_scripts will be ignored when docker_compose is specified")
+		}
+	}
+
 	// Run command is only a required value in case of bare challenge types.
-	if config.RunCmd == "" && config.Entrypoint == "" && config.DockerCtx == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
+	if config.RunCmd == "" && config.Entrypoint == "" && config.DockerCtx == "" && config.DockerCompose == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
 		return fmt.Errorf("a valid run_cmd should be provided for the challenge environment")
 	}
 
@@ -457,8 +492,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		}
 	} else if strings.HasPrefix(challType, core.WEB_CHALLENGE_TYPE_NAME) {
 		// Challenge type is web.
-		if config.WebRoot == "" && config.DockerCtx == "" {
-			return errors.New("web root can not be empty for web challenges without custom dockerfile")
+		if config.WebRoot == "" && config.DockerCtx == "" && config.DockerCompose == "" {
+			return errors.New("web root can not be empty for web challenges without custom dockerfile or docker-compose")
 		} else if config.WebRoot != "" {
 			if filepath.IsAbs(config.WebRoot) {
 				return fmt.Errorf("web Root directory path should be relative to challenge directory root")
