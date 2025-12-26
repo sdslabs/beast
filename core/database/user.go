@@ -130,7 +130,7 @@ func CreateUserEntry(user *User) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction", tx.Error)
+		return fmt.Errorf("Error while starting transaction: %v", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(user, *user).Error; err != nil {
