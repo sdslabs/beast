@@ -4,10 +4,10 @@ email = "example@local"
 ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
-name = "compose-php-mysql"
+name = "compose-type"
 flag = "CTF{sample_flag}"
-# Compose challenges are typically easiest to express as docker-type.
-type = "docker"
+
+type = "web"
 points = 200
 
 [challenge.env]
@@ -15,7 +15,6 @@ points = 200
 ports = [10020]
 default_port = 10020
 
-# Enables Compose mode.
-# NOTE: Beast currently runs `docker compose build/up` without `-f`, so use a standard
-# compose filename (like docker-compose.yml) in the challenge root.
+
 docker_compose = "docker-compose.yml"
+web_root = "challenge"
