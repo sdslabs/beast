@@ -49,15 +49,19 @@ func Listen() {
 			h.mu.Unlock()
 		case user := <-h.disconnect:
 			h.mu.Lock()
+			close(user.NotifyChan)
 			h.clients.Remove(user)
 			log.Print("Client disconnected: ", user.Id)
 			log.Print("Num client: ", h.clients.Count())
 			h.mu.Unlock()
 		case notif := <-h.BroadcastChannel:
+			h.mu.Lock()
 			log.Print("Broadcasting notification: ", notif)
 			for _, client := range h.clients.Clients().data {
+				client.NotifyChan <- notif
 				log.Print("Notification sent to ", client.Id)
 			}
+			h.mu.Unlock()
 			// send notifications
 		}
 	}

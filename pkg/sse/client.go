@@ -2,11 +2,15 @@ package sse
 
 import (
 	"sync"
+
+	"github.com/sdslabs/beastv4/core/database"
 )
 
 type SseClient struct {
 	Id   string
 	Name string
+
+	NotifyChan chan database.Notification
 }
 
 type Clients struct {
