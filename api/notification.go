@@ -1,10 +1,13 @@
 package api
 
 import (
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/sse"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,6 +38,7 @@ func addNotification(c *gin.Context) {
 		Title:       title,
 		Description: desc,
 	}
+	sse.BroadcastNotification(notify)
 
 	if err := database.AddNotification(&notify); err != nil {
 		log.Info("Error while adding notification")
@@ -196,4 +200,38 @@ func availableNotificationHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 	return
+}
+
+func streamNotification(c *gin.Context) {
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	user := sse.SseClient{Id: time.Now().String()}
+	sse.AddClient(user)
+
+	defer func() {
+		sse.RemoveClient(user)
+	}()
+
+	welcome := false
+	c.Stream(func(w io.Writer) bool {
+		if !welcome {
+			c.SSEvent("user_connected", user)
+			welcome = true
+			return true
+		}
+		select {
+		case notif, ok := <-sse.BroadcastChannel():
+			if !ok {
+				return false // Channel closed
+			}
+			// Format: "event: <type>\ndata: <json>\n\n"
+			c.SSEvent("Notification", notif)
+			return true
+		case <-c.Request.Context().Done():
+			return false // Client disconnected
+		}
+	})
 }
