@@ -21,8 +21,10 @@ var (
 	MINIMUM_MEMORY_LIMIT int64  = (1 << 23) /* a little over 6MB */
 	AUTHORIZED_KEYS_FILE string = filepath.Join(core.BEAST_GLOBAL_DIR, core.DEFAULT_AUTH_KEYS_FILE)
 
-	BEAST_GLOBAL_CONFIG  string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
-	BEAST_EXAMPLE_CONFIG string = filepath.Join(core.BEAST_EXAMPLE_DIR, core.BEAST_EX_CONFIG_FILE_NAME)
+	BEAST_GLOBAL_CONFIG string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
+
+	BEAST_EXAMPLE_DIRECTORY string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_EXAMPLE_DIR)
+	BEAST_EXAMPLE_CONFIG    string = filepath.Join(BEAST_EXAMPLE_DIRECTORY, core.BEAST_EX_CONFIG_FILE_NAME)
 )
 
 func copySSHKey() error {
@@ -40,7 +42,7 @@ func copySSHKey() error {
 	}
 	defer authorizedKeyFile.Close()
 
-	_, err = io.Copy(publicKeyFile, authorizedKeyFile)
+	_, err = io.Copy(authorizedKeyFile, publicKeyFile)
 	if err != nil {
 		return err
 	}
@@ -82,6 +84,11 @@ func downloadExampleBeastConfig() error {
 
 	if response.StatusCode != http.StatusOK {
 		return errors.New("error while downloading: " + response.Status)
+	}
+
+	err = os.MkdirAll(BEAST_EXAMPLE_DIRECTORY, 0755)
+	if err != nil {
+		return err
 	}
 
 	exampleConfig, err := os.Create(BEAST_EXAMPLE_CONFIG)
