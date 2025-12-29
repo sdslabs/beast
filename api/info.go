@@ -727,7 +727,6 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/submissions [get]
 func submissionsHandler(c *gin.Context) {
-
 	submissions, err := database.QueryAllSubmissions()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -768,12 +767,11 @@ func submissionsHandler(c *gin.Context) {
 				Username:  user.Username,
 				ChallId:   challenge[0].ID,
 				ChallName: challenge[0].Name,
-				Category:  challenge[0].Type,
-				Tags:      challengeTags,
-				Points:    challenge[0].Points,
-				SolvedAt:  submission.CreatedAt,
 				Flag:      submission.Flag,
+				SolvedAt:  submission.CreatedAt,
+				Success:   submission.Solved,
 			}
+
 			submissionsResp = append(submissionsResp, singleSubmissionResp)
 		}
 	}
