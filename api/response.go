@@ -157,11 +157,9 @@ type SubmissionResp struct {
 	Username  string    `json:"username" example:"fristonio"`
 	ChallId   uint      `json:"chall_id" example:"3"`
 	ChallName string    `json:"name" example:"Web Challenge"`
-	Category  string    `json:"category" example:"web"`
-	Tags      []string  `json:"tags" example:"['pwn','misc']"`
-	Points    uint      `json:"points" example:"50"`
 	Flag      string    `json:"flag" example:"flag{@#$}"`
 	SolvedAt  time.Time `json:"solvedAt"`
+	Success   bool      `json:"success" example:"true"`
 }
 
 type FlagSubmitResp struct {
