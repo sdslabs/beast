@@ -25,9 +25,50 @@ var (
 	BEAST_EXAMPLE_CONFIG string = filepath.Join(core.BEAST_EXAMPLE_DIR, core.BEAST_EX_CONFIG_FILE_NAME)
 )
 
+func copySSHKey() error {
+	location := utils.PromptString("Enter absolute public key location (avoid using '~'):")
+
+	publicKeyFile, err := os.Open(location)
+	if err != nil {
+		return err
+	}
+	defer publicKeyFile.Close()
+
+	authorizedKeyFile, err := os.OpenFile(AUTHORIZED_KEYS_FILE, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer authorizedKeyFile.Close()
+
+	_, err = io.Copy(publicKeyFile, authorizedKeyFile)
+	if err != nil {
+		return err
+	}
+
+	_, err = authorizedKeyFile.WriteString("\n\n")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func initAuthorizedKeysFile() error {
 	log.Infoln("Defaulting Authorized keys file:", AUTHORIZED_KEYS_FILE, "... can be changed later")
-	return os.WriteFile(AUTHORIZED_KEYS_FILE, []byte("auth_keys"), 0666)
+
+	err := os.WriteFile(AUTHORIZED_KEYS_FILE, []byte{}, 0666)
+	if err != nil {
+		return err
+	}
+
+	for utils.PromptBinary("Would you like to add a public key to the authorized_keys file?") {
+		err = copySSHKey()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func downloadExampleBeastConfig() error {
