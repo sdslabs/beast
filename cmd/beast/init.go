@@ -212,12 +212,6 @@ func runBeastBootsteps() error {
 
 	log.Infoln(fmt.Sprintf("Created %s directory", core.BEAST_GLOBAL_DIR))
 
-	if err := initAuthorizedKeysFile(); err != nil {
-		return err
-	}
-
-	log.Infoln(fmt.Sprintf("Created %s", AUTHORIZED_KEYS_FILE))
-
 	if err := initBeastConfig(); err != nil {
 		return err
 	}
