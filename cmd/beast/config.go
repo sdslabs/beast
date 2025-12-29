@@ -18,10 +18,11 @@ import (
 )
 
 var (
-	AUTHORIZED_KEYS_FILE = filepath.Join(core.BEAST_GLOBAL_DIR, core.DEFAULT_AUTH_KEYS_FILE)
+	MINIMUM_MEMORY_LIMIT int64  = (1 << 23) /* a little over 6MB */
+	AUTHORIZED_KEYS_FILE string = filepath.Join(core.BEAST_GLOBAL_DIR, core.DEFAULT_AUTH_KEYS_FILE)
 
-	BEAST_GLOBAL_CONFIG  = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
-	BEAST_EXAMPLE_CONFIG = filepath.Join(core.BEAST_EXAMPLE_DIR, core.BEAST_EX_CONFIG_FILE_NAME)
+	BEAST_GLOBAL_CONFIG  string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
+	BEAST_EXAMPLE_CONFIG string = filepath.Join(core.BEAST_EXAMPLE_DIR, core.BEAST_EX_CONFIG_FILE_NAME)
 )
 
 func initAuthorizedKeysFile() error {
@@ -66,9 +67,14 @@ func promptServerDetails(configuration *config.BeastConfig) {
 }
 
 func promptResourceLimits(configuration *config.BeastConfig) {
-	configuration.Memory = utils.PromptInt64("Default CPU Share:", 1024)
-	configuration.PidsLimit = utils.PromptInt64("Default PIDs Limit:", 100)
-	configuration.CPUShares = utils.PromptInt64("Default Memory Limit:", 1024)
+	configuration.CPUShares = utils.PromptInt64("Default CPU Share (must be over 6MB):", core.DEFAULT_CPU_SHARE)
+	configuration.PidsLimit = utils.PromptInt64("Default PIDs Limit:", core.DEFAULT_PIDS_LIMIT)
+	configuration.Memory = utils.PromptInt64("Default Memory Limit:", core.DEFAULT_MEMORY_LIMIT)
+
+	if configuration.Memory < MINIMUM_MEMORY_LIMIT {
+		log.Warnln(fmt.Sprintf("Memory limit provided is below 6MB... setting limit to %v bytes", MINIMUM_MEMORY_LIMIT))
+		configuration.Memory = MINIMUM_MEMORY_LIMIT
+	}
 }
 
 func promptRemoteRepository(configuration *config.BeastConfig) {
