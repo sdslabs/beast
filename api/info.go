@@ -1254,6 +1254,26 @@ func getChallengeAttempts(c *gin.Context) {
 		return
 	}
 
+	challenge, err := database.QueryChallengeEntries("id", challengeIDStr)
+	if err != nil {
+		log.Errorf("DATABASE ERROR while fetching challenge details: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	if len(challenge) == 0 {
+		c.JSON(http.StatusNotFound, HTTPPlainResp{
+			Message: "Challenge not found",
+		})
+		return
+	}
+
+	challengeTags := make([]string, len(challenge[0].Tags))
+	for index, tag := range challenge[0].Tags {
+		challengeTags[index] = tag.TagName
+	}
+
 	attempts, err := database.QueryChallAttempts(challengeID)
 	if err != nil {
 		log.Errorf("DATABASE ERROR while fetching challenge attempts: %s", err.Error())
@@ -1262,14 +1282,17 @@ func getChallengeAttempts(c *gin.Context) {
 		})
 		return
 	}
-	resp := make([]UserSolveResp, 0, len(attempts))
+
+	resp := make([]SubmissionResp, 0, len(attempts))
 	for _, attempt := range attempts {
-		resp = append(resp, UserSolveResp{
-			Id:       attempt.Id,
-			Username: attempt.Username,
-			SolvedAt: attempt.SolvedAt,
-			Flag:     attempt.Flag,
-			Correct:  attempt.Correct,
+		resp = append(resp, SubmissionResp{
+			UserId:    attempt.UserId,
+			Username:  attempt.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			Flag:      attempt.Flag,
+			SolvedAt:  attempt.SolvedAt,
+			Success:   attempt.Correct,
 		})
 	}
 	c.JSON(http.StatusOK, resp)
