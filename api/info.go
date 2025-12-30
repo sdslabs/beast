@@ -770,6 +770,7 @@ func submissionsHandler(c *gin.Context) {
 				Flag:      submission.Flag,
 				SolvedAt:  submission.CreatedAt,
 				Success:   submission.Solved,
+				Cheating:  submission.Cheating,
 			}
 
 			submissionsResp = append(submissionsResp, singleSubmissionResp)
@@ -1303,7 +1304,7 @@ func getChallengeAttempts(c *gin.Context) {
 
 	resp := make([]SubmissionResp, 0, len(attempts))
 	for _, attempt := range attempts {
-		if isContestant && !attempt.Correct {
+		if isContestant && (!attempt.Correct || attempt.Cheating) {
 			continue
 		}
 
@@ -1318,6 +1319,7 @@ func getChallengeAttempts(c *gin.Context) {
 
 		if !isContestant {
 			submissionResp.Flag = attempt.Flag
+			submissionResp.Cheating = attempt.Cheating
 		}
 
 		resp = append(resp, submissionResp)
@@ -1393,7 +1395,7 @@ func getUserAttempts(c *gin.Context) {
 	resp := make([]SubmissionResp, 0, len(attempts))
 
 	for _, attempt := range attempts {
-		if isContestant && !attempt.Correct {
+		if isContestant && (!attempt.Correct || attempt.Cheating) {
 			continue
 		}
 
@@ -1422,6 +1424,7 @@ func getUserAttempts(c *gin.Context) {
 
 		if !isContestant {
 			submissionResp.Flag = attempt.Flag
+			submissionResp.Cheating = attempt.Cheating
 		}
 
 		resp = append(resp, submissionResp)

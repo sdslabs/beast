@@ -176,6 +176,7 @@ func submitFlagHandler(c *gin.Context) {
 		}
 
 		// If the challenge is dynamic, then the flag is not stored in the database
+		var isCheating bool
 		if challenge.DynamicFlag {
 			whereMap := map[string]interface{}{
 				"Name": challenge.Name,
@@ -185,15 +186,6 @@ func submitFlagHandler(c *gin.Context) {
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-
-			// flag not present in validFlags table
-			if len(validFlags) == 0 {
-				c.JSON(http.StatusOK, FlagSubmitResp{
-					Message: "Your flag is incorrect",
-					Success: false,
 				})
 				return
 			}
@@ -209,13 +201,42 @@ func submitFlagHandler(c *gin.Context) {
 				})
 				return
 			}
-			if len(submissions) > 0 {
+
+			flagInValidFlags := len(validFlags) > 0
+			flagInSubmissions := len(submissions) > 0
+
+			// Case 1: Flag not in validFlags (incorrect flag) - no cheating detection for wrong flags
+			if !flagInValidFlags {
+				UserChallengesEntry := database.UserChallenges{
+					CreatedAt:   time.Now(),
+					UserID:      user.ID,
+					ChallengeID: challenge.ID,
+					Solved:      false,
+					Flag:        flag,
+					Cheating:    false,
+				}
+				err = database.SaveFlagSubmission(&UserChallengesEntry)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+						Error: "DATABASE ERROR while processing the request.",
+					})
+					return
+				}
+				c.JSON(http.StatusOK, FlagSubmitResp{
+					Message: "Your flag is incorrect",
+					Success: false,
+				})
+				return
+			}
+
+			// Case 2: Flag in validFlags and in submissions, cheating with valid flag
+			if flagInValidFlags && flagInSubmissions {
 				if user.ID != submissions[0].UserID {
-					// notify the admin about cheating
 					subuser, _ := database.QueryUserById(submissions[0].UserID)
-					msg := "User " + subuser.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by another user " + user.Username
+					msg := "User " + user.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by user " + subuser.Username
 					go notify.SendNotification(notify.Warning, msg)
-					go coreUtils.LogCheating(msg)
+					isCheating = true
+					// Continue to end of function with Solved: true, Cheating: true
 				} else {
 					c.JSON(http.StatusOK, FlagSubmitResp{
 						Message: "You have already solved this challenge",
@@ -224,6 +245,9 @@ func submitFlagHandler(c *gin.Context) {
 					return
 				}
 			}
+
+			// Case 3: Flag in validFlags but not in submissions (solved without cheating) and saved at the end.
+
 		} else {
 			if challenge.Flag != flag {
 				UserChallengesEntry := database.UserChallenges{
@@ -294,6 +318,7 @@ func submitFlagHandler(c *gin.Context) {
 			ChallengeID: challenge.ID,
 			Solved:      true,
 			Flag:        flag,
+			Cheating:    isCheating,
 		}
 
 		err = database.SaveFlagSubmission(&UserChallengesEntry)
