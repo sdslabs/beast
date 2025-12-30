@@ -1325,6 +1325,111 @@ func getChallengeAttempts(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// Get submissions by user ID
+// @Summary Get submissions by user
+// @Description Returns all submissions for a specific user
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param user_id path int true "User ID"
+// @Param Authorization header string true "Bearer"
+// @Success 200 {array} api.SubmissionResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/submissions/user/{user_id} [get]
+func getUserAttempts(c *gin.Context) {
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	isContestant := user.Role == core.USER_ROLES["contestant"]
+
+	userIDStr := c.Param("user_id")
+	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid user_id",
+		})
+		return
+	}
+
+	submissionUser, err := database.QueryUserById(uint(userID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "User not found",
+		})
+		return
+	}
+
+	if submissionUser.Role != core.USER_ROLES["contestant"] {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Can only view submissions for contestants",
+		})
+		return
+	}
+
+	attempts, err := database.QueryUserAttempts(uint(userID))
+	if err != nil {
+		log.Errorf("DATABASE ERROR while fetching user attempts: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	resp := make([]SubmissionResp, 0, len(attempts))
+
+	for _, attempt := range attempts {
+		if isContestant && !attempt.Correct {
+			continue
+		}
+
+		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(attempt.ChallengeID)))
+		if err != nil {
+			log.Errorf("DATABASE ERROR while fetching challenge details: %s", err.Error())
+			continue
+		}
+		if len(challenge) == 0 {
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge[0].Tags))
+		for index, tag := range challenge[0].Tags {
+			challengeTags[index] = tag.TagName
+		}
+
+		submissionResp := SubmissionResp{
+			UserId:    submissionUser.ID,
+			Username:  submissionUser.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			SolvedAt:  attempt.SolvedAt,
+			Success:   attempt.Correct,
+		}
+
+		if !isContestant {
+			submissionResp.Flag = attempt.Flag
+		}
+
+		resp = append(resp, submissionResp)
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
 func getLeaderboardGraphHandler(c *gin.Context) {
 	var topUsers []uint
 	// TODO: Add a check for leaderboard stale to prevent stale graphs
