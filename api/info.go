@@ -1245,6 +1245,24 @@ func unfreezeLeaderboardHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/challenges/{challenge_id}/attempts [get]
 func getChallengeAttempts(c *gin.Context) {
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	queryingUser, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	isContestant := queryingUser.Role == core.USER_ROLES["contestant"]
+
 	challengeIDStr := c.Param("challenge_id")
 	challengeID, err := strconv.ParseUint(challengeIDStr, 10, 64)
 	if err != nil {
@@ -1285,15 +1303,24 @@ func getChallengeAttempts(c *gin.Context) {
 
 	resp := make([]SubmissionResp, 0, len(attempts))
 	for _, attempt := range attempts {
-		resp = append(resp, SubmissionResp{
+		if isContestant && !attempt.Correct {
+			continue
+		}
+
+		submissionResp := SubmissionResp{
 			UserId:    attempt.UserId,
 			Username:  attempt.Username,
 			ChallId:   challenge[0].ID,
 			ChallName: challenge[0].Name,
-			Flag:      attempt.Flag,
 			SolvedAt:  attempt.SolvedAt,
 			Success:   attempt.Correct,
-		})
+		}
+
+		if !isContestant {
+			submissionResp.Flag = attempt.Flag
+		}
+
+		resp = append(resp, submissionResp)
 	}
 	c.JSON(http.StatusOK, resp)
 }
