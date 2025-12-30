@@ -86,12 +86,13 @@ type UserChallenges struct {
 }
 
 type ChallengeAttempt struct {
-	Id       uint      `json:"id"`
-	UserId   uint      `json:"userId"`
-	Username string    `json:"username"`
-	SolvedAt time.Time `json:"solvedAt"`
-	Flag     string    `json:"flag"`
-	Correct  bool      `json:"correct"`
+	Id          uint      `json:"id"`
+	UserId      uint      `json:"userId"`
+	ChallengeID uint      `json:"challengeId"`
+	Username    string    `json:"username"`
+	SolvedAt    time.Time `json:"solvedAt"`
+	Flag        string    `json:"flag"`
+	Correct     bool      `json:"correct"`
 }
 type UserLeaderboardResp struct {
 	Id             uint         `json:"id" example:"5"`
@@ -687,6 +688,26 @@ func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
 		Select("user_challenges.id as id, user_challenges.user_id as user_id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct").
 		Joins("JOIN users ON users.id = user_challenges.user_id").
 		Where("user_challenges.challenge_id = ?", chall_id).
+		Order("user_challenges.created_at ASC").
+		Scan(&attempts).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return attempts, nil
+}
+
+// QueryUserAttempts queries all attempts for a given user ID
+func QueryUserAttempts(user_id uint) ([]ChallengeAttempt, error) {
+	var attempts []ChallengeAttempt
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	err := Db.Table("user_challenges").
+		Select("user_challenges.id as id, user_challenges.user_id as user_id, user_challenges.challenge_id as challenge_id, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct, user_challenges.cheating as cheating").
+		Where("user_challenges.user_id = ?", user_id).
 		Order("user_challenges.created_at ASC").
 		Scan(&attempts).Error
 
