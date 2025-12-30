@@ -73,6 +73,7 @@ type Challenge struct {
 }
 
 type UserChallenges struct {
+	ID        uint `gorm:"primaryKey"`
 	CreatedAt time.Time
 	User      User `gorm:"foreignKey:UserID"`
 	UserID    uint
@@ -86,6 +87,7 @@ type UserChallenges struct {
 
 type ChallengeAttempt struct {
 	Id       uint      `json:"id"`
+	UserId   uint      `json:"userId"`
 	Username string    `json:"username"`
 	SolvedAt time.Time `json:"solvedAt"`
 	Flag     string    `json:"flag"`
@@ -682,7 +684,7 @@ func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
 	defer DBMux.Unlock()
 
 	err := Db.Table("user_challenges").
-		Select("user_challenges.id as id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct").
+		Select("user_challenges.id as id, user_challenges.user_id as user_id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct").
 		Joins("JOIN users ON users.id = user_challenges.user_id").
 		Where("user_challenges.challenge_id = ?", chall_id).
 		Order("user_challenges.created_at ASC").
