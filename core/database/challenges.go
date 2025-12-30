@@ -83,6 +83,7 @@ type UserChallenges struct {
 	Tries       uint   `gorm:"not null;default:0"`
 	Solved      bool   `gorm:"not null;default:false;index"`
 	Flag        string `gorm:"type:text"`
+	Cheating    bool   `gorm:"not null;default:false"`
 }
 
 type ChallengeAttempt struct {
@@ -93,6 +94,7 @@ type ChallengeAttempt struct {
 	SolvedAt    time.Time `json:"solvedAt"`
 	Flag        string    `json:"flag"`
 	Correct     bool      `json:"correct"`
+	Cheating    bool      `json:"cheating"`
 }
 type UserLeaderboardResp struct {
 	Id             uint         `json:"id" example:"5"`
@@ -685,7 +687,7 @@ func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
 	defer DBMux.Unlock()
 
 	err := Db.Table("user_challenges").
-		Select("user_challenges.id as id, user_challenges.user_id as user_id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct").
+		Select("user_challenges.id as id, user_challenges.user_id as user_id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct, user_challenges.cheating as cheating").
 		Joins("JOIN users ON users.id = user_challenges.user_id").
 		Where("user_challenges.challenge_id = ?", chall_id).
 		Order("user_challenges.created_at ASC").

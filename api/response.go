@@ -160,6 +160,7 @@ type SubmissionResp struct {
 	Flag      string    `json:"flag" example:"flag{@#$}"`
 	SolvedAt  time.Time `json:"solvedAt"`
 	Success   bool      `json:"success" example:"true"`
+	Cheating  bool      `json:"cheating" example:"false"`
 }
 
 type FlagSubmitResp struct {
