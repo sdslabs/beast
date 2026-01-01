@@ -13,7 +13,6 @@ var (
 
 type Hub struct {
 	clients          Clients
-	mu               sync.Mutex
 	connect          chan SseClient
 	disconnect       chan SseClient
 	BroadcastChannel chan database.Notification
@@ -21,7 +20,6 @@ type Hub struct {
 
 func Init() {
 	h = &Hub{
-		mu: sync.Mutex{},
 		clients: Clients{
 			data: make(map[string]SseClient),
 			mu:   sync.Mutex{},
@@ -39,26 +37,20 @@ func Listen() {
 	for {
 		select {
 		case user := <-h.connect:
-			h.mu.Lock()
 			h.clients.Add(user)
 			log.Print("New client connected: ", user.Id)
 			log.Print("Num client: ", h.clients.Count())
-			h.mu.Unlock()
 		case user := <-h.disconnect:
-			h.mu.Lock()
 			close(user.NotifyChan)
 			h.clients.Remove(user)
 			log.Print("Client disconnected: ", user.Id)
 			log.Print("Num client: ", h.clients.Count())
-			h.mu.Unlock()
 		case notif := <-h.BroadcastChannel:
-			h.mu.Lock()
 			log.Print("Broadcasting notification: ", notif)
 			for _, client := range h.clients.Clients().data {
 				client.NotifyChan <- notif
 				log.Print("Notification sent to ", client.Id)
 			}
-			h.mu.Unlock()
 			// send notifications
 		}
 	}
