@@ -36,7 +36,7 @@ func copySSHKey() error {
 	}
 	defer publicKeyFile.Close()
 
-	authorizedKeyFile, err := os.OpenFile(AUTHORIZED_KEYS_FILE, os.O_APPEND|os.O_WRONLY, 0644)
+	authorizedKeyFile, err := os.OpenFile(AUTHORIZED_KEYS_FILE, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
