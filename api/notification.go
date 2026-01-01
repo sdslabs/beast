@@ -3,9 +3,9 @@ package api
 import (
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/sse"
 	log "github.com/sirupsen/logrus"
@@ -210,7 +210,7 @@ func streamNotification(c *gin.Context) {
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 
 	user := sse.SseClient{
-		Id:         time.Now().String(),
+		Id:         uuid.NewString(),
 		NotifyChan: make(chan database.Notification),
 	}
 	sse.AddClient(user)
