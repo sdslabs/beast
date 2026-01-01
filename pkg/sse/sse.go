@@ -3,7 +3,6 @@ package sse
 import (
 	"sync"
 
-	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/database"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,8 +18,6 @@ type Hub struct {
 	disconnect       chan SseClient
 	BroadcastChannel chan database.Notification
 }
-
-type HandlerFunc func(*gin.Context)
 
 func Init() {
 	h = &Hub{

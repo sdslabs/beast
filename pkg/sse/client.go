@@ -7,8 +7,7 @@ import (
 )
 
 type SseClient struct {
-	Id   string
-	Name string
+	Id string
 
 	NotifyChan chan database.Notification
 }
