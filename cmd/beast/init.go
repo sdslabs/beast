@@ -9,6 +9,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -197,7 +198,17 @@ func initDb() error {
 
 func initAdmin() error {
 	if result := utils.PromptBinary("Create an administrative user for beast?"); result {
-		return createAdminCmd.Execute()
+		config.InitConfig()
+
+		name := utils.PromptString("Enter admin name")
+		email := utils.PromptString("Enter admin email")
+		username := utils.PromptString("Enter admin username")
+		password := utils.PromptSecret("Enter admin password")
+
+		publicKeyPath := utils.PromptString("Enter public key path")
+
+		createAuthorAdminPrereq()
+		coreUtils.CreateAdminOrAuthor(name, username, email, publicKeyPath, password, "admin")
 	}
 
 	return nil

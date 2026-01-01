@@ -11,6 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func createAuthorAdminPrereq() {
+	config.InitConfig()
+
+	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
+}
+
 var createAuthorCmd = &cobra.Command{
 	Use:   "create-author",
 	Short: "Creates new author",
@@ -41,10 +47,7 @@ var createAuthorCmd = &cobra.Command{
 	},
 
 	Run: func(cmd *cobra.Command, args []string) {
-		config.InitConfig()
-
-		auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
-
+		createAuthorAdminPrereq()
 		utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "author")
 	},
 }
@@ -79,10 +82,7 @@ var createAdminCmd = &cobra.Command{
 	},
 
 	Run: func(cmd *cobra.Command, args []string) {
-		config.InitConfig()
-
-		auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
-
+		createAuthorAdminPrereq()
 		utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "admin")
 	},
 }
