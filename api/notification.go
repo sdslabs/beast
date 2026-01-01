@@ -38,7 +38,6 @@ func addNotification(c *gin.Context) {
 		Title:       title,
 		Description: desc,
 	}
-	sse.BroadcastNotification(notify)
 
 	if err := database.AddNotification(&notify); err != nil {
 		log.Info("Error while adding notification")
@@ -47,6 +46,8 @@ func addNotification(c *gin.Context) {
 		})
 		return
 	}
+	sse.BroadcastNotification(notify)
+
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "Notification successfully added",
 	})
