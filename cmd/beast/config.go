@@ -28,7 +28,15 @@ var (
 )
 
 func copySSHKey() error {
-	location := utils.PromptString("Enter absolute public key location (avoid using '~'):")
+	location, err := utils.PromptPublicKeyFile()
+	if err != nil {
+		return err
+	}
+
+	if location == "" {
+		log.Warnln("No public key file selected... aborting")
+		return nil
+	}
 
 	publicKeyFile, err := os.Open(location)
 	if err != nil {
@@ -52,6 +60,7 @@ func copySSHKey() error {
 		return err
 	}
 
+	log.Infoln(fmt.Sprintf("Added ssh key at %s", location))
 	return nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
@@ -201,11 +202,33 @@ func initAdmin() error {
 		config.InitConfig()
 
 		name := utils.PromptString("Enter admin name")
-		email := utils.PromptString("Enter admin email")
-		username := utils.PromptString("Enter admin username")
-		password := utils.PromptSecret("Enter admin password")
+		if name == "" {
+			return errors.New("admin name is required")
+		}
 
-		publicKeyPath := utils.PromptString("Enter public key path")
+		email := utils.PromptString("Enter admin email")
+		if email == "" {
+			return errors.New("admin email is required")
+		}
+
+		username := utils.PromptString("Enter admin username")
+		if username == "" {
+			return errors.New("admin username is required")
+		}
+
+		password := utils.PromptSecret("Enter admin password")
+		if password == "" {
+			return errors.New("admin password is required")
+		}
+
+		publicKeyPath, err := utils.PromptPublicKeyFile()
+		if err != nil {
+			return err
+		} else if publicKeyPath == "" {
+			return errors.New("no public key file selected")
+		}
+
+		database.Init()
 
 		createAuthorAdminPrereq()
 		coreUtils.CreateAdminOrAuthor(name, username, email, publicKeyPath, password, "admin")
