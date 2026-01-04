@@ -2,7 +2,7 @@ package utils
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func CreateAdminOrAuthor(name, username, email, publicKeyPath, password, role string) {
+func CreateAdminOrAuthor(name string, username string, email string, publicKeyPath string, password string, role string) {
 	var sshKey []byte
 	if publicKeyPath != "" {
 		err := utils.ValidateFileExists(publicKeyPath)
@@ -20,7 +20,7 @@ func CreateAdminOrAuthor(name, username, email, publicKeyPath, password, role st
 			return
 		}
 
-		sshKey, err = ioutil.ReadFile(publicKeyPath)
+		sshKey, err = os.ReadFile(publicKeyPath)
 		if err != nil {
 			log.Errorf("Error while reading file: %v", err)
 			return
