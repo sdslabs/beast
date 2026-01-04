@@ -177,6 +177,13 @@ func initDb() error {
 		log.Infoln(fmt.Sprintf("User %s already exists", configuration.PsqlConf.User))
 	}
 
+	log.Infoln(fmt.Sprintf("Changing password for user %s", configuration.PsqlConf.User))
+	query := fmt.Sprintf("ALTER USER %s WITH PASSWORD '%s';", pq.QuoteIdentifier(configuration.PsqlConf.User), configuration.PsqlConf.Password)
+	_, err = db.Exec(query)
+	if err != nil {
+		return err
+	}
+
 	err = db.QueryRow("SELECT 1 FROM pg_database WHERE datname = $1", configuration.PsqlConf.Dbname).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
 		if err = createBeastDatabase(db, &configuration.PsqlConf); err != nil {
