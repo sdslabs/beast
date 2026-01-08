@@ -3,6 +3,7 @@ package api
 import (
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -209,15 +210,16 @@ func streamNotification(c *gin.Context) {
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	user := sse.SseClient{
-		Id:         uuid.NewString(),
-		NotifyChan: make(chan database.Notification),
-	}
+	user := sse.NewSseClient(uuid.NewString())
 	sse.AddClient(user)
+	log.Print("adding id: ", user.Id)
 
 	defer func() {
 		sse.RemoveClient(user)
 	}()
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 
 	welcome := false
 	c.Stream(func(w io.Writer) bool {
@@ -229,10 +231,13 @@ func streamNotification(c *gin.Context) {
 		select {
 		case notif, ok := <-user.NotifyChan:
 			if !ok {
-				return false // Channel closed
+				return false // SSE Stream closed
 			}
-			// Format: "event: <type>\ndata: <json>\n\n"
 			c.SSEvent("notification", notif)
+			return true
+		case <-ticker.C:
+			// Keeps connection open, prevents connection drop on cloud
+			c.SSEvent("ping", "keep-alive")
 			return true
 		case <-c.Request.Context().Done():
 			return false // Client disconnected

@@ -14,6 +14,7 @@ require (
 	github.com/gin-gonic/gin v1.7.0
 	github.com/go-sql-driver/mysql v1.4.0
 	github.com/golang/protobuf v1.3.3
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/jinzhu/gorm v1.9.1
 	github.com/lib/pq v1.0.0
@@ -64,7 +65,6 @@ require (
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect

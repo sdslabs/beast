@@ -12,69 +12,113 @@ var (
 )
 
 type Hub struct {
-	clients          Clients
-	connect          chan SseClient
-	disconnect       chan SseClient
+	data             map[string]*Client
+	connect          chan *Client
+	disconnect       chan *Client
 	BroadcastChannel chan database.Notification
+
+	quit chan struct{}
+	done chan struct{}
+
+	once sync.Once // only for safe closure
 }
 
 func Init() {
 	h = &Hub{
-		clients: Clients{
-			data: make(map[string]SseClient),
-			mu:   sync.Mutex{},
-		},
-		connect:          make(chan SseClient), // TODO: Make them Buffered to avoid blocking due to bad internet speed
-		disconnect:       make(chan SseClient),
-		BroadcastChannel: make(chan database.Notification),
-	}
-	go Listen()
-	log.Debug("SSE hub initialized....")
+		data:             make(map[string]*Client),
+		connect:          make(chan *Client, SSE_CONNECT_BUFFER),
+		disconnect:       make(chan *Client, SSE_DISCONNECT_BUFFER),
+		BroadcastChannel: make(chan database.Notification, SSE_BROADCAST_BUFFER),
 
+		quit: make(chan struct{}),
+		done: make(chan struct{}), // Initialize the channel
+	}
+	go listen()
 }
 
-func Listen() {
+func listen() {
+	defer close(h.done)
+
+	log.Println("Hub started listening...")
+
 	for {
 		select {
-		case user := <-h.connect:
-			h.clients.Add(user)
-			log.Print("New client connected: ", user.Id)
-			log.Print("Num client: ", h.clients.Count())
-		case user := <-h.disconnect:
-			close(user.NotifyChan)
-			h.clients.Remove(user)
-			log.Print("Client disconnected: ", user.Id)
-			log.Print("Num client: ", h.clients.Count())
-		case notif := <-h.BroadcastChannel:
-			log.Print("Broadcasting notification: ", notif)
-			for _, client := range h.clients.Clients().data {
-				client.NotifyChan <- notif
-				log.Print("Notification sent to ", client.Id)
+
+		case user, ok := <-h.connect:
+			if !ok {
+				return
 			}
-			// send notifications
+			add(user)
+		case user, ok := <-h.disconnect:
+			if !ok {
+				return
+			}
+			if client, exists := h.data[user.Id]; exists {
+				close(client.NotifyChan)
+				remove(user)
+			}
+		case notif, ok := <-h.BroadcastChannel:
+			if !ok {
+				return
+			}
+			log.Printf("Broadcasting notification: id: [%v] %s", notif.ID, notif.Title)
+			for _, client := range h.data {
+				select {
+				case client.NotifyChan <- notif:
+					log.Print("Notification sent to ", client.Id)
+				default:
+					// For now we are dropping the notifications if the buffer is full
+					log.Printf("Skipping client %s (buffer full)", client.Id)
+				}
+
+			}
+		case <-h.quit:
+			log.Println("Hub shutting down...")
+
+			for _, client := range h.data {
+				close(client.NotifyChan)
+			}
+			log.Println("Hub shutdown complete. All clients disconnected.")
+			return
 		}
 	}
 }
 
-func Close() {
-	close(h.connect)
-	close(h.disconnect)
-	close(h.BroadcastChannel)
+func Shutdown() {
+	h.once.Do(func() {
+		close(h.quit) // send the signal <-h.quit in the select statement
+		<-h.done
+	})
 }
 
-func BroadcastChannel() chan database.Notification {
-	return h.BroadcastChannel
+func AddClient(user *Client) {
+	select {
+	case h.connect <- user:
+	case <-h.quit:
+	}
 }
 
-func AddClient(user SseClient) {
-	h.connect <- user
-}
-
-func RemoveClient(user SseClient) {
-	h.disconnect <- user
-	// handle connection cleanup in the main loop
+func RemoveClient(user *Client) {
+	select {
+	case h.disconnect <- user:
+	case <-h.quit:
+	}
 }
 
 func BroadcastNotification(notif database.Notification) {
-	h.BroadcastChannel <- notif
+	select {
+	case h.BroadcastChannel <- notif:
+	case <-h.quit:
+	}
+}
+
+func add(user *Client) {
+	h.data[user.Id] = user
+}
+
+func remove(user *Client) {
+	delete(h.data, user.Id)
+}
+func count() int {
+	return len(h.data)
 }
