@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sdslabs/beastv4/core"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,10 +18,15 @@ var runCmd = &cobra.Command{
 	Long:  "Run beast API server using beast/api/server, optionally an argument can be provided to specify the port to run the server on.",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		err := runBeastBootsteps()
-		if err != nil {
-			log.Error("Error while running Beast bootsteps.")
-			os.Exit(1)
+		if _, err := os.Stat(core.BEAST_GLOBAL_DIR); os.IsNotExist(err) {
+			log.Infof("%s directory not found... running Beast bootsteps...\n", core.BEAST_GLOBAL_DIR)
+
+			if err := runBeastBootsteps(); err != nil {
+				log.Error("Error while running Beast bootsteps.")
+				os.Exit(1)
+			}
+
+			log.Infoln("beast bootsteps complete... starting beast server")
 		}
 
 		sigChan := make(chan os.Signal, 1)

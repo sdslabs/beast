@@ -17,6 +17,7 @@ const ( //names
 	BEAST_LOCAL_SERVER          string = "BEAST_LOCAL_SERVER"
 	CHALLENGE_CONFIG_FILE_NAME  string = "beast.toml"
 	BEAST_CONFIG_FILE_NAME      string = "config.toml"
+	BEAST_EX_CONFIG_FILE_NAME   string = "example.config.toml"
 	BEAST_LOG_FILE              string = "beast.log"
 	BEAST_CHEAT_LOG_FILE        string = "cheat.log"
 	BEAST_FLAG_LOG_FILE         string = "flag.log"
@@ -35,12 +36,14 @@ const ( //names
 	DELIMITER                   string = "::::"
 	LOCALHOST                   string = "localhost"
 	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
+	DOCKER_PID                  string = "/var/run/docker.pid"
+	POSTGRES_SUPER_USER         string = "postgres"
 )
 
 const ( //paths
 	BEAST_DOCKER_CHALLENGE_DIR     string = "/challenge"
 	BEAST_CHALLENGE_LOGS_DIR       string = "logs"
-	DEFAULT_AUTH_KEYS_FILE         string = ".ssh/authorized_keys"
+	DEFAULT_AUTH_KEYS_FILE         string = "beast_authorized_keys"
 	BEAST_STAGING_DIR              string = "staging"
 	BEAST_SCRIPTS_DIR              string = "scripts"
 	BEAST_REMOTES_DIR              string = "remote"
@@ -49,6 +52,8 @@ const ( //paths
 	BEAST_ASSETS_DIR               string = "assets"
 	BEAST_LOGO_DIR                 string = "logo"
 	BEAST_EMAIL_TEMPLATE_DIR       string = "mailTemplates"
+	BEAST_SECRETS_DIR              string = "secrets"
+	BEAST_EXAMPLE_DIR              string = "_examples"
 )
 
 const ( //chall types
@@ -206,6 +211,11 @@ var USER_STATUS = map[string]string{
 }
 
 const (
-	LEADERBOARD_SIZE = 25
+	LEADERBOARD_SIZE       = 25
 	LEADERBOARD_GRAPH_SIZE = 12
 )
+
+var NOTIFICATION_SERVICES = []string{
+	"slack",
+	"discord",
+}
