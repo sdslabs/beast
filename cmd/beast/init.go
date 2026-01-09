@@ -231,8 +231,9 @@ func initAdmin() error {
 		publicKeyPath, err := utils.PromptPublicKeyFile()
 		if err != nil {
 			return err
-		} else if publicKeyPath == "" {
-			return errors.New("no public key file selected")
+		}
+		if publicKeyPath == "" {
+			log.Warnln("No public key provided... proceeding without it")
 		}
 
 		database.Init()
