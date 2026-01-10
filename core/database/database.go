@@ -102,14 +102,14 @@ func ConnectDatabase() error {
 	// Check if the DB exists, if not, create it.
 	exists, err := checkDatabaseExists()
 	if err != nil {
-		log.Errorf("Failed checking if db exists: %v", err)
+		log.Errorf("failed checking if db exists: %v", err)
 		return err
 	}
 	if !exists {
 		log.Infof("Database '%s' does not exist. Creating...", dbConfig.PsqlConf.Dbname)
 		if err := createDatabase(); err != nil {
-			log.Fatalf("Failed to create database: %v", err)
-			return err
+			// If unable to make DB connection then it should fail immediately
+			log.Fatalf("failed to create database: %v", err)
 		}
 		log.Infof("Database '%s' created successfully.", dbConfig.PsqlConf.Dbname)
 	}
