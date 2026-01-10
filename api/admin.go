@@ -40,10 +40,10 @@ func userActionHandler(c *gin.Context) {
 	} else if action == core.USER_STATUS["unban"] {
 		userState = 0
 	} else if action == core.USER_STATUS["hide"] {
-		userState = 2 
+		userState = 2
 	} else if action == core.USER_STATUS["unhide"] {
 		userState = 0
-	} 
+	}
 
 	parsedUserId, err := strconv.Atoi(userId)
 	if err != nil {
@@ -68,7 +68,7 @@ func userActionHandler(c *gin.Context) {
 		})
 		return
 	}
-	if val, _:= database.IsFrozenScoreSet(); !val {
+	if val, _ := database.IsFrozenScoreSet(); !val {
 		leaderboardStale = true
 		graphCacheStale = true
 	}
@@ -76,4 +76,3 @@ func userActionHandler(c *gin.Context) {
 		Message: fmt.Sprintf("Successfully %sned the user with id %s", action, userId),
 	})
 }
-

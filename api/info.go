@@ -157,10 +157,19 @@ func hintHandler(c *gin.Context) {
 		})
 		return
 	}
+	
+	oldScore := user.Score
+	newScore := oldScore - hint.Points
+	if newScore < 0 {
+		newScore = 0
+	}
 
-	leaderboardStale = true
-	adminLeaderboardStale = true
-	graphCacheStale = true
+	if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
+		(len(adminLeaderboardCache) > 0 && oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
+	}
 
 	// Return the hint description after successfully taking it
 	c.JSON(http.StatusOK, HTTPPlainResp{

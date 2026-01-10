@@ -236,7 +236,7 @@ func register(c *gin.Context) {
 		Email:     email,
 		SshKey:    sshKey,
 	}
-	
+
 	// skip otp verif if -n flag is enabled
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
@@ -277,9 +277,11 @@ func register(c *gin.Context) {
 		return
 	}
 
-	leaderboardStale = true
-	adminLeaderboardStale = true
-	graphCacheStale = true
+	if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE {
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
+	}
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User created successfully",
