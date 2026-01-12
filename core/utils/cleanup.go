@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"strings"
 
 	container_types "github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
@@ -50,7 +51,7 @@ func Cleanup() {
 }
 
 func CleanupContainerByFilter(filter, filterVal string) error {
-	if filter != "id" && filter != "name" {
+	if filter != "id" && filter != "name" && filter != "label" {
 		return fmt.Errorf("Not a valid filter %s", filter)
 	}
 	var containers []container_types.Container
@@ -97,13 +98,48 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 }
 
 func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChallengeConfig) error {
+	if chall.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		log.Debugf("Using label-based cleanup for Docker Compose challenge: %s", chall.Name)
+		projectName := fmt.Sprintf("beast-%s", chall.Name)
+
+		if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
+			findCommand := fmt.Sprintf("docker ps -aq --filter label=com.docker.compose.project=%s", projectName)
+			output, err := remoteManager.RunCommandOnServer(server, findCommand)
+			if err != nil {
+				log.Warnf("Failed to find containers by label on remote: %v", err)
+			} else {
+				containerIds := strings.Fields(strings.TrimSpace(output))
+				if len(containerIds) > 0 {
+					removeCommand := fmt.Sprintf("docker rm -f %s", strings.Join(containerIds, " "))
+					_, err = remoteManager.RunCommandOnServer(server, removeCommand)
+					if err != nil {
+						log.Errorf("Error removing containers on remote: %v", err)
+						return err
+					}
+				}
+			}
+
+			downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
+			_, _ = remoteManager.RunCommandOnServer(server, downCommand)
+		} else {
+			err := CleanupContainerByFilter("label", fmt.Sprintf("com.docker.compose.project=%s", projectName))
+			if err != nil {
+				log.Warnf("Label-based cleanup failed, trying project cleanup: %v", err)
+			}
+		}
+
+		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
+		return nil
+	}
+
 	if IsContainerIdValid(chall.ContainerId) {
 		err := CleanupContainerByFilter("id", chall.ContainerId)
 		if err != nil {
 			return err
 		}
 
-		database.UpdateChallenge(chall, map[string]interface{}{"ContainerId": GetTempContainerId(chall.Name)})
+		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
 	}
 
 	err := CleanupContainerByFilter("name", EncodeID(config.Challenge.Metadata.Name))
@@ -126,7 +162,7 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 		}
 	}
 
-	database.UpdateChallenge(chall, map[string]interface{}{"ImageId": GetTempImageId(chall.Name)})
+	database.UpdateChallenge(chall, map[string]any{"ImageId": GetTempImageId(chall.Name)})
 
 	return nil
 }
