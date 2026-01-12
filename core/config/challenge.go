@@ -464,6 +464,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if len(config.SetupScripts) > 0 {
 			log.Warn("setup_scripts will be ignored when docker_compose is specified")
 		}
+		return nil
 	}
 
 	// Run command is only a required value in case of bare challenge types.
