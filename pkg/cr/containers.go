@@ -286,24 +286,50 @@ func CommitContainer(containerId string) (string, error) {
 	return commitResp.ID, nil
 }
 
-func DeployContainerFromCompose(challengeName, stagedPath string) error {
+func DeployContainerFromCompose(challengeName, stagedPath, composeFileName string) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
-	log.Debugf("Deploying challenge %s using docker-compose at %s", challengeName, extractDir)
-	upCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose up -d", extractDir))
+	projectName := fmt.Sprintf("beast-%s", challengeName)
+	composeFile := filepath.Join(extractDir, composeFileName)
+
+	log.Debugf("Deploying challenge %s using docker compose with project name %s and file %s", challengeName, projectName, composeFileName)
+
+	// Deploy with project name - Docker Compose automatically labels containers with
+	// com.docker.compose.project=<projectName>
+	upCmd := exec.Command("docker", "compose",
+		"-f", composeFile,
+		"-p", projectName,
+		"up", "-d")
+
 	var upOutput bytes.Buffer
 	upCmd.Stdout = &upOutput
 	upCmd.Stderr = &upOutput
 
 	if err := upCmd.Run(); err != nil {
-		log.Errorf("docker-compose up failed for challenge %s. Output:\n%s", challengeName, upOutput.String())
-		return fmt.Errorf("error while running docker compose up: %v", err)
+		log.Errorf("docker compose up failed for challenge %s. Output:\n%s", challengeName, upOutput.String())
+		return "", fmt.Errorf("error while running docker compose up: %v", err)
 	}
 
+	if err := validateAllComposeServicesRunning(projectName, challengeName); err != nil {
+		return "", err
+	}
+
+	primaryContainerId, err := getPrimaryComposeContainerId(projectName)
+	if err != nil {
+		log.Warnf("Could not get primary container ID for challenge %s: %v", challengeName, err)
+		return "", nil // Return empty string but success
+	}
+
+	log.Debugf("Verified challenge %s services are running. Primary container: %s", challengeName, primaryContainerId)
+	return primaryContainerId, nil
+}
+
+func validateAllComposeServicesRunning(projectName, challengeName string) error {
+	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "--format", "json")
 	var psOutput bytes.Buffer
-	checkCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose ps --format json", extractDir))
-	checkCmd.Stdout = &psOutput
-	checkCmd.Stderr = &psOutput
-	if err := checkCmd.Run(); err != nil {
+	psCmd.Stdout = &psOutput
+	psCmd.Stderr = &psOutput
+
+	if err := psCmd.Run(); err != nil {
 		return fmt.Errorf("error checking container status after compose up for challenge %s. Output:\n%s", challengeName, psOutput.String())
 	}
 
@@ -320,7 +346,9 @@ func DeployContainerFromCompose(challengeName, stagedPath string) error {
 		Status  string `json:"Status"`
 	}
 
-	hasRunningService := false
+	var services []ComposeService
+	var notRunningServices []string
+
 	for _, line := range strings.Split(output, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
@@ -332,52 +360,164 @@ func DeployContainerFromCompose(challengeName, stagedPath string) error {
 			continue
 		}
 
-		if service.State == "running" || strings.HasPrefix(service.Status, "Up") {
+		services = append(services, service)
+
+		if service.State != "running" && !strings.HasPrefix(service.Status, "Up") {
+			notRunningServices = append(notRunningServices, service.Service)
+			log.Warnf("Service %s is not running. State: %s, Status: %s", service.Service, service.State, service.Status)
+		} else {
 			log.Debugf("Service %s (name: %s) is running with status: %s", service.Service, service.Name, service.Status)
-			hasRunningService = true
-			break
 		}
 	}
 
-	if !hasRunningService {
-		log.Warnf("No running services detected for challenge %s. Service status:\n%s", challengeName, output)
-		return fmt.Errorf("no running services after compose up for challenge %s", challengeName)
+	if len(services) == 0 {
+		return fmt.Errorf("no services detected for challenge %s", challengeName)
 	}
 
-	log.Debugf("Verified challenge %s services are running", challengeName)
+	if len(notRunningServices) > 0 {
+		return fmt.Errorf("services not running for challenge %s: %v", challengeName, notRunningServices)
+	}
+
+	log.Debugf("Verified all %d services are running for challenge %s", len(services), challengeName)
 	return nil
 }
 
-func ComposeDown(challengeName, stagedDir string) error {
-	log.Debugf("Stopping challenge %s using docker-compose", challengeName)
-	extractDir := filepath.Join(stagedDir, challengeName)
-	downCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose down", extractDir))
+// gets the first container ID from a compose project
+func getPrimaryComposeContainerId(projectName string) (string, error) {
+	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q")
+	var output bytes.Buffer
+	psCmd.Stdout = &output
 
+	if err := psCmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to get container IDs: %v", err)
+	}
+
+	containerIds := strings.Fields(strings.TrimSpace(output.String()))
+	if len(containerIds) == 0 {
+		return "", fmt.Errorf("no containers found for project %s", projectName)
+	}
+
+	// Return first 12 characters of the first container ID
+	if len(containerIds[0]) >= 12 {
+		return containerIds[0][:12], nil
+	}
+	return containerIds[0], nil
+}
+
+func ComposeDown(challengeName, stagedDir string) error {
+	log.Debugf("Stopping challenge %s using docker compose", challengeName)
+	projectName := fmt.Sprintf("beast-%s", challengeName)
+
+	// Try using project name
+	downCmd := exec.Command("docker", "compose", "-p", projectName, "down")
 	var downOutput bytes.Buffer
 	downCmd.Stdout = &downOutput
 	downCmd.Stderr = &downOutput
 
 	if err := downCmd.Run(); err != nil {
-		log.Errorf("docker-compose down failed for challenge %s. Output:\n%s", challengeName, downOutput.String())
-		return fmt.Errorf("error while running docker compose down: %v", err)
+		log.Warnf("docker compose down with project name failed for challenge %s: %v. Trying label-based cleanup...", challengeName, err)
+		// Fallback to label-based cleanup
+		return cleanupComposeByLabels(challengeName)
 	}
 
+	log.Debugf("Successfully stopped challenge %s", challengeName)
+	return nil
+}
+
+func cleanupComposeByLabels(challengeName string) error {
+	log.Debugf("Using label-based cleanup for challenge %s", challengeName)
+
+	// Find all containers with beast.challenge label
+	findCmd := exec.Command("docker", "ps", "-aq",
+		"--filter", fmt.Sprintf("label=beast.challenge=%s", challengeName))
+
+	var output bytes.Buffer
+	findCmd.Stdout = &output
+
+	if err := findCmd.Run(); err != nil {
+		return fmt.Errorf("error finding containers by label: %v", err)
+	}
+
+	containerIds := strings.Fields(strings.TrimSpace(output.String()))
+	if len(containerIds) == 0 {
+		log.Debugf("No containers found for challenge %s", challengeName)
+		return nil
+	}
+
+	log.Debugf("Found %d containers to remove for challenge %s", len(containerIds), challengeName)
+
+	removeCmd := exec.Command("docker", "rm", "-f")
+	removeCmd.Args = append(removeCmd.Args, containerIds...)
+
+	var removeOutput bytes.Buffer
+	removeCmd.Stdout = &removeOutput
+	removeCmd.Stderr = &removeOutput
+
+	if err := removeCmd.Run(); err != nil {
+		return fmt.Errorf("error removing containers: %v. Output: %s", err, removeOutput.String())
+	}
+
+	log.Debugf("Successfully removed containers for challenge %s using label-based cleanup", challengeName)
 	return nil
 }
 
 func ComposePurge(challengeName, stagedDir string) error {
-	log.Debugf("Purging challenge %s using docker-compose", challengeName)
-	extractDir := filepath.Join(stagedDir, challengeName)
-	purgeCmd := exec.Command("bash", "-c", fmt.Sprintf("cd %s && docker compose down --remove-orphans --volumes --rmi all", extractDir))
+	log.Debugf("Purging challenge %s using docker compose", challengeName)
+	projectName := fmt.Sprintf("beast-%s", challengeName)
+
+	// Try using project name with full cleanup
+	purgeCmd := exec.Command("docker", "compose", "-p", projectName,
+		"down", "--remove-orphans", "--volumes", "--rmi", "all")
 
 	var purgeOutput bytes.Buffer
 	purgeCmd.Stdout = &purgeOutput
 	purgeCmd.Stderr = &purgeOutput
 
 	if err := purgeCmd.Run(); err != nil {
-		log.Errorf("docker-compose purge failed for challenge %s. Output:\n%s", challengeName, purgeOutput.String())
-		return fmt.Errorf("error while running docker compose purge: %v", err)
+		log.Warnf("docker compose purge with project name failed for challenge %s: %v. Trying label-based cleanup...", challengeName, err)
+		// Fallback to label-based cleanup
+		if err := cleanupComposeByLabels(challengeName); err != nil {
+			return err
+		}
+		cleanupComposeVolumesAndNetworks(projectName)
 	}
 
+	log.Debugf("Successfully purged challenge %s", challengeName)
 	return nil
+}
+
+func cleanupComposeVolumesAndNetworks(projectName string) {
+	volCmd := exec.Command("docker", "volume", "ls", "-q",
+		"--filter", fmt.Sprintf("label=com.docker.compose.project=%s", projectName))
+
+	var volOutput bytes.Buffer
+	volCmd.Stdout = &volOutput
+
+	if err := volCmd.Run(); err == nil {
+		volumes := strings.Fields(strings.TrimSpace(volOutput.String()))
+		if len(volumes) > 0 {
+			removeVolCmd := exec.Command("docker", "volume", "rm")
+			removeVolCmd.Args = append(removeVolCmd.Args, volumes...)
+			if err := removeVolCmd.Run(); err != nil {
+				log.Warnf("Failed to remove volumes for project %s: %v", projectName, err)
+			}
+		}
+	}
+
+	netCmd := exec.Command("docker", "network", "ls", "-q",
+		"--filter", fmt.Sprintf("label=com.docker.compose.project=%s", projectName))
+
+	var netOutput bytes.Buffer
+	netCmd.Stdout = &netOutput
+
+	if err := netCmd.Run(); err == nil {
+		networks := strings.Fields(strings.TrimSpace(netOutput.String()))
+		if len(networks) > 0 {
+			removeNetCmd := exec.Command("docker", "network", "rm")
+			removeNetCmd.Args = append(removeNetCmd.Args, networks...)
+			if err := removeNetCmd.Run(); err != nil {
+				log.Warnf("Failed to remove networks for project %s: %v", projectName, err)
+			}
+		}
+	}
 }
