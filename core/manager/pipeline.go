@@ -271,25 +271,33 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 
 	if config.Challenge.Env.DockerCompose != "" {
+		// currently the first container id returned
+		var primaryContainerId string
+		var err error
+
+		composeFileName := config.Challenge.Env.DockerCompose
+
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-			err := remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, server)
+			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, composeFileName, server)
 			if err != nil {
 				return fmt.Errorf("error while deploying challenge with docker-compose on remote: %v", err)
 			}
 		} else {
-			err := cr.DeployContainerFromCompose(challengeName, stagingDir)
+			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, stagingDir, composeFileName)
 			if err != nil {
 				return fmt.Errorf("error while deploying challenge with docker-compose: %v", err)
 			}
 		}
+
+		// only for backward compatibility
 		if err := database.UpdateChallenge(challenge, map[string]any{
-			"ContainerId":    "",
+			"ContainerId":    primaryContainerId,
 			"DeploymentType": core.DEPLOYMENT_TYPES["docker_compose"],
 		}); err != nil {
 			return fmt.Errorf("error while updating Docker Compose challenge metadata: %s", err)
 		}
-		log.Infof("Challenge %s deployed with docker-compose successfully", challengeName)
+		log.Infof("Challenge %s deployed with docker-compose successfully (primary container: %s)", challengeName, primaryContainerId)
 		return nil
 	}
 
@@ -353,9 +361,6 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 	if err != nil {
 		if containerId != "" {
-			if e := database.UpdateChallenge(challenge, map[string]any{"ContainerId": containerId}); e != nil {
-				return fmt.Errorf("error while starting container : %s and saving database : %s", err, e)
-			}
 			return fmt.Errorf("error while starting the container : %s", err)
 		}
 		return fmt.Errorf("error while trying to create a container for the challenge: %s", err)
