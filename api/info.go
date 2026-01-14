@@ -725,7 +725,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.SubmissionResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/submissions [get]
+// @Router /api/admin/submissions [get]
 func submissionsHandler(c *gin.Context) {
 	submissions, err := database.QueryAllSubmissions()
 	if err != nil {
