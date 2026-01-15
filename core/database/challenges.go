@@ -475,6 +475,28 @@ func QueryAllSubmissions() ([]UserChallenges, error) {
 	return userChallenges, tx.Error
 }
 
+func QuerySubmissionsWithPagination(limit, offset int) ([]UserChallenges, error) {
+	var userChallenges []UserChallenges
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Table("user_challenges").
+		Select("user_challenges.*").
+		Joins("JOIN users ON users.id = user_challenges.user_id").
+		Where("users.role = ?", "contestant").
+		Order("user_challenges.created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&userChallenges)
+
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	return userChallenges, tx.Error
+}
+
 // QuerySubmissions queries all challenge where column matches
 func QuerySubmissions(whereMap map[string]interface{}) ([]UserChallenges, error) {
 	var userChallenges []UserChallenges

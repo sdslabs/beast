@@ -727,7 +727,21 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/admin/submissions [get]
 func submissionsHandler(c *gin.Context) {
-	submissions, err := database.QueryAllSubmissions()
+	pageStr := c.Query("page")
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid page number",
+		})
+		return
+	}
+
+	offset := (page - 1) * core.SUBMISSIONS_PAGE_SIZE
+
+	submissions, err := database.QuerySubmissionsWithPagination(core.SUBMISSIONS_PAGE_SIZE, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "DATABASE ERROR while processing the request.",
@@ -745,36 +759,35 @@ func submissionsHandler(c *gin.Context) {
 			return
 		}
 
-		if user.Role == core.USER_ROLES["contestant"] {
-			challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while fetching user details.",
-				})
-			}
-			if len(challenge) == 0 {
-				continue
-			}
-
-			challengeTags := make([]string, len(challenge[0].Tags))
-
-			for index, tags := range challenge[0].Tags {
-				challengeTags[index] = tags.TagName
-			}
-
-			singleSubmissionResp := SubmissionResp{
-				UserId:    user.ID,
-				Username:  user.Username,
-				ChallId:   challenge[0].ID,
-				ChallName: challenge[0].Name,
-				Flag:      submission.Flag,
-				SolvedAt:  submission.CreatedAt,
-				Success:   submission.Solved,
-				Cheating:  submission.Cheating,
-			}
-
-			submissionsResp = append(submissionsResp, singleSubmissionResp)
+		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while fetching challenge details.",
+			})
+			return
 		}
+		if len(challenge) == 0 {
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge[0].Tags))
+
+		for index, tags := range challenge[0].Tags {
+			challengeTags[index] = tags.TagName
+		}
+
+		singleSubmissionResp := SubmissionResp{
+			UserId:    user.ID,
+			Username:  user.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			Flag:      submission.Flag,
+			SolvedAt:  submission.CreatedAt,
+			Success:   submission.Solved,
+			Cheating:  submission.Cheating,
+		}
+
+		submissionsResp = append(submissionsResp, singleSubmissionResp)
 	}
 
 	format := c.Query("format")
