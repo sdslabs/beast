@@ -57,6 +57,35 @@ func containerProber(chall database.Challenge) error {
 			return err
 		}
 	}
+
+	memory_usage, _, err := cr.GetContainerStats(chall.ContainerId)
+	if err != nil {
+		err = fmt.Errorf("error while fetching container stats with id %s ", chall.ContainerId)
+		return err
+	}
+
+	memory_limit, _, err := cr.GetContainerLimits(chall.ContainerId)
+	if err != nil {
+		err = fmt.Errorf("error while fetching container limits with id %s ", chall.ContainerId)
+		return err
+	}
+	memory_perc := (float64(memory_usage) / float64(memory_limit)) * 100
+
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("Container ID: %s", chall.ContainerId)
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("Memory Usage: %.2f MB", float64(memory_usage)/1024/1024)
+	log.WithFields(log.Fields{
+		"ChallName": chall.Name,
+	}).Infof("Memory Usage Percentage: %.2f%%", memory_perc)
+
+	if memory_perc > 100 {
+		err := fmt.Errorf("Memory limit exceeded for container with id %s ", chall.ContainerId)
+		return err
+	}
+
 	return nil
 }
 
@@ -101,7 +130,7 @@ func ChallengesHealthProber(waitTime int) {
 				}
 				err = containerProber(chall)
 				if err != nil {
-					msg := fmt.Sprintf("CONTAINER HEALTH CHECK %s: %s : %s", result, chall.Name, err)
+ 					msg := fmt.Sprintf("CONTAINER HEALTH CHECK %s: %s : %s", result, chall.Name, err)
 					log.WithFields(log.Fields{
 						"ChallName": chall.Name,
 					}).Error(msg)

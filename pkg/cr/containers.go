@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
-
+	"encoding/json"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -12,7 +12,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sdslabs/beastv4/pkg/defaults"
-
+	"time"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
@@ -280,3 +280,73 @@ func CommitContainer(containerId string) (string, error) {
 
 	return commitResp.ID, nil
 }
+
+func GetContainerStats(containerId string) (int64, float64, error) {
+	ctx := context.Background()
+	var data1 types.StatsJSON
+	var data2 types.StatsJSON
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		log.Error("Failed to connect to docker sdk")
+		return 0, 0, err
+	}
+	defer cli.Close()
+
+	stats, err := cli.ContainerStats(ctx, containerId, false)
+	if err != nil {
+		log.Error("Failed to fetch container stats : ", containerId)
+		return 0, 0, err
+	}
+	time.Sleep(1 * time.Second)
+	stats2, err := cli.ContainerStats(ctx, containerId, false)
+	if err != nil {
+		log.Error("Failed to fetch container stats : ", containerId)
+		return 0, 0, err
+	}
+	defer stats.Body.Close()
+
+	if err := json.NewDecoder(stats.Body).Decode(&data1); err != nil {
+		return 0, 0, err
+	}
+	if err := json.NewDecoder(stats2.Body).Decode(&data2); err != nil {
+		return 0, 0, err
+	}
+
+	memoryUsage := data2.MemoryStats.Usage
+
+	cpuDelta := data2.CPUStats.CPUUsage.TotalUsage - data1.CPUStats.CPUUsage.TotalUsage
+	systemDelta := data2.CPUStats.SystemUsage - data1.CPUStats.SystemUsage
+	numCPUs := float64(len(data2.CPUStats.CPUUsage.PercpuUsage))
+	cpuPercent := 0.0
+	if systemDelta > 0 && cpuDelta > 0 {
+		cpuPercent = (float64(cpuDelta) / float64(systemDelta)) * numCPUs * 100
+	}
+
+	return int64(memoryUsage), cpuPercent, nil
+
+}
+
+func GetContainerLimits(containerId string) (int64, int64, error) {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		log.Error("Failed to connect to docker sdk")
+		return 0, 0, err
+	}
+	defer cli.Close()
+
+	stats, err := cli.ContainerInspect(ctx, containerId)
+	if err != nil {
+		log.Error("Failed to fetch container stats : ", containerId)
+		return 0, 0, err
+	}
+
+	memory_limit := stats.HostConfig.Resources.Memory
+	cpu_shares := stats.HostConfig.Resources.CPUShares
+
+	return memory_limit, cpu_shares, nil
+}
+
+
+
+

@@ -4,6 +4,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/spf13/cobra"
+	"github.com/sdslabs/beastv4/core/database"
 )
 
 var healthProbeCmd = &cobra.Command{
@@ -13,7 +14,8 @@ var healthProbeCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		config.InitConfig()
+		database.Init()
 
-		go manager.BeastHeathCheckProber(config.Cfg.TickerFrequency)
+		manager.BeastHeathCheckProber(config.Cfg.TickerFrequency)
 	},
 }

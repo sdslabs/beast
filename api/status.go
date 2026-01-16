@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
@@ -108,4 +108,47 @@ func statusHandler(c *gin.Context) {
 
 		c.JSON(http.StatusOK, resp)
 	}
+}
+
+func ChallengeHealthHandler(c *gin.Context) {
+    name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Name of the challenge is a required parameter to process request.",
+		})
+		return
+	}
+
+	challenge, err := database.QueryChallengeEntries("name", name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	chall := challenge[0]
+
+	memory_usage, cpu_perc, err := cr.GetContainerStats(chall.ContainerId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "error while fetching container stats",
+		})
+		return
+	}
+
+	memory_limit, _, err := cr.GetContainerLimits(chall.ContainerId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "error while fetching container limits",
+		})
+		return
+	}
+	memory_perc := (float64(memory_usage) / float64(memory_limit)) * 100
+
+    c.JSON(http.StatusOK, gin.H{
+        "status": "healthy",
+        "memory(bytes)": memory_usage,
+		"memory_perc": memory_perc,
+		"cpu_perc": cpu_perc,
+    })
 }

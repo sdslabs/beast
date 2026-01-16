@@ -49,8 +49,12 @@ func initGinRouter() *gin.Engine {
 	router.GET("/api/info/competition-info", competitionInfoHandler)
 	router.GET("/api/info/download", serveAssets)
 
+	router.GET("/api/health/:name", adminAuthorize, ChallengeHealthHandler)
+
+
 	// API routes group
-	apiGroup := router.Group("/api", authorize)
+	apiGroup := router.Group("/api", 
+)
 	{
 		// Deploy route group
 		manageGroup := apiGroup.Group("/manage", managerAuthorize)
@@ -92,6 +96,7 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/tags", tagHandler)
 			infoGroup.GET("/hint/:hintID", hintHandler)
 			infoGroup.POST("/hint/:hintID", hintHandler)
+			
 		}
 
 		// Notification route group
