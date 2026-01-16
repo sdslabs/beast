@@ -3,14 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/database"
-	"github.com/sdslabs/beastv4/core/manager"
-	"github.com/sdslabs/beastv4/pkg/remoteManager"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/core/manager"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
 
 	"github.com/sdslabs/beastv4/api"
 	log "github.com/sirupsen/logrus"
@@ -25,7 +27,7 @@ var (
 func stopApiScheduler() {
 	log.Infoln("Stopping the API scheduler...")
 	api.BeastScheduler.Stop()
-	log.Infoln("API scheduler stoped")
+	log.Infoln("API scheduler stopped")
 }
 
 func stopWorkerQueue() {
@@ -40,11 +42,12 @@ func stopRemoteManagers() {
 	log.Infoln("Remote Manager queue stopped")
 }
 
-func cleanUpRunningContainers() {
+func cleanupRunningContainers() {
 	log.Infoln("Cleaning up running challenges...")
 
 	challenges, err := database.QueryAllChallenges()
 	if err != nil {
+		log.Errorln(fmt.Sprintf("Error while querying challenges for cleanup: %s", err.Error()))
 		return
 	}
 
@@ -55,13 +58,13 @@ func cleanUpRunningContainers() {
 				log.Errorln(fmt.Sprintf("Failed to undeploy challenge [Id: %v] %s", challenge.ID, challenge.Name))
 				log.Errorln(err.Error())
 			} else {
-				log.Infoln(fmt.Sprintf("Successfully undeploy challenge [Id: %v] %s", challenge.ID, challenge.Name))
+				log.Infoln(fmt.Sprintf("Successfully undeployed challenge [Id: %v] %s", challenge.ID, challenge.Name))
 			}
 		}
 	}
 }
 
-func cleanUpDatabaseConnections() {
+func cleanupDatabaseConnections() {
 	log.Infoln("Backing up database...")
 
 	err := database.BackupDatabase()
@@ -71,7 +74,7 @@ func cleanUpDatabaseConnections() {
 		log.Infoln("Database backup completed successfully")
 	}
 
-	log.Infoln("Terminating  database connection...")
+	log.Infoln("Terminating database connection...")
 
 	err = database.TerminateDatabaseConnections()
 	if err != nil {
@@ -93,7 +96,8 @@ func writeJson(data any, location string) error {
 func saveLeaderboardCache() {
 	var topUsers []uint
 
-	leaderboardFresh, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
+	/* get maximum possible number of entires */
+	leaderboardFresh, err := database.QueryTopUsersByFrozenScore(math.MaxInt)
 	if err == nil {
 		for i := 0; i < 10 && i < len(leaderboardFresh); i++ {
 			user := leaderboardFresh[i]
@@ -107,7 +111,7 @@ func saveLeaderboardCache() {
 
 	graphFresh := database.QueryTimeSeriesForTopUsers(topUsers)
 	if err = writeJson(graphFresh, BEAST_GRAPH_CACHE); err != nil {
-		log.Errorln(fmt.Sprintf("Failed to write to leaderboard cache: %s", err.Error()))
+		log.Errorln(fmt.Sprintf("Failed to write to graph cache: %s", err.Error()))
 	}
 }
 
@@ -125,8 +129,8 @@ func cleanup() {
 
 	saveLeaderboardCache()
 
-	cleanUpRunningContainers()
-	cleanUpDatabaseConnections()
+	cleanupRunningContainers()
+	cleanupDatabaseConnections()
 
 	// - Clean up temporary files: found no files to be cleared as of now
 	// - Close network connections: all ssh connections are already closed and no new network connections as of now

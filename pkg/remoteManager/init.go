@@ -11,8 +11,8 @@ func Init() {
 	for _, server := range config.Cfg.AvailableServers {
 		if server.Active {
 			if server.Host == core.LOCALHOST {
-				ServerQueue.Push(server)
 				continue
+				ServerQueue.Push(server)
 			}
 			client, err := CreateSSHClient(server)
 			if err != nil {
@@ -29,7 +29,7 @@ func Init() {
 func Stop() {
 	for {
 		_, err := ServerQueue.Pop()
-		if err == nil {
+		if err != nil {
 			break
 		}
 	}

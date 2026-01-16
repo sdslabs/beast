@@ -55,7 +55,7 @@ func (q *Queue) Pop(ID string) {
 func (q *Queue) Stop() {
 	ids := make([]string, len(q.InQueue))
 	i := 0
-	for id, _ := range q.InQueue {
+	for id := range q.InQueue {
 		ids[i] = id
 		i++
 	}
