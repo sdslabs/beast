@@ -133,6 +133,11 @@ func initGinRouter() *gin.Engine {
 			adminPanelGroup.POST("/unfreezeLeaderboard", unfreezeLeaderboardHandler)
 			adminPanelGroup.GET("/submissions", submissionsHandler)
 		}
+
+		instanceGroup := apiGroup.Group("/instances")
+		{
+			instanceGroup.POST("/:challenge_name", spawnInstanceHandler)
+		}
 	}
 
 	router.NoRoute(func(c *gin.Context) {
