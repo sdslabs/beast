@@ -108,7 +108,7 @@ import (
 // dbname = "beast"
 // host = "localhost"
 // port = "5432"
-// sslmode = "prefer" 
+// sslmode = "prefer"
 // ```
 type BeastConfig struct {
 	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
@@ -117,6 +117,7 @@ type BeastConfig struct {
 	AvailableServers     map[string]AvailableServer `toml:"available_servers"`
 	GitRemotes           []GitRemote                `toml:"remote"`
 	PsqlConf             PsqlConfig                 `toml:"psql_config"`
+	RedisConf            RedisConfig                `toml:"redis_config"`
 	JWTSecret            string                     `toml:"jwt_secret"`
 	NotificationWebhooks []NotificationWebhook      `toml:"notification_webhooks"`
 	CompetitionInfo      CompetitionInfo            `toml:"competition_info"`
@@ -168,6 +169,11 @@ func (config *BeastConfig) ValidateConfig() error {
 	err := config.PsqlConf.ValidatePsqlConfig()
 	if err != nil {
 		return fmt.Errorf("error while validating db config : %s", err)
+	}
+
+	err = config.RedisConf.ValidateRedisConfig()
+	if err != nil {
+		return fmt.Errorf("error while validating redis config : %s", err)
 	}
 
 	if len(config.AvailableServers) == 0 {
@@ -324,6 +330,14 @@ type PsqlConfig struct {
 	SslMode  string `toml:"sslmode"`
 }
 
+type RedisConfig struct {
+	User     string `toml:"user"`
+	Password string `toml:"password"`
+	Host     string `toml:"host"`
+	Port     string `toml:"port"`
+	Db       uint32 `toml:"db"`
+}
+
 func (config *PsqlConfig) ValidatePsqlConfig() error {
 	if config.User == "" || config.Password == "" || config.Dbname == "" || config.Host == "" || config.Port == "" {
 		log.Error("One of username, password, dbname, hostname, port is missing in the config")
@@ -332,6 +346,14 @@ func (config *PsqlConfig) ValidatePsqlConfig() error {
 	if config.SslMode == "" {
 		log.Warn("Ssl Mode not set. Disabling it.")
 		config.SslMode = "prefer"
+	}
+	return nil
+}
+
+func (config *RedisConfig) ValidateRedisConfig() error {
+	if config.Host == "" || config.Port == "" {
+		log.Error("One of hostname or port is missing in the config")
+		return errors.New("redis config not valid, config parameters missing")
 	}
 	return nil
 }

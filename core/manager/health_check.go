@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
@@ -154,6 +155,7 @@ func BeastHeathCheckProber(waitTime int) {
 			go ChallengesHealthProber(waitTime)
 			go ServerHealthProber(waitTime)
 			go database.BackupDatabase()
+			go cache.BackupCache()
 			// Wait for some time before next probing.
 			time.Sleep(time.Duration(waitTime) * time.Second)
 		}
