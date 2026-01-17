@@ -133,6 +133,11 @@ func initGinRouter() *gin.Engine {
 			adminPanelGroup.GET("/challenges/:challenge_id/attempts", getChallengeAttempts)
 
 		}
+
+		instanceGroup := apiGroup.Group("/instances")
+		{
+			instanceGroup.POST("/:challenge_name", spawnInstanceHandler)
+		}
 	}
 
 	router.NoRoute(func(c *gin.Context) {
