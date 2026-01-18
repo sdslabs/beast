@@ -99,8 +99,8 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 
 func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChallengeConfig) error {
 	if chall.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
-		log.Debugf("Using label-based cleanup for Docker Compose challenge: %s", chall.Name)
-		projectName := fmt.Sprintf("beast-%s", chall.Name)
+		log.Debugf("Cleaning up Docker Compose challenge: %s", chall.Name)
+		projectName := utils.GetProjectName(chall.Name)
 
 		if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
 			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
