@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -82,6 +83,11 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 		Remove:     true,
 		Dockerfile: dockerCtxFile,
 		NoCache:    noCache,
+		Labels: map[string]string{
+			"beast.challenge":            challengeName,
+			"com.sdslabs.beast.project":  utils.GetProjectName(challengeName),
+			"com.docker.compose.project": utils.GetProjectName(challengeName),
+		},
 	}
 
 	dockerClient, err := client.NewEnvClient()
@@ -122,6 +128,8 @@ func BuildImagesFromCompose(challengeName, challengeTag, stagedPath, ComposeFile
 	if noCache {
 		cmdArgs = append(cmdArgs, "--no-cache")
 	}
+	// Note: docker compose build does not support --label flag
+	// Labels are automatically added to containers during 'docker compose up -p <project>'
 	composeCmd := fmt.Sprintf("docker %s", strings.Join(cmdArgs, " "))
 	log.Debugf("Building image for challenge %s with tag %s", challengeName, challengeTag)
 	log.Debugf("Running the command: docker %v", cmdArgs)

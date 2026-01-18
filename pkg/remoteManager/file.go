@@ -85,7 +85,12 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to extract tar: %s", err)
 	}
-	dockerBuildCmd := fmt.Sprintf("cd %s && docker build -t %s .", remoteExtractPath, imageTag)
+	projectName := utils.GetProjectName(challengeName)
+	dockerBuildCmd := fmt.Sprintf("cd %s && docker build -t %s "+
+		"--label beast.challenge=%s "+
+		"--label com.sdslabs.beast.project=%s "+
+		"--label com.docker.compose.project=%s .",
+		remoteExtractPath, imageTag, challengeName, projectName, projectName)
 	output, err := RunCommandOnServer(server, dockerBuildCmd)
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to build docker image: %s\nOutput: %s", err, output)
@@ -114,6 +119,8 @@ func BuildImagesFromComposeRemote(challengeName, imageTag, stagedDir string, ser
 	if noCache {
 		cmdBase += " --no-cache"
 	}
+	// Note: docker compose build does not support --label flag
+	// Labels are automatically added to containers during 'docker compose up -p <project>'
 	dockerComposeBuildCmd := fmt.Sprintf("cd %s && %s", remoteExtractPath, cmdBase)
 
 	// Execute the command on the remote server

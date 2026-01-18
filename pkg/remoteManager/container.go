@@ -12,6 +12,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
+	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
@@ -199,7 +200,7 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 
 func DeployContainerFromComposeRemote(challengeName, stagedDir, composeFileName string, server config.AvailableServer) (string, error) {
 	extractDir := filepath.Join(stagedDir, challengeName)
-	projectName := fmt.Sprintf("beast-%s", challengeName)
+	projectName := utils.GetProjectName(challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
 	upCommand := fmt.Sprintf("docker compose -f %s -p %s up -d", composeFile, projectName)
@@ -304,9 +305,8 @@ func getPrimaryComposeContainerIdRemote(projectName string, server config.Availa
 
 func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableServer) error {
 	log.Debugf("Stopping challenge %s using docker compose on remote", challengeName)
-	projectName := fmt.Sprintf("beast-%s", challengeName)
+	projectName := utils.GetProjectName(challengeName)
 
-	// Try using project name
 	downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
 	log.Debugf("Stopping challenge %s using docker compose remotely: %s", challengeName, downCommand)
 	downOutput, err := RunCommandOnServer(server, downCommand)
@@ -352,9 +352,7 @@ func cleanupComposeByLabelsRemote(challengeName string, server config.AvailableS
 
 func ComposePurgeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
 	log.Debugf("Purging challenge %s using docker compose on remote", challengeName)
-	projectName := fmt.Sprintf("beast-%s", challengeName)
-
-	// Try using project name with full cleanup
+	projectName := utils.GetProjectName(challengeName)
 	purgeCommand := fmt.Sprintf("docker compose -p %s down --remove-orphans --volumes --rmi all", projectName)
 	log.Debugf("Purge challenge %s using docker compose remotely: %s", challengeName, purgeCommand)
 	purgeOutput, err := RunCommandOnServer(server, purgeCommand)

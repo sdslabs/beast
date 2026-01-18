@@ -17,6 +17,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sdslabs/beastv4/pkg/defaults"
+	utils "github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -175,6 +176,12 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		Image:        containerConfig.ImageId,
 		ExposedPorts: portSet,
 		Env:          containerConfig.ContainerEnv,
+		Labels: map[string]string{
+			"beast.challenge":             containerConfig.ChallengeName,
+			"com.sdslabs.beast.project":   utils.GetProjectName(containerConfig.ChallengeName),
+			"com.docker.compose.project":  utils.GetProjectName(containerConfig.ChallengeName),
+			"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
+		},
 	}
 
 	var mountBindings []mount.Mount
@@ -288,7 +295,7 @@ func CommitContainer(containerId string) (string, error) {
 
 func DeployContainerFromCompose(challengeName, stagedPath, composeFileName string) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
-	projectName := fmt.Sprintf("beast-%s", challengeName)
+	projectName := utils.GetProjectName(challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
 	log.Debugf("Deploying challenge %s using docker compose with project name %s and file %s", challengeName, projectName, composeFileName)
@@ -406,9 +413,8 @@ func getPrimaryComposeContainerId(projectName string) (string, error) {
 
 func ComposeDown(challengeName, stagedDir string) error {
 	log.Debugf("Stopping challenge %s using docker compose", challengeName)
-	projectName := fmt.Sprintf("beast-%s", challengeName)
+	projectName := utils.GetProjectName(challengeName)
 
-	// Try using project name
 	downCmd := exec.Command("docker", "compose", "-p", projectName, "down")
 	var downOutput bytes.Buffer
 	downCmd.Stdout = &downOutput
@@ -463,9 +469,8 @@ func cleanupComposeByLabels(challengeName string) error {
 
 func ComposePurge(challengeName, stagedDir string) error {
 	log.Debugf("Purging challenge %s using docker compose", challengeName)
-	projectName := fmt.Sprintf("beast-%s", challengeName)
+	projectName := utils.GetProjectName(challengeName)
 
-	// Try using project name with full cleanup
 	purgeCmd := exec.Command("docker", "compose", "-p", projectName,
 		"down", "--remove-orphans", "--volumes", "--rmi", "all")
 
