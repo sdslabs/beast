@@ -311,42 +311,10 @@ func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableS
 	log.Debugf("Stopping challenge %s using docker compose remotely: %s", challengeName, downCommand)
 	downOutput, err := RunCommandOnServer(server, downCommand)
 	if err != nil {
-		log.Warnf("docker compose down with project name failed for challenge %s on remote: %v. Trying label-based cleanup...", challengeName, err)
-		// Fallback to label-based cleanup
-		return cleanupComposeByLabelsRemote(challengeName, server)
+		return fmt.Errorf("docker compose down failed for challenge %s on remote: %v. Output: %s", challengeName, err, downOutput)
 	}
 
 	log.Debugf("Successfully stopped challenge %s on remote. Output: %s", challengeName, downOutput)
-	return nil
-}
-
-func cleanupComposeByLabelsRemote(challengeName string, server config.AvailableServer) error {
-	log.Debugf("Using label-based cleanup for challenge %s on remote", challengeName)
-	projectName := fmt.Sprintf("beast-%s", challengeName)
-
-	// Find all containers with com.docker.compose.project label
-	findCommand := fmt.Sprintf("docker ps -aq --filter label=com.docker.compose.project=%s", projectName)
-	output, err := RunCommandOnServer(server, findCommand)
-	if err != nil {
-		return fmt.Errorf("error finding containers by label on remote: %v", err)
-	}
-
-	containerIds := strings.Fields(strings.TrimSpace(output))
-	if len(containerIds) == 0 {
-		log.Debugf("No containers found for challenge %s on remote", challengeName)
-		return nil
-	}
-
-	log.Debugf("Found %d containers to remove for challenge %s on remote", len(containerIds), challengeName)
-
-	// Stop and remove containers
-	removeCommand := fmt.Sprintf("docker rm -f %s", strings.Join(containerIds, " "))
-	removeOutput, err := RunCommandOnServer(server, removeCommand)
-	if err != nil {
-		return fmt.Errorf("error removing containers on remote: %v. Output: %s", err, removeOutput)
-	}
-
-	log.Debugf("Successfully removed containers for challenge %s on remote using label-based cleanup", challengeName)
 	return nil
 }
 
@@ -357,40 +325,10 @@ func ComposePurgeRemote(challengeName, stagedDir string, server config.Available
 	log.Debugf("Purge challenge %s using docker compose remotely: %s", challengeName, purgeCommand)
 	purgeOutput, err := RunCommandOnServer(server, purgeCommand)
 	if err != nil {
-		log.Warnf("docker compose purge with project name failed for challenge %s on remote: %v. Trying label-based cleanup...", challengeName, err)
-		// Fallback to label-based cleanup
-		if err := cleanupComposeByLabelsRemote(challengeName, server); err != nil {
-			return err
-		}
-		cleanupComposeVolumesAndNetworksRemote(projectName, server)
+		return fmt.Errorf("docker compose purge failed for challenge %s on remote: %v. Output: %s", challengeName, err, purgeOutput)
+
 	}
 
 	log.Debugf("Successfully purged challenge %s on remote. Output: %s", challengeName, purgeOutput)
 	return nil
-}
-
-func cleanupComposeVolumesAndNetworksRemote(projectName string, server config.AvailableServer) {
-	volCommand := fmt.Sprintf("docker volume ls -q --filter label=com.docker.compose.project=%s", projectName)
-	volOutput, err := RunCommandOnServer(server, volCommand)
-	if err == nil {
-		volumes := strings.Fields(strings.TrimSpace(volOutput))
-		if len(volumes) > 0 {
-			removeVolCommand := fmt.Sprintf("docker volume rm %s", strings.Join(volumes, " "))
-			if _, err := RunCommandOnServer(server, removeVolCommand); err != nil {
-				log.Warnf("Failed to remove volumes for project %s on remote: %v", projectName, err)
-			}
-		}
-	}
-
-	netCommand := fmt.Sprintf("docker network ls -q --filter label=com.docker.compose.project=%s", projectName)
-	netOutput, err := RunCommandOnServer(server, netCommand)
-	if err == nil {
-		networks := strings.Fields(strings.TrimSpace(netOutput))
-		if len(networks) > 0 {
-			removeNetCommand := fmt.Sprintf("docker network rm %s", strings.Join(networks, " "))
-			if _, err := RunCommandOnServer(server, removeNetCommand); err != nil {
-				log.Warnf("Failed to remove networks for project %s on remote: %v", projectName, err)
-			}
-		}
-	}
 }

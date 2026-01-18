@@ -421,49 +421,10 @@ func ComposeDown(challengeName, stagedDir string) error {
 	downCmd.Stderr = &downOutput
 
 	if err := downCmd.Run(); err != nil {
-		log.Warnf("docker compose down with project name failed for challenge %s: %v. Trying label-based cleanup...", challengeName, err)
-		// Fallback to label-based cleanup
-		return cleanupComposeByLabels(challengeName)
+		return fmt.Errorf("docker compose down failed for challenge %s: %v. Output: %s", challengeName, err, downOutput.String())
 	}
 
 	log.Debugf("Successfully stopped challenge %s", challengeName)
-	return nil
-}
-
-func cleanupComposeByLabels(challengeName string) error {
-	log.Debugf("Using label-based cleanup for challenge %s", challengeName)
-
-	// Find all containers with beast.challenge label
-	findCmd := exec.Command("docker", "ps", "-aq",
-		"--filter", fmt.Sprintf("label=beast.challenge=%s", challengeName))
-
-	var output bytes.Buffer
-	findCmd.Stdout = &output
-
-	if err := findCmd.Run(); err != nil {
-		return fmt.Errorf("error finding containers by label: %v", err)
-	}
-
-	containerIds := strings.Fields(strings.TrimSpace(output.String()))
-	if len(containerIds) == 0 {
-		log.Debugf("No containers found for challenge %s", challengeName)
-		return nil
-	}
-
-	log.Debugf("Found %d containers to remove for challenge %s", len(containerIds), challengeName)
-
-	removeCmd := exec.Command("docker", "rm", "-f")
-	removeCmd.Args = append(removeCmd.Args, containerIds...)
-
-	var removeOutput bytes.Buffer
-	removeCmd.Stdout = &removeOutput
-	removeCmd.Stderr = &removeOutput
-
-	if err := removeCmd.Run(); err != nil {
-		return fmt.Errorf("error removing containers: %v. Output: %s", err, removeOutput.String())
-	}
-
-	log.Debugf("Successfully removed containers for challenge %s using label-based cleanup", challengeName)
 	return nil
 }
 
@@ -479,50 +440,9 @@ func ComposePurge(challengeName, stagedDir string) error {
 	purgeCmd.Stderr = &purgeOutput
 
 	if err := purgeCmd.Run(); err != nil {
-		log.Warnf("docker compose purge with project name failed for challenge %s: %v. Trying label-based cleanup...", challengeName, err)
-		// Fallback to label-based cleanup
-		if err := cleanupComposeByLabels(challengeName); err != nil {
-			return err
-		}
-		cleanupComposeVolumesAndNetworks(projectName)
+		return fmt.Errorf("docker compose purge failed for challenge %s: %v. Output: %s", challengeName, err, purgeOutput.String())
 	}
 
 	log.Debugf("Successfully purged challenge %s", challengeName)
 	return nil
-}
-
-func cleanupComposeVolumesAndNetworks(projectName string) {
-	volCmd := exec.Command("docker", "volume", "ls", "-q",
-		"--filter", fmt.Sprintf("label=com.docker.compose.project=%s", projectName))
-
-	var volOutput bytes.Buffer
-	volCmd.Stdout = &volOutput
-
-	if err := volCmd.Run(); err == nil {
-		volumes := strings.Fields(strings.TrimSpace(volOutput.String()))
-		if len(volumes) > 0 {
-			removeVolCmd := exec.Command("docker", "volume", "rm")
-			removeVolCmd.Args = append(removeVolCmd.Args, volumes...)
-			if err := removeVolCmd.Run(); err != nil {
-				log.Warnf("Failed to remove volumes for project %s: %v", projectName, err)
-			}
-		}
-	}
-
-	netCmd := exec.Command("docker", "network", "ls", "-q",
-		"--filter", fmt.Sprintf("label=com.docker.compose.project=%s", projectName))
-
-	var netOutput bytes.Buffer
-	netCmd.Stdout = &netOutput
-
-	if err := netCmd.Run(); err == nil {
-		networks := strings.Fields(strings.TrimSpace(netOutput.String()))
-		if len(networks) > 0 {
-			removeNetCmd := exec.Command("docker", "network", "rm")
-			removeNetCmd.Args = append(removeNetCmd.Args, networks...)
-			if err := removeNetCmd.Run(); err != nil {
-				log.Warnf("Failed to remove networks for project %s: %v", projectName, err)
-			}
-		}
-	}
 }

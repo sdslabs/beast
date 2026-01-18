@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 
 	container_types "github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
@@ -11,6 +10,7 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
+	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -104,28 +104,11 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 
 		if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
 			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
-			findCommand := fmt.Sprintf("docker ps -aq --filter label=com.docker.compose.project=%s", projectName)
-			output, err := remoteManager.RunCommandOnServer(server, findCommand)
-			if err != nil {
-				log.Warnf("Failed to find containers by label on remote: %v", err)
-			} else {
-				containerIds := strings.Fields(strings.TrimSpace(output))
-				if len(containerIds) > 0 {
-					removeCommand := fmt.Sprintf("docker rm -f %s", strings.Join(containerIds, " "))
-					_, err = remoteManager.RunCommandOnServer(server, removeCommand)
-					if err != nil {
-						log.Errorf("Error removing containers on remote: %v", err)
-						return err
-					}
-				}
-			}
-
 			downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
-			_, _ = remoteManager.RunCommandOnServer(server, downCommand)
-		} else {
-			err := CleanupContainerByFilter("label", fmt.Sprintf("com.docker.compose.project=%s", projectName))
+			_, err := remoteManager.RunCommandOnServer(server, downCommand)
 			if err != nil {
-				log.Warnf("Label-based cleanup failed, trying project cleanup: %v", err)
+				log.Errorf("Error running docker compose down on remote: %v", err)
+				return err
 			}
 		}
 
