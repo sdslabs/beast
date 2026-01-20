@@ -11,8 +11,8 @@ func Init() {
 	for _, server := range config.Cfg.AvailableServers {
 		if server.Active {
 			if server.Host == core.LOCALHOST {
-				ServerQueue.Push(server)
 				continue
+				ServerQueue.Push(server)
 			}
 			client, err := CreateSSHClient(server)
 			if err != nil {
@@ -22,6 +22,15 @@ func Init() {
 			defer client.Close()
 			ServerQueue.Push(server)
 			RunCommandOnServer(server, "mkdir -p $HOME/.beast/staging/")
+		}
+	}
+}
+
+func Stop() {
+	for {
+		_, err := ServerQueue.Pop()
+		if err != nil {
+			break
 		}
 	}
 }

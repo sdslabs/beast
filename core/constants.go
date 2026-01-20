@@ -37,6 +37,8 @@ const ( //names
 	LOCALHOST                   string = "localhost"
 	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
 	DOCKER_PID                  string = "/var/run/docker.pid"
+	BEAST_GRAPH_CACHE           string = "graph_cache.json"
+	BEAST_LEADERBOARD_CACHE     string = "leaderboard.json"
 	POSTGRES_SUPER_USER         string = "postgres"
 )
 
@@ -54,6 +56,7 @@ const ( //paths
 	BEAST_EMAIL_TEMPLATE_DIR       string = "mailTemplates"
 	BEAST_SECRETS_DIR              string = "secrets"
 	BEAST_EXAMPLE_DIR              string = "_examples"
+	BEAST_CACHE_DIR                string = "cache"
 )
 
 const ( //chall types

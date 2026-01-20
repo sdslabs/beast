@@ -34,6 +34,7 @@ func initDirectories() error {
 	log.Infoln("Creating beast directories...")
 
 	directories := []string{
+		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CACHE_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR),

@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-
 	container_types "github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
@@ -13,41 +12,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
-
-// This function ensures graceful shutdown of all running processes and connections from the server
-func Cleanup() {
-	log.Info("Starting graceful shutdown cleanup...")
-
-	// TODO: Add your specific cleanup tasks here
-	// For example:
-	// - Stop the scheduler (api.BeastScheduler.Stop())
-	// - Stop worker queue (manager.Q - note: no Stop() method exists, may need to implement)
-	// - Stop remote manager queue
-	// - Close database connections
-	// - Stop running containers
-	// - Clean up temporary files
-	// - Close network connections
-	// - Stop background goroutines
-	// - Store leaderboard cache and graph cache if leaderboard is frozen and competition not ended. and make sure to fill it abck on restart.
-
-	// Backup the database to ensure no data loss
-	err := database.BackupDatabase()
-	if err != nil {
-		log.Errorf("Error while backing up database: %s", err)
-	} else {
-		log.Info("Database backup completed successfully")
-	}
-
-	// Terminate the Database Connection for graceful shutdown
-	err = database.TerminateDatabaseConnections()
-	if err != nil {
-		log.Errorf("Unable to terminate database connections: %s", err)
-	} else {
-		log.Info("Database connections terminated successfully")
-	}
-
-	log.Info("Graceful shutdown cleanup completed")
-}
 
 func CleanupContainerByFilter(filter, filterVal string) error {
 	if filter != "id" && filter != "name" {
