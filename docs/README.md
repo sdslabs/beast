@@ -14,7 +14,6 @@ This directory contains documentation related to beast and will guide you throug
 * [Challenge Configuration](ChallConfig.md)
 * [Sample Challenges](SampleChallenges.md)
 * [Deployment](Deployment.md)
-* **[DEPRECATED]** [Sidecars](Sidecars.md)
 
 
 ## Intro

@@ -132,24 +132,6 @@ var USER_ROLES = map[string]string{
 	"maintainer": "maintainer",
 }
 
-// const MYSQL_SIDECAR_HOST = "mysql"
-// const MONGO_SIDECAR_HOST = "mongo"
-
-// var SIDECAR_CONTAINER_MAP = map[string]string{
-// 	"mysql": "mysql",
-// 	"mongo": "mongo",
-// }
-
-// var SIDECAR_NETWORK_MAP = map[string]string{
-// 	"mysql": "beast-mysql",
-// 	"mongo": "beast-mongo",
-// }
-
-// var SIDECAR_ENV_PREFIX = map[string]string{
-// 	"mysql": "MYSQL",
-// 	"mongo": "MONGO",
-// }
-
 // Available challenge types
 var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, WEB_CHALLENGE_TYPE_NAME}
 

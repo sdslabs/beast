@@ -65,10 +65,6 @@ import (
 // # We are also working on implmeneting notification using Discord and IRC.
 // slack_webhook = ""
 //
-// # The sidecar that we support with beast, currently we only support two MySQL and
-// # MongoDB.
-// available_sidecars = ["mysql", "mongodb"]
-//
 // #Health Prober, if active starts a health prober on a thread which checks for
 // #deployed challenges, containers and servers after every ticker_frequency period
 // health_prober = false
@@ -118,7 +114,6 @@ type BeastConfig struct {
 	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
 	BeastScriptsDir      string                     `toml:"scripts_dir"`
 	AllowedBaseImages    []string                   `toml:"allowed_base_images"`
-	// AvailableSidecars    []string                   `toml:"available_sidecars"`
 	AvailableServers     map[string]AvailableServer `toml:"available_servers"`
 	GitRemotes           []GitRemote                `toml:"remote"`
 	PsqlConf             PsqlConfig                 `toml:"psql_config"`

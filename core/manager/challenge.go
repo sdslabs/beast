@@ -710,11 +710,6 @@ func undeployChallenge(challengeName string, purge bool) error {
 		if err != nil {
 			return err
 		}
-		// TODO: remove sidecars completely
-		// err = cleanSidecar(&cfg)
-		if err != nil {
-			return err
-		}
 
 		err = coreUtils.CleanupChallengeIfExist(cfg)
 		if err != nil {

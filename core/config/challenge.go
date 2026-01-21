@@ -46,7 +46,6 @@ func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
 	Metadata.Type = "ChallengeType"
 	Metadata.DynamicFlag = false
 	Metadata.Flag = "ChallengeFlag"
-	// Metadata.Sidecar = "SidecarHelper"
 }
 
 func (Env *ChallengeEnv) PopulateChallengeEnv() {
@@ -127,14 +126,12 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 // # Optional fields.
 // tags = ["", ""] # Tags that the challenge might belong to, used to do bulk query and handling eg. binary, misc etc.
 // hints = ["", ""]
-// sidecar = "" # Name of the sidecar if any used by the challenge.
 // ```
 type ChallengeMetadata struct {
 	Flag        string   `toml:"flag"`
 	Name        string   `toml:"name"`
 	Type        string   `toml:"type"`
 	Tags        []string `toml:"tags"`
-	// Sidecar     string   `toml:"sidecar"`
 	Description string   `toml:"description"`
 	Hints       []struct {
 		Text   string `toml:"text"`
@@ -166,10 +163,6 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 		log.Warn("MaxAttemptLimit is set to 0, defaulting to no limit for attempts")
 		config.MaxAttemptLimit = -1
 	}
-
-	// if !(utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "") {
-	//     return fmt.Errorf("sidecar provided is not an available sidecar"), false
-	// }
 
 	// Check if the config type is static here and if it is
 	// then return an indication for that, so that caller knows if it need
