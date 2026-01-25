@@ -25,6 +25,7 @@ var (
 )
 
 func stopApiScheduler() {
+	/* Stop the scheduler if it hasn't stopped already */
 	log.Infoln("Stopping the API scheduler...")
 	api.BeastScheduler.Stop()
 	log.Infoln("API scheduler stopped")
