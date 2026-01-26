@@ -25,7 +25,7 @@ func AddNotification(notification *Notification) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while adding notification", tx.Error)
+		return fmt.Errorf("Error while adding notification: %v", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(notification, *notification).Error; err != nil {

@@ -173,9 +173,13 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	}
 
 	// Check if a container for the challenge is already deployed.
-	// If the challange is already deployed, return an error.
-	// If not then start the deploy pipeline for the challenge.
-	if coreUtils.IsContainerIdValid(challenge.ContainerId) {
+
+	if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		if challenge.Status == core.DEPLOY_STATUS["deployed"] {
+			log.Debugf("Found an already deployed docker-compose challenge: %s", challengeName)
+			return nil, fmt.Errorf("challenge already deployed")
+		}
+	} else if coreUtils.IsContainerIdValid(challenge.ContainerId) {
 		var containers, remoteContainers []containerType.Container
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
@@ -636,27 +640,52 @@ func undeployChallenge(challengeName string, purge bool) error {
 		return fmt.Errorf("ChallengeName %s not valid", challengeName)
 	}
 
-	// If a existing container ID is not found make sure that you atleast
-	// set the deploy status to undeployed. This earlier caused problem since if a challenge
-	// was in staging state(and deployed is cancled) then we can neither deploy new
-	// version nor we can undeploy the existing version(since it does not exist)
-	// So this....
-	if challenge.ContainerId == coreUtils.GetTempContainerId(challengeName) {
-		log.Warnf("No instance of challenge(%s) deployed", challengeName)
-	} else {
-		log.Debug("Removing challenge instance for ", challengeName)
+	if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		log.Debugf("Detected Docker Compose deployment for challenge %s", challengeName)
+
+		stagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
-			err = remoteManager.StopAndRemoveContainerRemote(challenge.ContainerId, server)
+
+			if !purge {
+				err = remoteManager.ComposeDownRemote(challengeName, stagedDir, server)
+			} else {
+				err = remoteManager.ComposePurgeRemote(challengeName, stagedDir, server)
+			}
 		} else {
-			err = cr.StopAndRemoveContainer(challenge.ContainerId)
+			if !purge {
+				err = cr.ComposeDown(challengeName, stagedDir)
+			} else {
+				err = cr.ComposePurge(challengeName, stagedDir)
+			}
 		}
 		if err != nil {
-			// This should not return from here, this should assume that
-			// the container instance does not exist and hence should update the database
-			// with the container ID.
-			p := fmt.Errorf("error while removing challenge instance : %s", err)
-			log.Error(p.Error())
+			log.Errorf("Error while removing challenge instance : %s", err)
+			return fmt.Errorf("error while removing challenge instance : %s", err)
+		}
+	} else {
+		// If a existing container ID is not found make sure that you atleast
+		// set the deploy status to undeployed. This earlier caused problem since if a challenge
+		// was in staging state(and deployed is cancled) then we can neither deploy new
+		// version nor we can undeploy the existing version(since it does not exist)
+		// So this....
+		if challenge.ContainerId == coreUtils.GetTempContainerId(challengeName) {
+			log.Warnf("No instance of challenge(%s) deployed", challengeName)
+		} else {
+			log.Debug("Removing challenge instance for ", challengeName)
+			if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+				server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+				err = remoteManager.StopAndRemoveContainerRemote(challenge.ContainerId, server)
+			} else {
+				err = cr.StopAndRemoveContainer(challenge.ContainerId)
+			}
+			if err != nil {
+				// This should not return from here, this should assume that
+				// the container instance does not exist and hence should update the database
+				// with the container ID.
+				p := fmt.Errorf("error while removing challenge instance : %s", err)
+				log.Error(p.Error())
+			}
 		}
 	}
 

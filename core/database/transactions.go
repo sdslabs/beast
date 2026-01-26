@@ -22,7 +22,7 @@ func SaveTransaction(transaction *Transaction) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while saving transaction", tx.Error)
+		return fmt.Errorf("Error while saving transaction: %v", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(transaction, *transaction).Error; err != nil {

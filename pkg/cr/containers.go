@@ -1,9 +1,14 @@
 package cr
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os/exec"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -12,6 +17,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sdslabs/beastv4/pkg/defaults"
+	utils "github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -155,7 +161,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	for _, portMapping := range containerConfig.PortMapping {
 		natPort, err := nat.NewPort(containerConfig.TrafficType(), strconv.Itoa(int(portMapping.ContainerPort)))
 		if err != nil {
-			return "", fmt.Errorf("Error while creating new port from port %d", portMapping.ContainerPort)
+			return "", fmt.Errorf("error while creating new port from port %d", portMapping.ContainerPort)
 		}
 
 		portSet[natPort] = struct{}{}
@@ -170,6 +176,12 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		Image:        containerConfig.ImageId,
 		ExposedPorts: portSet,
 		Env:          containerConfig.ContainerEnv,
+		Labels: map[string]string{
+			"beast.challenge":             containerConfig.ChallengeName,
+			"com.sdslabs.beast.project":   utils.GetProjectName(containerConfig.ChallengeName),
+			"com.docker.compose.project":  utils.GetProjectName(containerConfig.ChallengeName),
+			"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
+		},
 	}
 
 	var mountBindings []mount.Mount
@@ -198,7 +210,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
 	if err != nil {
-		log.Error("Error while creating the container with name %s", containerName)
+		log.Errorf("Error while creating the container with name %s", containerName)
 		return "", err
 	}
 
@@ -208,7 +220,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	if err := cli.ContainerStart(ctx, containerId, types.ContainerStartOptions{}); err != nil {
-		log.Error("Error while starting the container : %s", err)
+		log.Errorf("Error while starting the container : %s", err)
 		return "", err
 	}
 
@@ -279,4 +291,158 @@ func CommitContainer(containerId string) (string, error) {
 	}
 
 	return commitResp.ID, nil
+}
+
+func DeployContainerFromCompose(challengeName, stagedPath, composeFileName string) (string, error) {
+	extractDir := filepath.Join(stagedPath, challengeName)
+	projectName := utils.GetProjectName(challengeName)
+	composeFile := filepath.Join(extractDir, composeFileName)
+
+	log.Debugf("Deploying challenge %s using docker compose with project name %s and file %s", challengeName, projectName, composeFileName)
+
+	// Deploy with project name - Docker Compose automatically labels containers with
+	// com.docker.compose.project=<projectName>
+	upCmd := exec.Command("docker", "compose",
+		"-f", composeFile,
+		"-p", projectName,
+		"up", "-d")
+
+	var upOutput bytes.Buffer
+	upCmd.Stdout = &upOutput
+	upCmd.Stderr = &upOutput
+
+	if err := upCmd.Run(); err != nil {
+		log.Errorf("docker compose up failed for challenge %s. Output:\n%s", challengeName, upOutput.String())
+		return "", fmt.Errorf("error while running docker compose up: %v", err)
+	}
+
+	if err := validateAllComposeServicesRunning(projectName, challengeName); err != nil {
+		return "", err
+	}
+
+	primaryContainerId, err := getPrimaryComposeContainerId(projectName)
+	if err != nil {
+		log.Warnf("Could not get primary container ID for challenge %s: %v", challengeName, err)
+		return "", nil // Return empty string but success
+	}
+
+	log.Debugf("Verified challenge %s services are running. Primary container: %s", challengeName, primaryContainerId)
+	return primaryContainerId, nil
+}
+
+func validateAllComposeServicesRunning(projectName, challengeName string) error {
+	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "--format", "json")
+	var psOutput bytes.Buffer
+	psCmd.Stdout = &psOutput
+	psCmd.Stderr = &psOutput
+
+	if err := psCmd.Run(); err != nil {
+		return fmt.Errorf("error checking container status after compose up for challenge %s. Output:\n%s", challengeName, psOutput.String())
+	}
+
+	output := strings.TrimSpace(psOutput.String())
+	if output == "" {
+		return fmt.Errorf("no services found after compose up for challenge %s", challengeName)
+	}
+
+	type ComposeService struct {
+		ID      string `json:"ID"`
+		Name    string `json:"Name"`
+		Service string `json:"Service"`
+		State   string `json:"State"`
+		Status  string `json:"Status"`
+	}
+
+	var services []ComposeService
+	var notRunningServices []string
+
+	for _, line := range strings.Split(output, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		var service ComposeService
+		if err := json.Unmarshal([]byte(line), &service); err != nil {
+			log.Warnf("Failed to parse compose service JSON: %v. Line: %s", err, line)
+			continue
+		}
+
+		services = append(services, service)
+
+		if service.State != "running" && !strings.HasPrefix(service.Status, "Up") {
+			notRunningServices = append(notRunningServices, service.Service)
+			log.Warnf("Service %s is not running. State: %s, Status: %s", service.Service, service.State, service.Status)
+		} else {
+			log.Debugf("Service %s (name: %s) is running with status: %s", service.Service, service.Name, service.Status)
+		}
+	}
+
+	if len(services) == 0 {
+		return fmt.Errorf("no services detected for challenge %s", challengeName)
+	}
+
+	if len(notRunningServices) > 0 {
+		return fmt.Errorf("services not running for challenge %s: %v", challengeName, notRunningServices)
+	}
+
+	log.Debugf("Verified all %d services are running for challenge %s", len(services), challengeName)
+	return nil
+}
+
+// gets the first container ID from a compose project
+func getPrimaryComposeContainerId(projectName string) (string, error) {
+	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q")
+	var output bytes.Buffer
+	psCmd.Stdout = &output
+
+	if err := psCmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to get container IDs: %v", err)
+	}
+
+	containerIds := strings.Fields(strings.TrimSpace(output.String()))
+	if len(containerIds) == 0 {
+		return "", fmt.Errorf("no containers found for project %s", projectName)
+	}
+
+	// Return first 12 characters of the first container ID
+	if len(containerIds[0]) >= 12 {
+		return containerIds[0][:12], nil
+	}
+	return containerIds[0], nil
+}
+
+func ComposeDown(challengeName, stagedDir string) error {
+	log.Debugf("Stopping challenge %s using docker compose", challengeName)
+	projectName := utils.GetProjectName(challengeName)
+
+	downCmd := exec.Command("docker", "compose", "-p", projectName, "down")
+	var downOutput bytes.Buffer
+	downCmd.Stdout = &downOutput
+	downCmd.Stderr = &downOutput
+
+	if err := downCmd.Run(); err != nil {
+		return fmt.Errorf("docker compose down failed for challenge %s: %v. Output: %s", challengeName, err, downOutput.String())
+	}
+
+	log.Debugf("Successfully stopped challenge %s", challengeName)
+	return nil
+}
+
+func ComposePurge(challengeName, stagedDir string) error {
+	log.Debugf("Purging challenge %s using docker compose", challengeName)
+	projectName := utils.GetProjectName(challengeName)
+
+	purgeCmd := exec.Command("docker", "compose", "-p", projectName,
+		"down", "--remove-orphans", "--volumes", "--rmi", "all")
+
+	var purgeOutput bytes.Buffer
+	purgeCmd.Stdout = &purgeOutput
+	purgeCmd.Stderr = &purgeOutput
+
+	if err := purgeCmd.Run(); err != nil {
+		return fmt.Errorf("docker compose purge failed for challenge %s: %v. Output: %s", challengeName, err, purgeOutput.String())
+	}
+
+	log.Debugf("Successfully purged challenge %s", challengeName)
+	return nil
 }

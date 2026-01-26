@@ -61,6 +61,7 @@ type Challenge struct {
 	ContainerId     string `gorm:"size:64;unique"`
 	ImageId         string `gorm:"size:64;unique"`
 	Status          string `gorm:"not null;default:'Undeployed'"`
+	DeploymentType  string `gorm:"not null;default:'standard_docker'"`
 	AuthorID        uint   `gorm:"not null"`
 	HealthCheck     uint   `gorm:"not null;default:1"`
 	Points          uint   `gorm:"default:0"`

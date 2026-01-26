@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    ports:
+      - "10020:80"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: my_db
+      MYSQL_USER: my_user
+      MYSQL_PASSWORD: my_password
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_DATABASE: my_db
+      MYSQL_USER: my_user
+      MYSQL_PASSWORD: my_password
+      MYSQL_ROOT_PASSWORD: root_password

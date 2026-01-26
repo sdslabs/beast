@@ -85,7 +85,12 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to extract tar: %s", err)
 	}
-	dockerBuildCmd := fmt.Sprintf("cd %s && docker build -t %s .", remoteExtractPath, imageTag)
+	projectName := utils.GetProjectName(challengeName)
+	dockerBuildCmd := fmt.Sprintf("cd %s && docker build -t %s "+
+		"--label beast.challenge=%s "+
+		"--label com.sdslabs.beast.project=%s "+
+		"--label com.docker.compose.project=%s .",
+		remoteExtractPath, imageTag, challengeName, projectName, projectName)
 	output, err := RunCommandOnServer(server, dockerBuildCmd)
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to build docker image: %s\nOutput: %s", err, output)
@@ -102,4 +107,27 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 		return []byte{}, "", fmt.Errorf("failed to retrieve Docker image ID")
 	}
 	return []byte(output), strings.TrimSpace(imageID), nil
+}
+
+func BuildImagesFromComposeRemote(challengeName, imageTag, stagedDir string, server config.AvailableServer, noCache bool) ([]byte, error) {
+	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
+	_, err := RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", remoteExtractPath, stagedDir, remoteExtractPath))
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to extract tar: %s", err)
+	}
+	cmdBase := "docker compose build"
+	if noCache {
+		cmdBase += " --no-cache"
+	}
+	// Note: docker compose build does not support --label flag
+	// Labels are automatically added to containers during 'docker compose up -p <project>'
+	dockerComposeBuildCmd := fmt.Sprintf("cd %s && %s", remoteExtractPath, cmdBase)
+
+	// Execute the command on the remote server
+	output, err := RunCommandOnServer(server, dockerComposeBuildCmd)
+	if err != nil {
+		return []byte(output), fmt.Errorf("failed to build docker compose images remotely: %s\nOutput: %s", err, output)
+	}
+
+	return []byte(output), nil
 }

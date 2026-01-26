@@ -2,7 +2,9 @@ package remoteManager
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -10,6 +12,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
+	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
@@ -73,7 +76,7 @@ func StopAndRemoveContainerRemote(containerId string, server config.AvailableSer
 				log.Debugf("no container with container id %s present", containerId)
 				return nil
 			}
-			return fmt.Errorf("DATABASE ERROR while fetching user details.")
+			return fmt.Errorf("DATABASE ERROR while fetching challenge details")
 		}
 		if len(chall) > 0 {
 			server = config.Cfg.AvailableServers[chall[0].ServerDeployed]
@@ -193,4 +196,139 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 	}
 	imageID := strings.TrimSpace(output)
 	return imageID, nil
+}
+
+func DeployContainerFromComposeRemote(challengeName, stagedDir, composeFileName string, server config.AvailableServer) (string, error) {
+	extractDir := filepath.Join(stagedDir, challengeName)
+	projectName := utils.GetProjectName(challengeName)
+	composeFile := filepath.Join(extractDir, composeFileName)
+
+	upCommand := fmt.Sprintf("docker compose -f %s -p %s up -d", composeFile, projectName)
+	log.Debugf("Deploying challenge %s using docker compose remotely with project %s and file %s", challengeName, projectName, composeFileName)
+	upOutput, err := RunCommandOnServer(server, upCommand)
+	if err != nil {
+		log.Errorf("docker compose up failed for challenge %s. Output:\n%s", challengeName, upOutput)
+		return "", fmt.Errorf("error while running docker compose up on remote: %v", err)
+	}
+
+	if err := validateAllComposeServicesRunningRemote(projectName, challengeName, server); err != nil {
+		return "", err
+	}
+
+	primaryContainerId, err := getPrimaryComposeContainerIdRemote(projectName, server)
+	if err != nil {
+		log.Warnf("Could not get primary container ID for challenge %s on remote: %v", challengeName, err)
+		return "", nil // Return empty string but success
+	}
+
+	log.Debugf("Verified challenge %s services are running on remote. Primary container: %s", challengeName, primaryContainerId)
+	return primaryContainerId, nil
+}
+
+func validateAllComposeServicesRunningRemote(projectName, challengeName string, server config.AvailableServer) error {
+	psCommand := fmt.Sprintf("docker compose -p %s ps --format json", projectName)
+	log.Debugf("Verifying docker compose services for challenge %s: %s", challengeName, psCommand)
+	psOutput, err := RunCommandOnServer(server, psCommand)
+	if err != nil {
+		log.Errorf("docker compose ps failed for challenge %s. Output:\n%s", challengeName, psOutput)
+		return fmt.Errorf("error while verifying docker compose services on remote: %v", err)
+	}
+
+	output := strings.TrimSpace(psOutput)
+	if output == "" {
+		return fmt.Errorf("no services found after compose up for challenge %s", challengeName)
+	}
+
+	type ComposeService struct {
+		ID      string `json:"ID"`
+		Name    string `json:"Name"`
+		Service string `json:"Service"`
+		State   string `json:"State"`
+		Status  string `json:"Status"`
+	}
+
+	var services []ComposeService
+	var notRunningServices []string
+
+	for _, line := range strings.Split(output, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		var service ComposeService
+		if err := json.Unmarshal([]byte(line), &service); err != nil {
+			log.Warnf("Failed to parse compose service JSON on remote: %v. Line: %s", err, line)
+			continue
+		}
+
+		services = append(services, service)
+
+		if service.State != "running" && !strings.HasPrefix(service.Status, "Up") {
+			notRunningServices = append(notRunningServices, service.Service)
+			log.Warnf("Remote service %s is not running. State: %s, Status: %s", service.Service, service.State, service.Status)
+		} else {
+			log.Debugf("Remote service %s (name: %s) is running with status: %s", service.Service, service.Name, service.Status)
+		}
+	}
+
+	if len(services) == 0 {
+		return fmt.Errorf("no services detected for challenge %s on remote", challengeName)
+	}
+
+	if len(notRunningServices) > 0 {
+		return fmt.Errorf("services not running for challenge %s on remote: %v", challengeName, notRunningServices)
+	}
+
+	log.Debugf("Verified all %d services are running for challenge %s on remote", len(services), challengeName)
+	return nil
+}
+
+// gets the first container ID from a compose project on remote
+func getPrimaryComposeContainerIdRemote(projectName string, server config.AvailableServer) (string, error) {
+	psCommand := fmt.Sprintf("docker compose -p %s ps -q | head -1", projectName)
+	output, err := RunCommandOnServer(server, psCommand)
+	if err != nil {
+		return "", fmt.Errorf("failed to get container IDs on remote: %v", err)
+	}
+
+	containerId := strings.TrimSpace(output)
+	if containerId == "" {
+		return "", fmt.Errorf("no containers found for project %s on remote", projectName)
+	}
+
+	// Return first 12 characters
+	if len(containerId) >= 12 {
+		return containerId[:12], nil
+	}
+	return containerId, nil
+}
+
+func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableServer) error {
+	log.Debugf("Stopping challenge %s using docker compose on remote", challengeName)
+	projectName := utils.GetProjectName(challengeName)
+
+	downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
+	log.Debugf("Stopping challenge %s using docker compose remotely: %s", challengeName, downCommand)
+	downOutput, err := RunCommandOnServer(server, downCommand)
+	if err != nil {
+		return fmt.Errorf("docker compose down failed for challenge %s on remote: %v. Output: %s", challengeName, err, downOutput)
+	}
+
+	log.Debugf("Successfully stopped challenge %s on remote. Output: %s", challengeName, downOutput)
+	return nil
+}
+
+func ComposePurgeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
+	log.Debugf("Purging challenge %s using docker compose on remote", challengeName)
+	projectName := utils.GetProjectName(challengeName)
+	purgeCommand := fmt.Sprintf("docker compose -p %s down --remove-orphans --volumes --rmi all", projectName)
+	log.Debugf("Purge challenge %s using docker compose remotely: %s", challengeName, purgeCommand)
+	purgeOutput, err := RunCommandOnServer(server, purgeCommand)
+	if err != nil {
+		return fmt.Errorf("docker compose purge failed for challenge %s on remote: %v. Output: %s", challengeName, err, purgeOutput)
+
+	}
+
+	log.Debugf("Successfully purged challenge %s on remote. Output: %s", challengeName, purgeOutput)
+	return nil
 }

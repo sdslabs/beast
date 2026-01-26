@@ -76,7 +76,6 @@ func LogCheating(msg string) error {
 	return nil
 }
 
-
 func LogFlag(msg string, challName string) error {
 	// log the cheating attempt in a file in cheat.log
 	file, err := os.OpenFile(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challName, core.BEAST_CHALLENGE_LOGS_DIR, core.BEAST_FLAG_LOG_FILE), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

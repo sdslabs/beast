@@ -41,37 +41,49 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	challengeConfig := filepath.Join(contextDir, core.CHALLENGE_CONFIG_FILE_NAME)
 	log.Debugf("Reading challenge config from : %s", challengeConfig)
 
-	var dockerfileCtx, serviceConfig string
+	var dockerfileCtx, serviceConfig, dockerCompose string
 	dockerfileProvided := false
 
-	if config.Challenge.Env.DockerCtx != "" {
-		dockerfileProvided = true
-		dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
-		err := utils.ValidateFileExists(dockerfileCtx)
+	additionalCtx := make(map[string]string)
+	if config.Challenge.Env.DockerCompose != "" {
+		dockerCompose = filepath.Join(challengeDir, config.Challenge.Env.DockerCompose)
+		err := utils.ValidateFileExists(dockerCompose)
 		if err != nil {
 			return err
 		}
+		additionalCtx["docker-compose.yml"] = dockerCompose
+		log.Debug("Got docker-compose file from the challenge config")
 	} else {
-		config.Challenge.Env.DockerCtx = core.DEFAULT_DOCKER_FILE
-		dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
-		if err != nil {
-			return err
-		}
-		log.Debug("Got dockerfile context from the challenge config")
-	}
 
-	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
-		if config.Challenge.Env.XinetdConf != "" {
-			serviceConfig = filepath.Join(challengeDir, config.Challenge.Env.XinetdConf)
-			err := utils.ValidateFileExists(serviceConfig)
+		if config.Challenge.Env.DockerCtx != "" {
+			dockerfileProvided = true
+			dockerfileCtx = filepath.Join(challengeDir, config.Challenge.Env.DockerCtx)
+			err := utils.ValidateFileExists(dockerfileCtx)
 			if err != nil {
 				return err
 			}
+			log.Debug("Got dockerfile context from the challenge config")
+		} else {
+			config.Challenge.Env.DockerCtx = core.DEFAULT_DOCKER_FILE
+			dockerfileCtx, err = GenerateChallengeDockerfileCtx(config)
+			if err != nil {
+				return err
+			}
+			log.Debug("Generated dockerfile context for the challenge")
 		}
+
+		if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
+			if config.Challenge.Env.XinetdConf != "" {
+				serviceConfig = filepath.Join(challengeDir, config.Challenge.Env.XinetdConf)
+				err := utils.ValidateFileExists(serviceConfig)
+				if err != nil {
+					return err
+				}
+				additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = serviceConfig
+			}
+		}
+		additionalCtx["Dockerfile"] = dockerfileCtx
 	}
-	additionalCtx := make(map[string]string)
-	additionalCtx["Dockerfile"] = dockerfileCtx
-	additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = serviceConfig
 
 	// Here we try to add all the additional context that are required like xinetd.conf
 	// instead of mounting these files inside the container, since we want reproducibility
@@ -138,27 +150,61 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		log.Errorf("Error while cleaning up the challenge")
 		return err
 	}
-	var imageId string
-	var buildErr error
-	var logBytes []byte
+	var (
+		imageId  string
+		buildErr error
+		logBytes []byte
+	)
+	imageId = ""
+
 	challengeTag := coreUtils.EncodeID(challengeName)
 	log.Printf("== Server for challenge %s : %s", challengeName, challenge.ServerDeployed)
-	if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
-		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-		stagedRemoteChallengePath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
-		remoteStagedPath := filepath.Join(stagedRemoteChallengePath, fmt.Sprintf("%s.tar.gz", challengeName))
-		err := remoteManager.ValidateFileRemoteExists(server, stagedRemoteChallengePath)
-		if err != nil {
-			return fmt.Errorf("error while checking if the challenge is staged on the remote server")
-		}
-		logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server)
-	} else {
-		var buff *bytes.Buffer
-		buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
-		if buff != nil {
-			logBytes = buff.Bytes()
+	if config.Challenge.Env.DockerCompose != "" {
+
+		//  Should add some validation for the compose file
+
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+
+			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+			logBytes, buildErr = remoteManager.BuildImagesFromComposeRemote(
+				challengeName,
+				challengeTag,
+				stagedPath,
+				server,
+				noCache,
+			)
 		} else {
-			logBytes = []byte("BuildImageFromTarContext returned nil buffer")
+			var buff *bytes.Buffer
+
+			buff, buildErr = cr.BuildImagesFromCompose(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCompose, noCache)
+			if buff != nil {
+				logBytes = buff.Bytes()
+			} else {
+				logBytes = []byte("BuildImagesFromCompose returned nil buffer")
+			}
+		}
+		// For Docker Compose challenges, ensure ImageId is empty in the database
+		if err := database.UpdateChallenge(challenge, map[string]any{"ImageId": ""}); err != nil {
+			return fmt.Errorf("error while setting empty ImageId for Docker Compose challenge: %s", err)
+		}
+	} else {
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+			stagedRemoteChallengePath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+			remoteStagedPath := filepath.Join(stagedRemoteChallengePath, fmt.Sprintf("%s.tar.gz", challengeName))
+			err := remoteManager.ValidateFileRemoteExists(server, stagedRemoteChallengePath)
+			if err != nil {
+				return fmt.Errorf("error while checking if the challenge is staged on the remote server")
+			}
+			logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server)
+		} else {
+			var buff *bytes.Buffer
+			buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
+			if buff != nil {
+				logBytes = buff.Bytes()
+			} else {
+				logBytes = []byte("BuildImageFromTarContext returned nil buffer")
+			}
 		}
 	}
 	// Create logs directory for the challenge in staging directory.
@@ -183,13 +229,16 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		log.Error("Error while building image from the tar context of challenge")
 		return buildErr
 	}
-	if imageId == "" {
-		log.Error("Error while creating image logs written to the logfile")
-		return fmt.Errorf("error while getting imageId for the commited challenge")
-	}
+	// Only update imageId for non-Docker Compose challenges
+	if config.Challenge.Env.DockerCompose == "" {
+		if imageId == "" {
+			log.Error("Error while creating image logs written to the logfile")
+			return fmt.Errorf("error while getting imageId for the commited challenge")
+		}
 
-	if err = database.UpdateChallenge(challenge, map[string]interface{}{"ImageId": imageId}); err != nil {
-		return fmt.Errorf("error while writing imageId to database : %s", err)
+		if err = database.UpdateChallenge(challenge, map[string]interface{}{"ImageId": imageId}); err != nil {
+			return fmt.Errorf("error while writing imageId to database : %s", err)
+		}
 	}
 
 	log.Infof("Image build for `%s` done", challengeName)
@@ -218,6 +267,40 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeConfig) error {
 	log.Debug("Starting to deploy the challenge")
 
+	challengeName := config.Challenge.Metadata.Name
+	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+
+	if config.Challenge.Env.DockerCompose != "" {
+		// currently the first container id returned
+		var primaryContainerId string
+		var err error
+
+		composeFileName := config.Challenge.Env.DockerCompose
+
+		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, composeFileName, server)
+			if err != nil {
+				return fmt.Errorf("error while deploying challenge with docker-compose on remote: %v", err)
+			}
+		} else {
+			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, stagingDir, composeFileName)
+			if err != nil {
+				return fmt.Errorf("error while deploying challenge with docker-compose: %v", err)
+			}
+		}
+
+		// only for backward compatibility
+		if err := database.UpdateChallenge(challenge, map[string]any{
+			"ContainerId":    primaryContainerId,
+			"DeploymentType": core.DEPLOYMENT_TYPES["docker_compose"],
+		}); err != nil {
+			return fmt.Errorf("error while updating Docker Compose challenge metadata: %s", err)
+		}
+		log.Infof("Challenge %s deployed with docker-compose successfully (primary container: %s)", challengeName, primaryContainerId)
+		return nil
+	}
+
 	staticMount := make(map[string]string)
 	var staticMountDir string
 	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
@@ -235,14 +318,10 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	var containerEnv []string
 	var containerNetwork string
 	if config.Challenge.Metadata.Sidecar != "" {
-		// We need to configure the sidecar for the challenge container.
-		// Push the environment variables to the container and link to the sidecar.
 		env := getSidecarEnv(&config)
 		containerEnv = append(containerEnv, env...)
-
 		containerNetwork = getSidecarNetwork(config.Challenge.Metadata.Sidecar)
 	}
-
 	for _, env := range config.Challenge.Env.EnvironmentVars {
 		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)))
 	}
@@ -254,8 +333,6 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		config.Resources.PidsLimit,
 	)
 
-	// Since till this point we have already valiadated the challenge config this is highly
-	// unlikely to fail.
 	portMapping, err := config.Challenge.Env.GetPortMappings()
 	if err != nil {
 		return fmt.Errorf("error while parsing port mapping for the challenge %s: %s", config.Challenge.Metadata.Name, err)
@@ -266,7 +343,6 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
 		ContainerName:    coreUtils.EncodeID(config.Challenge.Metadata.Name),
-		ChallengeName:    config.Challenge.Metadata.Name,
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
 		Traffic:          config.Challenge.Env.TrafficType(),
@@ -285,21 +361,17 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 	if err != nil {
 		if containerId != "" {
-			if e := database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": containerId}); e != nil {
-				return fmt.Errorf("error while starting container : %s and saving database : %s", err, e)
-			}
-
 			return fmt.Errorf("error while starting the container : %s", err)
 		}
-
 		return fmt.Errorf("error while trying to create a container for the challenge: %s", err)
 	}
 
-	challenge.ContainerId = containerId
-	if err = database.UpdateChallenge(challenge, map[string]interface{}{"ContainerId": containerId}); err != nil {
+	if err = database.UpdateChallenge(challenge, map[string]any{
+		"ContainerId":    containerId,
+		"DeploymentType": core.DEPLOYMENT_TYPES["standard_docker"],
+	}); err != nil {
 		return fmt.Errorf("error while saving containerId to database : %s", err)
 	}
-
 	return nil
 }
 
