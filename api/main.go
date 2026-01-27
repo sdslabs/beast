@@ -17,6 +17,8 @@ import (
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/pkg/scheduler"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
+	_ "github.com/sdslabs/beastv4/plugins/dummy"
+	_ "github.com/sdslabs/beastv4/plugins/email_verify"
 )
 
 const (
@@ -66,7 +68,7 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 	remoteManager.Init()
 	database.Init()
-	
+
 	runBeastApiBootsteps(defaultauthorpassword)
 
 	// Initialize Gin router.

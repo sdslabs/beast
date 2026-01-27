@@ -117,6 +117,19 @@ host = "localhost"
 port = "5432"
 sslmode = "prefer"
 
+# Configuration related to plugin management in Beast
+# This section lists all plugins that should be initialized at runtime
+[plugins_config]
+
+# List of plugin names to be enabled. Only plugins listed here will be initialized
+# For reference, Beast currently supports: "DummyPlugin", "EmailVerifyPlugin"
+enabled_plugins = ["DummyPlugin", "EmailVerifyPlugin"]
+
+#Allowed email ids for the Email Verify plugin
+[emailverify]
+allowed_domains = ["example.com", "organization.example.com"]
+
+
 # The following fields are required only while hosting a competition on beast
 # This section contains information about the competition to be hosted
 # Structure of the sections with the acceptable fields are:
