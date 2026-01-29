@@ -196,12 +196,12 @@ func initDb() error {
 		log.Infoln(fmt.Sprintf("Database %s already exists", configuration.PsqlConf.Dbname))
 	}
 
-	_, err = db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s;", pq.QuoteIdentifier(configuration.PsqlConf.Dbname), pq.QuoteIdentifier(configuration.PsqlConf.User)))
+	_, err = db.Exec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", pq.QuoteIdentifier(configuration.PsqlConf.Dbname), pq.QuoteIdentifier(configuration.PsqlConf.User)))
 	if err != nil {
 		return err
 	}
 
-	log.Infoln(fmt.Sprintf("Granted all privileges on database: %s to user: %s", configuration.PsqlConf.Dbname, configuration.PsqlConf.User))
+	log.Infoln(fmt.Sprintf("%s set as owner of database %s", configuration.PsqlConf.User, configuration.PsqlConf.Dbname))
 	return nil
 }
 
