@@ -100,7 +100,7 @@ func createBeastDbUser(db *sql.DB, configuration *config.PsqlConfig) error {
 		return errors.New("failed to create database")
 	}
 
-	_, err := db.Exec(fmt.Sprintf("CREATE USER %s WITH PASSWORD $1;", pq.QuoteIdentifier(configuration.User)), configuration.Password)
+	_, err := db.Exec(fmt.Sprintf("CREATE USER %s WITH PASSWORD %s;", pq.QuoteIdentifier(configuration.User), utils.QuoteLiteral(configuration.Password)))
 	return err
 }
 
@@ -179,7 +179,7 @@ func initDb() error {
 	}
 
 	log.Infoln(fmt.Sprintf("Changing password for user %s", configuration.PsqlConf.User))
-	query := fmt.Sprintf("ALTER USER %s WITH PASSWORD '%s';", pq.QuoteIdentifier(configuration.PsqlConf.User), configuration.PsqlConf.Password)
+	query := fmt.Sprintf("ALTER USER %s WITH PASSWORD %s", pq.QuoteIdentifier(configuration.PsqlConf.User), utils.QuoteLiteral(configuration.PsqlConf.Password))
 	_, err = db.Exec(query)
 	if err != nil {
 		return err
@@ -196,12 +196,12 @@ func initDb() error {
 		log.Infoln(fmt.Sprintf("Database %s already exists", configuration.PsqlConf.Dbname))
 	}
 
-	_, err = db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s;", pq.QuoteIdentifier(configuration.PsqlConf.Dbname), pq.QuoteIdentifier(configuration.PsqlConf.User)))
+	_, err = db.Exec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", pq.QuoteIdentifier(configuration.PsqlConf.Dbname), pq.QuoteIdentifier(configuration.PsqlConf.User)))
 	if err != nil {
 		return err
 	}
 
-	log.Infoln(fmt.Sprintf("Granted all privileges on database: %s to user: %s", configuration.PsqlConf.Dbname, configuration.PsqlConf.User))
+	log.Infoln(fmt.Sprintf("%s set as owner of database %s", configuration.PsqlConf.User, configuration.PsqlConf.Dbname))
 	return nil
 }
 
