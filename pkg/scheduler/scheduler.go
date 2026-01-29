@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"sync"
 	"time"
 )
 
@@ -10,6 +11,8 @@ type Scheduler struct {
 
 	stopChan chan bool
 	ticker   *time.Ticker
+
+	once sync.Once
 }
 
 func NewScheduler() Scheduler {
@@ -19,6 +22,8 @@ func NewScheduler() Scheduler {
 
 		stopChan: make(chan bool),
 		ticker:   time.NewTicker(1 * time.Second),
+
+		once: sync.Once{},
 	}
 }
 
@@ -31,13 +36,17 @@ func (scheduler *Scheduler) Start() {
 			case <-scheduler.stopChan:
 				scheduler.ticker.Stop()
 				close(scheduler.stopChan)
+
+				return
 			}
 		}
 	}()
 }
 
 func (Scheduler *Scheduler) Stop() {
-	Scheduler.stopChan <- true
+	Scheduler.once.Do(func() {
+		Scheduler.stopChan <- true
+	})
 }
 
 func (Scheduler *Scheduler) Wait() {
