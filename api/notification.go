@@ -1,10 +1,14 @@
 package api
 
 import (
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/sse"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -43,6 +47,8 @@ func addNotification(c *gin.Context) {
 		})
 		return
 	}
+	sse.BroadcastNotification(notify)
+
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "Notification successfully added",
 	})
@@ -196,4 +202,45 @@ func availableNotificationHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 	return
+}
+
+func streamNotification(c *gin.Context) {
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	user := sse.NewSseClient(uuid.NewString())
+	sse.AddClient(user)
+	log.Print("adding id: ", user.Id)
+
+	defer func() {
+		sse.RemoveClient(user)
+	}()
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	welcome := false
+	c.Stream(func(w io.Writer) bool {
+		if !welcome {
+			c.SSEvent("user_connected", user.Id)
+			welcome = true
+			return true
+		}
+		select {
+		case notif, ok := <-user.NotifyChan:
+			if !ok {
+				return false // SSE Stream closed
+			}
+			c.SSEvent("notification", notif)
+			return true
+		case <-ticker.C:
+			// Keeps connection open, prevents connection drop on cloud
+			c.SSEvent("ping", "keep-alive")
+			return true
+		case <-c.Request.Context().Done():
+			return false // Client disconnected
+		}
+	})
 }

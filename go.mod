@@ -14,6 +14,7 @@ require (
 	github.com/gin-gonic/gin v1.7.0
 	github.com/go-sql-driver/mysql v1.4.0
 	github.com/golang/protobuf v1.3.3
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/jinzhu/gorm v1.9.1
 	github.com/lib/pq v1.0.0

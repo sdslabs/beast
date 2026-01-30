@@ -101,6 +101,8 @@ func initGinRouter() *gin.Engine {
 			notificationGroup.POST("/add", adminAuthorize, addNotification)
 			notificationGroup.PUT("/update", adminAuthorize, updateNotifications)
 			notificationGroup.DELETE("/delete", adminAuthorize, removeNotification)
+			notificationGroup.GET("/stream", streamNotification)
+
 		}
 
 		remoteGroup := apiGroup.Group("/remote", adminAuthorize)

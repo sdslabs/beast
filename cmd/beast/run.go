@@ -13,6 +13,7 @@ import (
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
+	"github.com/sdslabs/beastv4/pkg/sse"
 
 	"github.com/sdslabs/beastv4/api"
 	log "github.com/sirupsen/logrus"
@@ -116,6 +117,10 @@ func saveLeaderboardCache() {
 	}
 }
 
+func stopSseNotificationHub() {
+	sse.Shutdown()
+}
+
 // NOTE: Why this function is not in 'core/utils/cleanup.go'
 // 1. 'database', 'manager' and 'remoteManager' depend on utils so moving these inside utils will create cycle dependencies.
 // 2. 'core/utils/cleanup.go' contains functions to clean up challenges, while this function does a more broad cleanup.
@@ -123,6 +128,7 @@ func saveLeaderboardCache() {
 func cleanup() {
 	log.Info("Starting graceful shutdown cleanup...")
 
+	stopSseNotificationHub()
 	stopApiScheduler()
 
 	stopWorkerQueue()
