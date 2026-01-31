@@ -134,14 +134,22 @@ func BackupCache() error {
 	}
 
 	backupFile := fmt.Sprintf("%d_%s.bak", cacheConfig.RedisConfig.DB, time.Now().Format("20060102150405"))
-	cmd := exec.Command(
-		"redis-cli",
+
+	args := []string{
 		"-h", cacheConfig.RedisConfig.Host,
 		"-p", cacheConfig.RedisConfig.Port,
-		"--user", cacheConfig.RedisConfig.User,
 		"-n", strconv.Itoa(cacheConfig.RedisConfig.DB),
 		"--rdb", filepath.Join(backupPath, backupFile),
-	)
+	}
+	if cacheConfig.RedisConfig.User != "" {
+		args = append(args, "--user", cacheConfig.RedisConfig.User)
+	}
+	if cacheConfig.RedisConfig.Password != "" {
+		args = append(args, "--pass", cacheConfig.RedisConfig.Password)
+	}
+
+	cmd := exec.Command("redis-cli", args...)
+
 	cmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.RedisConfig.Password))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
