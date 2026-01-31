@@ -139,10 +139,10 @@ func BackupCache() error {
 		"-h", cacheConfig.RedisConfig.Host,
 		"-p", cacheConfig.RedisConfig.Port,
 		"--user", cacheConfig.RedisConfig.User,
-		"--pass", cacheConfig.RedisConfig.Password,
 		"-n", strconv.Itoa(cacheConfig.RedisConfig.DB),
 		"--rdb", filepath.Join(backupPath, backupFile),
 	)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.RedisConfig.Password))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Backup error: %s\n", string(output))
@@ -167,10 +167,11 @@ func ResetCache() error {
 		"-h", cacheConfig.RedisConfig.Host,
 		"-p", cacheConfig.RedisConfig.Port,
 		"--user", cacheConfig.RedisConfig.User,
-		"--pass", cacheConfig.RedisConfig.Password,
 		"-n", strconv.Itoa(cacheConfig.RedisConfig.DB),
 		"FLUSHDB",
 	)
+
+	dropCmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.RedisConfig.Password))
 
 	output, err := dropCmd.CombinedOutput()
 	if err != nil {
@@ -192,10 +193,11 @@ func TerminateCacheConnections() error {
 		"-h", cacheConfig.RedisConfig.Host,
 		"-p", cacheConfig.RedisConfig.Port,
 		"--user", cacheConfig.RedisConfig.User,
-		"--pass", cacheConfig.RedisConfig.Password,
 		"-n", strconv.Itoa(cacheConfig.RedisConfig.DB),
 		"CLIENT", "KILL", "USER", cacheConfig.RedisConfig.User,
 	)
+
+	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.RedisConfig.Password))
 
 	output, err := terminateCmd.CombinedOutput()
 	outputStr := string(output)
