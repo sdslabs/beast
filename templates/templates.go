@@ -11,7 +11,6 @@ name            = {{.Challenge.Metadata.Name}}         # Required: Name of the c
 type            = {{.Challenge.Metadata.Type}}         # Required: Type of challenge -> [web:<language>:<version>:<framework> static service]
 dynamicFlag    = {{.Challenge.Metadata.DynamicFlag}} # Required: Dynamic flag or not -> [true/false]
 flag            = {{.Challenge.Metadata.Flag}}         # Challenge Flag if dynamicFlag is false
-sidecar          = {{.Challenge.Metadata.Sidecar}}        # Specify helper sidecar container for example mysql
 difficulty      = {{.Challenge.Metadata.Difficulty}}     # Specify the difficulty of the challenge
 
 [challenge.env]

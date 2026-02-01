@@ -515,7 +515,6 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			DynamicFlag:     config.Challenge.Metadata.DynamicFlag,
 			Flag:            config.Challenge.Metadata.Flag,
 			Type:            config.Challenge.Metadata.Type,
-			Sidecar:         config.Challenge.Metadata.Sidecar,
 			Description:     config.Challenge.Metadata.Description,
 			Assets:          strings.Join(assetsURL, core.DELIMITER),
 			AdditionalLinks: strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),

@@ -180,63 +180,6 @@ The `web_root` is the base directory for the php server to locate the files.
 
 The type of challenge consist of the following format - `web:php:<PHP Version>:<cil/apache>`
 
-### PHP challenge with MySQL database
-
-For deploying a challenge with database requirement beast sidecars needs to be used.
-
-```
-[author]
-name = "fristonio"
-email = "deepeshpathak09@gmail.com"
-ssh_key = "ssh-rsa AAAAB3NzaC1y"
-
-[challenge.metadata]
-name = "web-php-mysql"
-flag = "CTF{sample_flag}"
-type = "web:php:7.1:cli"
-sidecar = "mysql"
-
-[challenge.env]
-apt_deps = ["gcc", "php*-mysql"]
-setup_scripts = ["setup.sh"]
-ports = [10004]
-web_root = "challenge"
-default_port = 10004
-```
-
-The above configuration will create a new database in the globally present MySQL instance and will put the connection
-credentials in the Environment variables. For MySQL database these credentials are
-
-* MYSQL_database
-* MYSQL_username
-* MYSQL_password
-
-These environment variables can then be used to connect to the database and perform the required action.
-
-```php
-<?php 
-$dsn = "mysql:host=mysql;dbname=" . getenv("MYSQL_database") . ";charset=utf8mb4";
-$options = [
-  PDO::ATTR_EMULATE_PREPARES   => false,
-  PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-  PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-];
-
-try {
-	$pdo = new PDO($dsn, getenv("MYSQL_username"), getenv("MYSQL_password"), $options);
-} catch (Exception $e) {
-	error_log($e->getMessage());
-	echo $e->getMessage();
-	exit('Something weird happened');
-}
-
-echo "Success: A proper connection to MySQL was made! The my_db database is great." . PHP_EOL;
-
-?>
-```
-
-For other databases, more information can be found on Sidecars documentation.
-
 #### Note
 
 Make sure that you are installing all the mysql related dependencies in the `apt_deps` configuration parameter. As in the 

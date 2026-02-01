@@ -35,7 +35,7 @@ All the challenges which requires the hackers to only have static files comes un
 
 ## Bare Challenge
 
-A challenge which requires high level of customization can be hosted using `bare` challenge. In these case, a bare base image is provided with access to mentioned sidecars, and exposed ports. 
+A challenge which requires high level of customization can be hosted using `bare` challenge. In these case, a bare base image is provided with exposed ports. 
 
 ###Primary Requirements
 

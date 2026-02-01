@@ -77,8 +77,6 @@ func StageChallRemote(server config.AvailableServer, challenge database.Challeng
 }
 
 // BuildImageFromTarContextRemote builds a Docker image from the tar context on the remote server.
-//
-//	TODO: Sidecar's configuration left. Need to be added.
 func BuildImageFromTarContextRemote(challengeName string, imageTag string, stagedDir string, server config.AvailableServer) ([]byte, string, error) {
 	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
 	_, err := RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", remoteExtractPath, stagedDir, remoteExtractPath))
