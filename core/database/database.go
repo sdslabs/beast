@@ -50,49 +50,48 @@ func LoadDbConfig() {
 	}
 }
 
-// Check if the database exists
-func checkDatabaseExists() (bool, error) {
-	psqlCmd := exec.Command(
-		"psql",
-		"-U", dbConfig.PsqlConf.User,
-		"-h", dbConfig.PsqlConf.Host,
-		"-p", dbConfig.PsqlConf.Port,
-		"-d", "postgres",
-		"-tAc",
-		fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s';", dbConfig.PsqlConf.Dbname),
-	)
-	psqlCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+// Ensure that the database exists; if not, create one.
+func ensureDatabaseExists() error {
+    dsn := fmt.Sprintf("user=%s password=%s dbname=postgres host=%s port=%s sslmode=%s",
+        dbConfig.PsqlConf.User,
+        dbConfig.PsqlConf.Password,
+        dbConfig.PsqlConf.Host,
+        dbConfig.PsqlConf.Port,
+        dbConfig.PsqlConf.SslMode)
 
-	output, err := psqlCmd.CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("failed to check if database exists: %v, output: %s", err, string(output))
-	}
-	// output will be "1" if db exists
-	exists := false
-	if len(output) > 0 && string(output[:1]) == "1" {
-		exists = true
-	}
-	return exists, nil
-}
+    db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+    if err != nil {
+        return fmt.Errorf("failed to connect to postgres database: %w", err)
+    }
 
-// Create the database if it does not exist
-func createDatabase() error {
-	createCmd := exec.Command(
-		"psql",
-		"-U", dbConfig.PsqlConf.User,
-		"-h", dbConfig.PsqlConf.Host,
-		"-p", dbConfig.PsqlConf.Port,
-		"-d", "postgres",
-		"-c", fmt.Sprintf("CREATE DATABASE %s;", dbConfig.PsqlConf.Dbname),
-	)
-	createCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+    sqlDB, err := db.DB()
+    if err != nil {
+        return fmt.Errorf("failed to get underlying sql.DB: %w", err)
+    }
+    defer sqlDB.Close()
 
-	output, err := createCmd.CombinedOutput()
-	if err != nil {
-		log.Errorf("Create DB error: %s\n", string(output))
-		return err
-	}
-	return nil
+    // Check if database exists
+    var exists bool
+    result := db.Raw("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = ?)", 
+        dbConfig.PsqlConf.Dbname).Scan(&exists)
+    
+    if result.Error != nil {
+        return fmt.Errorf("failed to check if database exists: %w", result.Error)
+    }
+
+    if !exists {
+        log.Infof("Database '%s' does not exist. Creating...", dbConfig.PsqlConf.Dbname)
+        
+        // Create the database
+        createSQL := fmt.Sprintf("CREATE DATABASE %s", dbConfig.PsqlConf.Dbname)
+        if err := db.Exec(createSQL).Error; err != nil {
+            return fmt.Errorf("failed to create database: %w", err)
+        }
+        
+        log.Infof("Database '%s' created successfully.", dbConfig.PsqlConf.Dbname)
+    }
+
+    return nil
 }
 
 // Connect psql database
@@ -100,19 +99,9 @@ func ConnectDatabase() error {
 	LoadDbConfig()
 
 	// Check if the DB exists, if not, create it.
-	exists, err := checkDatabaseExists()
-	if err != nil {
-		log.Errorf("failed checking if db exists: %v", err)
-		return err
-	}
-	if !exists {
-		log.Infof("Database '%s' does not exist. Creating...", dbConfig.PsqlConf.Dbname)
-		if err := createDatabase(); err != nil {
-			// If unable to make DB connection then it should fail immediately
-			log.Fatalf("failed to create database: %v", err)
-		}
-		log.Infof("Database '%s' created successfully.", dbConfig.PsqlConf.Dbname)
-	}
+    if err := ensureDatabaseExists(); err != nil {
+        log.Fatalf("failed to ensure database exists: %v", err)
+    }
 
 	dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, dbConfig.PsqlConf.Dbname, dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.SslMode)
 	Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
