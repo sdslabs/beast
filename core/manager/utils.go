@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
+	"github.com/sdslabs/beastv4/core/cache"
 	"io"
 	"io/ioutil"
 	"os"
@@ -566,37 +567,46 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		return false
 	}
 
-	hostPorts, err := config.Challenge.Env.GetAllHostPorts()
-	if err != nil {
-		return fmt.Errorf("error while parsing host port for challenge %s : %s", challEntry.Name, err)
-	}
-	// Once the challenge entry has been created, add entries to the ports
-	// table in the database with the ports to expose
-	// for the challenge.
-	// TODO: Do all this under a database transaction so that if any port
-	// request is not available
-	for _, port := range hostPorts {
-		if isAllocated(port) {
-			// The port has already been allocated to the challenge
-			// Do nothing for this.
-			continue
+	if challEntry.ContainerId != "" {
+		var host string
+		if challEntry.ServerDeployed == core.LOCALHOST || challEntry.ServerDeployed == "" {
+			host = core.LOCALHOST
+		} else {
+			host = cfg.Cfg.AvailableServers[challEntry.ServerDeployed].Host
 		}
 
-		portEntry := database.Port{
-			ChallengeID: challEntry.ID,
-			PortNo:      port,
-		}
-
-		gotPort, err := database.PortEntryGetOrCreate(&portEntry)
+		hostPorts, err := cache.GetContainerPorts(host, challEntry.ContainerId)
 		if err != nil {
-			return err
+			return fmt.Errorf("error while parsing host port for challenge %s : %s", challEntry.Name, err)
 		}
+		// Once the challenge entry has been created, add entries to the ports
+		// table in the database with the ports to expose
+		// for the challenge.
+		// TODO: Do all this under a database transaction so that if any port
+		// request is not available
+		for _, port := range hostPorts {
+			if isAllocated(port) {
+				// The port has already been allocated to the challenge
+				// Do nothing for this.
+				continue
+			}
 
-		// var gotChall database.Challenge
-		// database.Db.Model(&gotPort).Related(&gotChall)
+			portEntry := database.Port{
+				ChallengeID: challEntry.ID,
+				PortNo:      port,
+			}
 
-		if gotPort.ChallengeID != challEntry.ID {
-			return fmt.Errorf("the port %d requested is already in use by another challenge", gotPort.PortNo)
+			gotPort, err := database.PortEntryGetOrCreate(&portEntry)
+			if err != nil {
+				return err
+			}
+
+			// var gotChall database.Challenge
+			// database.Db.Model(&gotPort).Related(&gotChall)
+
+			if gotPort.ChallengeID != challEntry.ID {
+				return fmt.Errorf("the port %d requested is already in use by another challenge", gotPort.PortNo)
+			}
 		}
 	}
 

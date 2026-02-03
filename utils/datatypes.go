@@ -46,7 +46,7 @@ func UInt32InList(a uint32, list []uint32) bool {
 
 // ParsePortMapping parses the port mapping string and return the required ports
 // If the portMapping string is not valid, this returns an error.
-// The format of the port mapping is `HOST_PORT:CONTAINER_PORT`
+// The format of the port mapping is `PORT_FIRST:PORT_LAST`
 func ParsePortMapping(portMap string) (uint32, uint32, error) {
 	ports := strings.Split(portMap, mappingDelimeter)
 
@@ -54,15 +54,15 @@ func ParsePortMapping(portMap string) (uint32, uint32, error) {
 		return 0, 0, errors.New("port mapping string is not valid")
 	}
 
-	hostPort, err := strconv.ParseUint(ports[0], 10, 32)
+	firstPort, err := strconv.ParseUint(ports[0], 10, 32)
 	if err != nil {
 		return 0, 0, fmt.Errorf("host port is not a valid port in: %s", portMap)
 	}
 
-	containerPort, err := strconv.ParseUint(ports[1], 10, 32)
+	secondPort, err := strconv.ParseUint(ports[1], 10, 32)
 	if err != nil {
 		return 0, 0, fmt.Errorf("container port is not a valid port in: %s", portMap)
 	}
 
-	return uint32(hostPort), uint32(containerPort), nil
+	return uint32(firstPort), uint32(secondPort), nil
 }
