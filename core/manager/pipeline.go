@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/sdslabs/beastv4/core/cache"
+
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -318,9 +320,35 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		config.Resources.PidsLimit,
 	)
 
-	portMapping, err := config.Challenge.Env.GetPortMappings()
-	if err != nil {
-		return fmt.Errorf("error while parsing port mapping for the challenge %s: %s", config.Challenge.Metadata.Name, err)
+	var err error
+	var host string
+	var firstPort, lastPort uint32
+	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
+		host = core.LOCALHOST
+		firstPort, lastPort, err = utils.ParsePortMapping(cfg.Cfg.LocalHostPortRange)
+	} else {
+		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+
+		host = server.Host
+		firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
+	}
+
+	/* both ports are inclusive */
+	portRange := lastPort - firstPort - 1
+
+	ports := config.Challenge.Env.Ports
+	portMapping := make([]cr.PortMapping, len(ports))
+
+	for i, containerPort := range ports {
+		hostPort, err := cache.GetFreePort(host, firstPort, portRange)
+		if err != nil {
+			return fmt.Errorf("error while getting free port on host %s: %s", host, err)
+		}
+
+		portMapping[i] = cr.PortMapping{
+			HostPort:      hostPort,
+			ContainerPort: containerPort,
+		}
 	}
 
 	containerConfig := cr.CreateContainerConfig{
@@ -342,6 +370,13 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	} else {
 		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
 		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, server)
+	}
+
+	for _, portMap := range portMapping {
+		err = cache.RegisterFreePort(host, containerId, portMap.ContainerPort)
+		if err != nil {
+			return fmt.Errorf("error while registering port %v on host %s: %s", portMap.HostPort, host, err)
+		}
 	}
 
 	if err != nil {
@@ -520,6 +555,12 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 			return fmt.Errorf("COMMIT ERROR: Cannot skip commit step, no Image ID found for challenge.")
 		}
 		log.Debugf("Skipping commit phase")
+	}
+
+	if challenge.Instanced {
+		database.UpdateChallenge(&challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deployed"]})
+		log.Infof("Challenge %s is instanced, skipping deploy stage", challengeName)
+		return nil
 	}
 
 	database.UpdateChallenge(&challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deploying"]})

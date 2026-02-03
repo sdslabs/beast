@@ -70,6 +70,8 @@ type Challenge struct {
 	Tags            []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Users           []*User `gorm:"many2many:user_challenges;"`
 	ServerDeployed  string  `gorm:"type:varchar(64)"`
+	Instanced          bool  `gorm:"not null;default:false"`
+	InstanceExpiration int64 `gorm:"default:0"`
 }
 
 type UserChallenges struct {
@@ -176,7 +178,7 @@ func QueryAllChallengesMetadata() ([]Challenge, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Select("id", "name", "created_at", "points", "difficulty").
+	tx := Db.Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
 		Preload("Tags").
 		Find(&challenges)
 
@@ -209,7 +211,7 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 	return challenges, nil
 }
 
-// QueryChallengeEntriesMetadata returns only selected columns: Name, ID, Tags, CreatedAt, Points, Difficulty
+// QueryChallengeEntriesMetadata returns only selected columns: Name, ID, Tags, CreatedAt, Points, Difficulty, Instanced, InstanceExpiration, Status
 func QueryChallengeEntriesMetadata(key string, value string) ([]Challenge, error) {
 	queryKey := fmt.Sprintf("%s = ?", key)
 
@@ -219,7 +221,7 @@ func QueryChallengeEntriesMetadata(key string, value string) ([]Challenge, error
 	defer DBMux.Unlock()
 
 	// Only select the required columns, but preload Tags for tag names
-	tx := Db.Select("id", "name", "created_at", "points", "difficulty").
+	tx := Db.Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
 		Preload("Tags").
 		Where(queryKey, value).
 		Find(&challenges)

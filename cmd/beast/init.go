@@ -113,14 +113,10 @@ func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig
 		}
 	}
 
-	_, err = cache.ACLSetUser(ctx, configuration.User, "on", ">"+configuration.Password, "~host:*",
-		"+sadd",
-		"+smembers",
-		"+srem").Result()
+	_, err = cache.ACLSetUser(ctx, configuration.User, "on", ">"+configuration.Password, "~host:*", "~beast:*", "+@all").Result()
 	if err != nil {
 		return err
 	}
-
 	log.Infoln(fmt.Sprintf("Initialised redis user %s", configuration.User))
 
 	err = cache.Do(ctx, "acl", "save").Err()

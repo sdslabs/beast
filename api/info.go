@@ -43,7 +43,7 @@ func usedPortsInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, PortsInUseResp{
 		MinPortValue: core.ALLOWED_MIN_PORT_VALUE,
 		MaxPortValue: core.ALLOWED_MAX_PORT_VALUE,
-		PortsInUse:   cfg.USED_PORTS_LIST,
+		PortsInUse:   []uint32{},
 	})
 }
 

@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"github.com/sdslabs/beastv4/core/cache"
 	"path/filepath"
 	"strings"
 
@@ -640,6 +641,12 @@ func undeployChallenge(challengeName string, purge bool) error {
 		return fmt.Errorf("ChallengeName %s not valid", challengeName)
 	}
 
+	// Kill all active instances of this challenge before undeploying
+	if err := KillChallengeInstances(challengeName); err != nil {
+		log.Warnf("Error killing instances for challenge %s: %v", challengeName, err)
+		// Continue with undeploy even if some instances failed to kill
+	}
+
 	if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
 		log.Debugf("Detected Docker Compose deployment for challenge %s", challengeName)
 
@@ -687,6 +694,18 @@ func undeployChallenge(challengeName string, purge bool) error {
 				log.Error(p.Error())
 			}
 		}
+	}
+
+	var host string
+	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
+		host = core.LOCALHOST
+	} else {
+		host = config.Cfg.AvailableServers[challenge.ServerDeployed].Host
+	}
+
+	err = cache.FreeContainerPorts(host, challenge.ContainerId)
+	if err != nil {
+		return fmt.Errorf("error while freeing ports for container %s on host %s: %s", challenge.ContainerId, host, err)
 	}
 
 	err = database.UpdateChallenge(&challenge, map[string]interface{}{

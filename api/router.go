@@ -132,11 +132,21 @@ func initGinRouter() *gin.Engine {
 			adminPanelGroup.POST("/freezeLeaderboard", freezeLeaderboardHandler)
 			adminPanelGroup.POST("/unfreezeLeaderboard", unfreezeLeaderboardHandler)
 			adminPanelGroup.GET("/submissions", submissionsHandler)
+
+			adminPanelGroup.GET("/instances", adminGetAllInstancesHandler)
+			adminPanelGroup.GET("/instances/:instance_id", adminGetInstanceHandler)
+			adminPanelGroup.DELETE("/instances/:instance_id", adminKillInstanceHandler)
+			adminPanelGroup.DELETE("/instances/user/:user_id", adminKillUserInstancesHandler)
+			adminPanelGroup.DELETE("/instances/challenge/:challenge_name", adminKillChallengeInstancesHandler)
 		}
 
 		instanceGroup := apiGroup.Group("/instances")
 		{
-			instanceGroup.POST("/:challenge_name", spawnInstanceHandler)
+			instanceGroup.GET("", getUserInstancesHandler)
+			instanceGroup.GET("/:challenge_name", getUserInstanceHandler)
+			instanceGroup.POST("/:challenge_name/spawn", spawnInstanceHandler)
+			instanceGroup.POST("/:challenge_name/extend", extendInstanceHandler)
+			instanceGroup.DELETE("/:challenge_name", killUserInstanceHandler)
 		}
 	}
 
