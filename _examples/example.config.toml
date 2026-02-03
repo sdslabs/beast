@@ -30,6 +30,9 @@ default_cpu_shares = 1024
 default_memory_limit = 1024
 default_pids_limit = 100
 
+# Port range for localhost deployments (format: START:END)
+local_host_port_range = "30000:40000"
+
 # List of ip addresses of all the servers where challenge could be deployed for 
 # balanced load accross servers. 
 [available_servers]
@@ -44,6 +47,9 @@ username = "user1"
 # Path to private SSH key for interacting with the server.
 ssh_key_path = "/path/to/your/private/key1"
 
+# Port range for this server (format: START:END)
+port_range = "30000:40000"
+
 # Status of remote server to be used
 # If it is set to false then that remote server will not be used
 active = false
@@ -53,10 +59,13 @@ active = false
 host = "localhost"
 
 # Username to be used for ssh connection (Leave empty for localhost)
-username = "user1"
+username = ""
 
 # Path to private SSH key for interacting with the server. (Leave empty for localhost)
-ssh_key_path = "/path/to/your/private/key1"
+ssh_key_path = ""
+
+# Port range for this server (format: START:END) - uses local_host_port_range if empty
+port_range = ""
 
 # Status of remote server to be used
 active = true
@@ -118,6 +127,13 @@ host = "localhost"
 port = "6379"
 password = ""
 user = ""
+
+[instance_config]
+port_range_start = 30000
+port_range_end = 40000
+default_expiration = 300
+max_extension = 600
+max_instances_per_user = 3
 
 # The following fields are required only while hosting a competition on beast
 # This section contains information about the competition to be hosted

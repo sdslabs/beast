@@ -67,7 +67,6 @@ func SyncBeastRemote(defaultauthorpassword string) error {
 		}
 	}
 	log.Info("Beast git base synced with remote")
-	go config.UpdateUsedPortList()
 	UpdateChallenges(defaultauthorpassword)
 	return fmt.Errorf("%s", strings.Join(errStrings, "\n"))
 }
@@ -187,7 +186,6 @@ func SyncAndGetChangesFromRemote(defaultauthorpassword string) []string {
 		}
 	}
 	log.Info("Beast git base synced with remote")
-	go config.UpdateUsedPortList()
 	UpdateChallenges(defaultauthorpassword)
 
 	return modifiedChallsNameList

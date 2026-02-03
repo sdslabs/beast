@@ -66,6 +66,7 @@ type CreateContainerConfig struct {
 	ContainerEnv     []string
 	ContainerNetwork string
 	Traffic          TrafficType
+	Labels           map[string]string
 
 	CPUShares int64
 	Memory    int64
@@ -172,16 +173,21 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		}}
 	}
 
+	labels := map[string]string{
+		"beast.challenge":             containerConfig.ChallengeName,
+		"com.sdslabs.beast.project":   utils.GetProjectName(containerConfig.ChallengeName),
+		"com.docker.compose.project":  utils.GetProjectName(containerConfig.ChallengeName),
+		"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
+	}
+	for k, v := range containerConfig.Labels {
+		labels[k] = v
+	}
+
 	config := &container.Config{
 		Image:        containerConfig.ImageId,
 		ExposedPorts: portSet,
 		Env:          containerConfig.ContainerEnv,
-		Labels: map[string]string{
-			"beast.challenge":             containerConfig.ChallengeName,
-			"com.sdslabs.beast.project":   utils.GetProjectName(containerConfig.ChallengeName),
-			"com.docker.compose.project":  utils.GetProjectName(containerConfig.ChallengeName),
-			"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
-		},
+		Labels:       labels,
 	}
 
 	var mountBindings []mount.Mount

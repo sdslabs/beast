@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      # Use INSTANCE_PORT env var if available, otherwise default to 8080
+      - "${INSTANCE_PORT:-8080}:80"
+    environment:
+      - DB_HOST=db
+      - DB_USER=challenge
+      - DB_PASS=challengepass
+      - DB_NAME=ctf
+    depends_on:
+      - db
+    restart: unless-stopped
+    
+  db:
+    image: mysql:5.7
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=ctf
+      - MYSQL_USER=challenge
+      - MYSQL_PASSWORD=challengepass
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
