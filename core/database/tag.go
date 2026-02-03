@@ -61,7 +61,7 @@ func QueryRelatedChallengesMetadata(tag *Tag) ([]Challenge, error) {
 	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
 
 	if err := Db.Model(&tagName).
-		Select("id", "name", "created_at", "points", "difficulty").
+		Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
 		Preload("Tags").
 		Association("Challenges").
 		Find(&challenges); err != nil {
