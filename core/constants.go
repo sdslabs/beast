@@ -40,6 +40,7 @@ const ( //names
 	BEAST_GRAPH_CACHE           string = "graph_cache.json"
 	BEAST_LEADERBOARD_CACHE     string = "leaderboard.json"
 	POSTGRES_SUPER_USER         string = "postgres"
+	REDIS_DEFAULT_USER          string = "default"
 )
 
 const ( //paths

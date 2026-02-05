@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -52,11 +53,17 @@ func LoadCacheConfig() {
 func ConnectRedis() error {
 	LoadCacheConfig()
 	Cache = redis.NewClient(&redis.Options{
-		Addr:     cacheConfig.RedisConfig.Host + ":" + cacheConfig.RedisConfig.Port,
+		Addr:     fmt.Sprintf("%s:%s", cacheConfig.RedisConfig.Host, cacheConfig.RedisConfig.Port),
 		Username: cacheConfig.RedisConfig.User,
 		Password: cacheConfig.RedisConfig.Password,
 		DB:       cacheConfig.RedisConfig.DB,
 	})
+
+	_, err := Cache.Ping(context.Background()).Result()
+	if err != nil {
+		return fmt.Errorf("failed to connected to redis")
+	}
+
 	log.Debug("Cache initialized")
 	return nil
 }

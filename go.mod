@@ -12,7 +12,6 @@ require (
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-contrib/static v0.0.0-20200916080430-d45d9a37d28e
 	github.com/gin-gonic/gin v1.7.0
-	github.com/golang/protobuf v1.3.3
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/jinzhu/gorm v1.9.1
@@ -20,6 +19,7 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae
 	github.com/olekukonko/tablewriter v0.0.5
+	github.com/redis/go-redis/v9 v9.17.3
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v0.0.3
 	github.com/swaggo/gin-swagger v1.0.0
@@ -27,7 +27,6 @@ require (
 	golang.org/x/crypto v0.29.0
 	golang.org/x/net v0.31.0
 	golang.org/x/term v0.26.0
-	google.golang.org/grpc v1.19.0
 	gopkg.in/src-d/go-git.v4 v4.7.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.10
@@ -40,6 +39,7 @@ require (
 	github.com/alcortesm/tgz v0.0.0-20161220082320-9c5fe88206d7 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
@@ -48,6 +48,7 @@ require (
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20180901172138-1eb28afdf9b6 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -65,6 +66,7 @@ require (
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/go-sql-driver/mysql v1.4.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/protobuf v1.3.3 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
@@ -109,7 +111,6 @@ require (
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.27.0 // indirect
 	google.golang.org/appengine v1.2.0 // indirect
-	google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8 // indirect
 	gopkg.in/src-d/go-billy.v4 v4.3.0 // indirect
 	gopkg.in/src-d/go-git-fixtures.v3 v3.3.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
