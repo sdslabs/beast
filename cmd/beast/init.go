@@ -182,11 +182,13 @@ func initDb() error {
 		return err
 	}
 
+	configuration := config.Cfg.PsqlConf
+
 	var db *sql.DB
 	if isPostgres {
 		log.Infoln("Attempting to connect to postgres as postgres super user...")
 
-		dsn := fmt.Sprintf("user=%s dbname=%s sslmode=%s", "postgres", "postgres", "disable")
+		dsn := fmt.Sprintf("user=%s dbname=%s host=%s port=%s sslmode=%s", "postgres", "postgres", configuration.Host, configuration.Port, "disable")
 		db, err = sql.Open("pgx", dsn)
 
 		if err != nil {
@@ -198,7 +200,7 @@ func initDb() error {
 		if utils.PromptBinary("Do you use password authentication for the postgres super user?") {
 			password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
 
-			dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
+			dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", "postgres", password, "postgres", configuration.Host, configuration.Port, "disable")
 			db, err = sql.Open("pgx", dsn)
 
 			if err != nil {
@@ -211,8 +213,6 @@ func initDb() error {
 	}
 
 	defer db.Close()
-
-	configuration := config.Cfg.PsqlConf
 
 	var exists int
 	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.User).Scan(&exists)
@@ -321,7 +321,10 @@ func runBeastBootsteps() error {
 
 	log.Infoln("Successfully installed air for live reloading...")
 
-	config.InitConfig()
+	err := config.ReloadBeastConfig()
+	if err != nil {
+		return err
+	}
 
 	if err := initCache(); err != nil {
 		return err
