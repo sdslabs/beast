@@ -249,6 +249,7 @@ func promptBeastConfiguration(configuration *config.BeastConfig) {
 	promptRemoteRepository(configuration)
 	promptCompetitionDetails(configuration)
 	promptNotificationWebhooks(configuration)
+	promptCacheConnectionDetails(configuration)
 	promptDatabaseConnectionDetails(configuration)
 }
 
