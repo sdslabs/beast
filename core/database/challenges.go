@@ -518,7 +518,7 @@ func QuerySubmissions(whereMap map[string]interface{}) ([]UserChallenges, error)
 	return userChallenges, nil
 }
 
-func SaveFlagSubmission(user_challenges *UserChallenges) error {
+func SaveChallengeSubmission(user_challenges *UserChallenges) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
