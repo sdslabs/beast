@@ -370,7 +370,7 @@ func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, 
 		}
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
-		containerId, err = cr.CreateContainerFromImage(&containerConfig)
+		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, server)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to create container from image: %w", err)
 		}
