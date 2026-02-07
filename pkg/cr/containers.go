@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -26,6 +27,11 @@ import (
 type PortMapping struct {
 	HostPort      uint32
 	ContainerPort uint32
+}
+
+type ExecResult struct {
+	ExitCode int
+	Output   string
 }
 
 // TrafficType is the protocol supported by container ingress and egress through
@@ -299,6 +305,57 @@ func CommitContainer(containerId string) (string, error) {
 	}
 
 	return commitResp.ID, nil
+}
+
+func RunCommandInContainer(containerID string, cmd []string) (ExecResult, error) {
+	result := ExecResult{
+		ExitCode: 1,
+	}
+
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		return result, err
+	}
+
+	ctx := context.Background()
+
+	execResp, err := cli.ContainerExecCreate(
+		ctx,
+		containerID,
+		types.ExecConfig{
+			Cmd:          cmd,
+			Tty:          true,
+			AttachStdout: true,
+			AttachStderr: true,
+		},
+	)
+	if err != nil {
+		return result, err
+	}
+
+	resp, err := cli.ContainerExecAttach(
+		ctx,
+		execResp.ID,
+		types.ExecStartCheck{},
+	)
+	if err != nil {
+		return result, err
+	}
+	defer resp.Close()
+
+	var output bytes.Buffer
+	_, err = io.Copy(&output, resp.Reader)
+	if err != nil {
+		return result, err
+	}
+
+	inspect, err := cli.ContainerExecInspect(ctx, execResp.ID)
+	if err != nil {
+		return result, err
+	}
+
+	result.ExitCode = inspect.ExitCode
+	return result, nil
 }
 
 func DeployContainerFromCompose(challengeName string, projectName string, stagedPath string, composeFileName string, ports map[string]uint32) (string, error) {
