@@ -75,14 +75,15 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	ttl := time.Duration(expirationSeconds) * time.Second
 	expiresAt := time.Now().Add(ttl)
 
+	var checkHash string
 	var containerID string
 	var deploymentType string
 
 	if config.Challenge.Env.DockerCompose != "" {
-		containerID, err = deployInstanceFromCompose(instanceID, challengeName, port, &config, stagingDir, serverDeployed)
+		containerID, checkHash, err = deployInstanceFromCompose(instanceID, challengeName, port, &config, stagingDir, serverDeployed)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
 	} else {
-		containerID, err = deployInstanceContainer(instanceID, challengeName, port, challenge.ImageId, &config, serverDeployed)
+		containerID, checkHash, err = deployInstanceContainer(instanceID, challengeName, port, challenge.ImageId, &config, serverDeployed)
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
 	}
 
@@ -103,6 +104,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		ChallengeName:  challengeName,
 		ContainerID:    containerID,
 		HostedAddress:  getHostedAddress(serverDeployed),
+		CheckHash:      checkHash,
 		Port:           port,
 		UserID:         userID,
 		Username:       username,
@@ -272,7 +274,49 @@ func selectServerForInstance() string {
 	return core.LOCALHOST
 }
 
-func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string) (string, error) {
+func verifyCheckLocal(containerId string) (string, error) {
+	fileCommand := fmt.Sprintf("[ -f '%s' ]", core.SAD_CHECK_SCRIPT_LOCATION)
+	hashCommand := fmt.Sprintf("comand cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
+
+	result, err := cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", fileCommand,
+	})
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to verify 'check.sh' at location: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", hashCommand,
+	})
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to hash 'check.sh' to store flag: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	return strings.TrimSpace(result.Output), nil
+}
+
+func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, error) {
+	fileCommand := fmt.Sprintf("[ -f '%s' ]", core.SAD_CHECK_SCRIPT_LOCATION)
+	hashCommand := fmt.Sprintf("comand cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
+
+	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, fileCommand)
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to verify 'check.sh' at location: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, hashCommand)
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to hash 'check.sh' to store flag: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	return strings.TrimSpace(result.Output), nil
+}
+
+func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string) (string, string, error) {
 	containerName := fmt.Sprintf("beast_instance_%s_%s", challengeName, instanceID)
 
 	containerPort := config.Challenge.Env.DefaultPort
@@ -309,31 +353,50 @@ func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, 
 		},
 	}
 
-	var containerId string
 	var err error
+
+	var checkHash string
+	var containerId string
 
 	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create container from image: %w", err)
+		}
+
+		checkHash, err = verifyCheckLocal(containerId)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
+		}
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
-		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, server)
+		containerId, err = cr.CreateContainerFromImage(&containerConfig)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create container from image: %w", err)
+		}
+
+		checkHash, err = verifyCheckRemote(containerId, server)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
+		}
 	}
 
-	if err != nil {
-		return "", fmt.Errorf("failed to create container: %w", err)
-	}
-
-	return containerId, nil
+	return containerId, checkHash, nil
 }
 
-func deployInstanceFromCompose(instanceID, challengeName string, hostPort uint32, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string) (string, error) {
+func deployInstanceFromCompose(instanceID, challengeName string, hostPort uint32, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string) (string, string, error) {
 	projectName := fmt.Sprintf("beast-instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
 	composeFile := filepath.Join(stagingDir, challengeName, config.Challenge.Env.DockerCompose)
 
+	var err error
+
+	var checkHash string
+	var containerId string
+
 	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
-		err := utils.ValidateFileExists(composeFile)
+		err = utils.ValidateFileExists(composeFile)
 		if err != nil {
-			return "", fmt.Errorf("compose file not found: %w", err)
+			return "", "", fmt.Errorf("compose file not found: %w", err)
 		}
 
 		upCmd := exec.Command("docker", "compose",
@@ -347,39 +410,47 @@ func deployInstanceFromCompose(instanceID, challengeName string, hostPort uint32
 		upCmd.Stdout = &upOutput
 		upCmd.Stderr = &upOutput
 
-		if err := upCmd.Run(); err != nil {
+		if err = upCmd.Run(); err != nil {
 			log.Errorf("docker compose up failed for instance %s. Output:\n%s", instanceID, upOutput.String())
-			return "", fmt.Errorf("docker compose up failed: %v", err)
+			return "", "", fmt.Errorf("docker compose up failed: %v", err)
 		}
 
 		psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q")
 		var output bytes.Buffer
 		psCmd.Stdout = &output
 
-		if err := psCmd.Run(); err != nil {
-			return "", fmt.Errorf("failed to get container IDs: %v", err)
+		if err = psCmd.Run(); err != nil {
+			return "", "", fmt.Errorf("failed to get container IDs: %v", err)
 		}
 
 		containerIds := strings.Fields(strings.TrimSpace(output.String()))
 		if len(containerIds) == 0 {
-			return "", fmt.Errorf("no containers found for instance")
+			return "", "", fmt.Errorf("no containers found for instance")
 		}
 
-		containerId := containerIds[0]
+		containerId = containerIds[0]
 		if len(containerId) >= 12 {
 			containerId = containerId[:12]
 		}
 
-		return containerId, nil
+		checkHash, err = verifyCheckLocal(containerId)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
+		}
+	} else {
+		server := cfg.Cfg.AvailableServers[serverDeployed]
+		containerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, config.Challenge.Env.DockerCompose, server)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to deploy compose on remote: %w", err)
+		}
+
+		checkHash, err = verifyCheckRemote(containerId, server)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
+		}
 	}
 
-	server := cfg.Cfg.AvailableServers[serverDeployed]
-	containerId, err := remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, config.Challenge.Env.DockerCompose, server)
-	if err != nil {
-		return "", fmt.Errorf("failed to deploy compose on remote: %w", err)
-	}
-
-	return containerId, nil
+	return containerId, checkHash, nil
 }
 
 func killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed string) error {
