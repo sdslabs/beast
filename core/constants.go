@@ -59,6 +59,7 @@ const ( //paths
 	BEAST_SECRETS_DIR              string = "secrets"
 	BEAST_EXAMPLE_DIR              string = "_examples"
 	BEAST_CACHE_DIR                string = "cache"
+	SAD_CHECK_SCRIPT_LOCATION      string = "$HOME/check.sh"
 	BEAST_BACKUP_DIR               string = "backup"
 	DB_BACKUP_DIR                  string = "db"
 	CACHE_BACKUP_DIR               string = "cache"

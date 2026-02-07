@@ -15,6 +15,7 @@ type Instance struct {
 	ChallengeName  string    `json:"challenge_name"`
 	ContainerID    string    `json:"container_id"`
 	PortOwner      string    `json:"port_owner"`
+	CheckHash      string    `json:"check_hash"`
 	Port           uint32    `json:"port"`
 	UserID         string    `json:"user_id"`
 	Username       string    `json:"username"`
