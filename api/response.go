@@ -166,7 +166,7 @@ type SubmissionResp struct {
 	SolvedAt  time.Time `json:"solvedAt"`
 }
 
-type FlagSubmitResp struct {
+type ChallengeSubmitResponse struct {
 	Message string `json:"message" example:"Your answer is correct"`
 	Success bool   `json:"success" example:"true"`
 }

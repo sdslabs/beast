@@ -46,32 +46,32 @@ import (
 type Challenge struct {
 	gorm.Model
 
-	Name            string `gorm:"not null;type:varchar(64);unique"`
-	DynamicFlag     bool   `gorm:"not null;default:false"`
-	Flag            string `gorm:"type:text"`
-	Type            string `gorm:"type:varchar(64)"`
-	Difficulty      string `gorm:"not null;default:'medium'"`
-	MaxAttemptLimit int    `gorm:"default:-1"`
-	PreReqs         string `gorm:"type:text"`
-	Assets          string `gorm:"type:text"`
-	AdditionalLinks string `gorm:"type:text"`
-	Description     string `gorm:"type:text"`
-	Format          string `gorm:"not null"`
-	ContainerId     string `gorm:"size:64;unique"`
-	ImageId         string `gorm:"size:64;unique"`
-	Status          string `gorm:"not null;default:'Undeployed'"`
-	DeploymentType  string `gorm:"not null;default:'standard_docker'"`
-	AuthorID        uint   `gorm:"not null"`
-	HealthCheck     uint   `gorm:"not null;default:1"`
-	Points          uint   `gorm:"default:0"`
-	MaxPoints       uint   `gorm:"default:0"`
-	MinPoints       uint   `gorm:"default:0"`
-	Ports           []Port
-	Tags            []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Users           []*User `gorm:"many2many:user_challenges;"`
-	ServerDeployed  string  `gorm:"type:varchar(64)"`
-	Instanced          bool  `gorm:"not null;default:false"`
-	InstanceExpiration int64 `gorm:"default:0"`
+	Name               string `gorm:"not null;type:varchar(64);unique"`
+	DynamicFlag        bool   `gorm:"not null;default:false"`
+	Flag               string `gorm:"type:text"`
+	Type               string `gorm:"type:varchar(64)"`
+	Difficulty         string `gorm:"not null;default:'medium'"`
+	MaxAttemptLimit    int    `gorm:"default:-1"`
+	PreReqs            string `gorm:"type:text"`
+	Assets             string `gorm:"type:text"`
+	AdditionalLinks    string `gorm:"type:text"`
+	Description        string `gorm:"type:text"`
+	Format             string `gorm:"not null"`
+	ContainerId        string `gorm:"size:64;unique"`
+	ImageId            string `gorm:"size:64;unique"`
+	Status             string `gorm:"not null;default:'Undeployed'"`
+	DeploymentType     string `gorm:"not null;default:'standard_docker'"`
+	AuthorID           uint   `gorm:"not null"`
+	HealthCheck        uint   `gorm:"not null;default:1"`
+	Points             uint   `gorm:"default:0"`
+	MaxPoints          uint   `gorm:"default:0"`
+	MinPoints          uint   `gorm:"default:0"`
+	Ports              []Port
+	Tags               []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Users              []*User `gorm:"many2many:user_challenges;"`
+	ServerDeployed     string  `gorm:"type:varchar(64)"`
+	Instanced          bool    `gorm:"not null;default:false"`
+	InstanceExpiration int64   `gorm:"default:0"`
 }
 
 type UserChallenges struct {
@@ -491,7 +491,7 @@ func QuerySubmissions(whereMap map[string]interface{}) ([]UserChallenges, error)
 	return userChallenges, nil
 }
 
-func SaveFlagSubmission(user_challenges *UserChallenges) error {
+func SaveChallengeSubmission(user_challenges *UserChallenges) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
