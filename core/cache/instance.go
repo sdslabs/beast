@@ -14,6 +14,7 @@ type Instance struct {
 	InstanceID     string    `json:"instance_id"`
 	ChallengeName  string    `json:"challenge_name"`
 	ContainerID    string    `json:"container_id"`
+	CheckHash      string    `json:"check_hash"`
 	Port           uint32    `json:"port"`
 	UserID         string    `json:"user_id"`
 	Username       string    `json:"username"`
@@ -21,6 +22,21 @@ type Instance struct {
 	ExpiresAt      time.Time `json:"expires_at"`
 	DeploymentType string    `json:"deployment_type"`
 	ServerDeployed string    `json:"server_deployed"`
+}
+
+const (
+	InstanceKeyPrefix     = "beast:instance:"
+	UserInstanceKeyPrefix = "beast:user_instance:"
+	InstancesSetKey       = "beast:instances"
+	InstanceDeletionQueue = "beast:instances:to_delete"
+)
+
+func instanceKey(instanceID string) string {
+	return InstanceKeyPrefix + instanceID
+}
+
+func userInstanceKey(userID, challengeName string) string {
+	return UserInstanceKeyPrefix + userID + ":" + challengeName
 }
 
 func SaveInstance(instance *Instance, ttl time.Duration) error {
