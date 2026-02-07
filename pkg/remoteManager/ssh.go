@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"io/ioutil"
-	"strconv"
+	"os/exec"
 	"strings"
 	"sync"
 
@@ -101,7 +101,7 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 // Runs a command in a container on a remote server
 func RunCommandInContainerOnServer(server config.AvailableServer, containerId string, cmd string) (cr.ExecResult, error) {
 	result := cr.ExecResult{
-		ExitCode: 1,
+		ExitCode: 0,
 	}
 
 	if !server.Active {
@@ -117,31 +117,21 @@ func RunCommandInContainerOnServer(server config.AvailableServer, containerId st
 	}
 	defer session.Close()
 
-	/* Run the command, capture the output and exit code and emit them in a specific order */
-	dockerCmd := fmt.Sprintf(`
-		output=$(docker exec %s sh -c "%s"); 
-		exitcode=$?;
-		echo "$exitcode"
-		echo "$output"
-	`, containerId, cmd)
+	cmd = strings.ReplaceAll(cmd, `'`, `'\''`)
 
+	dockerCmd := fmt.Sprintf("docker exec %s sh -c '%s'", containerId, cmd)
 	output, err := session.CombinedOutput(dockerCmd)
 	if err != nil {
-		return result, fmt.Errorf("failed to execute command: %s\nOutput: %s", err, output)
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			result.ExitCode = exitErr.ExitCode()
+		}
 	}
 
-	lines := strings.SplitN(string(output), "\n", 2)
-	result.ExitCode, err = strconv.Atoi(strings.TrimSpace(lines[0]))
-	if err != nil {
-		return result, fmt.Errorf("failed to parse exit code: %s\nOutput: %s", err, output)
-	}
+	result.Output = string(output)
 
-	if len(lines) > 1 {
-		result.Output = lines[1]
-	}
-
-	log.Debugf("Command output for cmd %s : %s\n", cmd, result.Output)
-	log.Debugf("Exit Code for cmd %s : %s\n", cmd, result.ExitCode)
+	log.Debugln(fmt.Sprintf("Command output for cmd %s in container %s on host %s: %s", cmd, containerId, server.Host, result.Output))
+	log.Debugln(fmt.Sprintf("Exit Code for cmd %s in container %s on host %s: %v", cmd, containerId, server.Host, result.ExitCode))
 	return result, nil
 }
 
