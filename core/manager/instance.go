@@ -84,7 +84,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 
 		port = ports[config.Challenge.Env.DefaultPortVar]
 
-		containerID, checkHash, err = deployInstanceFromCompose(instanceID, challengeName, port, &config, stagingDir, serverDeployed)
+		containerID, checkHash, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
 
 		if err != nil {
@@ -359,13 +359,24 @@ func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, 
 	return strings.TrimSpace(result.Output), nil
 }
 
+func verifySSHLocal(containerId string) error {
+	return exec.Command("docker", "port", containerId, fmt.Sprintf("%v/tcp", core.SSH_PORT)).Run()
+}
+
+func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
+	portCmd := fmt.Sprintf("docker port %s %v:tcp", containerId, core.SSH_PORT)
+	_, err := remoteManager.RunCommandOnServer(server, portCmd)
+	return err
+}
+
 func deployInstanceContainer(instanceID, challengeName string, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string, ports []uint32) (string, string, error) {
 	// Instanced non compose challenges are managed by the container ID
 	containerName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
 	containerPort := config.Challenge.Env.DefaultPort
-	if containerPort == 0 {
-		containerPort = 8080
+	if containerPort != core.SSH_PORT {
+		log.Warnln(fmt.Sprintf("Challenge %s does not have default port set to 22", challengeName))
+		containerPort = 22
 	}
 
 	portMapping := make([]cr.PortMapping, len(ports))
@@ -409,6 +420,11 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 			return "", "", fmt.Errorf("failed to create container from image: %w", err)
 		}
 
+		err = verifySSHLocal(containerId)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
+		}
+
 		checkHash, err = verifyCheckLocal(containerId)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
@@ -418,6 +434,11 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, server)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to create container from image: %w", err)
+		}
+
+		err = verifySSHRemote(containerId, server)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
 		}
 
 		checkHash, err = verifyCheckRemote(containerId, server)
@@ -443,6 +464,11 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 			return "", "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
 		}
 
+		err = verifySSHLocal(containerId)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
+		}
+
 		checkHash, err = verifyCheckLocal(containerId)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
@@ -452,6 +478,11 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 		containerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, config.Challenge.Env.DockerCompose, server)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to deploy compose on remote: %w", err)
+		}
+
+		err = verifySSHRemote(containerId, server)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
 		}
 
 		checkHash, err = verifyCheckRemote(containerId, server)
