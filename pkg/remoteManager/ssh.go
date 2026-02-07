@@ -3,7 +3,10 @@ package remoteManager
 import (
 	"errors"
 	"fmt"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"io/ioutil"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/sdslabs/beastv4/core/config"
@@ -93,6 +96,53 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 
 	log.Debugf("Command output for cmd %s : %s\n", cmd, output)
 	return string(output), nil
+}
+
+// Runs a command in a container on a remote server
+func RunCommandInContainerOnServer(server config.AvailableServer, containerId string, cmd string) (cr.ExecResult, error) {
+	result := cr.ExecResult{
+		ExitCode: 1,
+	}
+
+	if !server.Active {
+		return result, fmt.Errorf("server is inactive in config.toml")
+	}
+	client, err := CreateSSHClient(server)
+	if err != nil {
+		return result, fmt.Errorf("failed to create session: %s", err)
+	}
+	session, err := client.NewSession()
+	if err != nil {
+		return result, fmt.Errorf("failed to create session: %s", err)
+	}
+	defer session.Close()
+
+	/* Run the command, capture the output and exit code and emit them in a specific order */
+	dockerCmd := fmt.Sprintf(`
+		output=$(docker exec %s sh -c "%s"); 
+		exitcode=$?;
+		echo "$exitcode"
+		echo "$output"
+	`, containerId, cmd)
+
+	output, err := session.CombinedOutput(dockerCmd)
+	if err != nil {
+		return result, fmt.Errorf("failed to execute command: %s\nOutput: %s", err, output)
+	}
+
+	lines := strings.SplitN(string(output), "\n", 2)
+	result.ExitCode, err = strconv.Atoi(strings.TrimSpace(lines[0]))
+	if err != nil {
+		return result, fmt.Errorf("failed to parse exit code: %s\nOutput: %s", err, output)
+	}
+
+	if len(lines) > 1 {
+		result.Output = lines[1]
+	}
+
+	log.Debugf("Command output for cmd %s : %s\n", cmd, result.Output)
+	log.Debugf("Exit Code for cmd %s : %s\n", cmd, result.ExitCode)
+	return result, nil
 }
 
 // Creates an SSH client to connect to the remote server.
