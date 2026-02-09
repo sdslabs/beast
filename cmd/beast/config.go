@@ -194,6 +194,8 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 }
 
 func promptCacheConnectionDetails(configuration *config.BeastConfig) {
+	log.Warnln("Beast expects Redis ACLs to be enabled. If ACLs are not configured, some features may not function correctly.")
+
 	configuration.RedisConf.User = utils.PromptString("Enter Redis User Name (this user will be created if does not exist)... leaving it empty will default it to beast")
 	if configuration.RedisConf.User == "" {
 		configuration.RedisConf.User = "beast"
