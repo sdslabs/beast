@@ -3,18 +3,19 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/utils"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/BurntSushi/toml"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/utils"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -251,6 +252,9 @@ func promptBeastConfiguration(configuration *config.BeastConfig) {
 	promptNotificationWebhooks(configuration)
 	promptCacheConnectionDetails(configuration)
 	promptDatabaseConnectionDetails(configuration)
+
+	log.Infoln("Enabling healthcheck for instance on demand containers")
+	configuration.HealthProber = true
 }
 
 func tryCopyExampleConfig() error {
