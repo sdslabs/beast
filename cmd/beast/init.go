@@ -117,6 +117,12 @@ func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig
 		return err
 	}
 	log.Infoln(fmt.Sprintf("Initialised redis user %s", configuration.User))
+
+	err = cache.Do(ctx, "acl", "save").Err()
+	if err != nil {
+		return fmt.Errorf("error while trying to save the acl file: %s", err.Error())
+	}
+
 	return nil
 }
 
@@ -133,14 +139,14 @@ func initCache() error {
 		})
 	} else {
 		cache = redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprint("%s:%s", redisConfig.Host, redisConfig.Port),
+			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
 			Username: core.REDIS_DEFAULT_USER,
 		})
 	}
 
 	_, err := cache.Ping(context.Background()).Result()
 	if err != nil {
-		return fmt.Errorf("failed to connected to redis")
+		return fmt.Errorf("failed to connected to redis: %s", err.Error())
 	}
 
 	defer cache.Close()
