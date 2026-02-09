@@ -3,13 +3,14 @@ package utils
 import (
 	"bufio"
 	"fmt"
-	"github.com/manifoldco/promptui"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/term"
 	"os"
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/manifoldco/promptui"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/term"
 )
 
 var binaryOptions = []string{
@@ -57,6 +58,7 @@ func PromptInt64(prompt string, defaultValue int64) int64 {
 
 	if temp == "" {
 		log.Warnln(fmt.Sprintf("Input empty.. defaulting to %v...", defaultValue))
+		return defaultValue
 	} else if err != nil {
 		log.Errorln(fmt.Sprintf("Failed to read input... defaulting to %v...", defaultValue))
 		return defaultValue
