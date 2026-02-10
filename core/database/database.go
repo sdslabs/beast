@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/JCoupalK/go-pgdump"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/utils"
@@ -176,13 +177,20 @@ func BackupDatabase() error {
 	}
 
 	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.PsqlConf.Dbname, time.Now().Format("20060102150405"))
-	cmd := exec.Command("pg_dump", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.PsqlConf.Dbname)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
-	output, err := cmd.CombinedOutput()
+
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, dbConfig.PsqlConf.Dbname)
+	dumper := pgdump.NewDumper(dsn, core.PGDUMP_MAX_THREADS)
+
+	dumpFilename := filepath.Join(backupPath, backupFile)
+
+	err = dumper.DumpDatabase(dumpFilename, &pgdump.TableOptions{
+		TablePrefix: "-F c",
+	})
+
 	if err != nil {
-		log.Printf("Backup error: %s\n", string(output))
-		return err
+		return fmt.Errorf("error while backing up dataabase: %w", err)
 	}
+
 	log.Debug("Backup successful.")
 	return nil
 }

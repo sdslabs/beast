@@ -209,3 +209,7 @@ var NOTIFICATION_SERVICES = []string{
 	"slack",
 	"discord",
 }
+
+const (
+	PGDUMP_MAX_THREADS = 50
+)
