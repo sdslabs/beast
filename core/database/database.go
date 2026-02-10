@@ -2,6 +2,7 @@ package database
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -192,6 +193,7 @@ func BackupDatabase() error {
 	}
 
 	log.Debug("Backup successful.")
+
 	return nil
 }
 
@@ -231,23 +233,21 @@ func TerminateDatabaseConnections() error {
 	if dbConfig == (Config{}) {
 		LoadDbConfig()
 	}
-	terminateCmd := exec.Command(
-		"psql",
-		"-U", dbConfig.PsqlConf.User,
-		"-h", dbConfig.PsqlConf.Host,
-		"-p", dbConfig.PsqlConf.Port,
-		"-d", "postgres",
-		"-c",
-		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname),
-	)
-	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
 
-	output, err := terminateCmd.CombinedOutput()
-	outputStr := string(output)
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, "postgres")
+	db, err := sql.Open("pgx", dsn)
+
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	outputStr, err := db.Exec("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname)
 	if err != nil {
 		log.Errorf("Terminate connections error: %s\n", outputStr)
 		return err
 	}
+
 	log.Debug(outputStr)
 	return nil
 }
