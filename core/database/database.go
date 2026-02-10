@@ -12,6 +12,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/JCoupalK/go-pgdump"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/utils"
@@ -179,7 +180,7 @@ func BackupDatabase() error {
 
 	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.PsqlConf.Dbname, time.Now().Format("20060102150405"))
 
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, dbConfig.PsqlConf.Dbname)
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, dbConfig.PsqlConf.Dbname, dbConfig.PsqlConf.SslMode)
 	dumper := pgdump.NewDumper(dsn, core.PGDUMP_MAX_THREADS)
 
 	dumpFilename := filepath.Join(backupPath, backupFile)
@@ -189,7 +190,7 @@ func BackupDatabase() error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("error while backing up dataabase: %w", err)
+		return fmt.Errorf("error while backing up databse base: %w", err)
 	}
 
 	log.Debug("Backup successful.")
@@ -234,7 +235,7 @@ func TerminateDatabaseConnections() error {
 		LoadDbConfig()
 	}
 
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, "postgres")
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, "postgres", dbConfig.PsqlConf.SslMode)
 	db, err := sql.Open("pgx", dsn)
 
 	if err != nil {
@@ -242,13 +243,13 @@ func TerminateDatabaseConnections() error {
 	}
 	defer db.Close()
 
-	outputStr, err := db.Exec("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname)
+	_, err = db.Exec("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname)
 	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", outputStr)
+		log.Errorf("Terminate connections error: %s\n", err.Error())
 		return err
 	}
 
-	log.Debug(outputStr)
+	log.Debug(err)
 	return nil
 }
 
