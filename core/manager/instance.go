@@ -87,7 +87,9 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	}
 
 	if err != nil {
-		cache.FreeContainerPorts(serverDeployed, containerID)
+		if err := cache.FreeContainerPorts(serverDeployed, containerID); err != nil {
+			return nil, fmt.Errorf("failed to free container ports: %w", err)
+		}
 		return nil, fmt.Errorf("failed to deploy instance container: %w", err)
 	}
 
@@ -112,8 +114,13 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 
 	err = cache.SaveInstance(instance, ttl)
 	if err != nil {
-		killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed)
-		cache.FreeContainerPorts(serverDeployed, containerID)
+		if err := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); err != nil {
+			return nil, fmt.Errorf("failed to kill instance container: %w", err)
+		}
+		if err := cache.FreeContainerPorts(serverDeployed, containerID); err != nil {
+			return nil, fmt.Errorf("failed to free container ports: %w", err)
+		}
+
 		return nil, fmt.Errorf("failed to save instance: %w", err)
 	}
 
@@ -136,7 +143,10 @@ func KillInstance(instanceID string) error {
 		log.Warnf("Error killing container for instance %s: %v", instanceID, err)
 	}
 
-	cache.FreeContainerPorts(instance.ServerDeployed, instance.ContainerID)
+	err = cache.FreeContainerPorts(instance.ServerDeployed, instance.ContainerID)
+	if err != nil {
+		return fmt.Errorf("failed to free container ports: %w", err)
+	}
 
 	err = cache.DeleteInstance(instanceID)
 	if err != nil {
