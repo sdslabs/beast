@@ -276,6 +276,7 @@ func selectServerForInstance() string {
 
 func verifyCheckLocal(containerId string) (string, error) {
 	fileCommand := fmt.Sprintf("[ -f '%s' ]", core.SAD_CHECK_SCRIPT_LOCATION)
+	chmodCommand := fmt.Sprintf("chmod +x %s", core.SAD_CHECK_SCRIPT_LOCATION)
 	hashCommand := fmt.Sprintf("comand cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
 
 	result, err := cr.RunCommandInContainer(containerId, []string{
@@ -291,7 +292,15 @@ func verifyCheckLocal(containerId string) (string, error) {
 	})
 
 	if err != nil || result.ExitCode != 0 {
-		return "", fmt.Errorf("failed to hash 'check.sh' to store flag: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+		return "", fmt.Errorf("failed to hash 'check.sh' to store flag")
+	}
+
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", chmodCommand,
+	})
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to make 'check.sh' executable at: %s", core.SAD_CHECK_SCRIPT_LOCATION)
 	}
 
 	return strings.TrimSpace(result.Output), nil
@@ -299,6 +308,7 @@ func verifyCheckLocal(containerId string) (string, error) {
 
 func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, error) {
 	fileCommand := fmt.Sprintf("[ -f '%s' ]", core.SAD_CHECK_SCRIPT_LOCATION)
+	chmodCommand := fmt.Sprintf("chmod +x %s", core.SAD_CHECK_SCRIPT_LOCATION)
 	hashCommand := fmt.Sprintf("comand cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
 
 	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, fileCommand)
@@ -310,7 +320,15 @@ func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, 
 	result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, hashCommand)
 
 	if err != nil || result.ExitCode != 0 {
-		return "", fmt.Errorf("failed to hash 'check.sh' to store flag: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+		return "", fmt.Errorf("failed to hash 'check.sh' to store flag")
+	}
+
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", chmodCommand,
+	})
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to make 'check.sh' executable at: %s", core.SAD_CHECK_SCRIPT_LOCATION)
 	}
 
 	return strings.TrimSpace(result.Output), nil
