@@ -170,7 +170,7 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
-		localDeploy := challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != ""
+		localDeploy := challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == ""
 		instance, err := cache.GetInstance(instanceId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -182,14 +182,14 @@ func checkFlagHandler(c *gin.Context) {
 		exists, err := checkScriptExistence(localDeploy, instance)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "CONTAINER RUNTIME ERROR while processing the request.",
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while verifying the existance of check script: %s", err.Error()),
 			})
 			return
 		}
 
 		if !exists {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("VALIDATION ERROR: check.sh not found at %s.", core.SAD_CHECK_SCRIPT_LOCATION),
+				Error: fmt.Sprintf("VALIDATION ERROR: check script not found at %s.", core.SAD_CHECK_SCRIPT_LOCATION),
 			})
 			return
 		}
@@ -197,7 +197,7 @@ func checkFlagHandler(c *gin.Context) {
 		verified, err := validateCheckScriptHash(localDeploy, instance)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "CONTAINER RUNTIME ERROR while processing the request.",
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while processing the request: %s", err.Error()),
 			})
 			return
 		}
@@ -211,7 +211,7 @@ func checkFlagHandler(c *gin.Context) {
 		result, err := executeCheckScript(localDeploy, instance)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "CONTAINER RUNTIME ERROR while processing the request.",
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing check script: %s", err.Error()),
 			})
 			return
 		}
@@ -296,7 +296,7 @@ func validateCheckScriptHash(localDeploy bool, instance *cache.Instance) (bool, 
 	var result cr.ExecResult
 
 	containerId := instance.ContainerID
-	hashCommand := fmt.Sprintf("comand cat %s | sha256sum")
+	hashCommand := fmt.Sprintf("command cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
 	if localDeploy {
 		result, err = cr.RunCommandInContainer(containerId, []string{
 			"sh", "-c", hashCommand,
