@@ -330,8 +330,8 @@ func selectServerForInstance() string {
 
 func verifyCheckLocal(containerId string) (string, error) {
 	fileCommand := fmt.Sprintf("[ -f '%s' ]", core.SAD_CHECK_SCRIPT_LOCATION)
-	chmodCommand := fmt.Sprintf("chmod +x %s", core.SAD_CHECK_SCRIPT_LOCATION)
-	hashCommand := fmt.Sprintf("comand cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
+	chmodCommand := fmt.Sprintf("command chmod +x %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	hashCommand := fmt.Sprintf("command cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
 
 	result, err := cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", fileCommand,
@@ -349,6 +349,8 @@ func verifyCheckLocal(containerId string) (string, error) {
 		return "", fmt.Errorf("failed to hash 'check.sh' to store flag")
 	}
 
+	hash := result.Output
+
 	result, err = cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", chmodCommand,
 	})
@@ -357,13 +359,13 @@ func verifyCheckLocal(containerId string) (string, error) {
 		return "", fmt.Errorf("failed to make 'check.sh' executable at: %s", core.SAD_CHECK_SCRIPT_LOCATION)
 	}
 
-	return strings.TrimSpace(result.Output), nil
+	return strings.TrimSpace(hash), nil
 }
 
 func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, error) {
 	fileCommand := fmt.Sprintf("[ -f '%s' ]", core.SAD_CHECK_SCRIPT_LOCATION)
-	chmodCommand := fmt.Sprintf("chmod +x %s", core.SAD_CHECK_SCRIPT_LOCATION)
-	hashCommand := fmt.Sprintf("comand cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
+	chmodCommand := fmt.Sprintf("command chmod +x %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	hashCommand := fmt.Sprintf("command cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
 
 	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, fileCommand)
 
@@ -377,6 +379,8 @@ func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, 
 		return "", fmt.Errorf("failed to hash 'check.sh' to store flag")
 	}
 
+	hash := result.Output
+
 	result, err = cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", chmodCommand,
 	})
@@ -385,7 +389,7 @@ func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, 
 		return "", fmt.Errorf("failed to make 'check.sh' executable at: %s", core.SAD_CHECK_SCRIPT_LOCATION)
 	}
 
-	return strings.TrimSpace(result.Output), nil
+	return strings.TrimSpace(hash), nil
 }
 
 func verifySSHLocal(containerId string) error {
