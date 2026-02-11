@@ -41,6 +41,7 @@ const ( //names
 	BEAST_LEADERBOARD_CACHE     string = "leaderboard.json"
 	POSTGRES_SUPER_USER         string = "postgres"
 	REDIS_DEFAULT_USER          string = "default"
+	SAD_CHECK_SCRIPT            string = "check.sh"
 )
 
 const ( //paths
@@ -58,7 +59,7 @@ const ( //paths
 	BEAST_SECRETS_DIR              string = "secrets"
 	BEAST_EXAMPLE_DIR              string = "_examples"
 	BEAST_CACHE_DIR                string = "cache"
-	SAD_CHECK_SCRIPT_LOCATION      string = "$HOME/check.sh"
+	SAD_CHECK_SCRIPT_LOCATION      string = BEAST_DOCKER_CHALLENGE_DIR + "/" + SAD_CHECK_SCRIPT
 )
 
 const ( //chall types
