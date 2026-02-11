@@ -347,6 +347,8 @@ func RunCommandInContainer(containerID string, cmd []string) (ExecResult, error)
 		return result, err
 	}
 
+	result.Output = output.String()
+
 	inspect, err := cli.ContainerExecInspect(ctx, execResp.ID)
 	if err != nil {
 		return result, err
