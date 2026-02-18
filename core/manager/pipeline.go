@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/sdslabs/beastv4/core/cache"
+
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -295,13 +297,13 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
 		staticMountDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
 	} else {
-		staticMountDir = filepath.Join("$HOME/.beast", core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
+		staticMountDir = filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
 	}
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
 		relativeStaticContentDir = core.PUBLIC
 	}
-	staticMount[staticMountDir] = filepath.Join("/challenge", relativeStaticContentDir)
+	staticMount[staticMountDir] = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir)
 	log.Debugf("Static mount config for deploy : %s", staticMount)
 
 	var containerEnv []string
@@ -318,9 +320,39 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		config.Resources.PidsLimit,
 	)
 
-	portMapping, err := config.Challenge.Env.GetPortMappings()
+	var err error
+	var host string
+	var firstPort, lastPort uint32
+	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
+		host = core.LOCALHOST
+		firstPort, lastPort, err = utils.ParsePortMapping(cfg.Cfg.LocalHostPortRange)
+	} else {
+		server := GetServerFromHost(challenge.ServerDeployed)
+
+		host = server.Host
+		firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
+	}
+
 	if err != nil {
-		return fmt.Errorf("error while parsing port mapping for the challenge %s: %s", config.Challenge.Metadata.Name, err)
+		return fmt.Errorf("error while allocating ports on server %s for challenge %s: %s", host, challenge.Name, err.Error())
+	}
+
+	/* both ports are inclusive */
+	portRange := lastPort - firstPort + 1
+
+	ports := config.Challenge.Env.Ports
+	portMapping := make([]cr.PortMapping, len(ports))
+
+	for i, containerPort := range ports {
+		hostPort, err := cache.GetFreePort(host, firstPort, portRange)
+		if err != nil {
+			return fmt.Errorf("error while getting free port on host %s: %s", host, err)
+		}
+
+		portMapping[i] = cr.PortMapping{
+			HostPort:      hostPort,
+			ContainerPort: containerPort,
+		}
 	}
 
 	containerConfig := cr.CreateContainerConfig{
@@ -345,10 +377,13 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	if err != nil {
-		if containerId != "" {
-			return fmt.Errorf("error while starting the container : %s", err)
+		return fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
+	}
+
+	for _, portMap := range portMapping {
+		if err := cache.RegisterFreePort(host, containerId, portMap.HostPort); err != nil {
+			return fmt.Errorf("error while registering port %v on host %s: %s", portMap.HostPort, host, err)
 		}
-		return fmt.Errorf("error while trying to create a container for the challenge: %s", err)
 	}
 
 	if err = database.UpdateChallenge(challenge, map[string]any{
@@ -520,6 +555,12 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 			return fmt.Errorf("COMMIT ERROR: Cannot skip commit step, no Image ID found for challenge.")
 		}
 		log.Debugf("Skipping commit phase")
+	}
+
+	if challenge.Instanced {
+		database.UpdateChallenge(&challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deployed"]})
+		log.Infof("Challenge %s is instanced, skipping deploy stage", challengeName)
+		return nil
 	}
 
 	database.UpdateChallenge(&challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deploying"]})

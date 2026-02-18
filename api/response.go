@@ -106,16 +106,18 @@ type HintResponse struct {
 }
 
 type ChallengeMetadata struct {
-	ChallId        uint      `json:"id" example:"0"`
-	Name           string    `json:"name" example:"Web Challenge"`
-	Tags           []string  `json:"tags" example:"['pwn','misc']"`
-	Points         uint      `json:"points" example:"50"`
-	Difficulty     string    `json:"difficulty" example:"easy"` // e.g., "easy", "medium", "hard"
-	SolvesNumber   uint16    `json:"solvesNumber" example:"100"`
-	SolveStatus    bool      `json:"solveStatus" example:"True"` // e.g., True: "solved", False: "unsolved"
-	CreatedAt      time.Time `json:"createdAt"`
-	DeployedStatus string    `json:"deployedStatus" example:"deployed"`
-	PreRequisite   []string  `json:"preRequisite" example:"['chall1', chall2]"`
+	ChallId            uint      `json:"id" example:"0"`
+	Name               string    `json:"name" example:"Web Challenge"`
+	Tags               []string  `json:"tags" example:"['pwn','misc']"`
+	Points             uint      `json:"points" example:"50"`
+	Difficulty         string    `json:"difficulty" example:"easy"`
+	SolvesNumber       uint16    `json:"solvesNumber" example:"100"`
+	SolveStatus        bool      `json:"solveStatus" example:"True"`
+	CreatedAt          time.Time `json:"createdAt"`
+	DeployedStatus     string    `json:"deployedStatus" example:"deployed"`
+	PreRequisite       []string  `json:"preRequisite" example:"['chall1', chall2]"`
+	Instanced          bool      `json:"instanced" example:"false"`
+	InstanceExpiration int64     `json:"instanceExpiration" example:"300"`
 }
 
 type Challenge struct {
@@ -164,7 +166,7 @@ type SubmissionResp struct {
 	SolvedAt  time.Time `json:"solvedAt"`
 }
 
-type FlagSubmitResp struct {
+type ChallengeSubmitResponse struct {
 	Message string `json:"message" example:"Your answer is correct"`
 	Success bool   `json:"success" example:"true"`
 }

@@ -1,19 +1,10 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/lib/pq"
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/core/database"
-	coreUtils "github.com/sdslabs/beastv4/core/utils"
-	"github.com/sdslabs/beastv4/utils"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"io"
 	"net/http"
 	"os"
@@ -21,6 +12,17 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/utils"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -95,6 +97,62 @@ func installAir() error {
 	return cmd.Run()
 }
 
+func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig) error {
+	ctx := context.Background()
+
+	result, err := cache.ACLUsers(ctx).Result()
+	if err != nil {
+		return err
+	}
+
+	for _, user := range result {
+		if user == configuration.User {
+			log.Infoln(fmt.Sprintf("Redis user %s already exists", configuration.User))
+			break
+		}
+	}
+
+	_, err = cache.ACLSetUser(ctx, configuration.User, "on", ">"+configuration.Password, "~host:*", "~beast:*", "+@all").Result()
+	if err != nil {
+		return err
+	}
+	log.Infoln(fmt.Sprintf("Initialised redis user %s", configuration.User))
+
+	err = cache.Do(ctx, "acl", "save").Err()
+	if err != nil {
+		return fmt.Errorf("error while trying to save the acl file: %s", err.Error())
+	}
+
+	return nil
+}
+
+func initCache() error {
+	log.Infoln("Initializing cache...")
+
+	redisConfig := config.Cfg.RedisConf
+	var cache *redis.Client
+	if utils.PromptBinary("Do you use password authentication for the redis default user?") {
+		cache = redis.NewClient(&redis.Options{
+			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
+			Username: core.REDIS_DEFAULT_USER,
+			Password: utils.PromptSecret("Enter default redis user password"),
+		})
+	} else {
+		cache = redis.NewClient(&redis.Options{
+			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
+			Username: core.REDIS_DEFAULT_USER,
+		})
+	}
+
+	_, err := cache.Ping(context.Background()).Result()
+	if err != nil {
+		return fmt.Errorf("failed to connected to redis: %s", err.Error())
+	}
+
+	defer cache.Close()
+	return createBeastRedisUser(cache, &config.Cfg.RedisConf)
+}
+
 func createBeastDbUser(db *sql.DB, configuration *config.PsqlConfig) error {
 	if result := utils.PromptBinary("Create default beast postgres user?"); !result {
 		return errors.New("failed to create database")
@@ -125,22 +183,18 @@ func dbUserCheck() (bool, error) {
 func initDb() error {
 	log.Infoln("Initializing database...")
 
-	var configuration config.BeastConfig
-	_, err := toml.DecodeFile(BEAST_GLOBAL_CONFIG, &configuration)
-	if err != nil {
-		return err
-	}
-
 	isPostgres, err := dbUserCheck()
 	if err != nil {
 		return err
 	}
 
+	configuration := config.Cfg.PsqlConf
+
 	var db *sql.DB
 	if isPostgres {
 		log.Infoln("Attempting to connect to postgres as postgres super user...")
 
-		dsn := fmt.Sprintf("user=%s dbname=%s sslmode=%s", "postgres", "postgres", "disable")
+		dsn := fmt.Sprintf("user=%s dbname=%s host=%s port=%s sslmode=%s", "postgres", "postgres", configuration.Host, configuration.Port, "disable")
 		db, err = sql.Open("pgx", dsn)
 
 		if err != nil {
@@ -152,7 +206,7 @@ func initDb() error {
 		if utils.PromptBinary("Do you use password authentication for the postgres super user?") {
 			password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
 
-			dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
+			dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", "postgres", password, "postgres", configuration.Host, configuration.Port, "disable")
 			db, err = sql.Open("pgx", dsn)
 
 			if err != nil {
@@ -167,41 +221,41 @@ func initDb() error {
 	defer db.Close()
 
 	var exists int
-	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.PsqlConf.User).Scan(&exists)
+	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.User).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		if err = createBeastDbUser(db, &configuration.PsqlConf); err != nil {
+		if err = createBeastDbUser(db, &configuration); err != nil {
 			return err
 		}
 	} else if err != nil {
 		return err
 	} else {
-		log.Infoln(fmt.Sprintf("User %s already exists", configuration.PsqlConf.User))
+		log.Infoln(fmt.Sprintf("User %s already exists", configuration.User))
 	}
 
-	log.Infoln(fmt.Sprintf("Changing password for user %s", configuration.PsqlConf.User))
-	query := fmt.Sprintf("ALTER USER %s WITH PASSWORD %s", pq.QuoteIdentifier(configuration.PsqlConf.User), utils.QuoteLiteral(configuration.PsqlConf.Password))
+	log.Infoln(fmt.Sprintf("Changing password for user %s", configuration.User))
+	query := fmt.Sprintf("ALTER USER %s WITH PASSWORD %s", pq.QuoteIdentifier(configuration.User), utils.QuoteLiteral(configuration.Password))
 	_, err = db.Exec(query)
 	if err != nil {
 		return err
 	}
 
-	err = db.QueryRow("SELECT 1 FROM pg_database WHERE datname = $1", configuration.PsqlConf.Dbname).Scan(&exists)
+	err = db.QueryRow("SELECT 1 FROM pg_database WHERE datname = $1", configuration.Dbname).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		if err = createBeastDatabase(db, &configuration.PsqlConf); err != nil {
+		if err = createBeastDatabase(db, &configuration); err != nil {
 			return err
 		}
 	} else if err != nil {
 		return err
 	} else {
-		log.Infoln(fmt.Sprintf("Database %s already exists", configuration.PsqlConf.Dbname))
+		log.Infoln(fmt.Sprintf("Database %s already exists", configuration.Dbname))
 	}
 
-	_, err = db.Exec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", pq.QuoteIdentifier(configuration.PsqlConf.Dbname), pq.QuoteIdentifier(configuration.PsqlConf.User)))
+	_, err = db.Exec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", pq.QuoteIdentifier(configuration.Dbname), pq.QuoteIdentifier(configuration.User)))
 	if err != nil {
 		return err
 	}
 
-	log.Infoln(fmt.Sprintf("%s set as owner of database %s", configuration.PsqlConf.User, configuration.PsqlConf.Dbname))
+	log.Infoln(fmt.Sprintf("%s set as owner of database %s", configuration.User, configuration.Dbname))
 	return nil
 }
 
@@ -272,6 +326,17 @@ func runBeastBootsteps() error {
 	}
 
 	log.Infoln("Successfully installed air for live reloading...")
+
+	err := config.ReloadBeastConfig()
+	if err != nil {
+		return err
+	}
+
+	if err := initCache(); err != nil {
+		return err
+	}
+
+	log.Infoln("Verified redis setup for beast")
 
 	if err := initDb(); err != nil {
 		return err

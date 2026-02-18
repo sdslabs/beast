@@ -3,7 +3,9 @@ package remoteManager
 import (
 	"errors"
 	"fmt"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"io/ioutil"
+	"strings"
 	"sync"
 
 	"github.com/sdslabs/beastv4/core/config"
@@ -83,8 +85,8 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %s", err)
 	}
-	defer client.Close()
 	defer session.Close()
+	defer client.Close()
 
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
@@ -93,6 +95,44 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 
 	log.Debugf("Command output for cmd %s : %s\n", cmd, output)
 	return string(output), nil
+}
+
+// Runs a command in a container on a remote server
+func RunCommandInContainerOnServer(server config.AvailableServer, containerId string, cmd string) (cr.ExecResult, error) {
+	result := cr.ExecResult{
+		ExitCode: 0,
+	}
+
+	if !server.Active {
+		return result, fmt.Errorf("server is inactive in config.toml")
+	}
+	client, err := CreateSSHClient(server)
+	if err != nil {
+		return result, fmt.Errorf("failed to create session: %s", err)
+	}
+	session, err := client.NewSession()
+	if err != nil {
+		return result, fmt.Errorf("failed to create session: %s", err)
+	}
+	defer session.Close()
+	defer client.Close()
+
+	cmd = strings.ReplaceAll(cmd, `'`, `'\''`)
+
+	dockerCmd := fmt.Sprintf("docker exec %s sh -c '%s'", containerId, cmd)
+	output, err := session.CombinedOutput(dockerCmd)
+	if err != nil {
+		var exitErr *ssh.ExitError
+		if errors.As(err, &exitErr) {
+			result.ExitCode = exitErr.ExitStatus()
+		}
+	}
+
+	result.Output = string(output)
+
+	log.Debugln(fmt.Sprintf("Command output for cmd %s in container %s on host %s: %s", cmd, containerId, server.Host, result.Output))
+	log.Debugln(fmt.Sprintf("Exit Code for cmd %s in container %s on host %s: %v", cmd, containerId, server.Host, result.ExitCode))
+	return result, nil
 }
 
 // Creates an SSH client to connect to the remote server.

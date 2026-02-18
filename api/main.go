@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core/cache"
 	log "github.com/sirupsen/logrus"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	swaggerFiles "github.com/swaggo/gin-swagger/swaggerFiles"
@@ -67,6 +68,7 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 	remoteManager.Init()
 	database.Init()
+	cache.Init()
 
 	// Initialise and start the Hub
 	// Must be started before the Notification Router, since SSE handler has access to SSE Hub

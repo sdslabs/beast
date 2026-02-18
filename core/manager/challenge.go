@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"github.com/sdslabs/beastv4/core/cache"
 	"path/filepath"
 	"strings"
 
@@ -640,52 +641,73 @@ func undeployChallenge(challengeName string, purge bool) error {
 		return fmt.Errorf("ChallengeName %s not valid", challengeName)
 	}
 
-	if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
-		log.Debugf("Detected Docker Compose deployment for challenge %s", challengeName)
-
-		stagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
-			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
-
-			if !purge {
-				err = remoteManager.ComposeDownRemote(challengeName, stagedDir, server)
-			} else {
-				err = remoteManager.ComposePurgeRemote(challengeName, stagedDir, server)
-			}
-		} else {
-			if !purge {
-				err = cr.ComposeDown(challengeName, stagedDir)
-			} else {
-				err = cr.ComposePurge(challengeName, stagedDir)
-			}
-		}
-		if err != nil {
-			log.Errorf("Error while removing challenge instance : %s", err)
-			return fmt.Errorf("error while removing challenge instance : %s", err)
+	/* TODO: verify this cleanup */
+	if challenge.Instanced {
+		// Kill all active instances of this challenge before undeploying
+		if err := KillChallengeInstances(challengeName); err != nil {
+			log.Warnf("Error killing instances for challenge %s: %v", challengeName, err)
+			// Continue with undeploy even if some instances failed to kill
 		}
 	} else {
-		// If a existing container ID is not found make sure that you atleast
-		// set the deploy status to undeployed. This earlier caused problem since if a challenge
-		// was in staging state(and deployed is cancled) then we can neither deploy new
-		// version nor we can undeploy the existing version(since it does not exist)
-		// So this....
-		if challenge.ContainerId == coreUtils.GetTempContainerId(challengeName) {
-			log.Warnf("No instance of challenge(%s) deployed", challengeName)
-		} else {
-			log.Debug("Removing challenge instance for ", challengeName)
+		if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+			log.Debugf("Detected Docker Compose deployment for challenge %s", challengeName)
+
+			stagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 			if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 				server := config.Cfg.AvailableServers[challenge.ServerDeployed]
-				err = remoteManager.StopAndRemoveContainerRemote(challenge.ContainerId, server)
+
+				if !purge {
+					err = remoteManager.ComposeDownRemote(challengeName, stagedDir, server)
+				} else {
+					err = remoteManager.ComposePurgeRemote(challengeName, stagedDir, server)
+				}
 			} else {
-				err = cr.StopAndRemoveContainer(challenge.ContainerId)
+				if !purge {
+					err = cr.ComposeDown(challengeName, stagedDir)
+				} else {
+					err = cr.ComposePurge(challengeName, stagedDir)
+				}
 			}
 			if err != nil {
-				// This should not return from here, this should assume that
-				// the container instance does not exist and hence should update the database
-				// with the container ID.
-				p := fmt.Errorf("error while removing challenge instance : %s", err)
-				log.Error(p.Error())
+				log.Errorf("Error while removing challenge instance : %s", err)
+				return fmt.Errorf("error while removing challenge instance : %s", err)
 			}
+		} else {
+			// If a existing container ID is not found make sure that you atleast
+			// set the deploy status to undeployed. This earlier caused problem since if a challenge
+			// was in staging state(and deployed is cancled) then we can neither deploy new
+			// version nor we can undeploy the existing version(since it does not exist)
+			// So this....
+			if challenge.ContainerId == coreUtils.GetTempContainerId(challengeName) {
+				log.Warnf("No instance of challenge(%s) deployed", challengeName)
+			} else {
+				log.Debug("Removing challenge instance for ", challengeName)
+				if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+					server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+					err = remoteManager.StopAndRemoveContainerRemote(challenge.ContainerId, server)
+				} else {
+					err = cr.StopAndRemoveContainer(challenge.ContainerId)
+				}
+				if err != nil {
+					// This should not return from here, this should assume that
+					// the container instance does not exist and hence should update the database
+					// with the container ID.
+					p := fmt.Errorf("error while removing challenge instance : %s", err)
+					log.Error(p.Error())
+				}
+			}
+		}
+
+		var host string
+		if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
+			host = core.LOCALHOST
+		} else {
+			host = config.Cfg.AvailableServers[challenge.ServerDeployed].Host
+		}
+
+		err = cache.FreeContainerPorts(host, challenge.ContainerId)
+		if err != nil {
+			return fmt.Errorf("error while freeing ports for container %s on host %s: %s", challenge.ContainerId, host, err)
 		}
 	}
 

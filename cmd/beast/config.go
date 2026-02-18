@@ -3,18 +3,19 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/utils"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/BurntSushi/toml"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/utils"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -192,6 +193,30 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 	}
 }
 
+func promptCacheConnectionDetails(configuration *config.BeastConfig) {
+	log.Warnln("Beast expects Redis ACLs to be enabled. If ACLs are not configured, some features may not function correctly.")
+
+	configuration.RedisConf.User = utils.PromptString("Enter Redis User Name (this user will be created if does not exist)... leaving it empty will default it to beast")
+	if configuration.RedisConf.User == "" {
+		configuration.RedisConf.User = "beast"
+	}
+
+	configuration.RedisConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Redis User %s Password... leaving it empty will default it to beast", configuration.RedisConf.User))
+	if configuration.RedisConf.Password == "" {
+		configuration.RedisConf.Password = "beast"
+	}
+
+	configuration.RedisConf.Host = utils.PromptString("Enter Redis Host Name, leave empty for localhost")
+	if configuration.RedisConf.Host == "" {
+		configuration.RedisConf.Host = core.LOCALHOST
+	}
+
+	configuration.RedisConf.Port = strconv.FormatInt(utils.PromptInt64("Enter Redis Port", 6379), 10)
+
+	log.Infoln("Setting Redis DB to 0...")
+	configuration.RedisConf.Db = 0
+}
+
 func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {
 	configuration.PsqlConf.User = utils.PromptString("Enter Postgres User Name (this user will be created if does not exist)... leaving it empty will default it to beast")
 	if configuration.PsqlConf.User == "" {
@@ -210,7 +235,7 @@ func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {
 
 	configuration.PsqlConf.Host = utils.PromptString("Enter Postgres Host Name, leave empty for localhost")
 	if configuration.PsqlConf.Host == "" {
-		configuration.PsqlConf.Host = "localhost"
+		configuration.PsqlConf.Host = core.LOCALHOST
 	}
 	configuration.PsqlConf.Port = strconv.FormatInt(utils.PromptInt64("Enter Postgres Port", 5432), 10)
 	configuration.PsqlConf.SslMode = utils.PromptSelection("Enter Postgres SSL Mode", []string{
@@ -227,7 +252,11 @@ func promptBeastConfiguration(configuration *config.BeastConfig) {
 	promptRemoteRepository(configuration)
 	promptCompetitionDetails(configuration)
 	promptNotificationWebhooks(configuration)
+	promptCacheConnectionDetails(configuration)
 	promptDatabaseConnectionDetails(configuration)
+
+	log.Infoln("Enabling healthcheck for instance on demand containers")
+	configuration.HealthProber = true
 }
 
 func tryCopyExampleConfig() error {
