@@ -327,7 +327,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		host = core.LOCALHOST
 		firstPort, lastPort, err = utils.ParsePortMapping(cfg.Cfg.LocalHostPortRange)
 	} else {
-		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+		server := GetServerFromHost(challenge.ServerDeployed)
 
 		host = server.Host
 		firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)

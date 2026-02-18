@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"io/ioutil"
-	"os/exec"
 	"strings"
 	"sync"
 
@@ -86,8 +85,8 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %s", err)
 	}
-	defer client.Close()
 	defer session.Close()
+	defer client.Close()
 
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
@@ -116,15 +115,16 @@ func RunCommandInContainerOnServer(server config.AvailableServer, containerId st
 		return result, fmt.Errorf("failed to create session: %s", err)
 	}
 	defer session.Close()
+	defer client.Close()
 
 	cmd = strings.ReplaceAll(cmd, `'`, `'\''`)
 
 	dockerCmd := fmt.Sprintf("docker exec %s sh -c '%s'", containerId, cmd)
 	output, err := session.CombinedOutput(dockerCmd)
 	if err != nil {
-		var exitErr *exec.ExitError
+		var exitErr *ssh.ExitError
 		if errors.As(err, &exitErr) {
-			result.ExitCode = exitErr.ExitCode()
+			result.ExitCode = exitErr.ExitStatus()
 		}
 	}
 

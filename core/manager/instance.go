@@ -242,7 +242,22 @@ func allocateInstancePort(host string) (uint32, error) {
 	if host == core.LOCALHOST || host == "" {
 		firstPort, lastPort, err = utils.ParsePortMapping(cfg.Cfg.LocalHostPortRange)
 	} else {
-		server := cfg.Cfg.AvailableServers[host]
+		/* This is the simplest, not the best, solution to this...
+		essentially selectServer returns the host, which is not necessarily the key used by AvailableServers so...
+		a better solution would be to treat localhost explicitly as a server so it can be generalised
+		(will also remove a lot of conditions scattered throughout the place) */
+		var server *cfg.AvailableServer
+		for _, s := range cfg.Cfg.AvailableServers {
+			if s.Host == host {
+				server = &s
+				break
+			}
+		}
+
+		if server == nil {
+			return 0, fmt.Errorf("no available server found for host %s", host)
+		}
+
 		firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
 	}
 
@@ -327,9 +342,7 @@ func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, 
 
 	hash := result.Output
 
-	result, err = cr.RunCommandInContainer(containerId, []string{
-		"sh", "-c", chmodCommand,
-	})
+	result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, chmodCommand)
 
 	if err != nil || result.ExitCode != 0 {
 		return "", fmt.Errorf("failed to make 'check.sh' executable at: %s", core.SAD_CHECK_SCRIPT_LOCATION)
@@ -343,7 +356,7 @@ func verifySSHLocal(containerId string) error {
 }
 
 func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
-	portCmd := fmt.Sprintf("docker port %s %v:tcp", containerId, core.SSH_PORT)
+	portCmd := fmt.Sprintf("docker port %s %v/tcp", containerId, core.SSH_PORT)
 	_, err := remoteManager.RunCommandOnServer(server, portCmd)
 	return err
 }
