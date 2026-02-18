@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"net/http"
@@ -65,6 +66,13 @@ func checkFlagHandler(c *gin.Context) {
 		if challId == "" {
 			c.JSON(http.StatusBadRequest, HTTPErrorResp{
 				Error: "Id of the challenge is a required parameter to process request.",
+			})
+			return
+		}
+
+		if instanceId == "" {
+			c.JSON(http.StatusBadRequest, HTTPErrorResp{
+				Error: "Instance of id is required",
 			})
 			return
 		}
@@ -170,7 +178,6 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
-		localDeploy := challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == ""
 		instance, err := cache.GetInstance(instanceId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -178,6 +185,15 @@ func checkFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+
+		if instance.Username != username {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Unauthorized user",
+			})
+			return
+		}
+
+		localDeploy := instance.ServerDeployed == core.LOCALHOST || instance.ServerDeployed == ""
 
 		exists, err := checkScriptExistence(localDeploy, instance)
 		if err != nil {
@@ -278,8 +294,12 @@ func checkScriptExistence(localDeploy bool, instance *cache.Instance) (bool, err
 			"sh", "-c", fileCommand,
 		})
 	} else {
-		server := config.Cfg.AvailableServers[instance.HostedAddress]
-		result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, fileCommand)
+		server := manager.GetServerFromHost(instance.HostedAddress)
+		if server == nil {
+			return false, fmt.Errorf("server not found for host: %s", instance.HostedAddress)
+		}
+
+		result, err = remoteManager.RunCommandInContainerOnServer(*server, containerId, fileCommand)
 	}
 
 	if err != nil {
