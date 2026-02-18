@@ -129,8 +129,8 @@ password = ""
 user = ""
 
 [instance_config]
-port_range_start = 30000
-port_range_end = 40000
+# Port Range for localhost. per-server this is configured via `port-range`
+local_host_port_range = '10000:11000'
 default_expiration = 300
 max_extension = 600
 max_instances_per_user = 3

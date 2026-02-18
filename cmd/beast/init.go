@@ -127,7 +127,7 @@ func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig
 }
 
 func initCache() error {
-	log.Infoln("Ininializing cache...")
+	log.Infoln("Initializing cache...")
 
 	redisConfig := config.Cfg.RedisConf
 	var cache *redis.Client

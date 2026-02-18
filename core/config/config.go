@@ -169,7 +169,7 @@ func ValidatePortRange(portRange string) error {
 	}
 
 	if firstPort < core.ALLOWED_MIN_PORT_VALUE {
-		return fmt.Errorf("invalid port range, range cannot preceed %v", core.ALLOWED_MIN_PORT_VALUE)
+		return fmt.Errorf("invalid port range, range cannot precede %v", core.ALLOWED_MIN_PORT_VALUE)
 	}
 
 	if lastPort > core.ALLOWED_MAX_PORT_VALUE {

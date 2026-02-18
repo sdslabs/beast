@@ -8,6 +8,10 @@ import (
 )
 
 func GetFreePort(host string, firstPort uint32, portRange uint32) (uint32, error) {
+	if Cache == nil {
+		Init()
+	}
+
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
@@ -49,6 +53,10 @@ func RegisterFreePort(host string, containerId string, port uint32) error {
 }
 
 func GetContainerPorts(host string, containerId string) ([]uint32, error) {
+	if Cache == nil {
+		Init()
+	}
+
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
@@ -74,6 +82,10 @@ func GetContainerPorts(host string, containerId string) ([]uint32, error) {
 }
 
 func FreeContainerPorts(host string, containerId string) error {
+	if Cache == nil {
+		Init()
+	}
+	
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 

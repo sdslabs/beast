@@ -29,24 +29,6 @@ var (
 	graphCacheStale       = true
 )
 
-// Returns port in use by beast.
-// @Summary Returns ports in use by beast by looking in the hack git repository, also returns min and max value of port allowed while specifying in beast challenge config.
-// @Description Returns the ports in use by beast, which cannot be used in creating a new challenge..
-// @Tags info
-// @Accept  json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.PortsInUseResp
-// @Router /api/info/ports/used [get]
-
-func usedPortsInfoHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, PortsInUseResp{
-		MinPortValue: core.ALLOWED_MIN_PORT_VALUE,
-		MaxPortValue: core.ALLOWED_MAX_PORT_VALUE,
-		PortsInUse:   []uint32{},
-	})
-}
-
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
 
