@@ -29,11 +29,10 @@ In your Beast `config.toml`, configure the instance settings:
 
 ```toml
 [instance_config]
-port_range_start = 30000      # Start of port range for instances
-port_range_end = 40000        # End of port range for instances
-default_expiration = 300      # Default TTL in seconds (5 minutes)
-max_extension = 600           # Maximum extension time (10 minutes)
-max_instances_per_user = 3    # Max concurrent instances per user
+local_host_port_range = "10000-11000"  # Host port range for instances
+default_expiration = 300               # Default TTL in seconds (5 minutes)
+max_extension = 600                    # Maximum extension time (10 minutes)
+max_instances_per_user = 3             # Max concurrent instances per user
 ```
 
 ## API Usage

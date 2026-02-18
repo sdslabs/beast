@@ -297,13 +297,13 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
 		staticMountDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
 	} else {
-		staticMountDir = filepath.Join("$HOME/.beast", core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
+		staticMountDir = filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
 	}
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
 		relativeStaticContentDir = core.PUBLIC
 	}
-	staticMount[staticMountDir] = filepath.Join("/challenge", relativeStaticContentDir)
+	staticMount[staticMountDir] = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir)
 	log.Debugf("Static mount config for deploy : %s", staticMount)
 
 	var containerEnv []string
@@ -333,8 +333,12 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
 	}
 
+	if err != nil {
+		return fmt.Errorf("error while allocating ports on server %s for challenge %s: %s", host, challenge.Name, err.Error())
+	}
+
 	/* both ports are inclusive */
-	portRange := lastPort - firstPort - 1
+	portRange := lastPort - firstPort + 1
 
 	ports := config.Challenge.Env.Ports
 	portMapping := make([]cr.PortMapping, len(ports))
@@ -372,18 +376,14 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, server)
 	}
 
-	for _, portMap := range portMapping {
-		err = cache.RegisterFreePort(host, containerId, portMap.ContainerPort)
-		if err != nil {
-			return fmt.Errorf("error while registering port %v on host %s: %s", portMap.HostPort, host, err)
-		}
+	if err != nil {
+		return fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 	}
 
-	if err != nil {
-		if containerId != "" {
-			return fmt.Errorf("error while starting the container : %s", err)
+	for _, portMap := range portMapping {
+		if err := cache.RegisterFreePort(host, containerId, portMap.HostPort); err != nil {
+			return fmt.Errorf("error while registering port %v on host %s: %s", portMap.HostPort, host, err)
 		}
-		return fmt.Errorf("error while trying to create a container for the challenge: %s", err)
 	}
 
 	if err = database.UpdateChallenge(challenge, map[string]any{
