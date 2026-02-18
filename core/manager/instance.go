@@ -1,8 +1,11 @@
 package manager
 
 import (
+	"bytes"
 	"fmt"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -381,9 +384,7 @@ func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, 
 
 	hash := result.Output
 
-	result, err = cr.RunCommandInContainer(containerId, []string{
-		"sh", "-c", chmodCommand,
-	})
+	result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, chmodCommand)
 
 	if err != nil || result.ExitCode != 0 {
 		return "", fmt.Errorf("failed to make 'check.sh' executable at: %s", core.SAD_CHECK_SCRIPT_LOCATION)

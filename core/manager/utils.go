@@ -940,3 +940,17 @@ func ValidateFlag(flag, challenge_name string) error {
 	}
 	return nil
 }
+
+/*
+The better solution is to add a parameter to AvailableServer to store the key itself
+but should be hanlded in a different PR
+*/
+func GetServerFromHost(host string) *cfg.AvailableServer {
+	for _, server := range cfg.Cfg.AvailableServers {
+		if server.Host == host {
+			return &server
+		}
+	}
+
+	return nil
+}
