@@ -59,7 +59,7 @@ func ConnectCache() error {
 
 	_, err := Cache.Ping(context.Background()).Result()
 	if err != nil {
-		return fmt.Errorf("failed to connected to redis")
+		return fmt.Errorf("failed to connected to redis: %s", err.Error())
 	}
 
 	log.Debug("Cache initialized")
@@ -75,7 +75,7 @@ func Init() {
 	if Cache == nil {
 		cacheError = ConnectCache()
 		if cacheError != nil {
-			log.Error("Error while initializing the database.", cacheError)
+			log.Errorf("Error while initializing cache: %s", cacheError.Error())
 		}
 	}
 }
