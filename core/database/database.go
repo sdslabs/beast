@@ -2,6 +2,7 @@ package database
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/JCoupalK/go-pgdump"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/utils"
@@ -176,14 +179,22 @@ func BackupDatabase() error {
 	}
 
 	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.PsqlConf.Dbname, time.Now().Format("20060102150405"))
-	cmd := exec.Command("pg_dump", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.PsqlConf.Dbname)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
-	output, err := cmd.CombinedOutput()
+
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, dbConfig.PsqlConf.Dbname, dbConfig.PsqlConf.SslMode)
+	dumper := pgdump.NewDumper(dsn, core.PGDUMP_MAX_THREADS)
+
+	dumpFilename := filepath.Join(backupPath, backupFile)
+
+	err = dumper.DumpDatabase(dumpFilename, &pgdump.TableOptions{
+		TablePrefix: "-F c",
+	})
+
 	if err != nil {
-		log.Printf("Backup error: %s\n", string(output))
-		return err
+		return fmt.Errorf("error while backing up databse base: %w", err)
 	}
+
 	log.Debug("Backup successful.")
+
 	return nil
 }
 
@@ -223,24 +234,22 @@ func TerminateDatabaseConnections() error {
 	if dbConfig == (Config{}) {
 		LoadDbConfig()
 	}
-	terminateCmd := exec.Command(
-		"psql",
-		"-U", dbConfig.PsqlConf.User,
-		"-h", dbConfig.PsqlConf.Host,
-		"-p", dbConfig.PsqlConf.Port,
-		"-d", "postgres",
-		"-c",
-		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname),
-	)
-	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
 
-	output, err := terminateCmd.CombinedOutput()
-	outputStr := string(output)
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, "postgres", dbConfig.PsqlConf.SslMode)
+	db, err := sql.Open("pgx", dsn)
+
 	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", outputStr)
 		return err
 	}
-	log.Debug(outputStr)
+	defer db.Close()
+
+	_, err = db.Exec("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname)
+	if err != nil {
+		log.Errorf("Terminate connections error: %s\n", err.Error())
+		return err
+	}
+
+	log.Debug(err)
 	return nil
 }
 

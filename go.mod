@@ -2,6 +2,7 @@ module github.com/sdslabs/beastv4
 
 require (
 	github.com/BurntSushi/toml v1.4.0
+	github.com/JCoupalK/go-pgdump v1.1.0
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.21.0
@@ -15,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/jinzhu/gorm v1.9.1
-	github.com/lib/pq v1.0.0
+	github.com/lib/pq v1.10.9
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mohae/struct2csv v0.0.0-20151122200941-e72239694eae
 	github.com/olekukonko/tablewriter v0.0.5
