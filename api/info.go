@@ -725,10 +725,23 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.SubmissionResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/submissions [get]
+// @Router /api/admin/submissions [get]
 func submissionsHandler(c *gin.Context) {
+	pageStr := c.Query("page")
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid page number",
+		})
+		return
+	}
 
-	submissions, err := database.QueryAllSubmissions()
+	offset := (page - 1) * core.SUBMISSIONS_PAGE_SIZE
+
+	submissions, err := database.QuerySubmissionsWithPagination(core.SUBMISSIONS_PAGE_SIZE, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "DATABASE ERROR while processing the request.",
@@ -746,36 +759,35 @@ func submissionsHandler(c *gin.Context) {
 			return
 		}
 
-		if user.Role == core.USER_ROLES["contestant"] {
-			challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while fetching user details.",
-				})
-			}
-			if len(challenge) == 0 {
-				continue
-			}
-
-			challengeTags := make([]string, len(challenge[0].Tags))
-
-			for index, tags := range challenge[0].Tags {
-				challengeTags[index] = tags.TagName
-			}
-
-			singleSubmissionResp := SubmissionResp{
-				UserId:    user.ID,
-				Username:  user.Username,
-				ChallId:   challenge[0].ID,
-				ChallName: challenge[0].Name,
-				Category:  challenge[0].Type,
-				Tags:      challengeTags,
-				Points:    challenge[0].Points,
-				SolvedAt:  submission.CreatedAt,
-				Flag:      submission.Flag,
-			}
-			submissionsResp = append(submissionsResp, singleSubmissionResp)
+		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while fetching challenge details.",
+			})
+			return
 		}
+		if len(challenge) == 0 {
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge[0].Tags))
+
+		for index, tags := range challenge[0].Tags {
+			challengeTags[index] = tags.TagName
+		}
+
+		singleSubmissionResp := SubmissionResp{
+			UserId:    user.ID,
+			Username:  user.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			Flag:      submission.Flag,
+			SolvedAt:  submission.CreatedAt,
+			Success:   submission.Solved,
+			Cheating:  submission.Cheating,
+		}
+
+		submissionsResp = append(submissionsResp, singleSubmissionResp)
 	}
 
 	format := c.Query("format")
@@ -1247,6 +1259,24 @@ func unfreezeLeaderboardHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/challenges/{challenge_id}/attempts [get]
 func getChallengeAttempts(c *gin.Context) {
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	queryingUser, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	isContestant := queryingUser.Role == core.USER_ROLES["contestant"]
+
 	challengeIDStr := c.Param("challenge_id")
 	challengeID, err := strconv.ParseUint(challengeIDStr, 10, 64)
 	if err != nil {
@@ -1254,6 +1284,26 @@ func getChallengeAttempts(c *gin.Context) {
 			Message: "Invalid challenge_id",
 		})
 		return
+	}
+
+	challenge, err := database.QueryChallengeEntries("id", challengeIDStr)
+	if err != nil {
+		log.Errorf("DATABASE ERROR while fetching challenge details: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	if len(challenge) == 0 {
+		c.JSON(http.StatusNotFound, HTTPPlainResp{
+			Message: "Challenge not found",
+		})
+		return
+	}
+
+	challengeTags := make([]string, len(challenge[0].Tags))
+	for index, tag := range challenge[0].Tags {
+		challengeTags[index] = tag.TagName
 	}
 
 	attempts, err := database.QueryChallAttempts(challengeID)
@@ -1264,16 +1314,135 @@ func getChallengeAttempts(c *gin.Context) {
 		})
 		return
 	}
-	resp := make([]UserSolveResp, 0, len(attempts))
+
+	resp := make([]SubmissionResp, 0, len(attempts))
 	for _, attempt := range attempts {
-		resp = append(resp, UserSolveResp{
-			Id:       attempt.Id,
-			Username: attempt.Username,
-			SolvedAt: attempt.SolvedAt,
-			Flag:     attempt.Flag,
-			Correct:  attempt.Correct,
-		})
+		if isContestant && (!attempt.Correct || attempt.Cheating) {
+			continue
+		}
+
+		submissionResp := SubmissionResp{
+			UserId:    attempt.UserId,
+			Username:  attempt.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			SolvedAt:  attempt.SolvedAt,
+			Success:   attempt.Correct,
+		}
+
+		if !isContestant {
+			submissionResp.Flag = attempt.Flag
+			submissionResp.Cheating = attempt.Cheating
+		}
+
+		resp = append(resp, submissionResp)
 	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// Get submissions by user ID
+// @Summary Get submissions by user
+// @Description Returns all submissions for a specific user
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param user_id path int true "User ID"
+// @Param Authorization header string true "Bearer"
+// @Success 200 {array} api.SubmissionResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/submissions/user/{user_id} [get]
+func getUserAttempts(c *gin.Context) {
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	isContestant := user.Role == core.USER_ROLES["contestant"]
+
+	userIDStr := c.Param("user_id")
+	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid user_id",
+		})
+		return
+	}
+
+	submissionUser, err := database.QueryUserById(uint(userID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "User not found",
+		})
+		return
+	}
+
+	if submissionUser.Role != core.USER_ROLES["contestant"] {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Can only view submissions for contestants",
+		})
+		return
+	}
+
+	attempts, err := database.QueryUserAttempts(uint(userID))
+	if err != nil {
+		log.Errorf("DATABASE ERROR while fetching user attempts: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	resp := make([]SubmissionResp, 0, len(attempts))
+
+	for _, attempt := range attempts {
+		if isContestant && (!attempt.Correct || attempt.Cheating) {
+			continue
+		}
+
+		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(attempt.ChallengeID)))
+		if err != nil {
+			log.Errorf("DATABASE ERROR while fetching challenge details: %s", err.Error())
+			continue
+		}
+		if len(challenge) == 0 {
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge[0].Tags))
+		for index, tag := range challenge[0].Tags {
+			challengeTags[index] = tag.TagName
+		}
+
+		submissionResp := SubmissionResp{
+			UserId:    submissionUser.ID,
+			Username:  submissionUser.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			SolvedAt:  attempt.SolvedAt,
+			Success:   attempt.Correct,
+		}
+
+		if !isContestant {
+			submissionResp.Flag = attempt.Flag
+			submissionResp.Cheating = attempt.Cheating
+		}
+
+		resp = append(resp, submissionResp)
+	}
+
 	c.JSON(http.StatusOK, resp)
 }
 

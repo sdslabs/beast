@@ -88,7 +88,8 @@ func initGinRouter() *gin.Engine {
 			infoGroup.GET("/leaderboard", getLeaderboardHandler)
 			infoGroup.GET("leaderboard-graph", getLeaderboardGraphHandler)
 			infoGroup.GET("/usercount", getUserCountHandler)
-			infoGroup.GET("/submissions", submissionsHandler)
+			infoGroup.GET("/submissions/challenge/:challenge_id", getChallengeAttempts)
+			infoGroup.GET("/submissions/user/:user_id", getUserAttempts)
 			infoGroup.GET("/tags", tagHandler)
 			infoGroup.GET("/hint/:hintID", hintHandler)
 			infoGroup.POST("/hint/:hintID", hintHandler)
@@ -130,8 +131,7 @@ func initGinRouter() *gin.Engine {
 			adminPanelGroup.GET("/leaderboard", adminLeaderboardHandler)
 			adminPanelGroup.POST("/freezeLeaderboard", freezeLeaderboardHandler)
 			adminPanelGroup.POST("/unfreezeLeaderboard", unfreezeLeaderboardHandler)
-			adminPanelGroup.GET("/challenges/:challenge_id/attempts", getChallengeAttempts)
-
+			adminPanelGroup.GET("/submissions", submissionsHandler)
 		}
 	}
 

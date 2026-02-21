@@ -203,6 +203,7 @@ var USER_STATUS = map[string]string{
 const (
 	LEADERBOARD_SIZE       = 25
 	LEADERBOARD_GRAPH_SIZE = 12
+	SUBMISSIONS_PAGE_SIZE = 10
 )
 
 var NOTIFICATION_SERVICES = []string{
