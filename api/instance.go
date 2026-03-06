@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"github.com/sdslabs/beastv4/core"
 	"net/http"
 	"time"
 
@@ -76,7 +77,7 @@ func spawnInstanceHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil || user.ID == 0 {
+	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -120,7 +121,7 @@ func getUserInstanceHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil || user.ID == 0 {
+	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -150,7 +151,7 @@ func getUserInstancesHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil || user.ID == 0 {
+	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -197,7 +198,7 @@ func extendInstanceHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil || user.ID == 0 {
+	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -214,7 +215,7 @@ func extendInstanceHandler(ctx *gin.Context) {
 		return
 	}
 
-	additionalSeconds := int64(300)
+	additionalSeconds := core.DEFAULT_MINIMUM_EXTEND_TIME
 	if seconds := ctx.PostForm("seconds"); seconds != "" {
 		var parsedSeconds int64
 		_, err := fmt.Sscanf(seconds, "%d", &parsedSeconds)
@@ -265,7 +266,7 @@ func killUserInstanceHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil || user.ID == 0 {
+	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -389,7 +390,7 @@ func adminKillChallengeInstancesHandler(ctx *gin.Context) {
 		return
 	}
 
-	instances, err := manager.GetAllInstances()
+	instances, err := manager.GetChallengeInstances(challengeName)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: err.Error(),
@@ -397,13 +398,12 @@ func adminKillChallengeInstancesHandler(ctx *gin.Context) {
 		return
 	}
 
+	// can be delegated to a coroutine if bottlenecks performance
 	killedCount := 0
 	for _, instance := range instances {
-		if instance.ChallengeName == challengeName {
-			err := manager.KillInstance(instance.InstanceID)
-			if err == nil {
-				killedCount++
-			}
+		err = manager.KillInstance(instance.InstanceID)
+		if err == nil {
+			killedCount++
 		}
 	}
 

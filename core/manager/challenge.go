@@ -705,7 +705,7 @@ func undeployChallenge(challengeName string, purge bool) error {
 			host = config.Cfg.AvailableServers[challenge.ServerDeployed].Host
 		}
 
-		err = cache.FreeContainerPorts(host, challenge.ContainerId)
+		err = cache.FreeContainerPortsOnHost(host, challenge.ContainerId)
 		if err != nil {
 			return fmt.Errorf("error while freeing ports for container %s on host %s: %s", challenge.ContainerId, host, err)
 		}

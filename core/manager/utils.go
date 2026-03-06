@@ -577,7 +577,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			host = cfg.Cfg.AvailableServers[challEntry.ServerDeployed].Host
 		}
 
-		hostPorts, err := cache.GetContainerPorts(host, challEntry.ContainerId)
+		hostPorts, err := cache.GetContainerPortsOnHost(host, challEntry.ContainerId)
 		if err != nil {
 			return fmt.Errorf("error while parsing host port for challenge %s : %s", challEntry.Name, err)
 		}

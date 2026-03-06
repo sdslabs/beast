@@ -188,7 +188,6 @@ func GetAllInstances() ([]*Instance, error) {
 	return instances, nil
 }
 
-// GetChallengeInstances retrieves all active instances for a specific challenge
 func GetChallengeInstances(challengeName string) ([]*Instance, error) {
 	if Cache == nil {
 		return nil, fmt.Errorf("redis cache not initialized")

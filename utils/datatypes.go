@@ -59,10 +59,10 @@ func ParsePortMapping(portMap string) (uint32, uint32, error) {
 		return 0, 0, fmt.Errorf("host port is not a valid port in: %s", portMap)
 	}
 
-	secondPort, err := strconv.ParseUint(ports[1], 10, 32)
+	lastPort, err := strconv.ParseUint(ports[1], 10, 32)
 	if err != nil {
 		return 0, 0, fmt.Errorf("container port is not a valid port in: %s", portMap)
 	}
 
-	return uint32(firstPort), uint32(secondPort), nil
+	return uint32(firstPort), uint32(lastPort), nil
 }

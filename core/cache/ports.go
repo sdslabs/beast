@@ -7,7 +7,9 @@ import (
 	"strconv"
 )
 
-func GetFreePort(host string, firstPort uint32, portRange uint32) (uint32, error) {
+// GetFreePortOnHost gets the first available port in the specific range by checking its existance in the cache.
+// algorithm can be imprived later on if it bottlenecks performance.
+func GetFreePortOnHost(host string, firstPort uint32, portRange uint32) (uint32, error) {
 	if Cache == nil {
 		Init()
 	}
@@ -33,7 +35,8 @@ func GetFreePort(host string, firstPort uint32, portRange uint32) (uint32, error
 	return 0, fmt.Errorf("no free port found on host: %s", host)
 }
 
-func RegisterFreePort(host string, containerId string, port uint32) error {
+// AssignFreePortOnHostToContainer allocates a port for a container on a given host machine
+func AssignFreePortOnHostToContainer(host string, containerId string, port uint32) error {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
@@ -52,7 +55,8 @@ func RegisterFreePort(host string, containerId string, port uint32) error {
 	return fmt.Errorf("port: %v on host: %s is already registered to instance: %s", port, host, containerId)
 }
 
-func GetContainerPorts(host string, containerId string) ([]uint32, error) {
+// GetContainerPortsOnHost gets all the assigned ports for a given container on a given host
+func GetContainerPortsOnHost(host string, containerId string) ([]uint32, error) {
 	if Cache == nil {
 		Init()
 	}
@@ -81,11 +85,12 @@ func GetContainerPorts(host string, containerId string) ([]uint32, error) {
 	return ports, nil
 }
 
-func FreeContainerPorts(host string, containerId string) error {
+// FreeContainerPortsOnHost frees all allocated host ports on a machine, at present occupied by a container
+func FreeContainerPortsOnHost(host string, containerId string) error {
 	if Cache == nil {
 		Init()
 	}
-	
+
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 

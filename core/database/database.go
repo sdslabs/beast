@@ -131,7 +131,7 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", core.BEAST_REMOTES_DIR)
+	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_REMOTES_DIR)
 	err = utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
 		log.Errorf("Error while creating backup directory: %s", err)
@@ -146,7 +146,7 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, "backup", core.BEAST_STAGING_DIR)
+	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_STAGING_DIR)
 
 	err = utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
@@ -168,7 +168,7 @@ func BackupDatabase() error {
 		LoadDbConfig()
 	}
 
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", "db")
+	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.DB_BACKUP_DIR)
 	err := utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
 		log.Errorf("Error while creating backup directory: %s", err)

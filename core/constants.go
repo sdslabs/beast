@@ -59,6 +59,8 @@ const ( //paths
 	BEAST_EXAMPLE_DIR              string = "_examples"
 	BEAST_CACHE_DIR                string = "cache"
 	BEAST_BACKUP_DIR               string = "backup"
+	DB_BACKUP_DIR                  string = "db"
+	CACHE_BACKUP_DIR               string = "cache"
 )
 
 const ( //chall types
@@ -108,8 +110,15 @@ const ( // roles
 	USER    int = 1 << 2
 )
 
+const (
+	DEFAULT_MINIMUM_EXTEND_TIME        int64 = 300
+	DEFAULT_MAXIMUM_EXTEND_TIME        int64 = 600
+	DEFAULT_MAXIMUM_INSTANCES_PER_USER int   = 3
+)
+
 var (
 	DEFAULT_REMOTE_PERIODIC_SYNC_TIME = time.Second * 120
+	DEFAULT_HEALTH_CHECK_TIME         = time.Second * 30
 )
 
 var DEPLOY_STATUS = map[string]string{
@@ -200,3 +209,4 @@ var NOTIFICATION_SERVICES = []string{
 	"slack",
 	"discord",
 }
+

@@ -41,9 +41,6 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to query challenge: %w", err)
 	}
-	if challenge.ID == 0 {
-		return nil, fmt.Errorf("challenge not found: %s", challengeName)
-	}
 
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	configFile := filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
@@ -87,13 +84,13 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	}
 
 	if err != nil {
-		if err := cache.FreeContainerPorts(serverDeployed, containerID); err != nil {
+		if err := cache.FreeContainerPortsOnHost(serverDeployed, containerID); err != nil {
 			return nil, fmt.Errorf("failed to free container ports: %w", err)
 		}
 		return nil, fmt.Errorf("failed to deploy instance container: %w", err)
 	}
 
-	err = cache.RegisterFreePort(serverDeployed, containerID, port)
+	err = cache.AssignFreePortOnHostToContainer(serverDeployed, containerID, port)
 	if err != nil {
 		log.Warnf("Failed to register port %d for container %s: %v", port, containerID, err)
 	}
@@ -117,7 +114,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		if err := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); err != nil {
 			return nil, fmt.Errorf("failed to kill instance container: %w", err)
 		}
-		if err := cache.FreeContainerPorts(serverDeployed, containerID); err != nil {
+		if err := cache.FreeContainerPortsOnHost(serverDeployed, containerID); err != nil {
 			return nil, fmt.Errorf("failed to free container ports: %w", err)
 		}
 
@@ -143,7 +140,7 @@ func KillInstance(instanceID string) error {
 		log.Warnf("Error killing container for instance %s: %v", instanceID, err)
 	}
 
-	err = cache.FreeContainerPorts(instance.ServerDeployed, instance.ContainerID)
+	err = cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.ContainerID)
 	if err != nil {
 		return fmt.Errorf("failed to free container ports: %w", err)
 	}
@@ -249,7 +246,7 @@ func allocateInstancePort(host string) (uint32, error) {
 	}
 
 	portRange := lastPort - firstPort + 1
-	port, err := cache.GetFreePort(host, firstPort, portRange)
+	port, err := cache.GetFreePortOnHost(host, firstPort, portRange)
 	if err != nil {
 		return 0, fmt.Errorf("failed to allocate port: %w", err)
 	}
@@ -258,7 +255,7 @@ func allocateInstancePort(host string) (uint32, error) {
 }
 
 func freeInstancePort(host string, containerID string) {
-	err := cache.FreeContainerPorts(host, containerID)
+	err := cache.FreeContainerPortsOnHost(host, containerID)
 	if err != nil {
 		log.Warnf("Failed to free ports for container %s on %s: %v", containerID, host, err)
 	}

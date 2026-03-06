@@ -170,14 +170,13 @@ func BeastHeathCheckProber(waitTime int) {
 }
 
 func InstanceCleanupProber() {
-	cleanupInterval := 30 * time.Second
-	log.Info("Starting Instance Cleanup prober with interval: ", cleanupInterval)
+	log.Info("Starting Instance Cleanup prober with interval: ", core.DEFAULT_HEALTH_CHECK_TIME)
 
 	for {
 		QueueExpiredInstances()
 		ProcessInstanceDeletionQueue()
 		CleanupOrphanedInstanceContainers()
-		time.Sleep(cleanupInterval)
+		time.Sleep(core.DEFAULT_HEALTH_CHECK_TIME)
 	}
 }
 
@@ -225,7 +224,7 @@ func ProcessInstanceDeletionQueue() {
 			log.Infof("Successfully killed container for instance %s", instance.InstanceID)
 		}
 
-		cache.FreeContainerPorts(instance.ServerDeployed, instance.ContainerID)
+		cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.ContainerID)
 	}
 
 	queueLen, _ := cache.GetDeletionQueueLength()
@@ -306,7 +305,7 @@ func cleanupOrphanedOnServer(serverHost string) {
 				}
 			}
 
-			cache.FreeContainerPorts(serverHost, container.ID)
+			cache.FreeContainerPortsOnHost(serverHost, container.ID)
 		}
 	}
 }

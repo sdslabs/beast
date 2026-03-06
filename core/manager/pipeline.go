@@ -344,7 +344,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	portMapping := make([]cr.PortMapping, len(ports))
 
 	for i, containerPort := range ports {
-		hostPort, err := cache.GetFreePort(host, firstPort, portRange)
+		hostPort, err := cache.GetFreePortOnHost(host, firstPort, portRange)
 		if err != nil {
 			return fmt.Errorf("error while getting free port on host %s: %s", host, err)
 		}
@@ -381,7 +381,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	for _, portMap := range portMapping {
-		if err := cache.RegisterFreePort(host, containerId, portMap.HostPort); err != nil {
+		if err := cache.AssignFreePortOnHostToContainer(host, containerId, portMap.HostPort); err != nil {
 			return fmt.Errorf("error while registering port %v on host %s: %s", portMap.HostPort, host, err)
 		}
 	}

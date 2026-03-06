@@ -144,13 +144,14 @@ type InstanceConfig struct {
 
 func (config *InstanceConfig) Validate() {
 	if config.DefaultExpiration <= 0 {
-		config.DefaultExpiration = 300
+		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
 	}
-	if config.MaxExtension <= 0 {
-		config.MaxExtension = 600
+	if config.MaxExtension <= config.DefaultExpiration {
+		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
+		config.MaxExtension = core.DEFAULT_MAXIMUM_EXTEND_TIME
 	}
 	if config.MaxInstancesPerUser <= 0 {
-		config.MaxInstancesPerUser = 3
+		config.MaxInstancesPerUser = core.DEFAULT_MAXIMUM_INSTANCES_PER_USER
 	}
 }
 

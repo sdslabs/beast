@@ -24,7 +24,8 @@ var (
 )
 
 var (
-	cacheConfig Config
+	BEAST_GLOBAL_DIR string = filepath.Join(os.Getenv("HOME"), ".beast")
+	cacheConfig      Config
 )
 
 type Config struct {
