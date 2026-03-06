@@ -230,9 +230,9 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 // # Exists for flexibility reasons try to use existing base iamges wherever possible.
 // base_image = ""
 //
-// # Docker file name for specific type challenge - `docker`.
+// # Docker file name for specific type challenge - `docker` or `ssh`.
 // # Helps to build flexible images for specific user-custom challenges
-// docket_context = ""
+// docker_context = ""
 //
 // # Environment variables that can be used in the application code.
 // [[var]]
@@ -390,6 +390,23 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		return fmt.Errorf("max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
 	}
 
+	// For SSH challenges, ensure there's an explicit host->container mapping to SSH port.
+	// If user didn't specify a mapping like "host:22", map the first port in `Ports`
+	// to container SSH port so downstream code doesn't need the challenge type.
+	if challType == core.SSH_CHALLENGE_TYPE_NAME {
+		sshMapped := false
+		for _, pm := range config.PortMappings {
+			_, cp, err := utils.ParsePortMapping(pm)
+			if err == nil && cp == core.SSH_PORT {
+				sshMapped = true
+				break
+			}
+		}
+		if !sshMapped && len(config.Ports) > 0 {
+			config.PortMappings = append(config.PortMappings, fmt.Sprintf("%d:%d", config.Ports[0], core.SSH_PORT))
+		}
+	}
+
 	portMappings, err := config.GetPortMappings()
 	if err != nil {
 		return fmt.Errorf("error while parsing port mapping: %s", err)
@@ -494,6 +511,21 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			} else if err := utils.ValidateDirExists(filepath.Join(challdir, config.WebRoot)); err != nil {
 				return fmt.Errorf("web Root directory does not exist")
 			}
+		}
+	} else if challType == core.SSH_CHALLENGE_TYPE_NAME {
+		// Challenge type is SSH which requires docker_context
+		if config.DockerCtx == "" {
+			return fmt.Errorf("docker_context can not be empty for SSH challenges")
+		} else if config.DockerCtx != "" {
+			if filepath.IsAbs(config.DockerCtx) {
+				return fmt.Errorf("docker_context path should be relative to challenge directory root")
+			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
+				return fmt.Errorf("docker_context file does not exist")
+			}
+		}
+
+		if !checkIfPortExistInMapping(portMappings, core.SSH_PORT) {
+			log.Warnf("No SSH port (22) found in port mappings for SSH challenge, it might not be accessible via SSH")
 		}
 	}
 

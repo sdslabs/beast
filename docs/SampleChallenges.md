@@ -184,3 +184,35 @@ The type of challenge consist of the following format - `web:php:<PHP Version>:<
 
 Make sure that you are installing all the mysql related dependencies in the `apt_deps` configuration parameter. As in the 
 above case `php*-mysql`
+
+## SSH Challenges
+
+SSH challenges allow participants to connect directly to a container using SSH and interact with a shell environment to solve the challenge. These challenges are ideal for scenarios where participants need to explore a system, find hidden files, or exploit vulnerabilities in a controlled environment.
+
+```toml
+[author]
+name = "ph03n1x"
+email = "author@example.com"
+ssh_key = "ssh-rsa AAAAB3NzaC1y..."
+
+[challenge.metadata]
+name = "simple-ssh"
+flag = "FLAG{SSH_CHALLENGE_FLAG}"
+type = "ssh"
+points = 150
+description = "SSH into the server and find the flag. The creds are ctf-user:ctf-password"
+
+[[challenge.metadata.hints]]
+text = "Check for hidden files in the home directory"
+points = 10
+
+[challenge.env]
+docker_context = "Dockerfile"
+port_mappings = ["14442:22"]  # Map external port 14442 to container's SSH port 22
+```
+
+Participants will be able to connect to this challenge using SSH:
+```
+ssh ctf-user@challenge-host -p 2222
+Password: ctf-password
+```
