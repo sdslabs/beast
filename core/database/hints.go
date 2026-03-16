@@ -194,3 +194,44 @@ func QueryHintsByChallengeID(challengeID uint) ([]Hint, error) {
 
 	return hints, nil
 }
+
+func RestoreHintPointsAndDeleteHints(challengeID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("error while starting transaction: %w", tx.Error)
+	}
+
+	var userHints []UserHint
+	if err := tx.Where("challenge_id = ?", challengeID).Find(&userHints).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error fetching user hints: %v", err)
+	}
+
+	for _, uh := range userHints {
+		var hint Hint
+		if err := tx.Where("hint_id = ?", uh.HintID).First(&hint).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("error fetching hint %d: %v", uh.HintID, err)
+		}
+		if err := tx.Model(&User{}).Where("id = ?", uh.UserID).
+			UpdateColumn("score", gorm.Expr("score + ?", hint.Points)).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("error restoring hint points for user %d: %v", uh.UserID, err)
+		}
+	}
+
+	if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserHint{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting user hints: %v", err)
+	}
+
+	if err := tx.Where("challenge_id = ?", challengeID).Delete(&Hint{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting hints: %v", err)
+	}
+
+	return tx.Commit().Error
+}

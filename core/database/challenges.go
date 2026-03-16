@@ -623,6 +623,13 @@ func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, er
 	return dynamicFlags, tx.Error
 }
 
+func DeleteDynamicFlagsByChallengeName(name string) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	return Db.Unscoped().Where("name = ?", name).Delete(&DynamicFlag{}).Error
+}
+
 func SubtractScoreFromSolvers(challengeID uint) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
