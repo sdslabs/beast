@@ -722,6 +722,12 @@ func undeployChallenge(challengeName string, purge bool) error {
 			return fmt.Errorf("error while purging in unstage step: %s", err)
 		}
 
+		log.Info("Restoring hint points and deleting hints")
+		err = database.RestoreHintPointsAndDeleteHints(challenge.ID)
+		if err != nil {
+			return fmt.Errorf("error while restoring hint points: %s", err)
+		}
+
 		log.Info("Subtracting user points")
 		err = database.SubtractScoreFromSolvers(challenge.ID)
 		if err != nil {
@@ -732,6 +738,12 @@ func undeployChallenge(challengeName string, purge bool) error {
 		err = database.DeleteAllUserChallenges(challenge.ID)
 		if err != nil {
 			return fmt.Errorf("error while deleting user_challenges entries: %s", err)
+		}
+
+		log.Info("Deleting dynamic flag entries")
+		err = database.DeleteDynamicFlagsByChallengeName(challenge.Name)
+		if err != nil {
+			return fmt.Errorf("error while deleting dynamic flags: %s", err)
 		}
 
 		log.Info("Deleting database entry")

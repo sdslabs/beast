@@ -270,6 +270,7 @@ func submitFlagHandler(c *gin.Context) {
 				challengePoints = newPoints
 			}
 		}
+		oldScore := user.Score
 		newScore := user.Score + challengePoints
 		if newScore <= 0 {
 			newScore = 0
@@ -282,7 +283,9 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 
-		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE || (len(adminLeaderboardCache) > 0 && newScore > adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
+		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
+			(len(adminLeaderboardCache) > 0 && (newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
+				oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score)) {
 			leaderboardStale = true
 			graphCacheStale = true
 			adminLeaderboardStale = true
@@ -324,12 +327,14 @@ func dynamicScore(maxPoints, minPoints, solvers uint) uint {
 
 // updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes
 func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve uint) error {
+	scoreChanged := false
 	for _, submission := range submissions {
 		user, err := database.QueryUserById(submission.UserID)
 		if err != nil {
 			return err
 		}
 		if user.Role == "contestant" {
+			oldScore := user.Score
 			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
 			if newScore <= 0 {
 				newScore = 0
@@ -338,7 +343,19 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 			if err != nil {
 				return err
 			}
+			// Check if this user's score change could affect top 25 leaderboard
+			if !scoreChanged && (len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
+				(len(adminLeaderboardCache) > 0 && (oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
+					newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score))) {
+				scoreChanged = true
+			}
 		}
+	}
+	// Mark cache stale if any user's score change could affect top 25
+	if scoreChanged {
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
 	}
 	return nil
 }

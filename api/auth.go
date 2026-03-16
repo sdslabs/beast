@@ -236,7 +236,7 @@ func register(c *gin.Context) {
 		Email:     email,
 		SshKey:    sshKey,
 	}
-	
+
 	// skip otp verif if -n flag is enabled
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
@@ -275,6 +275,12 @@ func register(c *gin.Context) {
 			Error: err.Error(),
 		})
 		return
+	}
+
+	if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE {
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
