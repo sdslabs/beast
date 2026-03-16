@@ -499,7 +499,17 @@ func SaveFlagSubmission(user_challenges *UserChallenges) error {
 		return fmt.Errorf("error while saving record: %s", tx.Error)
 	}
 
-	if err := tx.FirstOrCreate(user_challenges, *user_challenges).Error; err != nil {
+	var solvedChallenge UserChallenges
+	querySolved := tx.Where("user_id = ? AND challenge_id = ? AND solved = ?", user_challenges.UserID, user_challenges.ChallengeID, true).First(&solvedChallenge)
+	if querySolved.Error == nil {
+		tx.Rollback()
+		return fmt.Errorf("already solved: user_id %v, challenge_id %v", user_challenges.UserID, user_challenges.ChallengeID)
+	} else if querySolved.Error != nil && !errors.Is(querySolved.Error, gorm.ErrRecordNotFound) {
+		tx.Rollback()
+		return querySolved.Error
+	}
+
+	if err := tx.Create(user_challenges).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
