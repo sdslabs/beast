@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
@@ -359,6 +360,9 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			return err
 		}
 		return nil
+	} else if !slices.Contains(config.AptDeps, "openssh-server") {
+		log.Warn("openssh-server not found as dependency for sad challenge... adding dependency")
+		config.AptDeps = append(config.AptDeps, "openssh-server")
 	}
 
 	if err := config.ExtractPorts(); err != nil {
