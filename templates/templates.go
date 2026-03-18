@@ -45,8 +45,6 @@ WORKDIR /challenge
 ENV {{$key}} "{{$elem}}" 
 {{end}}
 
-CMD ["/usr/sbin/sshd", "-D"]
-
 RUN cd /challenge {{ range $index, $elem := .SetupScripts}} && \
     chmod u+x {{$elem}} {{end}} {{ range $index, $elem := .SetupScripts}} && \
     ./{{$elem}} {{end}}

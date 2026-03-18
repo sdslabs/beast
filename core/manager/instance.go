@@ -381,6 +381,18 @@ func verifySSHLocal(containerId string) error {
 		return fmt.Errorf("ssh agent check failed, ssh-agent not running")
 	}
 
+	sshServiceStartCommand := fmt.Sprintf("service ssh start")
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshServiceStartCommand,
+	})
+
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("ssh start failed, ssh agent not running")
+	}
+
 	return nil
 }
 
@@ -399,6 +411,18 @@ func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
 	}
 	if result.ExitCode != 0 {
 		return fmt.Errorf("ssh agent check failed, ssh-agent not running")
+	}
+
+	sshServiceStartCommand := fmt.Sprintf("service ssh start")
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshServiceStartCommand,
+	})
+
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("ssh start failed, ssh agent not running")
 	}
 
 	return err
