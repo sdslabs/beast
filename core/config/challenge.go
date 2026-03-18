@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
@@ -360,6 +361,9 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			log.Warn("setup_scripts will be ignored when docker_compose is specified")
 		}
 		return nil
+	} else if !slices.Contains(config.AptDeps, "openssh-server") {
+		log.Warn("openssh-server not found as dependency for sad challenge... adding dependency")
+		config.AptDeps = append(config.AptDeps, "openssh-server")
 	}
 
 	// Run command is only a required value in case of bare challenge types.

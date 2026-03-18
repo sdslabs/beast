@@ -85,7 +85,7 @@ func spawnInstanceHandler(ctx *gin.Context) {
 
 	userID := fmt.Sprintf("%d", user.ID)
 
-	instance, err := manager.SpawnInstance(challengeName, userID, username)
+	instance, err := manager.SpawnInstance(challengeName, userID, username, user.SshKey)
 	if err != nil {
 		if instance != nil {
 			ctx.JSON(http.StatusConflict, HTTPErrorResp{
