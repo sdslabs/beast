@@ -87,6 +87,13 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
 	}
 
+	if err != nil {
+		if err := cache.FreeContainerPorts(serverDeployed, containerID); err != nil {
+			return nil, fmt.Errorf("failed to free container ports: %w", err)
+		}
+		return nil, fmt.Errorf("failed to deploy instance container: %w", err)
+	}
+
 	if serverDeployed == "" || serverDeployed == core.LOCALHOST {
 		err = addUserSSHKeyLocal(containerID, userSSHKey)
 		if err != nil {
@@ -97,13 +104,6 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		if err != nil {
 			return nil, fmt.Errorf("failed to add user ssh key: %w", err)
 		}
-	}
-
-	if err != nil {
-		if err := cache.FreeContainerPorts(serverDeployed, containerID); err != nil {
-			return nil, fmt.Errorf("failed to free container ports: %w", err)
-		}
-		return nil, fmt.Errorf("failed to deploy instance container: %w", err)
 	}
 
 	err = cache.RegisterFreePort(serverDeployed, containerID, port)
