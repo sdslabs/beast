@@ -22,7 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func SpawnInstance(challengeName, userID, username string) (*cache.Instance, error) {
+func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*cache.Instance, error) {
 	log.Infof("Spawning instance of challenge %s for user %s", challengeName, userID)
 
 	existingInstance, err := cache.GetUserInstance(userID, challengeName)
@@ -104,6 +104,11 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
 			return nil, fmt.Errorf("failed to register instance ports: %w", err)
 		}
+
+		err = addUserSSHKeyLocal(containerID, userSSHKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add user ssh key: %w", err)
+		}
 	} else {
 		err = config.Challenge.Env.ExtractPorts()
 		if err != nil {
@@ -137,6 +142,11 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			}
 			coreUtils.FreePortsOnHost(serverDeployed, ports)
 			return nil, fmt.Errorf("failed to register instance ports: %w", err)
+		}
+
+		err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add user ssh key: %w", err)
 		}
 	}
 
@@ -394,13 +404,98 @@ func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, 
 }
 
 func verifySSHLocal(containerId string) error {
-	return exec.Command("docker", "port", containerId, fmt.Sprintf("%v/tcp", core.SSH_PORT)).Run()
+	err := exec.Command("docker", "port", containerId, fmt.Sprintf("%v/tcp", core.SSH_PORT)).Run()
+	if err != nil {
+		return err
+	}
+
+	sshAgentCheckCommand := fmt.Sprintf("[ -z \"$SSH_AUTH_SOCK\" ]")
+	result, err := cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshAgentCheckCommand,
+	})
+
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("ssh agent check failed, ssh-agent not running")
+	}
+
+	sshServiceStartCommand := fmt.Sprintf("service ssh start")
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshServiceStartCommand,
+	})
+
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("ssh start failed, ssh agent not running")
+	}
+
+	return nil
 }
 
 func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
 	portCmd := fmt.Sprintf("docker port %s %v:tcp", containerId, core.SSH_PORT)
 	_, err := remoteManager.RunCommandOnServer(server, portCmd)
+	if err != nil {
+		return err
+	}
+
+	sshAgentCheckCommand := fmt.Sprintf("[ -z \"$SSH_AUTH_SOCK\" ]")
+	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, sshAgentCheckCommand)
+
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("ssh agent check failed, ssh-agent not running")
+	}
+
+	sshServiceStartCommand := fmt.Sprintf("service ssh start")
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshServiceStartCommand,
+	})
+
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("ssh start failed, ssh agent not running")
+	}
+
 	return err
+}
+
+func addUserSSHKeyLocal(containerId string, sshKey string) error {
+	sshCmd := fmt.Sprintf("mkdir -p /home/beast/.ssh && echo '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh", sshKey)
+
+	result, err := cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshCmd,
+	})
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("failed to add public key to container: %s", result.Output)
+	}
+
+	return nil
+}
+
+func addUserSSHKeyRemote(containerId string, server cfg.AvailableServer, sshKey string) error {
+	sshCmd := fmt.Sprintf("mkdir -p /home/beast/.ssh && echo '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh", sshKey)
+
+	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, sshCmd)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("failed to add public key to container: %s", result.Output)
+	}
+
+	return nil
 }
 
 func deployInstanceContainer(instanceID, challengeName string, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string, ports []uint32) (string, string, error) {
