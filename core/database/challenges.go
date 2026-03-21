@@ -332,7 +332,6 @@ func UpdateUserChallengeTries(userID uint, challengeID uint) error {
 	}
 
 	updates := map[string]interface{}{
-		"created_at": time.Now(),
 		"tries":      userChallenges.Tries + 1,
 	}
 
