@@ -10,4 +10,5 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - HOME=/root
+      - BEAST_FLAGS=${BEAST_FLAGS:--v}
     restart: unless-stopped

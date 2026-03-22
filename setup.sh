@@ -66,7 +66,9 @@ if [ "$IN_CONTAINER" = true ]; then
         exit 1
     fi
     echo -e "Docker socket available. Starting beast..."
-    exec beast run -v
+    BEAST_FLAGS="${BEAST_FLAGS:--v}"
+    echo -e "Running: beast run ${BEAST_FLAGS}"
+    exec beast run ${BEAST_FLAGS}
 fi
 
 # ── Local path: build then advise the user to run beast ──────────────────────
