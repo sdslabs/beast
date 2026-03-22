@@ -116,23 +116,25 @@ check-config:
 		exit 1; \
 	fi
 
+BEAST_DIR = $(HOME)/.$(NAME)
+
 setup-beast-dir: check-name check-config
-	@echo "[*] Setting up .$(NAME) directory..."
-	@mkdir -p .$(NAME)/assets/logo
-	@mkdir -p .$(NAME)/assets/mailTemplates
-	@mkdir -p .$(NAME)/remote
-	@mkdir -p .$(NAME)/uploads
-	@mkdir -p .$(NAME)/secrets
-	@mkdir -p .$(NAME)/scripts
-	@mkdir -p .$(NAME)/staging
-	@mkdir -p .$(NAME)/cache
-	@mkdir -p .$(NAME)/logs
-	@cp config.toml .$(NAME)/config.toml
-	@echo "[*] .$(NAME) ready (mounted as /root/.beast in container)"
+	@echo "[*] Setting up $(BEAST_DIR)..."
+	@mkdir -p $(BEAST_DIR)/assets/logo
+	@mkdir -p $(BEAST_DIR)/assets/mailTemplates
+	@mkdir -p $(BEAST_DIR)/remote
+	@mkdir -p $(BEAST_DIR)/uploads
+	@mkdir -p $(BEAST_DIR)/secrets
+	@mkdir -p $(BEAST_DIR)/scripts
+	@mkdir -p $(BEAST_DIR)/staging
+	@mkdir -p $(BEAST_DIR)/cache
+	@mkdir -p $(BEAST_DIR)/logs
+	@cp config.toml $(BEAST_DIR)/config.toml
+	@echo "[*] $(BEAST_DIR) ready (mounted as /root/.beast in container)"
 
 up: setup-beast-dir
 	@echo "[*] Starting beast services (project: $(NAME))..."
-	@BEAST_DIR=.$(NAME) docker compose --project-name $(NAME) up -d --build
+	@BEAST_DIR=$(BEAST_DIR) docker compose --project-name $(NAME) up -d --build
 	@echo "[*] Beast API running at http://localhost:5005"
 
 down: check-name

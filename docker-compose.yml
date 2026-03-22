@@ -11,4 +11,6 @@ services:
     environment:
       - HOME=/root
       - BEAST_FLAGS=${BEAST_FLAGS:--v}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
