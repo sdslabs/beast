@@ -1,0 +1,14 @@
+services:
+  beast:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    network_mode: host
+    volumes:
+      - ${BEAST_DIR}:/root/.beast
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - HOME=/root
+      - BEAST_FLAGS=${BEAST_FLAGS:--v}
+      - BEAST_HOST_DIR=${BEAST_DIR}
+    restart: unless-stopped
