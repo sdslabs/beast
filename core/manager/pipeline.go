@@ -293,7 +293,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	staticMount := make(map[string]string)
 	var staticMountDir string
 	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
-		staticMountDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
+		staticMountDir = filepath.Join(core.BEAST_MOUNT_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
 	} else {
 		staticMountDir = filepath.Join("$HOME/.beast", core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
 	}
