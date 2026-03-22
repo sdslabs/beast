@@ -1,0 +1,13 @@
+services:
+  beast:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    ports:
+      - "${BEAST_PORT:-5005}:5005"
+    volumes:
+      - ${BEAST_DIR}:/root/.beast
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - HOME=/root
+    restart: unless-stopped

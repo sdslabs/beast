@@ -81,3 +81,64 @@ installenv:
 	@./scripts/installenv.sh
 
 .PHONY: build format test check_format tools docs installenv
+
+# ── Docker Compose Targets ────────────────────────────────────────────────────
+# Usage: make up NAME=myctf
+#
+# NAME (required, no spaces) — used to create a .<NAME> folder on the host which
+# is mounted as /root/.beast inside the beast container. This keeps each
+# deployment isolated and named.
+#
+# Prerequisites:
+#   - config.toml must exist alongside this Makefile.
+#   - In config.toml set psql_config.host = "postgres" (the compose service name).
+#
+# Targets:
+#   make up   NAME=<name>  — set up .<name>/, copy config, start services
+#   make down NAME=<name>  — stop and remove services
+#   make logs NAME=<name>  — tail beast service logs
+
+check-name:
+	@if [ -z "$(NAME)" ]; then \
+		echo "Error: NAME is required. Usage: make up NAME=myctf"; \
+		exit 1; \
+	fi
+	@if echo "$(NAME)" | grep -q "[[:space:]]"; then \
+		echo "Error: NAME must not contain spaces"; \
+		exit 1; \
+	fi
+
+check-config:
+	@if [ ! -f "config.toml" ]; then \
+		echo "Error: config.toml not found in current directory."; \
+		echo "Place your config.toml here (see _examples/example.config.toml)."; \
+		echo "Ensure psql_config.host = \"postgres\" for the compose network."; \
+		exit 1; \
+	fi
+
+setup-beast-dir: check-name check-config
+	@echo "[*] Setting up .$(NAME) directory..."
+	@mkdir -p .$(NAME)/assets/logo
+	@mkdir -p .$(NAME)/assets/mailTemplates
+	@mkdir -p .$(NAME)/remote
+	@mkdir -p .$(NAME)/uploads
+	@mkdir -p .$(NAME)/secrets
+	@mkdir -p .$(NAME)/scripts
+	@mkdir -p .$(NAME)/staging
+	@mkdir -p .$(NAME)/cache
+	@mkdir -p .$(NAME)/logs
+	@cp config.toml .$(NAME)/config.toml
+	@echo "[*] .$(NAME) ready (mounted as /root/.beast in container)"
+
+up: setup-beast-dir
+	@echo "[*] Starting beast services (project: $(NAME))..."
+	@BEAST_DIR=.$(NAME) docker compose --project-name $(NAME) up -d --build
+	@echo "[*] Beast API running at http://localhost:5005"
+
+down: check-name
+	@docker compose --project-name $(NAME) down
+
+logs: check-name
+	@docker compose --project-name $(NAME) logs -f beast
+
+.PHONY: check-name check-config setup-beast-dir up down logs
