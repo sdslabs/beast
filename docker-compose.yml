@@ -3,14 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.app
-    ports:
-      - "${BEAST_PORT:-5005}:5005"
+    network_mode: host
     volumes:
       - ${BEAST_DIR}:/root/.beast
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - HOME=/root
       - BEAST_FLAGS=${BEAST_FLAGS:--v}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
