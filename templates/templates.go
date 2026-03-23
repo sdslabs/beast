@@ -29,7 +29,7 @@ LABEL version="0.2"
 LABEL author="SDSLabs"
 
 RUN groupadd -g 1337 beast-grp
-RUN useradd -u 1337 -g 1337 -ms /bin/bash beast
+RUN useradd -u 1337 -g 1337 -ms /bin/bash beast-user
 
 RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install {{.AptDeps}}
@@ -63,7 +63,7 @@ RUN touch /entrypoint.sh && \
     echo "fi" >> /entrypoint.sh && \
 {{if .SetupCommand}}    echo "{{.SetupCommand}}" >> /entrypoint.sh && {{end}}\
 {{if .XinetdService}}   echo "mv {{.XinetdConf}} /etc/xinetd.d/pwn_service" >> /entrypoint.sh && {{end}}\
-    echo {{if .RunRoot}}"exec /bin/bash -c \"{{.RunCmd}}\""{{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
+    echo {{if .RunRoot}}"exec /bin/bash -c \"{{.RunCmd}}\""{{else}} "exec su beast-user /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
     chmod u+x /entrypoint.sh
 {{else}}
 RUN chmod u+x {{.Entrypoint}}
