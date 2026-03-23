@@ -429,7 +429,7 @@ func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
 }
 
 func addUserSSHKeyLocal(containerId string, sshKey string) error {
-	sshCmd := fmt.Sprintf("mkdir -p /home/beast/.ssh && echo '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh", sshKey)
+	sshCmd := fmt.Sprintf("mkdir -p /home/beast-user/.ssh && echo '%s' >> /home/beast-user/.ssh/authorized_keys && chmod 700 /home/beast-user/.ssh && chmod 600 /home/beast-user/.ssh/authorized_keys && chown -R beast-user:beast-grp /home/beast-user/.ssh", sshKey)
 
 	result, err := cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", sshCmd,
@@ -445,7 +445,7 @@ func addUserSSHKeyLocal(containerId string, sshKey string) error {
 }
 
 func addUserSSHKeyRemote(containerId string, server cfg.AvailableServer, sshKey string) error {
-	sshCmd := fmt.Sprintf("mkdir -p /home/beast/.ssh && echo '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh", sshKey)
+	sshCmd := fmt.Sprintf("mkdir -p /home/beast-user/.ssh && echo '%s' >> /home/beast-user/.ssh/authorized_keys && chmod 700 /home/beast-user/.ssh && chmod 600 /home/beast-user/.ssh/authorized_keys && chown -R beast-user:beast-grp /home/beast-user/.ssh", sshKey)
 
 	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, sshCmd)
 	if err != nil {
