@@ -57,6 +57,7 @@ const ( //paths
 	BEAST_SECRETS_DIR              string = "secrets"
 	BEAST_EXAMPLE_DIR              string = "_examples"
 	BEAST_CACHE_DIR                string = "cache"
+	BEAST_BACKUP_DIR               string = "backup"
 )
 
 const ( //chall types
@@ -203,11 +204,10 @@ var USER_STATUS = map[string]string{
 const (
 	LEADERBOARD_SIZE       = 25
 	LEADERBOARD_GRAPH_SIZE = 12
-	SUBMISSIONS_PAGE_SIZE = 10
+	SUBMISSIONS_PAGE_SIZE  = 10
 )
 
 var NOTIFICATION_SERVICES = []string{
 	"slack",
 	"discord",
 }
-

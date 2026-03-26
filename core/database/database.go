@@ -2,6 +2,7 @@ package database
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"fmt"
 	"gorm.io/gorm/logger"
 	"os"
@@ -162,7 +163,7 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", core.BEAST_REMOTES_DIR)
+	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_REMOTES_DIR)
 	err = utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
 		log.Errorf("Error while creating backup directory: %s", err)
@@ -177,7 +178,7 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, "backup", core.BEAST_STAGING_DIR)
+	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_STAGING_DIR)
 
 	err = utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
@@ -198,7 +199,7 @@ func BackupDatabase() error {
 	if dbConfig == (Config{}) {
 		LoadDbConfig()
 	}
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", "db")
+	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, "db")
 	err := utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
 		log.Errorf("Error while creating backup directory: %s", err)
@@ -206,8 +207,20 @@ func BackupDatabase() error {
 	}
 
 	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.PsqlConf.Dbname, time.Now().Format("20060102150405"))
-	cmd := exec.Command("pg_dump", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.PsqlConf.Dbname)
+	cmd := exec.Command(
+		"pg_dump",
+		"-U",
+		dbConfig.PsqlConf.User,
+		"-h", dbConfig.PsqlConf.Host,
+		"-p",
+		dbConfig.PsqlConf.Port,
+		"-F",
+		"c",
+		"-f",
+		filepath.Join(backupPath, backupFile),
+		dbConfig.PsqlConf.Dbname)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Backup error: %s\n", string(output))
@@ -253,24 +266,21 @@ func TerminateDatabaseConnections() error {
 	if dbConfig == (Config{}) {
 		LoadDbConfig()
 	}
-	terminateCmd := exec.Command(
-		"psql",
-		"-U", dbConfig.PsqlConf.User,
-		"-h", dbConfig.PsqlConf.Host,
-		"-p", dbConfig.PsqlConf.Port,
-		"-d", "postgres",
-		"-c",
-		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname),
-	)
-	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
 
-	output, err := terminateCmd.CombinedOutput()
-	outputStr := string(output)
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, "postgres", dbConfig.PsqlConf.SslMode)
+	db, err := sql.Open("pgx", dsn)
+
 	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", outputStr)
 		return err
 	}
-	log.Debug(outputStr)
+	defer db.Close()
+
+	_, err = db.Exec("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname)
+	if err != nil {
+		log.Errorf("Terminate connections error: %s\n", err.Error())
+		return err
+	}
+
 	return nil
 }
 
@@ -297,8 +307,7 @@ func RestoreDatabase(backupFile string) error {
 		"--no-owner",
 		"--clean",
 		"--if-exists",
-		backupFile,
-	)
+		backupFile)
 	restoreCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
 
 	output, err := restoreCmd.CombinedOutput()
