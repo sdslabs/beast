@@ -127,6 +127,27 @@ func Init() {
 	}
 }
 
+func Close() error {
+	if Db == nil {
+		log.Warnln(fmt.Sprintf("Trying to close database connection when no connection is established..."))
+		return nil
+	}
+
+	sqlDb, err := Db.DB()
+	if err != nil {
+		log.Errorln(fmt.Sprintf("Error while closing database connection gracefully: %s, attempting to terminate forcefully", err.Error()))
+		return TerminateDatabaseConnections()
+	}
+
+	err = sqlDb.Close()
+	if err != nil {
+		log.Errorln(fmt.Sprintf("Error while closing database connection gracefully: %s, attempting to terminate forcefully", err.Error()))
+		return TerminateDatabaseConnections()
+	}
+
+	return nil
+}
+
 func BackupAndReset() {
 	LoadDbConfig()
 
@@ -177,7 +198,6 @@ func BackupDatabase() error {
 	if dbConfig == (Config{}) {
 		LoadDbConfig()
 	}
-
 	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", "db")
 	err := utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
