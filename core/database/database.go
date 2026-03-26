@@ -3,6 +3,7 @@ package database
 import (
 	"crypto/rand"
 	"fmt"
+	"gorm.io/gorm/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +55,16 @@ func LoadDbConfig() {
 func ConnectDatabase() error {
 	LoadDbConfig()
 	dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, dbConfig.PsqlConf.Dbname, dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.SslMode)
-	Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
+	Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.New(
+			log.New(),
+			logger.Config{
+				LogLevel:                  logger.Warn,
+				IgnoreRecordNotFoundError: true,
+			},
+		)})
+
 	if dberr != nil {
 		log.Error("Error while initializing the database.", dberr)
 		return dberr
