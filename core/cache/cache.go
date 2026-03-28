@@ -50,7 +50,7 @@ func LoadCacheConfig() {
 }
 
 // Connect redis
-func ConnectRedis() error {
+func ConnectCache() error {
 	LoadCacheConfig()
 	Cache = redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", cacheConfig.RedisConfig.Host, cacheConfig.RedisConfig.Port),
@@ -75,7 +75,7 @@ func ConnectRedis() error {
 func Init() {
 	CacheMutex = &sync.Mutex{}
 	if Cache == nil {
-		cacheError = ConnectRedis()
+		cacheError = ConnectCache()
 		if cacheError != nil {
 			log.Error("Error while initializing the database.", cacheError)
 		}
