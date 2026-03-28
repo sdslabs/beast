@@ -99,6 +99,7 @@ func installAir() error {
 
 func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig) error {
 	ctx := context.Background()
+	log.Warnln("Beast expects Redis ACLs to be enabled. If ACLs are not configured, some features may not function correctly.")
 
 	result, err := cache.ACLUsers(ctx).Result()
 	if err != nil {

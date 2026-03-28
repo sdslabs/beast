@@ -24,14 +24,12 @@ var (
 )
 
 var (
-	BEAST_GLOBAL_DIR string = filepath.Join(os.Getenv("HOME"), ".beast")
-	cacheConfig      Config
+	cacheConfig Config
 )
 
 type Config struct {
 	RedisConfig RedisConfig `toml:"redis_config"`
 }
-
 type RedisConfig struct {
 	User     string `toml:"user"`
 	Password string `toml:"password"`
@@ -246,39 +244,9 @@ func TerminateCacheConnections() error {
 }
 
 func RestoreCache(backupFile string) error {
-	LoadCacheConfig()
-
-	err := TerminateCacheConnections()
-	if err != nil {
-		log.Errorf("Unable to terminate connections: %s ", err)
-		return err
-	}
-
-	err = utils.ValidateFileExists(backupFile)
-	if err != nil {
-		return fmt.Errorf("backup file does not exist: %s", backupFile)
-	}
-
-	// TODO: figure out how to do this
-	//restoreCmd := exec.Command(
-	//	"pg_restore",
-	//	"-U", dbConfig.PsqlConf.User,
-	//	"-h", dbConfig.PsqlConf.Host,
-	//	"-p", dbConfig.PsqlConf.Port,
-	//	"-d", dbConfig.PsqlConf.Dbname,
-	//	"--no-owner",
-	//	"--clean",
-	//	"--if-exists",
-	//	backupFile,
-	//)
-	//restoreCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
-	//
-	//output, err := restoreCmd.CombinedOutput()
-	//if err != nil {
-	//	log.Printf("Restore cache error: %s\n", string(output))
-	//	return fmt.Errorf("failed to restore cache from %s: %v", backupFile, err)
-	//}
-
-	log.Println("Cache restored successfully from:", backupFile)
+	/*
+		The primary issue with restoring cache is that it needs to be written to /var/lib and redis needs to be restarted.
+		Redis will then pick up the changes and continue from there.
+	*/
 	return nil
 }
