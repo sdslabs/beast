@@ -27,8 +27,7 @@ var (
 )
 
 var (
-	BEAST_GLOBAL_DIR string = filepath.Join(os.Getenv("HOME"), ".beast")
-	dbConfig         Config
+	dbConfig Config
 )
 
 type Config struct {
