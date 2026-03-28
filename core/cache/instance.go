@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/sdslabs/beastv4/utils"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -23,21 +24,6 @@ type Instance struct {
 	ServerDeployed string    `json:"server_deployed"`
 }
 
-const (
-	InstanceKeyPrefix     = "beast:instance:"
-	UserInstanceKeyPrefix = "beast:user_instance:"
-	InstancesSetKey       = "beast:instances"
-	InstanceDeletionQueue = "beast:instances:to_delete"
-)
-
-func instanceKey(instanceID string) string {
-	return InstanceKeyPrefix + instanceID
-}
-
-func userInstanceKey(userID, challengeName string) string {
-	return UserInstanceKeyPrefix + userID + ":" + challengeName
-}
-
 func SaveInstance(instance *Instance, ttl time.Duration) error {
 	if Cache == nil {
 		return fmt.Errorf("redis cache not initialized")
@@ -52,19 +38,19 @@ func SaveInstance(instance *Instance, ttl time.Duration) error {
 		return fmt.Errorf("failed to marshal instance: %w", err)
 	}
 
-	key := instanceKey(instance.InstanceID)
+	key := utils.InstanceToKey(instance.InstanceID)
 	err = Cache.Set(ctx, key, data, ttl).Err()
 	if err != nil {
 		return fmt.Errorf("failed to save instance: %w", err)
 	}
 
-	userKey := userInstanceKey(instance.UserID, instance.ChallengeName)
+	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	err = Cache.Set(ctx, userKey, instance.InstanceID, ttl).Err()
 	if err != nil {
 		return fmt.Errorf("failed to save user instance mapping: %w", err)
 	}
 
-	err = Cache.SAdd(ctx, InstancesSetKey, instance.InstanceID).Err()
+	err = Cache.SAdd(ctx, utils.InstancesSetKey, instance.InstanceID).Err()
 	if err != nil {
 		log.Warnf("failed to add instance to set: %v", err)
 	}
@@ -84,7 +70,7 @@ func GetInstance(instanceID string) (*Instance, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	key := instanceKey(instanceID)
+	key := utils.InstanceToKey(instanceID)
 	data, err := Cache.Get(ctx, key).Bytes()
 	if err != nil {
 		return nil, fmt.Errorf("instance not found: %w", err)
@@ -108,13 +94,13 @@ func GetUserInstance(userID, challengeName string) (*Instance, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	userKey := userInstanceKey(userID, challengeName)
+	userKey := utils.UserChallengeToKey(userID, challengeName)
 	instanceID, err := Cache.Get(ctx, userKey).Result()
 	if err != nil {
 		return nil, fmt.Errorf("user instance not found: %w", err)
 	}
 
-	key := instanceKey(instanceID)
+	key := utils.InstanceToKey(instanceID)
 	data, err := Cache.Get(ctx, key).Bytes()
 	if err != nil {
 		return nil, fmt.Errorf("instance not found: %w", err)
@@ -138,7 +124,7 @@ func GetUserInstances(userID string) ([]*Instance, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	pattern := UserInstanceKeyPrefix + userID + ":*"
+	pattern := utils.UserChallengesAllKey(userID)
 	var instances []*Instance
 
 	iter := Cache.Scan(ctx, 0, pattern, 0).Iterator()
@@ -149,7 +135,7 @@ func GetUserInstances(userID string) ([]*Instance, error) {
 			continue
 		}
 
-		key := instanceKey(instanceID)
+		key := utils.InstanceToKey(instanceID)
 		data, err := Cache.Get(ctx, key).Bytes()
 		if err != nil {
 			continue
@@ -176,17 +162,17 @@ func GetAllInstances() ([]*Instance, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	instanceIDs, err := Cache.SMembers(ctx, InstancesSetKey).Result()
+	instanceIDs, err := Cache.SMembers(ctx, utils.InstancesSetKey).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance IDs: %w", err)
 	}
 
 	var instances []*Instance
 	for _, id := range instanceIDs {
-		key := instanceKey(id)
+		key := utils.InstanceToKey(id)
 		data, err := Cache.Get(ctx, key).Bytes()
 		if err != nil {
-			Cache.SRem(ctx, InstancesSetKey, id)
+			Cache.SRem(ctx, utils.InstancesSetKey, id)
 			continue
 		}
 
@@ -212,17 +198,17 @@ func GetChallengeInstances(challengeName string) ([]*Instance, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	instanceIDs, err := Cache.SMembers(ctx, InstancesSetKey).Result()
+	instanceIDs, err := Cache.SMembers(ctx, utils.InstancesSetKey).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance IDs: %w", err)
 	}
 
 	var instances []*Instance
 	for _, id := range instanceIDs {
-		key := instanceKey(id)
+		key := utils.InstanceToKey(id)
 		data, err := Cache.Get(ctx, key).Bytes()
 		if err != nil {
-			Cache.SRem(ctx, InstancesSetKey, id)
+			Cache.SRem(ctx, utils.InstancesSetKey, id)
 			continue
 		}
 
@@ -249,7 +235,7 @@ func DeleteInstance(instanceID string) error {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	key := instanceKey(instanceID)
+	key := utils.InstanceToKey(instanceID)
 	data, err := Cache.Get(ctx, key).Bytes()
 	if err != nil {
 		return fmt.Errorf("instance not found: %w", err)
@@ -266,9 +252,9 @@ func DeleteInstance(instanceID string) error {
 		return fmt.Errorf("failed to delete instance: %w", err)
 	}
 
-	userKey := userInstanceKey(instance.UserID, instance.ChallengeName)
+	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	Cache.Del(ctx, userKey)
-	Cache.SRem(ctx, InstancesSetKey, instanceID)
+	Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
 
 	log.Debugf("Deleted instance %s for user %s, challenge %s",
 		instanceID, instance.UserID, instance.ChallengeName)
@@ -285,7 +271,7 @@ func ExtendInstance(instanceID string, additionalTime time.Duration) error {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	key := instanceKey(instanceID)
+	key := utils.InstanceToKey(instanceID)
 
 	data, err := Cache.Get(ctx, key).Bytes()
 	if err != nil {
@@ -316,7 +302,7 @@ func ExtendInstance(instanceID string, additionalTime time.Duration) error {
 		return fmt.Errorf("failed to extend instance: %w", err)
 	}
 
-	userKey := userInstanceKey(instance.UserID, instance.ChallengeName)
+	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	Cache.Expire(ctx, userKey, newTTL)
 
 	log.Debugf("Extended instance %s by %v, new expiration: %v", instanceID, additionalTime, newExpiresAt)
@@ -333,7 +319,7 @@ func CountUserInstances(userID string) (int, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	pattern := UserInstanceKeyPrefix + userID + ":*"
+	pattern := utils.UserChallengesAllKey(userID)
 	count := 0
 
 	iter := Cache.Scan(ctx, 0, pattern, 0).Iterator()
@@ -353,7 +339,7 @@ func GetInstanceTTL(instanceID string) (time.Duration, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	key := instanceKey(instanceID)
+	key := utils.InstanceToKey(instanceID)
 	ttl, err := Cache.TTL(ctx, key).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get TTL: %w", err)
@@ -371,11 +357,11 @@ func QueueInstanceForDeletion(instanceID string) error {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	key := instanceKey(instanceID)
+	key := utils.InstanceToKey(instanceID)
 
 	data, err := Cache.Get(ctx, key).Bytes()
 	if err != nil {
-		Cache.SRem(ctx, InstancesSetKey, instanceID)
+		Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
@@ -386,10 +372,10 @@ func QueueInstanceForDeletion(instanceID string) error {
 	}
 
 	pipe := Cache.TxPipeline()
-	pipe.LPush(ctx, InstanceDeletionQueue, data)
-	pipe.SRem(ctx, InstancesSetKey, instanceID)
+	pipe.LPush(ctx, utils.InstanceDeletionQueue, data)
+	pipe.SRem(ctx, utils.InstancesSetKey, instanceID)
 
-	userKey := userInstanceKey(instance.UserID, instance.ChallengeName)
+	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	pipe.Del(ctx, userKey)
 	pipe.Del(ctx, key)
 
@@ -413,7 +399,7 @@ func PopInstanceForDeletion() (*Instance, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	data, err := Cache.RPop(ctx, InstanceDeletionQueue).Bytes()
+	data, err := Cache.RPop(ctx, utils.InstanceDeletionQueue).Bytes()
 	if err != nil {
 		if err.Error() == "redis: nil" {
 			return nil, nil
@@ -440,7 +426,7 @@ func GetDeletionQueueLength() (int64, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	return Cache.LLen(ctx, InstanceDeletionQueue).Result()
+	return Cache.LLen(ctx, utils.InstanceDeletionQueue).Result()
 }
 
 func GetExpiredInstances() ([]*Instance, error) {
@@ -452,7 +438,7 @@ func GetExpiredInstances() ([]*Instance, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	instanceIDs, err := Cache.SMembers(ctx, InstancesSetKey).Result()
+	instanceIDs, err := Cache.SMembers(ctx, utils.InstancesSetKey).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance IDs: %w", err)
 	}
@@ -461,10 +447,10 @@ func GetExpiredInstances() ([]*Instance, error) {
 	var expired []*Instance
 
 	for _, id := range instanceIDs {
-		key := instanceKey(id)
+		key := utils.InstanceToKey(id)
 		data, err := Cache.Get(ctx, key).Bytes()
 		if err != nil {
-			Cache.SRem(ctx, InstancesSetKey, id)
+			Cache.SRem(ctx, utils.InstancesSetKey, id)
 			continue
 		}
 

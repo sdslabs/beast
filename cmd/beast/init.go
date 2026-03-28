@@ -113,7 +113,7 @@ func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig
 		}
 	}
 
-	_, err = cache.ACLSetUser(ctx, configuration.User, "on", ">"+configuration.Password, "~host:*", "~beast:*", "+@all").Result()
+	_, err = cache.ACLSetUser(ctx, configuration.User, "on", ">"+configuration.Password, "~beast:*", "+@all").Result()
 	if err != nil {
 		return err
 	}
