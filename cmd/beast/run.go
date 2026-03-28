@@ -79,7 +79,7 @@ func cleanupCacheConnections() {
 
 	log.Infoln("Terminating cache connection...")
 
-	err = cache.TerminateCacheConnections()
+	err = cache.Close()
 	if err != nil {
 		log.Errorln("Unable to terminate cache connections:", err)
 	} else {

@@ -82,6 +82,21 @@ func Init() {
 	}
 }
 
+func Close() error {
+	if Cache == nil {
+		log.Warnln(fmt.Sprintf("Trying to close database connection when no connection is established..."))
+		return nil
+	}
+
+	err := Cache.Close()
+	if err != nil {
+		log.Errorln(fmt.Sprintf("Error while closing cache connection gracefully: %s, attempting to terminate forcefully", err.Error()))
+		return TerminateCacheConnections()
+	}
+
+	return nil
+}
+
 func BackupAndReset() {
 	LoadCacheConfig()
 
@@ -96,7 +111,7 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", core.BEAST_REMOTES_DIR)
+	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_REMOTES_DIR)
 	err = utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
 		log.Errorf("Error while creating backup directory: %s", err)
@@ -111,7 +126,7 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, "backup", core.BEAST_STAGING_DIR)
+	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_STAGING_DIR)
 
 	err = utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
@@ -133,7 +148,7 @@ func BackupCache() error {
 		LoadCacheConfig()
 	}
 
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", "cache")
+	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_CACHE_DIR)
 	err := utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
 		log.Errorf("Error while creating backup directory: %s", err)
@@ -203,24 +218,30 @@ func TerminateCacheConnections() error {
 	if cacheConfig == (Config{}) {
 		LoadCacheConfig()
 	}
-	terminateCmd := exec.Command(
-		"redis-cli",
-		"-h", cacheConfig.RedisConfig.Host,
-		"-p", cacheConfig.RedisConfig.Port,
-		"--user", cacheConfig.RedisConfig.User,
-		"-n", strconv.Itoa(cacheConfig.RedisConfig.DB),
-		"CLIENT", "KILL", "USER", cacheConfig.RedisConfig.User,
-	)
 
-	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.RedisConfig.Password))
+	cache := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", cacheConfig.RedisConfig.Host, cacheConfig.RedisConfig.Port),
+		Username: core.REDIS_DEFAULT_USER,
+		Password: utils.PromptSecret("Enter default redis user password"),
+	})
 
-	output, err := terminateCmd.CombinedOutput()
-	outputStr := string(output)
+	_, err := cache.Ping(context.Background()).Result()
 	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", outputStr)
-		return err
+		log.Errorf("Terminate connections error: %s\n", err.Error())
 	}
-	log.Debug(outputStr)
+
+	defer cache.Close()
+
+	_, err = cache.Do(context.Background(),
+		"CLIENT", "KILL",
+		"USER", cacheConfig.RedisConfig.User,
+		"SKIPME", "yes",
+	).Result()
+
+	if err != nil {
+		log.Errorf("Terminate connections error: %s\n", err.Error())
+	}
+
 	return nil
 }
 

@@ -58,6 +58,7 @@ const ( //paths
 	BEAST_SECRETS_DIR              string = "secrets"
 	BEAST_EXAMPLE_DIR              string = "_examples"
 	BEAST_CACHE_DIR                string = "cache"
+	BEAST_BACKUP_DIR               string = "backup"
 )
 
 const ( //chall types
