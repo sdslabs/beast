@@ -77,7 +77,7 @@ const ( // chall actions
 const ( // chall env
 	MAX_PORT_PER_CHALL           uint32 = 3
 	BEAST_CHALLENGES_STATIC_PORT uint32 = 80
-	DEFAULT_BASE_IMAGE           string = "ubuntu:16.04"
+	DEFAULT_BASE_IMAGE           string = "ubuntu:24.03"
 	DEFAULT_XINETD_CONF_FILE     string = "xinetd.conf"
 	BEAST_STATIC_AUTH_FILE       string = ".static.beast.htpasswd"
 	ALLOWED_MIN_PORT_VALUE       uint32 = 10000
@@ -137,53 +137,41 @@ var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHA
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	"php": {
-		"7.1": {
-			"cli":     "php:7.1-cli",
-			"apache":  "php:7.1-apache",
-			"fpm":     "php:7.1-fpm",
-			"nginx":   "php:7.1-fpm",
-			"default": "php:7.1-cli",
-		},
-		"5.6": {
-			"cli":     "php:5.6-cli",
-			"apache":  "php:5.6-apache",
-			"fpm":     "php:5.6-fpm",
-			"nginx":   "php:5.6-fpm",
-			"default": "php:5.6-cli",
+		"8.2": {
+			"cli":     "php:8.2-cli",
+			"apache":  "php:8.2-apache",
+			"fpm":     "php:8.2-fpm",
+			"nginx":   "php:8.2-fpm",
+			"default": "php:8.2-cli",
 		},
 		"default": {
-			"default": "php:5.6-cli",
+			"default": "php:8.2-cli",
 		},
 	},
 	"node": {
-		"8": {
-			"default": "node:8-jessie",
+		"20": {
+			"default": "node:20-bookworm",
 		},
-		"10": {
-			"default": "node:10-jessie",
+		"22": {
+			"default": "node:22-bookworm",
 		},
 		"default": {
-			"default": "node:10-jessie",
+			"default": "node:20-bookworm",
 		},
 	},
 	"python": {
-		"2.7": {
-			"flask":   "python:2.7-jessie",
-			"django":  "python:2.7-jessie",
-			"default": "python:2.7-jessie",
+		"3.11": {
+			"flask":   "python:3.11-bookworm",
+			"django":  "python:3.11-bookworm",
+			"default": "python:3.11-bookworm",
 		},
-		"3.5": {
-			"flask":   "python:3.5-jessie",
-			"django":  "python:3.5-jessie",
-			"default": "python:3.5-jessie",
-		},
-		"3.6": {
-			"flask":   "python:3.6-jessie",
-			"django":  "python:3.6-jessie",
-			"default": "python:3.6-jessie",
+		"3.12": {
+			"flask":   "python:3.12-bookworm",
+			"django":  "python:3.12-bookworm",
+			"default": "python:3.12-bookworm",
 		},
 		"default": {
-			"default": "python:2.7-jessie",
+			"default": "python:3.12-bookworm",
 		},
 	},
 	"default": {
@@ -203,11 +191,10 @@ var USER_STATUS = map[string]string{
 const (
 	LEADERBOARD_SIZE       = 25
 	LEADERBOARD_GRAPH_SIZE = 12
-	SUBMISSIONS_PAGE_SIZE = 10
+	SUBMISSIONS_PAGE_SIZE  = 10
 )
 
 var NOTIFICATION_SERVICES = []string{
 	"slack",
 	"discord",
 }
-
