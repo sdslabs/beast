@@ -11,7 +11,7 @@ var (
 	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
 	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
 	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
-	BEAST_MOUNT_DIR = func() string {
+	BEAST_MOUNT_DIR      = func() string {
 		if hostDir := os.Getenv("BEAST_HOST_DIR"); hostDir != "" {
 			return hostDir
 		}
@@ -146,6 +146,13 @@ var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHA
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	"php": {
+		"8.2": {
+			"cli":     "php:8.2-cli",
+			"apache":  "php:8.2-apache",
+			"fpm":     "php:8.2-fpm",
+			"nginx":   "php:8.2-fpm",
+			"default": "php:8.2-cli",
+		},
 		"7.1": {
 			"cli":     "php:7.1-cli",
 			"apache":  "php:7.1-apache",
@@ -212,7 +219,7 @@ var USER_STATUS = map[string]string{
 const (
 	LEADERBOARD_SIZE       = 25
 	LEADERBOARD_GRAPH_SIZE = 12
-	SUBMISSIONS_PAGE_SIZE = 10
+	SUBMISSIONS_PAGE_SIZE  = 10
 )
 
 var NOTIFICATION_SERVICES = []string{
