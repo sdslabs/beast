@@ -155,7 +155,7 @@ func StopAndRemoveContainer(containerId string) error {
 }
 
 func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
-	containerName := fmt.Sprintf("beast_%s_%s", containerConfig.ChallengeName, containerConfig.ContainerName[:3])
+	containerName := containerConfig.ContainerName
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	if err != nil {

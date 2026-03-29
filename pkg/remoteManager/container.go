@@ -20,7 +20,7 @@ import (
 func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, server config.AvailableServer) (string, error) {
 	var containerName, containerEnv, exposedPorts, portMap, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings string
 	if containerConfig.ContainerName != "" {
-		containerName = fmt.Sprintf("--name %s ", containerConfig.ContainerName)
+		containerName = fmt.Sprintf("--name_%s_", containerConfig.ContainerName)
 	}
 	for _, envVar := range containerConfig.ContainerEnv {
 		containerEnv += fmt.Sprintf("--env %s ", envVar)
