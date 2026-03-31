@@ -133,6 +133,9 @@ func Close() error {
 		return nil
 	}
 
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
 	sqlDb, err := Db.DB()
 	if err != nil {
 		log.Errorln(fmt.Sprintf("Error while closing database connection gracefully: %s, attempting to terminate forcefully", err.Error()))
@@ -145,6 +148,7 @@ func Close() error {
 		return TerminateDatabaseConnections()
 	}
 
+	Db = nil
 	return nil
 }
 
