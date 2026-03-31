@@ -6,7 +6,7 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 [challenge.metadata]
 name = "web-php-mysql"
 flag = "CTF{sample_flag}"
-type = "web:php:7.1:cli"
+type = "web:php:8.2:cli"
 points = 200
 maxAttemptLimit = 10
 
