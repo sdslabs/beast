@@ -221,7 +221,8 @@ func BackupDatabase() error {
 		"c",
 		"-f",
 		filepath.Join(backupPath, backupFile),
-		dbConfig.PsqlConf.Dbname)
+		dbConfig.PsqlConf.Dbname,
+	)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
 
 	output, err := cmd.CombinedOutput()
@@ -310,7 +311,8 @@ func RestoreDatabase(backupFile string) error {
 		"--no-owner",
 		"--clean",
 		"--if-exists",
-		backupFile)
+		backupFile,
+	)
 	restoreCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
 
 	output, err := restoreCmd.CombinedOutput()
