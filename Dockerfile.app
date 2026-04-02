@@ -38,6 +38,11 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
     apt-get clean
 
 COPY --from=builder /go/bin/beast /usr/local/bin/beast
+
+COPY --from=builder /usr/bin/docker-enter /usr/local/bin/docker-enter
+COPY --from=builder /usr/bin/docker_enter /usr/local/bin/docker_enter
+COPY --from=builder /usr/bin/importenv /usr/local/bin/importenv
+
 COPY setup.sh /usr/local/bin/setup.sh
 RUN chmod +x /usr/local/bin/setup.sh
 
