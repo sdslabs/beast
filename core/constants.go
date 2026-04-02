@@ -11,6 +11,12 @@ var (
 	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
 	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
 	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
+	BEAST_MOUNT_DIR = func() string {
+		if hostDir := os.Getenv("BEAST_HOST_DIR"); hostDir != "" {
+			return hostDir
+		}
+		return BEAST_GLOBAL_DIR
+	}()
 )
 
 const ( //names
