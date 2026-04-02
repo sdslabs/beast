@@ -9,7 +9,7 @@ type HTTPPlainResp struct {
 }
 
 type HTTPPlainMapResp struct {
-	Messages map[string]string `json:"messages" example:"["name1": "message1"],["name2": "message2"]"`
+	Messages map[string]string `json:"messages" example:"{\"name1\": \"message1\", \"name2\": \"message2\"}"`
 }
 
 type HTTPErrorResp struct {
@@ -30,18 +30,13 @@ type AvailableImagesResp struct {
 type PortsInUseResp struct {
 	MinPortValue uint32   `json:"port_min_value" example:"10000"`
 	MaxPortValue uint32   `json:"port_max_value" example:"20000"`
-	PortsInUse   []uint32 `json:"ports_in_use" example:[100001, 100003, 10010]`
+	PortsInUse   []uint32 `json:"ports_in_use" example:"[100001, 100003, 10010]"`
 }
 
 type ChallengeStatusResp struct {
 	Name      string    `json:"name" example:"Web Challenge"`
 	Status    string    `json:"status" example:"deployed"`
 	UpdatedAt time.Time `json:"updated_at" example:"2018-12-31T22:20:08.948096189+05:30"`
-}
-
-type ChallengesResp struct {
-	Message    string
-	Challenges []string
 }
 
 type LogsInfoResp struct {
@@ -93,28 +88,54 @@ type ChallengeSolveResp struct {
 }
 
 type UserSolveResp struct {
-	UserID   uint      `json:"id" example:"5"`
+	Id       uint      `json:"id" example:"5"`
 	Username string    `json:"username" example:"fristonio"`
 	SolvedAt time.Time `json:"solvedAt"`
+	Flag     string    `json:"flag" example:"flag{example_flag}"`
+	Correct  bool      `json:"correct" example:"true"`
 }
 
-type ChallengeInfoResp struct {
-	Name            string          `json:"name" example:"Web Challenge"`
-	ChallId         uint            `json:"id" example:"0"`
-	Category        string          `json:"category" example:"bare"`
-	Tags            []string        `json:"tags" example:"['pwn','misc']"`
-	Assets          []string        `json:"assets" example:"['image1.png', 'zippy.zip']"`
-	AdditionalLinks []string        `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
-	CreatedAt       time.Time       `json:"createdAt"`
-	Status          string          `json:"status" example:"deployed"`
-	Ports           []uint32        `json:"ports" example:[3001, 3002]`
-	Hints           string          `json:"hints" example:"Try robots"`
-	Desc            string          `json:"description" example:"A simple web challenge"`
-	Points          uint            `json:"points" example:"50"`
-	SolvesNumber    int             `json:"solvesNumber" example:"100"`
-	Solves          []UserSolveResp `json:"solves"`
-	DynamicFlag     bool            `json:"dynamicFlag" example:"true"`
-	Flag            string          `json:"flag"`
+type HintInfo struct {
+	ID     uint `json:"id"`
+	Points uint `json:"points"`
+}
+
+type HintResponse struct {
+	Description string `json:"description" example:"This is a hint"`
+	Points      uint   `json:"points" example:"10"`
+}
+
+type ChallengeMetadata struct {
+	ChallId        uint      `json:"id" example:"0"`
+	Name           string    `json:"name" example:"Web Challenge"`
+	Tags           []string  `json:"tags" example:"['pwn','misc']"`
+	Points         uint      `json:"points" example:"50"`
+	Difficulty     string    `json:"difficulty" example:"easy"` // e.g., "easy", "medium", "hard"
+	SolvesNumber   uint16    `json:"solvesNumber" example:"100"`
+	SolveStatus    bool      `json:"solveStatus" example:"True"` // e.g., True: "solved", False: "unsolved"
+	CreatedAt      time.Time `json:"createdAt"`
+	DeployedStatus string    `json:"deployedStatus" example:"deployed"`
+	PreRequisite   []string  `json:"preRequisite" example:"['chall1', chall2]"`
+}
+
+type Challenge struct {
+	ChallengeMetadata
+
+	Description     string     `json:"description" example:"A simple web challenge"`
+	Hints           []HintInfo `json:"hints"`
+	Category        string     `json:"category" example:"web"`
+	Assets          []string   `json:"assets" example:"['image1.png', 'zippy.zip']"`
+	AdditionalLinks []string   `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
+	PreviousTries   int        `json:"previousTries" example:"3"`
+	MaxAttemptLimit int        `json:"maxAttemptLimit" example:"5"`
+	DeployedLink    string     `json:"deployedLink" example:"beast.sdslabs.co or ip:port"`
+}
+
+// ChallengeDetails is an extended struct for admin use, containing additional fields.
+type AdminChallenge struct {
+	Challenge
+	DynamicFlag bool   `json:"dynamicFlag" example:"true"`
+	Flag        string `json:"flag"`
 }
 
 type ChallengePreviewResp struct {
@@ -123,10 +144,12 @@ type ChallengePreviewResp struct {
 	Tags            []string `json:"tags" example:"['pwn','misc']"`
 	Assets          []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
 	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
-	Ports           []uint32 `json:"ports" example:[3001, 3002]`
-	Hints           []string `json:"hints" example:"Try robots"`
+	MaxAttemptLimit int      `json:"maxAttemptLimit" example:"5"`
+	PreReqs         []string `json:"preRequisite" example:"['web-php','simple']"`
+	Ports           []uint32 `json:"ports" example:"[3001, 3002]"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
+	DeployedLink    string   `json:"deployedLink" example:"beast.sdslabs.co"`
 }
 
 type SubmissionResp struct {
@@ -134,10 +157,10 @@ type SubmissionResp struct {
 	Username  string    `json:"username" example:"fristonio"`
 	ChallId   uint      `json:"chall_id" example:"3"`
 	ChallName string    `json:"name" example:"Web Challenge"`
-	Category  string    `json:"category" example:"web"`
-	Tags      []string  `json:"tags" example:"['pwn','misc']"`
-	Points    uint      `json:"points" example:"50"`
+	Flag      string    `json:"flag" example:"flag{@#$}"`
 	SolvedAt  time.Time `json:"solvedAt"`
+	Success   bool      `json:"success" example:"true"`
+	Cheating  bool      `json:"cheating" example:"false"`
 }
 
 type FlagSubmitResp struct {
@@ -163,4 +186,9 @@ type CompetitionInfoResp struct {
 
 type TagInfoResp struct {
 	Tags []string `json:"tags"`
+}
+
+// UserCountResp represents the response for contestant user count
+type UserCountResp struct {
+	UserCount int64 `json:"user_count"`
 }

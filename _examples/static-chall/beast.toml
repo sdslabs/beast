@@ -7,5 +7,19 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "static-chall"
 flag = "BACKDOOR{SAMPLE_FLAG}"
 type = "static"
-hints = ["static_hint_1", "static_hint_2"]
-tags = ["easy"]
+points=150
+
+[[challenge.metadata.hints]]
+text = "simple_hint_1"
+points = 10
+
+[[challenge.metadata.hints]]
+text = "simple_hint_2"
+points = 20
+
+maxPoints = 100
+minPoints = 50
+tags = ["easy", "web"]
+
+[challenge.env]
+static_dir = "static"

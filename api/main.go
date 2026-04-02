@@ -11,9 +11,12 @@ import (
 	_ "github.com/sdslabs/beastv4/api/docs"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/pkg/auth"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/pkg/scheduler"
+	"github.com/sdslabs/beastv4/pkg/sse"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
 )
 
@@ -62,6 +65,12 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	manager.Q.StartWorkers(&manager.Worker{})
 
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
+	remoteManager.Init()
+	database.Init()
+
+	// Initialise and start the Hub
+	// Must be started before the Notification Router, since SSE handler has access to SSE Hub
+	sse.Init()
 
 	runBeastApiBootsteps(defaultauthorpassword)
 
@@ -93,8 +102,8 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 		BeastScheduler.ScheduleEvery(config.Cfg.RemoteSyncPeriod, manager.AutoUpdate)
 	}
 
-	if healthProbe {
-		go manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
+	if healthProbe || config.Cfg.HealthProber {
+		go manager.BeastHeathCheckProber(config.Cfg.TickerFrequency)
 	}
 
 	if autoDeploy {

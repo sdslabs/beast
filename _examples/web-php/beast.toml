@@ -6,8 +6,18 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 [challenge.metadata]
 name = "web-php"
 flag = "BACKDOOR{SAMPLE_WEB_FLAG}"
-type = "web:php:7.1:cli"
-hints = ["web_hint_1", "web_hint_2"]
+type = "web:php:8.2:cli"
+maxAttemptLimit = 3
+points = 200
+
+[[challenge.metadata.hints]]
+text = "simple_hint_1"
+points = 10
+
+[[challenge.metadata.hints]]
+text = "simple_hint_2"
+points = 20
+
 
 [challenge.env]
 ports = [10002]

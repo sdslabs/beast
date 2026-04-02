@@ -3,7 +3,6 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
@@ -40,6 +39,10 @@ func DeployStaticContentContainer() error {
 	}
 
 	images, err := cr.SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", core.BEAST_STATIC_CONTAINER_NAME)})
+	if err != nil {
+		log.Errorf("Error searching for static content image: %s", err)
+		return errors.New("IMAGE_SEARCH_ERROR")
+	}
 	if len(images) == 0 {
 		log.Debugf("Static content image does not exist, build image manually")
 		return errors.New("IMAGE_NOT_FOUND_ERROR")
@@ -107,13 +110,13 @@ func UndeployStaticContentContainer() {
 func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *database.Challenge, challengeDir string) {
 	log.Infof("Starting static challenge deploy pipeline")
 	challengeStagingRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challConf.Challenge.Metadata.Name)
-	challengeStagingDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
+	// challengeStagingDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
 
 	// Check if the challenge is already in staged state
 	// Remove the already staged challenge and then copy the new files.
-	err := utils.ValidateDirExists(challengeStagingDir)
+	err := utils.ValidateDirExists(challengeStagingRoot)
 	if err == nil {
-		err = utils.RemoveDirRecursively(challengeStagingDir)
+		err = utils.RemoveDirRecursively(challengeStagingRoot)
 		if err != nil {
 			log.Errorf("Error while cleaning already staged static challenge %s : %s", challConf.Challenge.Metadata.Name, err)
 			return
@@ -126,12 +129,13 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *datab
 	} else {
 		log.Infof("Challenge %s has been deployed as a static challenge", challConf.Challenge.Metadata.Name)
 
-		database.UpdateChallenge(challenge, map[string]interface{}{"Status": core.DEPLOY_STATUS["deployed"]})
+		database.UpdateChallenge(challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deployed"]})
 
-		configFile := filepath.Join(challengeStagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
-		err = os.Rename(configFile, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))
-		if err != nil {
-			log.Errorf("Error while removing challenge config file.")
-		}
+		// configFile := filepath.Join(challengeStaticDir, core.CHALLENGE_CONFIG_FILE_NAME)
+		// err = os.Rename(configFile, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))
+		// if err != nil {
+		// 	log.Errorf("Error while removing challenge config file: %s", err)
+		// }
+
 	}
 }

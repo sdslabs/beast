@@ -52,11 +52,23 @@ func (q *Queue) Pop(ID string) {
 	q.Mux.Unlock()
 }
 
+func (q *Queue) Stop() {
+	ids := make([]string, len(q.InQueue))
+	i := 0
+	for id := range q.InQueue {
+		ids[i] = id
+		i++
+	}
+
+	for _, id := range ids {
+		q.Pop(id)
+	}
+}
+
 func (q *Queue) startConcurrentWorker(i int, worker Worker) {
-	var newTask *Task
 	for {
 		w := <-q.TaskQueue
-		newTask = worker.PerformTask(w)
+		newTask := worker.PerformTask(w)
 
 		q.Pop(w.ID)
 

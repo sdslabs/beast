@@ -162,11 +162,6 @@ func updateChallengeInfoHandler(c *gin.Context) {
 		"Name": name,
 	}
 
-	hints, exist := c.GetPostForm("hints")
-	if exist {
-		configInfo["Hints"] = hints
-	}
-
 	desc, exist := c.GetPostForm("desc")
 	if exist {
 		configInfo["Description"] = desc
@@ -205,7 +200,7 @@ func updateChallengeInfoHandler(c *gin.Context) {
 	// Update challenge
 	if e := database.UpdateChallenge(&chall, configInfo); e != nil {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Error while updating challenge info: %s", err.Error()),
+			Message: fmt.Sprintf("Error while updating challenge info: %s", e.Error()),
 		})
 		return
 	}

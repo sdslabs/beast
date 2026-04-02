@@ -2,22 +2,33 @@ package utils
 
 import (
 	"fmt"
-
+	container_types "github.com/docker/docker/api/types"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
+	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
 
 func CleanupContainerByFilter(filter, filterVal string) error {
-	if filter != "id" && filter != "name" {
+	if filter != "id" && filter != "name" && filter != "label" {
 		return fmt.Errorf("Not a valid filter %s", filter)
 	}
-
-	containers, err := cr.SearchContainerByFilter(map[string]string{filter: filterVal})
+	var containers []container_types.Container
+	var err error
+	containers, err = cr.SearchContainerByFilter(map[string]string{filter: filterVal})
 	if err != nil {
-		log.Error("Error while searching for container with %s : ", filter, filterVal)
+		log.Errorf("Error while searching for container with %s : %s", filter, filterVal)
+		return err
+	}
+	server := config.AvailableServer{}
+	remoteContainers, err := remoteManager.SearchContainerByFilterRemote(map[string]string{filter: filterVal}, server)
+	if err != nil {
+		log.Errorf("Error while searching for remote container with %s : %s", filter, filterVal)
 		return err
 	}
 
@@ -33,21 +44,49 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 		}
 	}
 
+	if len(remoteContainers) != 0 {
+		log.Infof("Cleaning up remote container with %s %s", filter, filterVal)
+		for _, container := range remoteContainers {
+			err = remoteManager.StopAndRemoveContainerRemote(container.ID, config.AvailableServer{})
+			if err != nil {
+				erroredContainers = append(erroredContainers, container.ID)
+				log.Errorf("Error while cleaning up remote container %s : %s", container.ID, err)
+			}
+		}
+	}
+
 	if len(erroredContainers) != 0 {
 		return fmt.Errorf("Error while cleaning up container : %s", erroredContainers)
 	}
-
 	return nil
 }
 
 func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChallengeConfig) error {
+	if chall.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		log.Debugf("Cleaning up Docker Compose challenge: %s", chall.Name)
+		projectName := utils.GetProjectName(chall.Name)
+
+		if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
+			downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
+			_, err := remoteManager.RunCommandOnServer(server, downCommand)
+			if err != nil {
+				log.Errorf("Error running docker compose down on remote: %v", err)
+				return err
+			}
+		}
+
+		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
+		return nil
+	}
+
 	if IsContainerIdValid(chall.ContainerId) {
 		err := CleanupContainerByFilter("id", chall.ContainerId)
 		if err != nil {
 			return err
 		}
 
-		database.UpdateChallenge(chall, map[string]interface{}{"ContainerId": GetTempContainerId(chall.Name)})
+		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
 	}
 
 	err := CleanupContainerByFilter("name", EncodeID(config.Challenge.Metadata.Name))
@@ -55,13 +94,22 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 }
 
 func CleanupChallengeImage(chall *database.Challenge) error {
-	err := cr.RemoveImage(chall.ImageId)
-	if err != nil {
-		log.Error("Error while cleaning up image with id ", chall.ImageId)
-		return err
+	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+		server := config.Cfg.AvailableServers[chall.ServerDeployed]
+		err := remoteManager.RemoveImageRemote(chall.ImageId, server)
+		if err != nil {
+			log.Errorf("Error while cleaning up image on remote %s with id %s", chall.ServerDeployed, chall.ImageId)
+			return err
+		}
+	} else {
+		err := cr.RemoveImage(chall.ImageId)
+		if err != nil {
+			log.Errorf("Error while cleaning up image with id %s", chall.ImageId)
+			return err
+		}
 	}
 
-	database.UpdateChallenge(chall, map[string]interface{}{"ImageId": GetTempImageId(chall.Name)})
+	database.UpdateChallenge(chall, map[string]any{"ImageId": GetTempImageId(chall.Name)})
 
 	return nil
 }

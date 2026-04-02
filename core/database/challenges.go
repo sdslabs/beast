@@ -8,11 +8,16 @@ import (
 	"html/template"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/araddon/dateparse"
+
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
-	_ "gorm.io/driver/sqlite"
+	log "github.com/sirupsen/logrus"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -45,8 +50,9 @@ type Challenge struct {
 	DynamicFlag     bool   `gorm:"not null;default:false"`
 	Flag            string `gorm:"type:text"`
 	Type            string `gorm:"type:varchar(64)"`
-	Sidecar         string `gorm:"type:varchar(64)"`
-	Hints           string `gorm:"type:text"`
+	Difficulty      string `gorm:"not null;default:'medium'"`
+	MaxAttemptLimit int    `gorm:"default:-1"`
+	PreReqs         string `gorm:"type:text"`
 	Assets          string `gorm:"type:text"`
 	AdditionalLinks string `gorm:"type:text"`
 	Description     string `gorm:"type:text"`
@@ -54,22 +60,65 @@ type Challenge struct {
 	ContainerId     string `gorm:"size:64;unique"`
 	ImageId         string `gorm:"size:64;unique"`
 	Status          string `gorm:"not null;default:'Undeployed'"`
+	DeploymentType  string `gorm:"not null;default:'standard_docker'"`
 	AuthorID        uint   `gorm:"not null"`
 	HealthCheck     uint   `gorm:"not null;default:1"`
 	Points          uint   `gorm:"default:0"`
 	MaxPoints       uint   `gorm:"default:0"`
 	MinPoints       uint   `gorm:"default:0"`
 	Ports           []Port
-	Tags            []*Tag  `gorm:"many2many:tag_challenges;"`
+	Tags            []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Users           []*User `gorm:"many2many:user_challenges;"`
+	ServerDeployed  string  `gorm:"type:varchar(64)"`
 }
 
 type UserChallenges struct {
-	CreatedAt   time.Time
-	UserID      uint
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	User      User `gorm:"foreignKey:UserID"`
+	UserID    uint
+
+	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
 	ChallengeID uint
-	Flag        string
+	Tries       uint   `gorm:"not null;default:0"`
+	Solved      bool   `gorm:"not null;default:false;index"`
+	Flag        string `gorm:"type:text"`
+	Cheating    bool   `gorm:"not null;default:false"`
 }
+
+type ChallengeAttempt struct {
+	Id          uint      `json:"id"`
+	UserId      uint      `json:"userId"`
+	ChallengeID uint      `json:"challengeId"`
+	Username    string    `json:"username"`
+	SolvedAt    time.Time `json:"solvedAt"`
+	Flag        string    `json:"flag"`
+	Correct     bool      `json:"correct"`
+	Cheating    bool      `json:"cheating"`
+}
+type UserLeaderboardResp struct {
+	Id             uint         `json:"id" example:"5"`
+	Username       string       `json:"username" example:"ABCD"`
+	Score          uint         `json:"score" example:"750"`
+	Rank           int64        `json:"rank" example:"15"`
+	TimeSeriesdata []TimeSeries `json:"timeSeriesData"`
+}
+type TimeSeries struct {
+	Timestamp time.Time `json:"timestamp" example:"2018-12-31T22:20:08"`
+	Score     uint      `json:"score" example:"750"`
+}
+
+type TimeAggBucket int
+
+const (
+	LessThan10Min TimeAggBucket = iota
+	Between10And100Min
+	Between100MinAnd12Hr
+	Between12HrAnd24Hr
+	Between1DayAnd1Month
+	Between1MonthAnd1Year
+	MoreThan1Year
+)
 
 // The `DynamicFlags` table has the following columns
 // name
@@ -94,7 +143,7 @@ func CreateChallengeEntry(challenge *Challenge) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction", tx.Error)
+		return fmt.Errorf("error while starting transaction %w", tx.Error)
 	}
 
 	if err := tx.FirstOrCreate(challenge, *challenge).Error; err != nil {
@@ -121,6 +170,23 @@ func QueryAllChallenges() ([]Challenge, error) {
 	return challenges, tx.Error
 }
 
+func QueryAllChallengesMetadata() ([]Challenge, error) {
+	var challenges []Challenge
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Select("id", "name", "created_at", "points", "difficulty").
+		Preload("Tags").
+		Find(&challenges)
+
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	return challenges, tx.Error
+}
+
 // Queries all the challenges entries where the column represented by key
 // have the value in value.
 func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
@@ -132,6 +198,32 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Preload("Tags").Preload("Ports").Where(queryKey, value).Find(&challenges)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	if tx.Error != nil {
+		return challenges, tx.Error
+	}
+
+	return challenges, nil
+}
+
+// QueryChallengeEntriesMetadata returns only selected columns: Name, ID, Tags, CreatedAt, Points, Difficulty
+func QueryChallengeEntriesMetadata(key string, value string) ([]Challenge, error) {
+	queryKey := fmt.Sprintf("%s = ?", key)
+
+	var challenges []Challenge
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	// Only select the required columns, but preload Tags for tag names
+	tx := Db.Select("id", "name", "created_at", "points", "difficulty").
+		Preload("Tags").
+		Where(queryKey, value).
+		Find(&challenges)
+
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -178,6 +270,76 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 	return challenges[0], nil
 }
 
+// Check Pre Reqs Status
+func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
+	// Split the PreReqs field to get the list of prerequisite challenge names
+	preReqChallengeNames := strings.Split(challenge.PreReqs, core.DELIMITER)
+
+	// Check if all prerequisite challenges are solved
+	for _, preReq := range preReqChallengeNames {
+		var preReqChallenge Challenge
+		err := Db.Where("name = ?", preReq).First(&preReqChallenge).Error
+		if err != nil {
+			return false, err
+		}
+
+		var userChallenge UserChallenges
+		err = Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userID, preReqChallenge.ID, true).First(&userChallenge).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+
+	return true, nil
+}
+
+// Get User Related Challenges
+func GetUserPreviousTries(userID uint, challengeID uint) (int, error) {
+	var userChallenges UserChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Return true  if no record is found
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	return int(userChallenges.Tries), nil
+}
+
+func UpdateUserChallengeTries(userID uint, challengeID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	var userChallenges UserChallenges
+	err := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).First(&userChallenges).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Create a new record if not found
+			userChallenges = UserChallenges{
+				UserID:      userID,
+				ChallengeID: challengeID,
+				Tries:       1,
+				Solved:      false,
+			}
+			return Db.Create(&userChallenges).Error
+		}
+		return err
+	}
+
+	updates := map[string]interface{}{
+		"tries":      userChallenges.Tries + 1,
+	}
+
+	tx := Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
+
+	return tx.Error
+}
+
 // Update an entry for the challenge in the Challenge table
 func UpdateChallenge(chall *Challenge, m map[string]interface{}) error {
 
@@ -201,7 +363,7 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 
 	tx := Db.Where(whereMap).First(&challenge)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return fmt.Errorf("No challenge entry to update : WhereClause : %s", whereMap)
+		return fmt.Errorf("no challenge entry to update : WhereClause : %s", whereMap)
 	}
 
 	if tx.Error != nil {
@@ -235,11 +397,47 @@ func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(challenge).Association("Users").Find(&users); err != nil {
+	// Query users who have solved this challenge by checking the user_challenges table
+	if err := Db.Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
+		Where("user_challenges.challenge_id = ? AND user_challenges.solved = ?", challenge.ID, true).
+		Find(&users).Error; err != nil {
 		return users, err
 	}
 
 	return users, nil
+}
+
+// Function fetches total number of solves for a challenge and
+// Did the user solve this challenge
+func GetChallengeSolveInfo(challengeID uint, userID uint) (uint16, bool, error) {
+	type result struct {
+		TotalSolves int64
+		UserSolved  bool
+	}
+	var res result
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	err := Db.Raw(`
+		SELECT 
+			COUNT(*) FILTER (WHERE uc.solved = true) AS total_solves,
+			EXISTS (
+				SELECT 1
+				FROM user_challenges uc2
+				JOIN users u2 ON u2.id = uc2.user_id
+				WHERE uc2.challenge_id = ? AND uc2.user_id = ? AND uc2.solved = true AND u2.role = 'contestant'
+			) AS user_solved
+		FROM user_challenges uc
+		JOIN users u ON u.id = uc.user_id
+		WHERE uc.challenge_id = ? AND u.role = 'contestant'
+	`, challengeID, userID, challengeID).Scan(&res).Error
+
+	if err != nil {
+		return 0, false, err
+	}
+
+	return uint16(res.TotalSolves), res.UserSolved, nil
 }
 
 func DeleteChallengeEntry(challenge *Challenge) error {
@@ -249,7 +447,7 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 	tx := Db.Begin()
 
 	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
+		return fmt.Errorf("error while starting transaction : %s", tx.Error)
 	}
 
 	if err := tx.Unscoped().Delete(challenge).Error; err != nil {
@@ -268,6 +466,28 @@ func QueryAllSubmissions() ([]UserChallenges, error) {
 	defer DBMux.Unlock()
 
 	tx := Db.Find(&userChallenges)
+
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	return userChallenges, tx.Error
+}
+
+func QuerySubmissionsWithPagination(limit, offset int) ([]UserChallenges, error) {
+	var userChallenges []UserChallenges
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Table("user_challenges").
+		Select("user_challenges.*").
+		Joins("JOIN users ON users.id = user_challenges.user_id").
+		Where("users.role = ?", "contestant").
+		Order("user_challenges.created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&userChallenges)
 
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -366,7 +586,7 @@ func updateScript(user *User) error {
 	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
 	challs, err := GetRelatedChallenges(user)
 	if err != nil {
-		return fmt.Errorf("Error while getting related challenges : %v", err)
+		return fmt.Errorf("error while getting related challenges : %v", err)
 	}
 
 	mapOfChall := make(map[string]string)
@@ -383,12 +603,12 @@ func updateScript(user *User) error {
 	var script bytes.Buffer
 	scriptTemplate, err := template.New("script").Parse(tools.SSH_LOGIN_SCRIPT_TEMPLATE)
 	if err != nil {
-		return fmt.Errorf("Error while parsing script template :: %s", err)
+		return fmt.Errorf("error while parsing script template :: %s", err)
 	}
 
 	err = scriptTemplate.Execute(&script, data)
 	if err != nil {
-		return fmt.Errorf("Error while executing script template :: %s", err)
+		return fmt.Errorf("error while executing script template :: %s", err)
 	}
 
 	return ioutil.WriteFile(scriptPath, script.Bytes(), 0755)
@@ -427,4 +647,284 @@ func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, er
 	}
 
 	return dynamicFlags, tx.Error
+}
+
+func DeleteDynamicFlagsByChallengeName(name string) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	return Db.Unscoped().Where("name = ?", name).Delete(&DynamicFlag{}).Error
+}
+
+func SubtractScoreFromSolvers(challengeID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("error while starting transaction: %v", tx.Error)
+	}
+
+	var challenge Challenge
+	if err := tx.Where("id = ?", challengeID).First(&challenge).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error fetching challenge: %v", err)
+	}
+
+	pointsToSubtract := challenge.Points
+
+	var solvers []UserChallenges
+	if err := tx.Where("challenge_id = ? AND solved = ?", challengeID, true).Find(&solvers).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error fetching solvers: %v", err)
+	}
+
+	for _, solver := range solvers {
+		if err := tx.Model(&User{}).Where("id = ?", solver.UserID).
+			UpdateColumn("score", gorm.Expr("CASE WHEN score - ? < 0 THEN 0 ELSE score - ? END", pointsToSubtract, pointsToSubtract)).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("error updating score for user %d: %v", solver.UserID, err)
+		}
+	}
+
+	return tx.Commit().Error
+}
+
+func DeleteAllUserChallenges(challengeID uint) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("error while starting transaction: %v", tx.Error)
+	}
+
+	if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserChallenges{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting user challenge entries: %v", err)
+	}
+
+	return tx.Commit().Error
+}
+
+// QueryChallAttempts queries all attempts for a given challenge ID
+func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
+	var attempts []ChallengeAttempt
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	err := Db.Table("user_challenges").
+		Select("user_challenges.id as id, user_challenges.user_id as user_id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct, user_challenges.cheating as cheating").
+		Joins("JOIN users ON users.id = user_challenges.user_id").
+		Where("user_challenges.challenge_id = ?", chall_id).
+		Order("user_challenges.created_at ASC").
+		Scan(&attempts).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return attempts, nil
+}
+
+// QueryUserAttempts queries all attempts for a given user ID
+func QueryUserAttempts(user_id uint) ([]ChallengeAttempt, error) {
+	var attempts []ChallengeAttempt
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	err := Db.Table("user_challenges").
+		Select("user_challenges.id as id, user_challenges.user_id as user_id, user_challenges.challenge_id as challenge_id, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct, user_challenges.cheating as cheating").
+		Where("user_challenges.user_id = ?", user_id).
+		Order("user_challenges.created_at ASC").
+		Scan(&attempts).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return attempts, nil
+}
+
+// timeElapsed returns the aggregation bucket for the given duration
+func timeElapsed() TimeAggBucket {
+	startStr := config.Cfg.CompetitionInfo.StartingTime
+	// The format is "16:31:23 UTC: +05:30, 03 February 2025, Monday"
+	// We'll parse only the part up to the date, ignoring the weekday
+	// e.g. "16:31:23 UTC: +05:30, 03 February 2025"
+	parts := strings.Split(startStr, ",")
+	if len(parts) < 2 {
+		log.Errorf("invalid StartingTime format: %s", startStr)
+		return Between1MonthAnd1Year
+	}
+	startTimePart := strings.TrimSpace(parts[0])
+	startDatePart := strings.TrimSpace(parts[1])
+	startParseStr := startTimePart + ", " + startDatePart
+	start, err := dateparse.ParseLocal(startParseStr)
+	if err != nil {
+		log.Errorf("failed to parse StartingTime: %v", err)
+		return Between1MonthAnd1Year
+	}
+	end := time.Now()
+	diff := end.Sub(start)
+	minutes := diff.Minutes()
+	hours := diff.Hours()
+	days := hours / 24
+	months := days / 30
+
+	switch {
+	case minutes < 10:
+		return LessThan10Min
+	case minutes < 100:
+		return Between10And100Min
+	case hours < 12:
+		return Between100MinAnd12Hr
+	case hours < 24:
+		return Between12HrAnd24Hr
+	case days < 30:
+		return Between1DayAnd1Month
+	case months < 12:
+		return Between1MonthAnd1Year
+	default:
+		return MoreThan1Year
+	}
+}
+
+// aggregateTimeSeries aggregates the time series data based on the bucket
+func aggregateTimeSeries(ts []TimeSeries, bucket TimeAggBucket) []TimeSeries {
+	if len(ts) <= 10 {
+		return ts
+	}
+
+	var interval time.Duration
+	switch bucket {
+	case LessThan10Min:
+		return ts
+	case Between10And100Min:
+		interval = 10 * time.Minute
+	case Between100MinAnd12Hr:
+		interval = 1 * time.Hour
+	case Between12HrAnd24Hr:
+		interval = 2 * time.Hour
+	case Between1DayAnd1Month:
+		interval = 72 * time.Hour // 3 days
+	case Between1MonthAnd1Year:
+		interval = 30 * 24 * time.Hour // 1 month
+	case MoreThan1Year:
+		interval = 365 * 24 * time.Hour // 1 year
+	default:
+		return ts
+	}
+
+	var agg []TimeSeries
+	var lastAdded time.Time
+	for i, point := range ts {
+		if i == 0 {
+			agg = append(agg, point)
+			lastAdded = point.Timestamp
+			continue
+		}
+		if point.Timestamp.Sub(lastAdded) >= interval {
+			agg = append(agg, point)
+			lastAdded = point.Timestamp
+		}
+	}
+
+	if len(agg) == 0 || !agg[len(agg)-1].Timestamp.Equal(ts[len(ts)-1].Timestamp) {
+		agg = append(agg, ts[len(ts)-1])
+	}
+	return agg
+}
+
+/*
+QueryTimeSeriesForTopUsers returns a slice of UserLeaderboardResp for the given list of user IDs,
+containing each user's cumulative score time series data.
+
+Time Buckets:
+- The function uses time buckets to aggregate time series data for each user, reducing the number of data points for visualization.
+- The time buckets are determined by the timeElapsed() function, which calculates the elapsed time since the competition started and selects a bucket:
+  - LessThan10Min: No aggregation, all points shown.
+  - Between10And100Min: 10-minute intervals.
+  - Between100MinAnd12Hr: 1-hour intervals.
+  - Between12HrAnd24Hr: 2-hour intervals.
+  - Between1DayAnd1Month: 3-day intervals.
+  - Between1MonthAnd1Year: 1-month intervals.
+  - MoreThan1Year: 1-year intervals.
+
+This approach ensures that the returned time series is concise and suitable for plotting, while still reflecting the user's progress over time.
+*/
+func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
+	var results []UserLeaderboardResp
+
+	if len(topUserId) == 0 {
+		return results
+	}
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	type userChallengeRow struct {
+		UserID    uint
+		Username  string
+		CreatedAt time.Time
+		Points    uint
+	}
+	var allRows []userChallengeRow
+
+	if err := Db.Table("user_challenges").
+		Select("user_challenges.user_id, users.username, user_challenges.created_at, challenges.points").
+		Joins("JOIN challenges ON user_challenges.challenge_id = challenges.id").
+		Joins("JOIN users ON user_challenges.user_id = users.id").
+		Where("user_challenges.user_id IN ? AND user_challenges.solved = ?", topUserId, true).
+		Order("user_challenges.user_id ASC, user_challenges.created_at ASC").
+		Scan(&allRows).Error; err != nil {
+		return results
+	}
+
+	userRows := make(map[uint][]userChallengeRow)
+	userMap := make(map[uint]string)
+	for _, row := range allRows {
+		userRows[row.UserID] = append(userRows[row.UserID], row)
+		userMap[row.UserID] = row.Username
+	}
+
+	for _, userId := range topUserId {
+		rows := userRows[userId]
+		username, ok := userMap[userId]
+		if !ok {
+			continue
+		}
+
+		var timeSeriesRaw []TimeSeries
+		var cumulativeScore uint = 0
+		for _, r := range rows {
+			cumulativeScore += r.Points
+			timeSeriesRaw = append(timeSeriesRaw, TimeSeries{
+				Timestamp: r.CreatedAt,
+				Score:     cumulativeScore,
+			})
+		}
+
+		var timeSeries []TimeSeries
+		if len(timeSeriesRaw) <= 10 {
+			timeSeries = timeSeriesRaw
+		} else if len(timeSeriesRaw) > 0 {
+			bucket := timeElapsed()
+			timeSeries = aggregateTimeSeries(timeSeriesRaw, bucket)
+		}
+
+		var rank int64 = 0
+
+		results = append(results, UserLeaderboardResp{
+			Id:             userId,
+			Username:       username,
+			Score:          cumulativeScore,
+			Rank:           rank,
+			TimeSeriesdata: timeSeries,
+		})
+	}
+
+	return results
 }

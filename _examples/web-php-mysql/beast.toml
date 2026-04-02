@@ -6,9 +6,18 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 [challenge.metadata]
 name = "web-php-mysql"
 flag = "CTF{sample_flag}"
-type = "web:php:7.1:cli"
-sidecar = "mysql"
-hints = ["web-php-mysql_hint_1", "web-php-mysql_hint_2"]
+type = "web:php:8.2:cli"
+points = 200
+maxAttemptLimit = 10
+
+[[challenge.metadata.hints]]
+text = "simple_hint_1"
+points = 10
+
+[[challenge.metadata.hints]]
+text = "simple_hint_2"
+points = 20
+
 
 [challenge.env]
 apt_deps = ["gcc", "php*-mysql"]

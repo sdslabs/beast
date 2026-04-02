@@ -25,7 +25,7 @@ else
         echo -e '\e[93mCould not find example.config.toml'
         echo -e 'Downloading example.config.toml'
         wget https://raw.githubusercontent.com/sdslabs/beast/master/_examples/example.config.toml
-        mv ./example.config.toml $BEAST_GLOBAL_CONFIG
+        cp ./example.config.toml $BEAST_GLOBAL_CONFIG
         exit
     fi
     sed -i "s/vsts/$USER/g" $BEAST_GLOBAL_CONFIG

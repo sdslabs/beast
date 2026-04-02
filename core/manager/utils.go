@@ -4,15 +4,16 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/sdslabs/beastv4/pkg/auth"
 	"io"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/sdslabs/beastv4/pkg/auth"
+	"github.com/sdslabs/beastv4/pkg/remoteManager"
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -35,6 +36,7 @@ type BeastBareDockerfile struct {
 	EnvironmentVariables map[string]string
 	MountVolume          string
 	XinetdService        bool
+	XinetdConf           string
 	RunRoot              bool
 	Entrypoint           string
 	SetupCommand         string
@@ -51,7 +53,6 @@ type ChallengePreview struct {
 	Category        string
 	Tags            []string
 	Ports           []database.Port
-	Hints           string
 	Assets          []string
 	AdditionalLinks []string
 	Desc            string
@@ -80,7 +81,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 
 	challengeName := filepath.Base(challengeDir)
 	if challengeName != config.Challenge.Metadata.Name {
-		return fmt.Errorf("Name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
+		return fmt.Errorf("name of the challenge directory(%s) should match the name provided in the config file(%s)", challengeName, config.Challenge.Metadata.Name)
 	}
 
 	// log.Debugf("Parsed config file is : %s", config)
@@ -116,7 +117,7 @@ func ValidateChallengeDir(challengeDir string) error {
 func getContextDirPath(dirPath string) (string, error) {
 	absContextDir, err := filepath.Abs(dirPath)
 	if err != nil {
-		return "", fmt.Errorf("Unable to get absolute context directory of given context directory %q: %v", dirPath, err)
+		return "", fmt.Errorf("unable to get absolute context directory of given context directory %q: %v", dirPath, err)
 	}
 
 	err = utils.ValidateDirExists(absContextDir)
@@ -197,12 +198,15 @@ func getCommandAndModifierForWebChall(language, framework, webRoot, port string)
 }
 
 // This function provides the run command and image for a particular type of web challenge
-//  * webRoot:  relative path to web challenge directory
-//  * port:     web port
-//  * challengeInfo
 //
-//  It returns the run command for challenge
-//  and the docker base image corresponding to language
+//   - webRoot:  relative path to web challenge directory
+//
+//   - port:     web port
+//
+//   - challengeInfo
+//
+//     It returns the run command for challenge
+//     and the docker base image corresponding to language
 func GetWebChallSetup(webRoot, port string, challengeInfo []string) (string, string, func(*BeastBareDockerfile)) {
 	length := len(challengeInfo)
 	reqLength := 4
@@ -242,6 +246,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	setupScripts := config.Challenge.Env.SetupScripts
 	aptDeps := strings.Join(config.Challenge.Env.AptDeps[:], " ")
 	var xinetdService bool = false
+	xinetdConf := core.DEFAULT_XINETD_CONF_FILE
 	var executables []string
 	modifier := emptyFunction
 
@@ -285,6 +290,7 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 		RunCmd:               runCmd,
 		MountVolume:          filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir),
 		XinetdService:        xinetdService,
+		XinetdConf:           xinetdConf,
 		RunRoot:              xinetdService,
 		Executables:          executables,
 		Entrypoint:           entrypoint,
@@ -297,13 +303,13 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	log.Debugf("Preparing dockerfile template")
 	dockerfileTemplate, err := template.New("dockerfile").Parse(tools.BEAST_DOCKERFILE_TEMPLATE)
 	if err != nil {
-		return "", fmt.Errorf("Error while parsing Dockerfile template :: %s", err)
+		return "", fmt.Errorf("error while parsing Dockerfile template :: %s", err)
 	}
 
 	log.Debugf("Executing dockerfile template with challenge config")
 	err = dockerfileTemplate.Execute(&dockerfile, data)
 	if err != nil {
-		return "", fmt.Errorf("Error while executing Dockerfile template :: %s", err)
+		return "", fmt.Errorf("error while executing Dockerfile template :: %s", err)
 	}
 
 	log.Debugf("Dockerfile generated for the challenge")
@@ -321,7 +327,7 @@ func GenerateChallengeDockerfileCtx(config *cfg.BeastChallengeConfig) (string, e
 	log.Debug("Generating challenge dockerfile context from config")
 	file, err := ioutil.TempFile("", "Dockerfile.*")
 	if err != nil {
-		return "", fmt.Errorf("Error while creating a tempfile for Dockerfile :: %s", err)
+		return "", fmt.Errorf("error while creating a tempfile for Dockerfile :: %s", err)
 	}
 	defer file.Close()
 
@@ -332,7 +338,7 @@ func GenerateChallengeDockerfileCtx(config *cfg.BeastChallengeConfig) (string, e
 
 	_, err = file.WriteString(dockerfile)
 	if err != nil {
-		return "", fmt.Errorf("Error while writing Dockerfile to file :: %s", err)
+		return "", fmt.Errorf("error while writing Dockerfile to file :: %s", err)
 	}
 
 	log.Debugf("Generated dockerfile lives in : %s", file.Name())
@@ -346,38 +352,40 @@ func appendAdditionalFileContexts(additionalCtx map[string]string, config *cfg.B
 	// If the challenge type is service, we need to add xinetd configuration to the
 	// docker directory context.
 	if config.Challenge.Metadata.Type == core.SERVICE_CHALLENGE_TYPE_NAME {
-		log.Debug("Challenge type is service, trying to embed xinetd configuration.")
-		file, err := ioutil.TempFile("", "xinetd.conf.*")
-		if err != nil {
-			return fmt.Errorf("Error while creating a tempfile for xinetdconf :: %s", err)
-		}
-		defer file.Close()
+		if additionalCtx[core.DEFAULT_XINETD_CONF_FILE] == "" {
+			log.Debug("Challenge type is service, trying to embed xinetd configuration.")
+			file, err := ioutil.TempFile("", "xinetd.conf.*")
+			if err != nil {
+				return fmt.Errorf("error while creating a tempfile for xinetdconf :: %s", err)
+			}
+			defer file.Close()
 
-		var xinetd bytes.Buffer
-		xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
-		if err != nil {
-			return fmt.Errorf("Error while parsing Xinetd config template :: %s", err)
-		}
+			var xinetd bytes.Buffer
+			xinetdTemplate, err := template.New("xinetd").Parse(tools.XINETD_CONFIGURATION_TEMPLATE)
+			if err != nil {
+				return fmt.Errorf("error while parsing Xinetd config template :: %s", err)
+			}
 
-		port := config.Challenge.Env.GetDefaultPort()
+			port := config.Challenge.Env.GetDefaultPort()
 
-		data := BeastXinetdConf{
-			Port:        fmt.Sprintf("%d", port),
-			ServiceName: config.Challenge.Metadata.Name,
-			ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
-		}
-		err = xinetdTemplate.Execute(&xinetd, data)
-		if err != nil {
-			return fmt.Errorf("Error while executing Xinetd Config template :: %s", err)
-		}
+			data := BeastXinetdConf{
+				Port:        fmt.Sprintf("%d", port),
+				ServiceName: config.Challenge.Metadata.Name,
+				ServicePath: filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, config.Challenge.Env.ServicePath),
+			}
+			err = xinetdTemplate.Execute(&xinetd, data)
+			if err != nil {
+				return fmt.Errorf("error while executing Xinetd Config template :: %s", err)
+			}
 
-		_, err = file.WriteString(xinetd.String())
-		if err != nil {
-			return fmt.Errorf("Error while writing xinetd config to file :: %s", err)
-		}
+			_, err = file.WriteString(xinetd.String())
+			if err != nil {
+				return fmt.Errorf("error while writing xinetd config to file :: %s", err)
+			}
 
-		log.Debugf("Successfully added xinetd config context in docker context.")
-		additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = file.Name()
+			log.Debugf("Successfully added xinetd config context in docker context.")
+			additionalCtx[core.DEFAULT_XINETD_CONF_FILE] = file.Name()
+		}
 	}
 
 	return nil
@@ -415,7 +423,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		// in the challenge table using the config file.
 		userEntry, err := database.QueryFirstUserEntry("email", config.Author.Email)
 		if err != nil {
-			return fmt.Errorf("Error while querying user with email %s", config.Author.Email)
+			return fmt.Errorf("error while querying user with email %s", config.Author.Email)
 		}
 
 		tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
@@ -425,7 +433,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				TagName: tag,
 			}
 			if err = database.QueryOrCreateTagEntry(tags[i]); err != nil {
-				return fmt.Errorf("Error while querying the tags for challenge(%s) : %v", config.Challenge.Metadata.Name, err)
+				return fmt.Errorf("error while querying the tags for challenge(%s) : %v", config.Challenge.Metadata.Name, err)
 			}
 		}
 
@@ -434,15 +442,15 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		for i, user := range config.Maintainers {
 			u, err := database.QueryFirstUserEntry("email", user.Email)
 			if err != nil {
-				return fmt.Errorf("Error while querying user with email %s", user.Email)
+				return fmt.Errorf("error while querying user with email %s", user.Email)
 			}
 			users[i] = &u
 		}
 
 		if userEntry.Email == "" {
-			if defaultauthorpassword == "" {
-				return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
-			}
+			// if defaultauthorpassword == "" {
+			// 	return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
+			// }
 			log.Infof("User with the given email does not exist : %v, creating this user", config.Author.Email)
 			newUser := database.User{
 				Name:      config.Author.Name,
@@ -455,7 +463,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
-			return nil
+			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
 				(userEntry.SshKey != config.Author.SSHKey || config.Author.SSHKey == "") &&
@@ -467,13 +475,8 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		users[len(config.Maintainers)] = &userEntry
 
-		var assetsURL = make([]string, len(config.Challenge.Metadata.Assets))
-
-		for index, asset := range config.Challenge.Metadata.Assets {
-			beastStaticAssetUrl, _ := url.Parse(cfg.Cfg.BeastStaticUrl)
-			beastStaticAssetUrl.Path = path.Join(beastStaticAssetUrl.Path, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER, asset)
-			assetsURL[index] = beastStaticAssetUrl.String()
-		}
+		assetsURL := make([]string, len(config.Challenge.Metadata.Assets))
+		copy(assetsURL, config.Challenge.Metadata.Assets)
 		if config.Challenge.Metadata.MaxPoints > 0 {
 			log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
 			config.Challenge.Metadata.Points = config.Challenge.Metadata.MaxPoints
@@ -485,28 +488,60 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
 			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
 		}
+		availableServerHostname := core.LOCALHOST
+		if config.Challenge.Metadata.Type != core.STATIC_CHALLENGE_TYPE_NAME {
+			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
+			availableServerHostname = availableServer.Host
+		}
+		if config.Challenge.Metadata.Difficulty == "" {
+			log.Debug("Setting difficulty to default(medium)")
+			config.Challenge.Metadata.Difficulty = "medium"
+		}
+
+		deploymentType := core.DEPLOYMENT_TYPES["standard_docker"]
+		if config.Challenge.Env.DockerCompose != "" {
+			deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
+		}
+
 		*challEntry = database.Challenge{
-			Name:        config.Challenge.Metadata.Name,
-			AuthorID:    userEntry.ID,
-			Format:      config.Challenge.Metadata.Type,
-			Status:      core.DEPLOY_STATUS["undeployed"],
-			ContainerId: coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
-			ImageId:     coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
-			DynamicFlag: config.Challenge.Metadata.DynamicFlag,
-			Flag:        config.Challenge.Metadata.Flag,
-			Type:        config.Challenge.Metadata.Type,
-			Sidecar:     config.Challenge.Metadata.Sidecar,
-			Description: config.Challenge.Metadata.Description,
-			Hints:       strings.Join(config.Challenge.Metadata.Hints, core.DELIMITER),
-			Assets:      strings.Join(assetsURL, core.DELIMITER),
-			Points:      config.Challenge.Metadata.Points,
-			MinPoints:   config.Challenge.Metadata.MinPoints,
-			MaxPoints:   config.Challenge.Metadata.MaxPoints,
+			Name:            config.Challenge.Metadata.Name,
+			AuthorID:        userEntry.ID,
+			Format:          config.Challenge.Metadata.Type,
+			Status:          core.DEPLOY_STATUS["undeployed"],
+			ContainerId:     coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
+			ImageId:         coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
+			MaxAttemptLimit: config.Challenge.Metadata.MaxAttemptLimit,
+			PreReqs:         strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
+			DynamicFlag:     config.Challenge.Metadata.DynamicFlag,
+			Flag:            config.Challenge.Metadata.Flag,
+			Type:            config.Challenge.Metadata.Type,
+			Description:     config.Challenge.Metadata.Description,
+			Assets:          strings.Join(assetsURL, core.DELIMITER),
+			AdditionalLinks: strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),
+			Points:          config.Challenge.Metadata.Points,
+			MinPoints:       config.Challenge.Metadata.MinPoints,
+			MaxPoints:       config.Challenge.Metadata.MaxPoints,
+			Difficulty:      config.Challenge.Metadata.Difficulty,
+			ServerDeployed:  availableServerHostname,
+			DeploymentType:  deploymentType,
 		}
 
 		err = database.CreateChallengeEntry(challEntry)
 		if err != nil {
-			return fmt.Errorf("Error while creating chall entry with config : %s : %v", err, challEntry)
+			return fmt.Errorf("error while creating chall entry with config : %s : %v", err, challEntry)
+		}
+
+		for _, hint := range config.Challenge.Metadata.Hints {
+			hintEntry := database.Hint{
+				ChallengeID: challEntry.ID,
+				Points:      hint.Points,
+				Description: hint.Text,
+			}
+
+			err := database.CreateHintEntry(&hintEntry)
+			if err != nil {
+				return fmt.Errorf("error while creating hint entry: %v", err)
+			}
 		}
 
 		database.Db.Model(challEntry).Association("Tags").Append(tags)
@@ -516,7 +551,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
 	if err != nil {
-		return fmt.Errorf("Error while getting allocated ports for : %s : %s", challEntry.Name, err)
+		return fmt.Errorf("error while getting allocated ports for : %s : %s", challEntry.Name, err)
 	}
 
 	isAllocated := func(port uint32) bool {
@@ -533,7 +568,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 	hostPorts, err := config.Challenge.Env.GetAllHostPorts()
 	if err != nil {
-		return fmt.Errorf("Error while parsing host port for challenge %s : %s", challEntry.Name, err)
+		return fmt.Errorf("error while parsing host port for challenge %s : %s", challEntry.Name, err)
 	}
 	// Once the challenge entry has been created, add entries to the ports
 	// table in the database with the ports to expose
@@ -561,25 +596,25 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		// database.Db.Model(&gotPort).Related(&gotChall)
 
 		if gotPort.ChallengeID != challEntry.ID {
-			return fmt.Errorf("The port %s requested is already in use by another challenge", gotPort.PortNo)
+			return fmt.Errorf("the port %d requested is already in use by another challenge", gotPort.PortNo)
 		}
 	}
 
 	if len(allocatedPorts) > 0 {
 		if err = database.DeleteRelatedPorts(allocatedPorts); err != nil {
-			return fmt.Errorf("There was an error while deleting the ports which were already allocated to the challenge : %s : %s", challEntry.Name, err)
+			return fmt.Errorf("there was an error while deleting the ports which were already allocated to the challenge : %s : %s", challEntry.Name, err)
 		}
 	}
 
 	return nil
 }
 
-//Provides the Static Content Folder Name from the config
+// Provides the Static Content Folder Name from the config
 func GetStaticContentDir(configFile, contextDir string) (string, error) {
 	var config cfg.BeastChallengeConfig
 	_, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
-		return "", fmt.Errorf("Error while decoding file : %s", configFile)
+		return "", fmt.Errorf("error while decoding file : %s", configFile)
 	}
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
@@ -588,13 +623,13 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 	return filepath.Join(contextDir, relativeStaticContentDir), nil
 }
 
-//Takes and save the data to transaction table
+// Takes and save the data to transaction table
 func LogTransaction(identifier string, action string, authorization string) error {
 	log.Debugf("Logging transaction for %s on %s", action, identifier)
 
 	challenge, err := database.QueryFirstChallengeEntry("name", identifier)
 	if err != nil {
-		return fmt.Errorf("Error while querying challenge: %s", identifier)
+		return fmt.Errorf("error while querying challenge: %s", identifier)
 	}
 
 	// We are trying to get the username for the request from JWT claims here
@@ -608,7 +643,7 @@ func LogTransaction(identifier string, action string, authorization string) erro
 
 	user, err := database.QueryFirstUserEntry("username", userName)
 	if err != nil {
-		return fmt.Errorf("Error while querying user corresponding to request: %s", err)
+		return fmt.Errorf("error while querying user corresponding to request: %s", err)
 	}
 
 	TransactionEntry := database.Transaction{
@@ -622,12 +657,12 @@ func LogTransaction(identifier string, action string, authorization string) erro
 	return err
 }
 
-//Copies the Static content to the staging/static/folder
+// Copies the Static content to the staging/static/folder
 func CopyToStaticContent(challengeName, staticContentDir string) error {
 	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
 	err := utils.CreateIfNotExistDir(dirPath)
 	if err != nil {
-		return fmt.Errorf("Error while copying static content : %v", err)
+		return fmt.Errorf("error while copying static content : %v", err)
 	}
 
 	err = utils.ValidateDirExists(staticContentDir)
@@ -644,7 +679,7 @@ func GetAvailableChallenges() ([]string, error) {
 	var challsNameList []string
 
 	for _, gitRemote := range cfg.Cfg.GitRemotes {
-		if gitRemote.Active == true {
+		if gitRemote.Active {
 			challengesDirRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
 
 			err, challenges := utils.GetDirsInDir(challengesDirRoot)
@@ -652,10 +687,7 @@ func GetAvailableChallenges() ([]string, error) {
 				log.Errorf("Error while getting available challenges : %s", err)
 				return nil, err
 			}
-
-			for _, chall := range challenges {
-				challsNameList = append(challsNameList, chall)
-			}
+			challsNameList = append(challsNameList, challenges...)
 		}
 	}
 	return challsNameList, nil
@@ -679,78 +711,76 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 	return challengeNames
 }
 
-//Unzips challenge folder in a destination directory
+// Unzips challenge folder in a destination directory
 func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 
 	baseFileName := filepath.Base(zipContextPath)
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
 	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
-        log.Fatal(err)
-    }
+		log.Fatal(err)
+	}
 
 	// 1. Open the zip file
-    reader, err := zip.OpenReader(zipContextPath)
-    if err != nil {
-        return "", err
-    }
-    defer reader.Close()
+	reader, err := zip.OpenReader(zipContextPath)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
 
-    // 2. Get the absolute destination path
-    destination, err := filepath.Abs(targetDir)
-    if err != nil {
-        return "", err
-    }
+	// 2. Get the absolute destination path
+	destination, err := filepath.Abs(targetDir)
+	if err != nil {
+		return "", err
+	}
 
-    // 3. Iterate over zip files inside the archive and unzip each of them
-    for _, f := range reader.File {
-        err := unzipFile(f, destination)
-        if err != nil {
-            return "", err
-        }
-    }
-
-    return targetDir, nil
+	// 3. Iterate over zip files inside the archive and unzip each of them
+	for _, f := range reader.File {
+		err := unzipFile(f, destination)
+		if err != nil {
+			return "", err
+		}
+	}
+	return targetDir, nil
 }
 
-
 func unzipFile(f *zip.File, destination string) error {
-    // 4. Check if file paths are not vulnerable to [Zip Slip](https://snyk.io/research/zip-slip-vulnerability)
-    filePath := filepath.Join(destination, f.Name)
-    if !strings.HasPrefix(filePath, filepath.Clean(destination)+string(os.PathSeparator)) {
-        return fmt.Errorf("invalid file path: %s", filePath)
-    }
+	// 4. Check if file paths are not vulnerable to [Zip Slip](https://snyk.io/research/zip-slip-vulnerability)
+	filePath := filepath.Join(destination, f.Name)
+	if !strings.HasPrefix(filePath, filepath.Clean(destination)+string(os.PathSeparator)) {
+		return fmt.Errorf("invalid file path: %s", filePath)
+	}
 
-    // 5. Create directory tree
-    if f.FileInfo().IsDir() {
-        if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-            return err
-        }
-        return nil
-    }
+	// 5. Create directory tree
+	if f.FileInfo().IsDir() {
+		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+			return err
+		}
+		return nil
+	}
 
-    if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-        return err
-    }
+	if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+		return err
+	}
 
-    // 6. Create a destination file for unzipped content
-    destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-    if err != nil {
-        return err
-    }
-    defer destinationFile.Close()
+	// 6. Create a destination file for unzipped content
+	destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	if err != nil {
+		return err
+	}
+	defer destinationFile.Close()
 
-    // 7. Unzip the content of a file and copy it to the destination file
-    zippedFile, err := f.Open()
-    if err != nil {
-        return err
-    }
-    defer zippedFile.Close()
+	// 7. Unzip the content of a file and copy it to the destination file
+	zippedFile, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer zippedFile.Close()
 
-    if _, err := io.Copy(destinationFile, zippedFile); err != nil {
-        return err
-    }
-    return nil
+	if _, err := io.Copy(destinationFile, zippedFile); err != nil {
+		return err
+	}
+	return nil
 }
 
 // File copies a single file from src to dst
@@ -877,7 +907,7 @@ func UpdateChallenges(defaultauthorpassword string) {
 	log.Debugf("Challenges updated in Db")
 }
 
-func ValidateFlag(flag, challenge_name string)  error{
+func ValidateFlag(flag, challenge_name string) error {
 	if challenge_name == "" {
 		log.Errorf("Challenge name is empty")
 		return fmt.Errorf("challenge name is empty")
@@ -890,7 +920,7 @@ func ValidateFlag(flag, challenge_name string)  error{
 
 	dynamicflag := database.DynamicFlag{
 		Name: challenge_name,
-		Flag:          flag,
+		Flag: flag,
 	}
 	err := database.CreateDynamicFlagEntry(&dynamicflag)
 

@@ -7,6 +7,7 @@ import (
 )
 
 var (
+	// BEAST_GLOBAL_DIR should always be used only on local deployment
 	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
 	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
 	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
@@ -16,7 +17,10 @@ const ( //names
 	BEAST_LOCAL_SERVER          string = "BEAST_LOCAL_SERVER"
 	CHALLENGE_CONFIG_FILE_NAME  string = "beast.toml"
 	BEAST_CONFIG_FILE_NAME      string = "config.toml"
+	BEAST_EX_CONFIG_FILE_NAME   string = "example.config.toml"
 	BEAST_LOG_FILE              string = "beast.log"
+	BEAST_CHEAT_LOG_FILE        string = "cheat.log"
+	BEAST_FLAG_LOG_FILE         string = "flag.log"
 	BEAST_DATABASE              string = "beast.db"
 	DEFAULT_CHALLENGE_NAME      string = "Backdoor-Challenge"
 	DEFAULT_AUTHOR_NAME         string = "ghost"
@@ -30,12 +34,18 @@ const ( //names
 	HIDDEN                      string = ".hidden"
 	ISSUER                      string = "beast-sds"
 	DELIMITER                   string = "::::"
+	LOCALHOST                   string = "localhost"
+	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
+	DOCKER_PID                  string = "/var/run/docker.pid"
+	BEAST_GRAPH_CACHE           string = "graph_cache.json"
+	BEAST_LEADERBOARD_CACHE     string = "leaderboard.json"
+	POSTGRES_SUPER_USER         string = "postgres"
 )
 
 const ( //paths
 	BEAST_DOCKER_CHALLENGE_DIR     string = "/challenge"
 	BEAST_CHALLENGE_LOGS_DIR       string = "logs"
-	DEFAULT_AUTH_KEYS_FILE         string = ".ssh/authorized_keys"
+	DEFAULT_AUTH_KEYS_FILE         string = "beast_authorized_keys"
 	BEAST_STAGING_DIR              string = "staging"
 	BEAST_SCRIPTS_DIR              string = "scripts"
 	BEAST_REMOTES_DIR              string = "remote"
@@ -43,12 +53,16 @@ const ( //paths
 	BEAST_UPLOADS_DIR              string = "uploads"
 	BEAST_ASSETS_DIR               string = "assets"
 	BEAST_LOGO_DIR                 string = "logo"
+	BEAST_EMAIL_TEMPLATE_DIR       string = "mailTemplates"
+	BEAST_SECRETS_DIR              string = "secrets"
+	BEAST_EXAMPLE_DIR              string = "_examples"
+	BEAST_CACHE_DIR                string = "cache"
 )
 
 const ( //chall types
 	STATIC_CHALLENGE_TYPE_NAME  string = "static"
 	SERVICE_CHALLENGE_TYPE_NAME string = "service"
-	DOCKER_CHALLENGE_TYPE_NAME  string = "docker"
+	WEB_CHALLENGE_TYPE_NAME     string = "web"
 	BARE_CHALLENGE_TYPE_NAME    string = "bare"
 )
 
@@ -63,7 +77,7 @@ const ( // chall actions
 const ( // chall env
 	MAX_PORT_PER_CHALL           uint32 = 3
 	BEAST_CHALLENGES_STATIC_PORT uint32 = 80
-	DEFAULT_BASE_IMAGE           string = "ubuntu:16.04"
+	DEFAULT_BASE_IMAGE           string = "ubuntu:24.03"
 	DEFAULT_XINETD_CONF_FILE     string = "xinetd.conf"
 	BEAST_STATIC_AUTH_FILE       string = ".static.beast.htpasswd"
 	ALLOWED_MIN_PORT_VALUE       uint32 = 10000
@@ -83,6 +97,7 @@ const ( // default config
 	ITERATIONS               int    = 65536
 	HASH_LENGTH              int    = 32
 	TIMEPERIOD               int64  = 6 * 60 * 60
+	SSH_PORT                 int    = 22
 )
 
 const ( // roles
@@ -105,6 +120,11 @@ var DEPLOY_STATUS = map[string]string{
 	"queued":     "Queued",
 }
 
+var DEPLOYMENT_TYPES = map[string]string{
+	"docker_compose":  "docker_compose",
+	"standard_docker": "standard_docker",
+}
+
 var USER_ROLES = map[string]string{
 	"contestant": "contestant",
 	"admin":      "admin",
@@ -112,76 +132,46 @@ var USER_ROLES = map[string]string{
 	"maintainer": "maintainer",
 }
 
-const MYSQL_SIDECAR_HOST = "mysql"
-const MONGO_SIDECAR_HOST = "mongo"
-
-var SIDECAR_CONTAINER_MAP = map[string]string{
-	"mysql": "mysql",
-	"mongo": "mongo",
-}
-
-var SIDECAR_NETWORK_MAP = map[string]string{
-	"mysql": "beast-mysql",
-	"mongo": "beast-mongo",
-}
-
-var SIDECAR_ENV_PREFIX = map[string]string{
-	"mysql": "MYSQL",
-	"mongo": "MONGO",
-}
-
 // Available challenge types
-var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, DOCKER_CHALLENGE_TYPE_NAME}
+var AVAILABLE_CHALLENGE_TYPES = []string{STATIC_CHALLENGE_TYPE_NAME, SERVICE_CHALLENGE_TYPE_NAME, BARE_CHALLENGE_TYPE_NAME, WEB_CHALLENGE_TYPE_NAME}
 
 var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 	"php": {
-		"7.1": {
-			"cli":     "php:7.1-cli",
-			"apache":  "php:7.1-apache",
-			"fpm":     "php:7.1-fpm",
-			"nginx":   "php:7.1-fpm",
-			"default": "php:7.1-cli",
-		},
-		"5.6": {
-			"cli":     "php:5.6-cli",
-			"apache":  "php:5.6-apache",
-			"fpm":     "php:5.6-fpm",
-			"nginx":   "php:5.6-fpm",
-			"default": "php:5.6-cli",
+		"8.2": {
+			"cli":     "php:8.2-cli",
+			"apache":  "php:8.2-apache",
+			"fpm":     "php:8.2-fpm",
+			"nginx":   "php:8.2-fpm",
+			"default": "php:8.2-cli",
 		},
 		"default": {
-			"default": "php:5.6-cli",
+			"default": "php:8.2-cli",
 		},
 	},
 	"node": {
-		"8": {
-			"default": "node:8-jessie",
+		"20": {
+			"default": "node:20-bookworm",
 		},
-		"10": {
-			"default": "node:10-jessie",
+		"22": {
+			"default": "node:22-bookworm",
 		},
 		"default": {
-			"default": "node:10-jessie",
+			"default": "node:20-bookworm",
 		},
 	},
 	"python": {
-		"2.7": {
-			"flask":   "python:2.7-jessie",
-			"django":  "python:2.7-jessie",
-			"default": "python:2.7-jessie",
+		"3.11": {
+			"flask":   "python:3.11-bookworm",
+			"django":  "python:3.11-bookworm",
+			"default": "python:3.11-bookworm",
 		},
-		"3.5": {
-			"flask":   "python:3.5-jessie",
-			"django":  "python:3.5-jessie",
-			"default": "python:3.5-jessie",
-		},
-		"3.6": {
-			"flask":   "python:3.6-jessie",
-			"django":  "python:3.6-jessie",
-			"default": "python:3.6-jessie",
+		"3.12": {
+			"flask":   "python:3.12-bookworm",
+			"django":  "python:3.12-bookworm",
+			"default": "python:3.12-bookworm",
 		},
 		"default": {
-			"default": "python:2.7-jessie",
+			"default": "python:3.12-bookworm",
 		},
 	},
 	"default": {
@@ -192,6 +182,19 @@ var DockerBaseImageForWebChall = map[string]map[string]map[string]string{
 }
 
 var USER_STATUS = map[string]string{
-	"ban":   "ban",
-	"unban": "unban",
+	"ban":    "ban",
+	"unban":  "unban",
+	"hide":   "hide",
+	"unhide": "unhide",
+}
+
+const (
+	LEADERBOARD_SIZE       = 25
+	LEADERBOARD_GRAPH_SIZE = 12
+	SUBMISSIONS_PAGE_SIZE  = 10
+)
+
+var NOTIFICATION_SERVICES = []string{
+	"slack",
+	"discord",
 }

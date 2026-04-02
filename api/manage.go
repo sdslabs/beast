@@ -120,6 +120,12 @@ func manageChallengeHandler(c *gin.Context) {
 		return
 	}
 
+	if action == core.MANAGE_ACTION_PURGE {
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
+	}
+
 	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: respStr,
@@ -175,6 +181,12 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 			}
 			doesExist[name] = true
 		}
+	}
+
+	if action == core.MANAGE_ACTION_PURGE {
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainMapResp{
@@ -434,7 +446,7 @@ func manageUploadHandler(c *gin.Context) {
 	// The file cannot be received.
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("No file received from user"),
+			Message: "no file received from user",
 		})
 		return
 	}
@@ -510,7 +522,7 @@ func manageUploadHandler(c *gin.Context) {
 		Assets:          config.Challenge.Metadata.Assets,
 		AdditionalLinks: config.Challenge.Metadata.AdditionalLinks,
 		Ports:           config.Challenge.Env.Ports,
-		Hints:           config.Challenge.Metadata.Hints,
+		PreReqs:         config.Challenge.Metadata.PreReqs,
 		Desc:            config.Challenge.Metadata.Description,
 		Points:          config.Challenge.Metadata.Points,
 	})

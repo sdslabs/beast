@@ -108,3 +108,12 @@ type readerFunc func(p []byte) (int, error)
 func (fn readerFunc) Read(p []byte) (int, error) {
 	return fn(p)
 }
+
+// GetProjectName generates the standard project name for both docker and docker-compose deployments.
+// This name is used for:
+// - Docker Compose project name (-p flag)
+// - Container labels (com.sdslabs.beast.project, com.docker.compose.project)
+// - Container naming conventions
+func GetProjectName(challengeName string) string {
+	return fmt.Sprintf("beast-%s", challengeName)
+}

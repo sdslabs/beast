@@ -1,0 +1,20 @@
+[author]
+name = "example"
+email = "example@local"
+ssh_key = "ssh-rsa AAAAB3NzaC1y"
+
+[challenge.metadata]
+name = "compose-type"
+flag = "CTF{sample_flag}"
+
+type = "web"
+points = 200
+
+[challenge.env]
+# Beast still requires ports/default_port for validation and metadata.
+ports = [10020]
+default_port = 10020
+
+
+docker_compose = "docker-compose.yml"
+web_root = "challenge"

@@ -28,13 +28,17 @@ func initGinRouter() *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}
 	router.Use(cors.New(corsConfig))
-
+	router.GET("/dummy", dummyHandler)
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
 		authGroup.POST("/register", register)
 		authGroup.POST("/login", login)
 		authGroup.POST("/reset-password", authorize, resetPasswordHandler)
+		authGroup.POST("/send-otp", sendOTPHandler)
+		authGroup.POST("/verify-otp", verifyOTPHandler)
+		authGroup.POST("/send-otp-forget", sendOTPForForgetHandler)
+		authGroup.POST("/verify-otp-forget", verifyOTPForForgetHandler)
 	}
 
 	// For serving static files
@@ -43,6 +47,7 @@ func initGinRouter() *gin.Engine {
 		false)),
 	)
 	router.GET("/api/info/competition-info", competitionInfoHandler)
+	router.GET("/api/info/download", serveAssets)
 
 	// API routes group
 	apiGroup := router.Group("/api", authorize)
@@ -60,6 +65,7 @@ func initGinRouter() *gin.Engine {
 			manageGroup.POST("/schedule/:action", manageScheduledAction)
 			manageGroup.POST("/challenge/upload", manageUploadHandler)
 			manageGroup.POST("/challenge/validateflag", validateFlagHandler)
+			manageGroup.GET("/logs", challengeLogsHandler)
 		}
 
 		// Status route group
@@ -74,14 +80,19 @@ func initGinRouter() *gin.Engine {
 		infoGroup := apiGroup.Group("/info")
 		{
 			infoGroup.GET("/challenge/:name", challengeInfoHandler)
-			infoGroup.GET("/challenges", challengesInfoHandler)
-			infoGroup.GET("/images/available", availableImagesHandler)
-			infoGroup.GET("/ports/used", usedPortsInfoHandler)
-			infoGroup.GET("/logs", challengeLogsHandler)
+			infoGroup.GET("/challenges", challengesMetadataHandler)
+			// infoGroup.GET("/images/available", availableImagesHandler)
+			// infoGroup.GET("/ports/used", usedPortsInfoHandler)
 			infoGroup.GET("/user/:username", userInfoHandler)
 			infoGroup.GET("/users", getAllUsersInfoHandler)
-			infoGroup.GET("/submissions", submissionsHandler)
+			infoGroup.GET("/leaderboard", getLeaderboardHandler)
+			infoGroup.GET("leaderboard-graph", getLeaderboardGraphHandler)
+			infoGroup.GET("/usercount", getUserCountHandler)
+			infoGroup.GET("/submissions/challenge/:challenge_id", getChallengeAttempts)
+			infoGroup.GET("/submissions/user/:user_id", getUserAttempts)
 			infoGroup.GET("/tags", tagHandler)
+			infoGroup.GET("/hint/:hintID", hintHandler)
+			infoGroup.POST("/hint/:hintID", hintHandler)
 		}
 
 		// Notification route group
@@ -91,6 +102,8 @@ func initGinRouter() *gin.Engine {
 			notificationGroup.POST("/add", adminAuthorize, addNotification)
 			notificationGroup.PUT("/update", adminAuthorize, updateNotifications)
 			notificationGroup.DELETE("/delete", adminAuthorize, removeNotification)
+			notificationGroup.GET("/stream", streamNotification)
+
 		}
 
 		remoteGroup := apiGroup.Group("/remote", adminAuthorize)
@@ -113,8 +126,12 @@ func initGinRouter() *gin.Engine {
 
 		adminPanelGroup := apiGroup.Group("/admin", adminAuthorize)
 		{
-			adminPanelGroup.POST("/users/:action/:id", banUserHandler)
+			adminPanelGroup.POST("/users/:action/:id", userActionHandler)
 			adminPanelGroup.GET("/statistics", getUsersStatisticsHandler)
+			adminPanelGroup.GET("/leaderboard", adminLeaderboardHandler)
+			adminPanelGroup.POST("/freezeLeaderboard", freezeLeaderboardHandler)
+			adminPanelGroup.POST("/unfreezeLeaderboard", unfreezeLeaderboardHandler)
+			adminPanelGroup.GET("/submissions", submissionsHandler)
 		}
 	}
 

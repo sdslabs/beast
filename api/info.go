@@ -14,8 +14,19 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
+	fileUtils "github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
+)
+
+var (
+	leaderboardCache      []UserResp
+	leaderboardStale      = true
+	adminLeaderboardCache []UserResp
+	adminLeaderboardStale = true
+	graphCache            []database.UserLeaderboardResp
+	graphCacheStale       = true
 )
 
 // Returns port in use by beast.
@@ -27,11 +38,142 @@ import (
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.PortsInUseResp
 // @Router /api/info/ports/used [get]
+
 func usedPortsInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, PortsInUseResp{
 		MinPortValue: core.ALLOWED_MIN_PORT_VALUE,
 		MaxPortValue: core.ALLOWED_MAX_PORT_VALUE,
 		PortsInUse:   cfg.USED_PORTS_LIST,
+	})
+}
+
+func hintHandler(c *gin.Context) {
+	hintIDStr := c.Param("hintID")
+
+	if hintIDStr == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Hint ID cannot be empty",
+		})
+		return
+	}
+
+	hintID, err := strconv.Atoi(hintIDStr)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Hint Id format invalid",
+		})
+		return
+	}
+
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	if user.Status == 1 {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Banned user",
+		})
+		return
+	}
+
+	// Fetch hint details
+	hint, err := database.GetHintByID(uint(hintID))
+	if err != nil {
+		if err.Error() == "not_found" {
+			c.JSON(http.StatusNotFound, HTTPErrorResp{
+				Error: "Hint not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request",
+			})
+		}
+		return
+	}
+
+	if user.Role == core.USER_ROLES["admin"] {
+		c.JSON(http.StatusOK, HintResponse{
+			Description: hint.Description,
+			Points:      hint.Points,
+		})
+		return
+	}
+
+	// Check if the user has already taken the hint
+	hasTakenHint, err := database.UserHasTakenHint(user.ID, uint(hintID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while checking hint usage",
+		})
+		return
+	}
+
+	if c.Request.Method == "GET" {
+		if hasTakenHint {
+			c.JSON(http.StatusOK, HintResponse{
+				Description: hint.Description,
+				Points:      hint.Points,
+			})
+		} else {
+			c.JSON(http.StatusOK, HintResponse{
+				Description: "Hint is not taken yet",
+				Points:      hint.Points,
+			})
+		}
+		return
+	}
+
+	if hasTakenHint {
+		// If hint already taken, just return the description
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: hint.Description,
+		})
+		return
+	}
+
+	// Save user hint if not already taken
+	if err := database.SaveUserHint(user.ID, hint.ChallengeID, hint.HintID); err != nil {
+		if err.Error() == "Not enough points to take this hint" {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "You don't have enough points to take this hint",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while saving the hint usage",
+		})
+		return
+	}
+	
+	oldScore := user.Score
+	newScore := oldScore - hint.Points
+	if newScore < 0 {
+		newScore = 0
+	}
+
+	if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
+		(len(adminLeaderboardCache) > 0 && oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
+	}
+
+	// Return the hint description after successfully taking it
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: hint.Description,
 	})
 }
 
@@ -52,7 +194,7 @@ func challengeInfoHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: fmt.Sprintf("Challenge name cannot be empty"),
+			Error: "Challenge name cannot be empty",
 		})
 		return
 	}
@@ -65,10 +207,26 @@ func challengeInfoHandler(c *gin.Context) {
 		return
 	}
 
-	if len(challenges) > 0 {
-		challenge := challenges[0]
+	authHeader := c.GetHeader("Authorization")
+	username, err := coreUtils.GetUser(authHeader)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "No Token Provided",
+		})
+		return
+	}
 
-		users, err := database.GetRelatedUsers(&challenge)
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	if len(challenges) > 0 && challenges[0].Status != "Undeployed" {
+		challenge := challenges[0]
+		totalSolves, solveStatus, err := database.GetChallengeSolveInfo(challenge.ID, user.ID)
 		if err != nil {
 			log.Error(err)
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -76,95 +234,76 @@ func challengeInfoHandler(c *gin.Context) {
 			})
 			return
 		}
-
-		challengePorts := make([]uint32, len(challenge.Ports))
-		for index, port := range challenge.Ports {
-			challengePorts[index] = port.PortNo
-		}
-
-		var challSolves int
-		challengeUser := make([]UserSolveResp, 0)
-		for _, user := range users {
-			if user.Role == core.USER_ROLES["contestant"] {
-				userResp := UserSolveResp{
-					UserID:   user.ID,
-					Username: user.Username,
-					SolvedAt: user.CreatedAt,
-				}
-				challengeUser = append(challengeUser, userResp)
-				challSolves++
-			}
-		}
-
 		challengeTags := make([]string, len(challenge.Tags))
 
 		for index, tags := range challenge.Tags {
 			challengeTags[index] = tags.TagName
 		}
 
-		authHeader := c.GetHeader("Authorization")
-
-		values := strings.Split(authHeader, " ")
-
-		if len(values) < 2 || values[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-				Message: "No Token Provided",
-			})
-			c.Abort()
-			return
-		}
-
-		autherr := auth.Authorize(values[1], core.ADMIN)
-
-		if autherr != nil {
-			c.JSON(http.StatusOK, ChallengeInfoResp{
-				Name:            name,
-				ChallId:         challenge.ID,
-				Category:        challenge.Type,
-				CreatedAt:       challenge.CreatedAt,
-				Tags:            challengeTags,
-				Status:          challenge.Status,
-				Ports:           challengePorts,
-				Hints:           challenge.Hints,
-				Desc:            challenge.Description,
-				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
-				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
-				Points:          challenge.Points,
-				SolvesNumber:    challSolves,
-				Solves:          challengeUser,
+		hints, err := database.QueryHintsByChallengeID(challenge.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while fetching hints.",
 			})
 			return
 		}
 
-		c.JSON(http.StatusOK, ChallengeInfoResp{
-			Name:            name,
-			ChallId:         challenge.ID,
-			Category:        challenge.Type,
-			DynamicFlag:     challenge.DynamicFlag,
-			Flag:            challenge.Flag,
-			CreatedAt:       challenge.CreatedAt,
-			Tags:            challengeTags,
-			Status:          challenge.Status,
-			Ports:           challengePorts,
-			Hints:           challenge.Hints,
-			Desc:            challenge.Description,
-			Assets:          strings.Split(challenge.Assets, core.DELIMITER),
-			AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
-			Points:          challenge.Points,
-			SolvesNumber:    challSolves,
-			Solves:          challengeUser,
+		hintInfos := make([]HintInfo, len(hints))
+		for i, hint := range hints {
+			hintInfos[i] = HintInfo{
+				ID:     hint.HintID,
+				Points: hint.Points,
+			}
+		}
+
+		previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
+		if err != nil {
+			log.Error(err)
+			previousTries = 0
+
+		}
+		challMetadata := ChallengeMetadata{
+			Name:           challenge.Name,
+			ChallId:        challenge.ID,
+			Tags:           challengeTags,
+			CreatedAt:      challenge.CreatedAt,
+			Points:         challenge.Points,
+			SolvesNumber:   totalSolves,
+			SolveStatus:    solveStatus,
+			Difficulty:     challenge.Difficulty,
+			PreRequisite:   strings.Split(challenge.PreReqs, core.DELIMITER),
+			DeployedStatus: challenge.Status,
+		}
+		challengeInfo := Challenge{
+			ChallengeMetadata: challMetadata,
+			Description:       challenge.Description,
+			Hints:             hintInfos,
+			Category:          challenge.Type,
+			Assets:            strings.Split(challenge.Assets, core.DELIMITER),
+			AdditionalLinks:   strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+			PreviousTries:     previousTries,
+			MaxAttemptLimit:   challenge.MaxAttemptLimit,
+			DeployedLink:      challenge.ServerDeployed,
+		}
+		if user.Role == core.USER_ROLES["contestant"] {
+			c.JSON(http.StatusOK, challengeInfo)
+			return
+		}
+
+		c.JSON(http.StatusOK, AdminChallenge{
+			Challenge:   challengeInfo,
+			DynamicFlag: challenge.DynamicFlag,
+			Flag:        challenge.Flag,
 		})
 	} else {
 		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No challenge found with name: " + name,
 		})
 	}
-
-	return
 }
 
-// Returns information about all challenges with and without filters
-// @Summary Returns information about all challenges with and without filters.
+// Returns metadata about all challenges with and without filters
+// @Summary Returns metadata about all challenges with and without filters.
 // @Description Returns information about all the challenges present in the database with and without filters.
 // @Tags info
 // @Accept  json
@@ -176,7 +315,7 @@ func challengeInfoHandler(c *gin.Context) {
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/challenges [get]
-func challengesInfoHandler(c *gin.Context) {
+func challengesMetadataHandler(c *gin.Context) {
 	filter := c.Query("filter")
 	value := c.Query("value")
 
@@ -221,8 +360,26 @@ func challengesInfoHandler(c *gin.Context) {
 	}
 	// If comp in ongoing
 	if state == 1 || autherr == nil {
-		if value == "" || filter == "" {
-			challenges, err = database.QueryAllChallenges()
+		if (filter == "name" || filter == "author" || filter == "score") && value != "" {
+			challenges, err = database.QueryChallengeEntriesMetadata(filter, value)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+			}
+		} else if filter == "tag" && value != "" {
+			tag := database.Tag{
+				TagName: value,
+			}
+			challenges, err = database.QueryRelatedChallengesMetadata(&tag)
+			if err != nil {
+				log.Error(err)
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+			}
+		} else {
+			challenges, err = database.QueryAllChallengesMetadata()
 			if err != nil {
 				c.JSON(http.StatusBadRequest, HTTPErrorResp{
 					Error: err.Error(),
@@ -237,32 +394,30 @@ func challengesInfoHandler(c *gin.Context) {
 			}
 		}
 
-		if filter == "name" || filter == "author" || filter == "score" {
-			challenges, err = database.QueryChallengeEntries(filter, value)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-			}
+		availableChallenges := make([]ChallengeMetadata, len(challenges))
+
+		authHeader := c.GetHeader("Authorization")
+		username, err := coreUtils.GetUser(authHeader)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "No Token Provided",
+			})
+			return
 		}
 
-		if filter == "tag" {
-			tag := database.Tag{
-				TagName: value,
-			}
-			challenges, err = database.QueryRelatedChallenges(&tag)
-			if err != nil {
-				log.Error(err)
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-			}
+		user, err := database.QueryFirstUserEntry("username", username)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Unauthorized user",
+			})
+			return
 		}
-
-		availableChallenges := make([]ChallengeInfoResp, len(challenges))
 
 		for index, challenge := range challenges {
-			users, err := database.GetRelatedUsers(&challenge)
+			if challenge.Status == "Undeployed" && user.Role == core.USER_ROLES["contestant"] {
+				continue
+			}
+			totalSolves, solveStatus, err := database.GetChallengeSolveInfo(challenge.ID, user.ID)
 			if err != nil {
 				log.Error(err)
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -270,48 +425,23 @@ func challengesInfoHandler(c *gin.Context) {
 				})
 				return
 			}
-
-			challengePorts := make([]uint32, len(challenge.Ports))
-			for index, port := range challenge.Ports {
-				challengePorts[index] = port.PortNo
-			}
-
-			var challSolves int
-			challengeUser := make([]UserSolveResp, 0)
-
-			for _, user := range users {
-				if user.Role == core.USER_ROLES["contestant"] {
-					userResp := UserSolveResp{
-						UserID:   user.ID,
-						Username: user.Username,
-						SolvedAt: user.CreatedAt,
-					}
-					challengeUser = append(challengeUser, userResp)
-					challSolves++
-				}
-			}
-
 			challengeTags := make([]string, len(challenge.Tags))
 
 			for index, tags := range challenge.Tags {
 				challengeTags[index] = tags.TagName
 			}
 
-			availableChallenges[index] = ChallengeInfoResp{
-				Name:            challenge.Name,
-				ChallId:         challenge.ID,
-				Category:        challenge.Type,
-				Tags:            challengeTags,
-				CreatedAt:       challenge.CreatedAt,
-				Status:          challenge.Status,
-				Ports:           challengePorts,
-				Hints:           challenge.Hints,
-				Desc:            challenge.Description,
-				Points:          challenge.Points,
-				Assets:          strings.Split(challenge.Assets, core.DELIMITER),
-				AdditionalLinks: strings.Split(challenge.AdditionalLinks, core.DELIMITER),
-				SolvesNumber:    challSolves,
-				Solves:          challengeUser,
+			availableChallenges[index] = ChallengeMetadata{
+				Name:           challenge.Name,
+				ChallId:        challenge.ID,
+				Tags:           challengeTags,
+				CreatedAt:      challenge.CreatedAt,
+				Points:         challenge.Points,
+				SolvesNumber:   totalSolves,
+				SolveStatus:    solveStatus,
+				Difficulty:     challenge.Difficulty,
+				PreRequisite:   strings.Split(challenge.PreReqs, core.DELIMITER),
+				DeployedStatus: challenge.Status,
 			}
 		}
 
@@ -352,7 +482,7 @@ func challengeLogsHandler(c *gin.Context) {
 	chall := c.Query("challenge")
 	if chall == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Challenge name cannot be empty"),
+			Message: fmt.Sprint("challenge name cannot be empty"),
 		})
 		return
 	}
@@ -493,6 +623,7 @@ func userInfoHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer"
+// @Param sort, order, filter
 // @Success 200 {object} api.UserResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
@@ -571,6 +702,12 @@ func getAllUsersInfoHandler(c *gin.Context) {
 					filteredUsers = append(filteredUsers, user)
 				}
 			}
+		} else if filterParam == "hidden" {
+			for _, user := range availableUsers {
+				if user.Status == 2 {
+					filteredUsers = append(filteredUsers, user)
+				}
+			}
 		} else {
 			filteredUsers = make([]UsersResp, len(availableUsers))
 			copy(filteredUsers, availableUsers)
@@ -609,10 +746,23 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.SubmissionResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/submissions [get]
+// @Router /api/admin/submissions [get]
 func submissionsHandler(c *gin.Context) {
+	pageStr := c.Query("page")
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid page number",
+		})
+		return
+	}
 
-	submissions, err := database.QueryAllSubmissions()
+	offset := (page - 1) * core.SUBMISSIONS_PAGE_SIZE
+
+	submissions, err := database.QuerySubmissionsWithPagination(core.SUBMISSIONS_PAGE_SIZE, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "DATABASE ERROR while processing the request.",
@@ -630,36 +780,35 @@ func submissionsHandler(c *gin.Context) {
 			return
 		}
 
-		if user.Role == core.USER_ROLES["contestant"] {
-			challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while fetching user details.",
-				})
-				return
-			}
-			if len(challenge) == 0 {
-				continue
-			}
-
-			challengeTags := make([]string, len(challenge[0].Tags))
-
-			for index, tags := range challenge[0].Tags {
-				challengeTags[index] = tags.TagName
-			}
-
-			singleSubmissionResp := SubmissionResp{
-				UserId:    user.ID,
-				Username:  user.Username,
-				ChallId:   challenge[0].ID,
-				ChallName: challenge[0].Name,
-				Category:  challenge[0].Type,
-				Tags:      challengeTags,
-				Points:    challenge[0].Points,
-				SolvedAt:  submission.CreatedAt,
-			}
-			submissionsResp = append(submissionsResp, singleSubmissionResp)
+		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(submission.ChallengeID)))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while fetching challenge details.",
+			})
+			return
 		}
+		if len(challenge) == 0 {
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge[0].Tags))
+
+		for index, tags := range challenge[0].Tags {
+			challengeTags[index] = tags.TagName
+		}
+
+		singleSubmissionResp := SubmissionResp{
+			UserId:    user.ID,
+			Username:  user.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			Flag:      submission.Flag,
+			SolvedAt:  submission.CreatedAt,
+			Success:   submission.Solved,
+			Cheating:  submission.Cheating,
+		}
+
+		submissionsResp = append(submissionsResp, singleSubmissionResp)
 	}
 
 	format := c.Query("format")
@@ -771,23 +920,581 @@ func competitionInfoHandler(c *gin.Context) {
 // @Failure 400 {object} api.HTTPErrorResp
 // @Router /api/admin/statistics [get]
 func tagHandler(c *gin.Context) {
-	challenges, _ := database.QueryAllChallenges()
-	var tags []string
-	for _, challenge := range challenges {
-		for _, tag := range challenge.Tags {
-			tags = append(tags, tag.TagName)
-		}
+	// Optimized: Query unique tags directly from the database
+	tags, err := database.QueryAllUniqueTags()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while fetching tags.",
+		})
+		return
 	}
-	keys := make(map[string]bool)
-	uniqueTags := []string{}
-	for _, entry := range tags {
-		if _, value := keys[entry]; !value {
-			keys[entry] = true
-			uniqueTags = append(uniqueTags, entry)
-		}
-	}
+
 	c.JSON(http.StatusOK, TagInfoResp{
-		Tags: uniqueTags,
+		Tags: tags,
 	})
-	return
+}
+
+// @Tags info
+// @Accept  json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param challenge query string false "The name of the challenge to get the logs for."
+// @Param asset query string false "The name of the static asset requested."
+// @Success 200 {object} api.LogsInfoResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /api/info/download [get]
+func serveAssets(c *gin.Context) {
+	challenge := c.Query("challenge")
+	assetName := c.Query("asset")
+	challenge = filepath.Base(challenge)
+	assetName = filepath.Base(assetName)
+	if challenge == "" || assetName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "challenge and asset parameters are required"})
+		return
+	}
+	filepath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, core.BEAST_STATIC_FOLDER, assetName)
+	err := fileUtils.ValidateFileExists(filepath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Incorrect file requested"})
+		return
+	}
+	c.FileAttachment(filepath, assetName)
+
+}
+
+// This route returns the number of users in the databse with role=contestant
+// @Summary Returns the number of users in the database with role=contestant
+// @Description Returns the number of users in the database with role=contestant
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.UserCountResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/usercount [get]
+func getUserCountHandler(c *gin.Context) {
+	count, err := database.GetUserCount()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, UserCountResp{
+		UserCount: count,
+	})
+}
+
+// Returns leaderboard
+// @Summary Returns leaderboard
+// @Description Returns leaderboard of all users
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param page query string false "Page number"
+// @Success 200 {object} api.UserResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/leaderboard [get]
+func getLeaderboardHandler(c *gin.Context) {
+	pageStr := c.Query("page")
+	log.Print(pageStr)
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid page number",
+		})
+		return
+	}
+	isLeaderboardFrozen, err := database.IsFrozenScoreSet()
+	if err != nil {
+		log.Errorf("DATABASE ERROR:: Unable to lookup FrozenLeaderboard %s. Continuing with normal leaderboard", err.Error())
+	}
+	if isLeaderboardFrozen {
+		if page == 1 {
+			if leaderboardStale {
+				users, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+						Error: "DATABASE ERROR while processing the request.",
+					})
+					return
+				}
+				var leaderboard []UserResp
+				for index, user := range users {
+					if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+						continue
+					}
+					resp := UserResp{
+						Username: user.Username,
+						Id:       user.ID,
+						Role:     user.Role,
+						Status:   user.Status,
+						Score:    user.FrozenScore,
+						Rank:     int64(index + 1),
+					}
+					leaderboard = append(leaderboard, resp)
+				}
+				leaderboardCache = leaderboard
+				leaderboardStale = false
+			}
+			c.JSON(http.StatusOK, leaderboardCache)
+			return
+		}
+		offset := (page - 1) * core.LEADERBOARD_SIZE
+		users, err := database.QueryUsersByFrozenScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		var leaderboard []UserResp
+		rankOffset := offset
+		for index, user := range users {
+			if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+				continue
+			}
+			resp := UserResp{
+				Username: user.Username,
+				Id:       user.ID,
+				Role:     user.Role,
+				Status:   user.Status,
+				Score:    user.FrozenScore,
+				Rank:     int64(rankOffset + index + 1),
+			}
+			leaderboard = append(leaderboard, resp)
+		}
+		c.JSON(http.StatusOK, leaderboard)
+		return
+	}
+
+	if page == 1 {
+		if leaderboardStale {
+			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+			var leaderboard []UserResp
+			for index, user := range users {
+				if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+					continue
+				}
+				resp := UserResp{
+					Username: user.Username,
+					Id:       user.ID,
+					Role:     user.Role,
+					Status:   user.Status,
+					Score:    user.Score,
+					Rank:     int64(index + 1),
+				}
+				leaderboard = append(leaderboard, resp)
+			}
+			leaderboardCache = leaderboard
+			leaderboardStale = false
+		}
+		c.JSON(http.StatusOK, leaderboardCache)
+		return
+	}
+	offset := (page - 1) * core.LEADERBOARD_SIZE
+	users, err := database.QueryUsersByScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	var leaderboard []UserResp
+	rankOffset := offset
+	for index, user := range users {
+		if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+			continue
+		}
+		resp := UserResp{
+			Username: user.Username,
+			Id:       user.ID,
+			Role:     user.Role,
+			Status:   user.Status,
+			Score:    user.Score,
+			Rank:     int64(rankOffset + index + 1),
+		}
+		leaderboard = append(leaderboard, resp)
+	}
+	c.JSON(http.StatusOK, leaderboard)
+}
+
+// Returns admin leaderboard
+// @Summary Returns admin leaderboard
+// @Description Returns admin leaderboard of all users
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param page query string false "Page number"
+// @Success 200 {object} api.UserResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/admin/leaderboard [get]
+func adminLeaderboardHandler(c *gin.Context) {
+	pageStr := c.Query("page")
+	log.Print(pageStr)
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid page number",
+		})
+		return
+	}
+	if page == 1 {
+		if adminLeaderboardStale {
+			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+			var leaderboard []UserResp
+			for index, user := range users {
+				if user.Status != 0 {
+					continue
+				}
+				resp := UserResp{
+					Username: user.Username,
+					Id:       user.ID,
+					Role:     user.Role,
+					Status:   user.Status,
+					Score:    user.Score,
+					Email:    user.Email,
+					Rank:     int64(index + 1),
+				}
+				leaderboard = append(leaderboard, resp)
+			}
+			adminLeaderboardCache = leaderboard
+			adminLeaderboardStale = false
+		}
+		c.JSON(http.StatusOK, adminLeaderboardCache)
+		return
+	}
+	offset := (page - 1) * core.LEADERBOARD_SIZE
+	users, err := database.QueryUsersByScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	var leaderboard []UserResp
+	rankOffset := offset
+	for index, user := range users {
+		if user.Status != 0 {
+			continue
+		}
+		resp := UserResp{
+			Username: user.Username,
+			Id:       user.ID,
+			Role:     user.Role,
+			Status:   user.Status,
+			Score:    user.Score,
+			Email:    user.Email,
+			Rank:     int64(rankOffset + index + 1),
+		}
+		leaderboard = append(leaderboard, resp)
+	}
+	c.JSON(http.StatusOK, leaderboard)
+}
+
+// Freeze user leaderboard
+// @Summary Freeze user leaderboard
+// @Description freezes the user leaderboard on demand.
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.UserResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/admin/freezeLeaderboard [post]
+func freezeLeaderboardHandler(c *gin.Context) {
+	err := database.UpdateFrozenScores()
+	if err != nil {
+		log.Errorf("DATABASE ERROR while freezing the leaderboard. %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+	}
+	leaderboardStale = true
+	graphCacheStale = true
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "User leaderboard frozen successfully",
+	})
+}
+
+// Unfreeze user leaderboard
+// @Summary Unfreeze user leaderboard
+// @Description unfreezes the user leaderboard on demand.
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Success 200 {object} api.UserResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/admin/unfreezeLeaderboard [post]
+func unfreezeLeaderboardHandler(c *gin.Context) {
+	err := database.ResetFrozenScores()
+	if err != nil {
+		log.Errorf("DATABASE ERROR while un-freezing the leaderboard. %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+	}
+	leaderboardStale = true
+	graphCacheStale = true
+	c.JSON(http.StatusOK, HTTPPlainResp{
+		Message: "User leaderboard unfrozen successfully",
+	})
+}
+
+// Fetch all the attempts on this challenge
+// @Summary Get challenge attempts
+// @Description Returns all user attempts for a given challenge.
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param challenge_id path int true "Challenge ID"
+// @Param Authorization header string true "Bearer"
+// @Success 200 {array} api.UserSolveResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/challenges/{challenge_id}/attempts [get]
+func getChallengeAttempts(c *gin.Context) {
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	queryingUser, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	isContestant := queryingUser.Role == core.USER_ROLES["contestant"]
+
+	challengeIDStr := c.Param("challenge_id")
+	challengeID, err := strconv.ParseUint(challengeIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Invalid challenge_id",
+		})
+		return
+	}
+
+	challenge, err := database.QueryChallengeEntries("id", challengeIDStr)
+	if err != nil {
+		log.Errorf("DATABASE ERROR while fetching challenge details: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	if len(challenge) == 0 {
+		c.JSON(http.StatusNotFound, HTTPPlainResp{
+			Message: "Challenge not found",
+		})
+		return
+	}
+
+	challengeTags := make([]string, len(challenge[0].Tags))
+	for index, tag := range challenge[0].Tags {
+		challengeTags[index] = tag.TagName
+	}
+
+	attempts, err := database.QueryChallAttempts(challengeID)
+	if err != nil {
+		log.Errorf("DATABASE ERROR while fetching challenge attempts: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	resp := make([]SubmissionResp, 0, len(attempts))
+	for _, attempt := range attempts {
+		if isContestant && (!attempt.Correct || attempt.Cheating) {
+			continue
+		}
+
+		submissionResp := SubmissionResp{
+			UserId:    attempt.UserId,
+			Username:  attempt.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			SolvedAt:  attempt.SolvedAt,
+			Success:   attempt.Correct,
+		}
+
+		if !isContestant {
+			submissionResp.Flag = attempt.Flag
+			submissionResp.Cheating = attempt.Cheating
+		}
+
+		resp = append(resp, submissionResp)
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// Get submissions by user ID
+// @Summary Get submissions by user
+// @Description Returns all submissions for a specific user
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param user_id path int true "User ID"
+// @Param Authorization header string true "Bearer"
+// @Success 200 {array} api.SubmissionResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/info/submissions/user/{user_id} [get]
+func getUserAttempts(c *gin.Context) {
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	isContestant := user.Role == core.USER_ROLES["contestant"]
+
+	userIDStr := c.Param("user_id")
+	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid user_id",
+		})
+		return
+	}
+
+	submissionUser, err := database.QueryUserById(uint(userID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "User not found",
+		})
+		return
+	}
+
+	if submissionUser.Role != core.USER_ROLES["contestant"] {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Can only view submissions for contestants",
+		})
+		return
+	}
+
+	attempts, err := database.QueryUserAttempts(uint(userID))
+	if err != nil {
+		log.Errorf("DATABASE ERROR while fetching user attempts: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
+			Message: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	resp := make([]SubmissionResp, 0, len(attempts))
+
+	for _, attempt := range attempts {
+		if isContestant && (!attempt.Correct || attempt.Cheating) {
+			continue
+		}
+
+		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(attempt.ChallengeID)))
+		if err != nil {
+			log.Errorf("DATABASE ERROR while fetching challenge details: %s", err.Error())
+			continue
+		}
+		if len(challenge) == 0 {
+			continue
+		}
+
+		challengeTags := make([]string, len(challenge[0].Tags))
+		for index, tag := range challenge[0].Tags {
+			challengeTags[index] = tag.TagName
+		}
+
+		submissionResp := SubmissionResp{
+			UserId:    submissionUser.ID,
+			Username:  submissionUser.Username,
+			ChallId:   challenge[0].ID,
+			ChallName: challenge[0].Name,
+			SolvedAt:  attempt.SolvedAt,
+			Success:   attempt.Correct,
+		}
+
+		if !isContestant {
+			submissionResp.Flag = attempt.Flag
+			submissionResp.Cheating = attempt.Cheating
+		}
+
+		resp = append(resp, submissionResp)
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func getLeaderboardGraphHandler(c *gin.Context) {
+	var topUsers []uint
+	// TODO: Add a check for leaderboard stale to prevent stale graphs
+	// Try if graphCache and leaderboardCache can be merged.
+	// Right now graph cache gets invalidated whenver leaderboardCache gets invalidated even if no user under top 10 are changed. Fix later.
+	if leaderboardStale {
+		users, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
+		if err == nil {
+			for i := 0; i < 10 && i < len(users); i++ {
+				user := users[i]
+				topUsers = append(topUsers, user.ID)
+			}
+		}
+	} else {
+		for i := 0; i < 10 && i < len(leaderboardCache); i++ {
+			user := leaderboardCache[i]
+			topUsers = append(topUsers, user.Id)
+		}
+	}
+	// If leaderboard is frozen then directly send the last graph instance without updating
+	isLeaderboardFrozen, _ := database.IsFrozenScoreSet()
+	if !graphCacheStale || isLeaderboardFrozen {
+		c.JSON(http.StatusOK, graphCache)
+	} else {
+		// TODO: Add a fallback for frozen leaderboard as graphcache is in memory and not persistent. SO, might get lost if server got down in between.
+		graphCache = database.QueryTimeSeriesForTopUsers(topUsers)
+		graphCacheStale = false
+		c.JSON(http.StatusOK, graphCache)
+	}
+
 }

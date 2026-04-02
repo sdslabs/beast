@@ -14,6 +14,6 @@ var healthProbeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		config.InitConfig()
 
-		manager.ChallengesHealthProber(config.Cfg.TickerFrequency)
+		go manager.BeastHeathCheckProber(config.Cfg.TickerFrequency)
 	},
 }

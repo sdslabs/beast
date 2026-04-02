@@ -9,9 +9,9 @@ ssh_key   = {{.Author.SSHKey}}                    # Required: Public SSH key for
 [challenge.metadata]
 name            = {{.Challenge.Metadata.Name}}         # Required: Name of the challenge, should be same as directory.
 type            = {{.Challenge.Metadata.Type}}         # Required: Type of challenge -> [web:<language>:<version>:<framework> static service]
-dynamic_flag    = {{.Challenge.Metadata.DynamicFlag}} # Required: Dynamic flag or not -> [true/false]
-flag            = {{.Challenge.Metadata.Flag}}         # Challenge Flag if dynamic_flag is false
-sidecar          = {{.Challenge.Metadata.Sidecar}}        # Specify helper sidecar container for example mysql
+dynamicFlag    = {{.Challenge.Metadata.DynamicFlag}} # Required: Dynamic flag or not -> [true/false]
+flag            = {{.Challenge.Metadata.Flag}}         # Challenge Flag if dynamicFlag is false
+difficulty      = {{.Challenge.Metadata.Difficulty}}     # Specify the difficulty of the challenge
 
 [challenge.env]
 apt_deps         = {{.Challenge.Env.AptDeps}}              # Custom apt-dependencies for challenge
@@ -62,7 +62,7 @@ RUN touch /entrypoint.sh && \
     echo "    chmod -R 755 /challenge/public" >> /entrypoint.sh && \
     echo "fi" >> /entrypoint.sh && \
 {{if .SetupCommand}}    echo "{{.SetupCommand}}" >> /entrypoint.sh && {{end}}\
-{{if .XinetdService}}   echo "mv xinetd.conf /etc/xinetd.d/pwn_service" >> /entrypoint.sh && {{end}}\
+{{if .XinetdService}}   echo "mv {{.XinetdConf}} /etc/xinetd.d/pwn_service" >> /entrypoint.sh && {{end}}\
     echo {{if .RunRoot}}"exec /bin/bash -c \"{{.RunCmd}}\""{{else}} "exec su beast /bin/bash -c \"{{.RunCmd}}\"" {{end}} >> /entrypoint.sh && \
     chmod u+x /entrypoint.sh
 {{else}}

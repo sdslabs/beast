@@ -88,10 +88,6 @@ service_name = "discord"
 # If it is false then notification will not be sent on this URL
 active = true
 
-# The sidecar that we support with beast, currently we only support two MySQL and
-# MongoDB.
-available_sidecars = ["mysql", "mongodb"]
-
 
 # The frequency for any periodic event in beast, the value is provided in seconds.
 # This is currently only used for health check periodic duration.s

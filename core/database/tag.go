@@ -11,7 +11,7 @@ import (
 type Tag struct {
 	gorm.Model
 
-	Challenges []*Challenge `gorm:"many2many:tag_challenges;"`
+	Challenges []*Challenge `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	TagName    string       `gorm:"not null;unique"`
 }
 
@@ -44,6 +44,27 @@ func QueryRelatedChallenges(tag *Tag) ([]Challenge, error) {
 	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
 
 	if err := Db.Preload("Tags").Preload("Ports").Model(&tagName).Association("Challenges").Find(&challenges); err != nil {
+		return challenges, err
+	}
+
+	return challenges, nil
+}
+
+// Query Related Challenges Metadata
+func QueryRelatedChallengesMetadata(tag *Tag) ([]Challenge, error) {
+	var challenges []Challenge
+	var tagName Tag
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
+
+	if err := Db.Model(&tagName).
+		Select("id", "name", "created_at", "points", "difficulty").
+		Preload("Tags").
+		Association("Challenges").
+		Find(&challenges); err != nil {
 		return challenges, err
 	}
 

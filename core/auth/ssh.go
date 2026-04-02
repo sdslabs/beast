@@ -55,7 +55,7 @@ func ParseAuthorizedKeysFile(filePath string) (map[string][]string, error) {
 	return authorizedKeysMap, eMsg
 }
 
-//This function parses ssh Private Key
+// This function parses ssh Private Key
 func ParsePrivateKey(keyFile string) (*rsa.PrivateKey, error) {
 	keyString, err := ioutil.ReadFile(keyFile)
 	if err != nil {
