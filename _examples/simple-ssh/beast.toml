@@ -1,0 +1,19 @@
+[author]
+name = "ph03nix"
+email = "author@example.com"
+ssh_key = "ssh-ed25519 AAAAC3NzaC1lZD"
+
+[challenge.metadata]
+name = "simple-ssh"
+flag = "FLAG{SSH_CHALLENGE_FLAG}"
+type = "ssh"
+points = 150
+description = "SSH into the server and find the flag. Here are the creds: ctf-user:ctf-password"
+
+[[challenge.metadata.hints]]
+text = "Check for hidden files in the home directory"
+points = 10
+
+[challenge.env]
+docker_context = "Dockerfile"
+port_mappings = ["14442:22"]

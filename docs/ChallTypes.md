@@ -4,7 +4,7 @@
 
 Any service whether it is a binary file, or a shell script, which needs to be instantiated on every connection can be easily hosted using `service` type challenge. **Xinetd** is for hosting these type of challenges inside a docker container.
 
-###Primary Requirements
+### Primary Requirements
 
 ```toml
 # Relative path to binary or script which needs to be executed when the specified
@@ -21,7 +21,7 @@ Web challenges are hosted using the corresponding images from Dockerhub. Current
 * Python : Django and Flask
 * Php
 
-###Primary Requirements
+### Primary Requirements
 
 ```toml
 # Relative directory corresponding to root of the challenge where the root
@@ -57,10 +57,24 @@ entrypoint = ""
 
 Authors might have tested the challenges in a isolated docker environment and might not want to port the challenge to one of these types. So they can use `docker` type challenge in which you can provide your own docker context file and ports.
 
-###Primary Requirements
+### Primary Requirements
 
 ```toml
 # Docker file name for specific type challenge - `docker`.
 # Helps to build flexible images for specific user-custom challenges
 docket_context = ""
+```
+
+## SSH Challenge
+
+SSH challenges allow participants to connect directly to a container via SSH. This challenge type requires a dockerfile to be provided, which will be run with the necessary port mappings to allow SSH access. If the 22 port has been explicitly mapped to a host port using  `port_mappings` then it will be mapped that host port. Otherwise, if the `ports` list has been used, then the first port of that list, will be mapped to the container's 22 port. 
+
+### Primary Requirements
+
+```toml
+# Docker file name for the SSH challenge
+docker_context = ""
+
+# Port to be exposed for SSH access (typically 22)
+port_mappings = ["14442:22"]
 ```
