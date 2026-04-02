@@ -32,10 +32,12 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
       > /etc/apt/sources.list.d/docker.list && \
     apt-get update && \
     apt-get install -y \
+      redis-tools \
+      postgresql-client \
       docker-ce-cli \
       docker-compose-plugin \
       docker-buildx-plugin && \
-    apt-get clean
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /go/bin/beast /usr/local/bin/beast
 
