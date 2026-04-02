@@ -270,12 +270,14 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, composeFileName, server)
+			/* Challenge Name and Project Name are the same for non instanced challenges */
+			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, challengeName, stagingDir, composeFileName, server)
 			if err != nil {
 				return fmt.Errorf("error while deploying challenge with docker-compose on remote: %v", err)
 			}
 		} else {
-			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, stagingDir, composeFileName)
+			/* Challenge Name and Project Name are the same for non instanced challenges */
+			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, challengeName, stagingDir, composeFileName)
 			if err != nil {
 				return fmt.Errorf("error while deploying challenge with docker-compose: %v", err)
 			}

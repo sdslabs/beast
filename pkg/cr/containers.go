@@ -299,9 +299,9 @@ func CommitContainer(containerId string) (string, error) {
 	return commitResp.ID, nil
 }
 
-func DeployContainerFromCompose(challengeName, stagedPath, composeFileName string) (string, error) {
+func DeployContainerFromCompose(challengeName string, projectBase string, stagedPath string, composeFileName string) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
-	projectName := utils.GetProjectName(challengeName)
+	projectName := utils.GetProjectName(projectBase)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
 	log.Debugf("Deploying challenge %s using docker compose with project name %s and file %s", challengeName, projectName, composeFileName)

@@ -317,7 +317,7 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 	projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
 
 	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
-		primaryContainer, err := cr.DeployContainerFromCompose(projectName, stagingDir, config.Challenge.Env.DockerCompose)
+		primaryContainer, err := cr.DeployContainerFromCompose(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose)
 		if err != nil {
 			return "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
 		}
@@ -325,7 +325,7 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 		return primaryContainer, nil
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
-		containerId, err := remoteManager.DeployContainerFromComposeRemote(projectName, stagingDir, config.Challenge.Env.DockerCompose, server)
+		containerId, err := remoteManager.DeployContainerFromComposeRemote(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, server)
 		if err != nil {
 			return "", fmt.Errorf("failed to deploy compose on remote: %w", err)
 		}

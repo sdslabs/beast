@@ -198,9 +198,9 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 	return imageID, nil
 }
 
-func DeployContainerFromComposeRemote(challengeName, stagedDir, composeFileName string, server config.AvailableServer) (string, error) {
+func DeployContainerFromComposeRemote(challengeName string, projectBase string, stagedDir string, composeFileName string, server config.AvailableServer) (string, error) {
 	extractDir := filepath.Join(stagedDir, challengeName)
-	projectName := utils.GetProjectName(challengeName)
+	projectName := utils.GetProjectName(projectBase)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
 	upCommand := fmt.Sprintf("docker compose -f %s -p %s up -d", composeFile, projectName)
