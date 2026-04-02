@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
+	"github.com/lib/pq"
 	"gorm.io/gorm/logger"
 	"os"
 	"os/exec"
@@ -253,14 +254,23 @@ func ResetDatabase() error {
 		return err
 	}
 
-	createCmd := exec.Command("psql", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "-d", "postgres", "-c", "CREATE DATABASE "+dbConfig.PsqlConf.Dbname+";")
-	createCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
-
-	output, err = createCmd.CombinedOutput()
+	dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, "postgres", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, "disable")
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		log.Printf("Create DB error: %s\n", string(output))
-		return err
+		return fmt.Errorf("unable to connect to database: %s", err)
 	}
+	defer db.Close()
+
+	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s", pq.QuoteIdentifier(dbConfig.PsqlConf.Dbname)))
+	if err != nil {
+		return fmt.Errorf("unable to create database: %s", err)
+	}
+
+	_, err = db.Exec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", pq.QuoteIdentifier(dbConfig.PsqlConf.Dbname), pq.QuoteIdentifier(dbConfig.PsqlConf.User)))
+	if err != nil {
+		return fmt.Errorf("unable to alter database owner: %s", err)
+	}
+
 	log.Debug("Reset successful.")
 	return nil
 }
