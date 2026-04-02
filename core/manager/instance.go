@@ -1,11 +1,8 @@
 package manager
 
 import (
-	"bytes"
 	"fmt"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -61,6 +58,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 
 	serverDeployed := selectServerForInstance()
 
+	/* handle port allocation for compose differently */
 	port, err := allocateInstancePort(serverDeployed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to allocate port: %w", err)
@@ -76,7 +74,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	var deploymentType string
 
 	if config.Challenge.Env.DockerCompose != "" {
-		containerID, err = deployInstanceFromCompose(instanceID, challengeName, port, &config, stagingDir, serverDeployed)
+		containerID, err = deployInstanceFromCompose(instanceID, challengeName, &config, stagingDir, serverDeployed)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
 	} else {
 		containerID, err = deployInstanceContainer(instanceID, challengeName, port, challenge.ImageId, &config, serverDeployed)
@@ -253,13 +251,6 @@ func allocateInstancePort(host string) (uint32, error) {
 	return port, nil
 }
 
-func freeInstancePort(host string, containerID string) {
-	err := cache.FreeContainerPortsOnHost(host, containerID)
-	if err != nil {
-		log.Warnf("Failed to free ports for container %s on %s: %v", containerID, host, err)
-	}
-}
-
 func selectServerForInstance() string {
 	availableServer, err := remoteManager.ServerQueue.GetNextAvailableInstance()
 	if err == nil && availableServer.Host != "" {
@@ -322,74 +313,36 @@ func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, 
 	return containerId, nil
 }
 
-func deployInstanceFromCompose(instanceID, challengeName string, hostPort uint32, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string) (string, error) {
-	projectName := fmt.Sprintf("beast-instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
-	composeFile := filepath.Join(stagingDir, challengeName, config.Challenge.Env.DockerCompose)
+func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string) (string, error) {
+	projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
 
 	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
-		err := utils.ValidateFileExists(composeFile)
+		primaryContainer, err := cr.DeployContainerFromCompose(projectName, stagingDir, config.Challenge.Env.DockerCompose)
 		if err != nil {
-			return "", fmt.Errorf("compose file not found: %w", err)
+			return "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
 		}
 
-		upCmd := exec.Command("docker", "compose",
-			"-f", composeFile,
-			"-p", projectName,
-			"up", "-d")
-
-		upCmd.Env = append(upCmd.Environ(), fmt.Sprintf("INSTANCE_PORT=%d", hostPort))
-
-		var upOutput bytes.Buffer
-		upCmd.Stdout = &upOutput
-		upCmd.Stderr = &upOutput
-
-		if err := upCmd.Run(); err != nil {
-			log.Errorf("docker compose up failed for instance %s. Output:\n%s", instanceID, upOutput.String())
-			return "", fmt.Errorf("docker compose up failed: %v", err)
-		}
-
-		psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q")
-		var output bytes.Buffer
-		psCmd.Stdout = &output
-
-		if err := psCmd.Run(); err != nil {
-			return "", fmt.Errorf("failed to get container IDs: %v", err)
-		}
-
-		containerIds := strings.Fields(strings.TrimSpace(output.String()))
-		if len(containerIds) == 0 {
-			return "", fmt.Errorf("no containers found for instance")
-		}
-
-		containerId := containerIds[0]
-		if len(containerId) >= 12 {
-			containerId = containerId[:12]
+		return primaryContainer, nil
+	} else {
+		server := cfg.Cfg.AvailableServers[serverDeployed]
+		containerId, err := remoteManager.DeployContainerFromComposeRemote(projectName, stagingDir, config.Challenge.Env.DockerCompose, server)
+		if err != nil {
+			return "", fmt.Errorf("failed to deploy compose on remote: %w", err)
 		}
 
 		return containerId, nil
 	}
-
-	server := cfg.Cfg.AvailableServers[serverDeployed]
-	containerId, err := remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, config.Challenge.Env.DockerCompose, server)
-	if err != nil {
-		return "", fmt.Errorf("failed to deploy compose on remote: %w", err)
-	}
-
-	return containerId, nil
 }
 
 func killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed string) error {
 	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
 		if deploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
-			projectName := fmt.Sprintf("beast-instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
-			downCmd := exec.Command("docker", "compose", "-p", projectName, "down", "--remove-orphans", "-v")
+			stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+			projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
 
-			var output bytes.Buffer
-			downCmd.Stdout = &output
-			downCmd.Stderr = &output
-
-			if err := downCmd.Run(); err != nil {
-				return fmt.Errorf("docker compose down failed: %v, output: %s", err, output.String())
+			err := cr.ComposePurge(projectName, stagingDir)
+			if err != nil {
+				return fmt.Errorf("docker compose down failed: %s", err.Error())
 			}
 		} else {
 			err := cr.StopAndRemoveContainer(containerID)
