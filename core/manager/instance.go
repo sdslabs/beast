@@ -99,7 +99,6 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		InstanceID:     instanceID,
 		ChallengeName:  challengeName,
 		ContainerID:    containerID,
-		HostedAddress:  getHostedAddress(serverDeployed),
 		Port:           port,
 		UserID:         userID,
 		Username:       username,
@@ -415,14 +414,4 @@ func killInstanceContainer(containerID, deploymentType, instanceID, challengeNam
 	}
 
 	return nil
-}
-
-func getHostedAddress(serverDeployed string) string {
-	if serverDeployed != "" && serverDeployed != core.LOCALHOST {
-		return serverDeployed
-	}
-	if cfg.Cfg.BeastStaticUrl != "" {
-		return cfg.Cfg.BeastStaticUrl
-	}
-	return "localhost"
 }
