@@ -393,16 +393,18 @@ func challengesMetadataHandler(c *gin.Context) {
 			}
 
 			availableChallenges[index] = ChallengeMetadata{
-				Name:           challenge.Name,
-				ChallId:        challenge.ID,
-				Tags:           challengeTags,
-				CreatedAt:      challenge.CreatedAt,
-				Points:         challenge.Points,
-				SolvesNumber:   totalSolves,
-				SolveStatus:    solveStatus,
-				Difficulty:     challenge.Difficulty,
-				PreRequisite:   strings.Split(challenge.PreReqs, core.DELIMITER),
-				DeployedStatus: challenge.Status,
+				Name:               challenge.Name,
+				ChallId:            challenge.ID,
+				Tags:               challengeTags,
+				CreatedAt:          challenge.CreatedAt,
+				Points:             challenge.Points,
+				SolvesNumber:       totalSolves,
+				SolveStatus:        solveStatus,
+				Difficulty:         challenge.Difficulty,
+				PreRequisite:       strings.Split(challenge.PreReqs, core.DELIMITER),
+				DeployedStatus:     challenge.Status,
+				Instanced:          challenge.Instanced,
+				InstanceExpiration: challenge.InstanceExpiration,
 			}
 		}
 
