@@ -80,11 +80,10 @@ func UserHasTakenHint(userID, hintID uint) (bool, error) {
 
 	var userHint UserHint
 	if err := tx.Where("user_id = ? AND hint_id = ?", userID, hintID).First(&userHint).Error; err != nil {
+		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			tx.Rollback()
 			return false, nil
 		}
-		tx.Rollback()
 		return false, fmt.Errorf("db_error")
 	}
 

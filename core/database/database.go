@@ -2,7 +2,10 @@ package database
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"fmt"
+	"github.com/lib/pq"
+	"gorm.io/gorm/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,8 +28,7 @@ var (
 )
 
 var (
-	BEAST_GLOBAL_DIR string = filepath.Join(os.Getenv("HOME"), ".beast")
-	dbConfig         Config
+	dbConfig Config
 )
 
 type Config struct {
@@ -54,7 +56,16 @@ func LoadDbConfig() {
 func ConnectDatabase() error {
 	LoadDbConfig()
 	dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, dbConfig.PsqlConf.Dbname, dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.SslMode)
-	Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
+	Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.New(
+			log.New(),
+			logger.Config{
+				LogLevel:                  logger.Warn,
+				IgnoreRecordNotFoundError: true,
+			},
+		)})
+
 	if dberr != nil {
 		log.Error("Error while initializing the database.", dberr)
 		return dberr
@@ -117,6 +128,31 @@ func Init() {
 	}
 }
 
+func Close() error {
+	if Db == nil {
+		log.Warnln(fmt.Sprintf("Trying to close database connection when no connection is established..."))
+		return nil
+	}
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	sqlDb, err := Db.DB()
+	if err != nil {
+		log.Errorln(fmt.Sprintf("Error while closing database connection gracefully: %s, attempting to terminate forcefully", err.Error()))
+		return TerminateDatabaseConnections()
+	}
+
+	err = sqlDb.Close()
+	if err != nil {
+		log.Errorln(fmt.Sprintf("Error while closing database connection gracefully: %s, attempting to terminate forcefully", err.Error()))
+		return TerminateDatabaseConnections()
+	}
+
+	Db = nil
+	return nil
+}
+
 func BackupAndReset() {
 	LoadDbConfig()
 
@@ -131,7 +167,7 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", core.BEAST_REMOTES_DIR)
+	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_REMOTES_DIR)
 	err = utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
 		log.Errorf("Error while creating backup directory: %s", err)
@@ -146,7 +182,7 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, "backup", core.BEAST_STAGING_DIR)
+	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_STAGING_DIR)
 
 	err = utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
@@ -167,8 +203,7 @@ func BackupDatabase() error {
 	if dbConfig == (Config{}) {
 		LoadDbConfig()
 	}
-
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, "backup", "db")
+	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, "db")
 	err := utils.CreateIfNotExistDir(backupPath)
 	if err != nil {
 		log.Errorf("Error while creating backup directory: %s", err)
@@ -176,8 +211,21 @@ func BackupDatabase() error {
 	}
 
 	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.PsqlConf.Dbname, time.Now().Format("20060102150405"))
-	cmd := exec.Command("pg_dump", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.PsqlConf.Dbname)
+	cmd := exec.Command(
+		"pg_dump",
+		"-U",
+		dbConfig.PsqlConf.User,
+		"-h", dbConfig.PsqlConf.Host,
+		"-p",
+		dbConfig.PsqlConf.Port,
+		"-F",
+		"c",
+		"-f",
+		filepath.Join(backupPath, backupFile),
+		dbConfig.PsqlConf.Dbname,
+	)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Backup error: %s\n", string(output))
@@ -206,14 +254,23 @@ func ResetDatabase() error {
 		return err
 	}
 
-	createCmd := exec.Command("psql", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "-d", "postgres", "-c", "CREATE DATABASE "+dbConfig.PsqlConf.Dbname+";")
-	createCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
-
-	output, err = createCmd.CombinedOutput()
+	dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, "postgres", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, "disable")
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		log.Printf("Create DB error: %s\n", string(output))
-		return err
+		return fmt.Errorf("unable to connect to database: %s", err)
 	}
+	defer db.Close()
+
+	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s", pq.QuoteIdentifier(dbConfig.PsqlConf.Dbname)))
+	if err != nil {
+		return fmt.Errorf("unable to create database: %s", err)
+	}
+
+	_, err = db.Exec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", pq.QuoteIdentifier(dbConfig.PsqlConf.Dbname), pq.QuoteIdentifier(dbConfig.PsqlConf.User)))
+	if err != nil {
+		return fmt.Errorf("unable to alter database owner: %s", err)
+	}
+
 	log.Debug("Reset successful.")
 	return nil
 }
@@ -223,24 +280,21 @@ func TerminateDatabaseConnections() error {
 	if dbConfig == (Config{}) {
 		LoadDbConfig()
 	}
-	terminateCmd := exec.Command(
-		"psql",
-		"-U", dbConfig.PsqlConf.User,
-		"-h", dbConfig.PsqlConf.Host,
-		"-p", dbConfig.PsqlConf.Port,
-		"-d", "postgres",
-		"-c",
-		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname),
-	)
-	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
 
-	output, err := terminateCmd.CombinedOutput()
-	outputStr := string(output)
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, "postgres", dbConfig.PsqlConf.SslMode)
+	db, err := sql.Open("pgx", dsn)
+
 	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", outputStr)
 		return err
 	}
-	log.Debug(outputStr)
+	defer db.Close()
+
+	_, err = db.Exec("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname)
+	if err != nil {
+		log.Errorf("Terminate connections error: %s\n", err.Error())
+		return err
+	}
+
 	return nil
 }
 

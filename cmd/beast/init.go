@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/BurntSushi/toml"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/lib/pq"
 	"github.com/sdslabs/beastv4/core"
@@ -125,11 +124,11 @@ func dbUserCheck() (bool, error) {
 func initDb() error {
 	log.Infoln("Initializing database...")
 
-	var configuration config.BeastConfig
-	_, err := toml.DecodeFile(BEAST_GLOBAL_CONFIG, &configuration)
+	err := config.ReloadBeastConfig()
 	if err != nil {
 		return err
 	}
+	configuration := config.Cfg.PsqlConf
 
 	isPostgres, err := dbUserCheck()
 	if err != nil {
@@ -140,7 +139,7 @@ func initDb() error {
 	if isPostgres {
 		log.Infoln("Attempting to connect to postgres as postgres super user...")
 
-		dsn := fmt.Sprintf("user=%s dbname=%s sslmode=%s", "postgres", "postgres", "disable")
+		dsn := fmt.Sprintf("user=%s dbname=%s host=%s port=%s sslmode=%s", "postgres", "postgres", configuration.Host, configuration.Port, "disable")
 		db, err = sql.Open("pgx", dsn)
 
 		if err != nil {
@@ -152,7 +151,7 @@ func initDb() error {
 		if utils.PromptBinary("Do you use password authentication for the postgres super user?") {
 			password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
 
-			dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
+			dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", "postgres", password, "postgres", configuration.Host, configuration.Port, "disable")
 			db, err = sql.Open("pgx", dsn)
 
 			if err != nil {
@@ -167,41 +166,41 @@ func initDb() error {
 	defer db.Close()
 
 	var exists int
-	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.PsqlConf.User).Scan(&exists)
+	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.User).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		if err = createBeastDbUser(db, &configuration.PsqlConf); err != nil {
+		if err = createBeastDbUser(db, &configuration); err != nil {
 			return err
 		}
 	} else if err != nil {
 		return err
 	} else {
-		log.Infoln(fmt.Sprintf("User %s already exists", configuration.PsqlConf.User))
+		log.Infoln(fmt.Sprintf("User %s already exists", configuration.User))
 	}
 
-	log.Infoln(fmt.Sprintf("Changing password for user %s", configuration.PsqlConf.User))
-	query := fmt.Sprintf("ALTER USER %s WITH PASSWORD %s", pq.QuoteIdentifier(configuration.PsqlConf.User), utils.QuoteLiteral(configuration.PsqlConf.Password))
+	log.Infoln(fmt.Sprintf("Changing password for user %s", configuration.User))
+	query := fmt.Sprintf("ALTER USER %s WITH PASSWORD %s", pq.QuoteIdentifier(configuration.User), utils.QuoteLiteral(configuration.Password))
 	_, err = db.Exec(query)
 	if err != nil {
 		return err
 	}
 
-	err = db.QueryRow("SELECT 1 FROM pg_database WHERE datname = $1", configuration.PsqlConf.Dbname).Scan(&exists)
+	err = db.QueryRow("SELECT 1 FROM pg_database WHERE datname = $1", configuration.Dbname).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		if err = createBeastDatabase(db, &configuration.PsqlConf); err != nil {
+		if err = createBeastDatabase(db, &configuration); err != nil {
 			return err
 		}
 	} else if err != nil {
 		return err
 	} else {
-		log.Infoln(fmt.Sprintf("Database %s already exists", configuration.PsqlConf.Dbname))
+		log.Infoln(fmt.Sprintf("Database %s already exists", configuration.Dbname))
 	}
 
-	_, err = db.Exec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", pq.QuoteIdentifier(configuration.PsqlConf.Dbname), pq.QuoteIdentifier(configuration.PsqlConf.User)))
+	_, err = db.Exec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", pq.QuoteIdentifier(configuration.Dbname), pq.QuoteIdentifier(configuration.User)))
 	if err != nil {
 		return err
 	}
 
-	log.Infoln(fmt.Sprintf("%s set as owner of database %s", configuration.PsqlConf.User, configuration.PsqlConf.Dbname))
+	log.Infoln(fmt.Sprintf("%s set as owner of database %s", configuration.User, configuration.Dbname))
 	return nil
 }
 

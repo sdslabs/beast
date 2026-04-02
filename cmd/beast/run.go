@@ -76,13 +76,13 @@ func cleanupDatabaseConnections() {
 		log.Infoln("Database backup completed successfully")
 	}
 
-	log.Infoln("Terminating database connection...")
+	log.Infoln("Closing database connection...")
 
-	err = database.TerminateDatabaseConnections()
+	err = database.Close()
 	if err != nil {
-		log.Errorln("Unable to terminate database connections:", err)
+		log.Errorln("Unable to close database connections:", err)
 	} else {
-		log.Infoln("Database connections terminated successfully")
+		log.Infoln("Database connections close successfully")
 	}
 }
 
