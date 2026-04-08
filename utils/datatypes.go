@@ -66,3 +66,15 @@ func ParsePortMapping(portMap string) (uint32, uint32, error) {
 
 	return uint32(firstPort), uint32(lastPort), nil
 }
+
+func PortMappingToEnvironmentVariable(ports map[string]uint32) string {
+	env := make([]string, len(ports))
+
+	i := 0
+	for variable, port := range ports {
+		env[i] = fmt.Sprintf("%s=%s", variable, strconv.FormatUint(uint64(port), 10))
+		i++
+	}
+
+	return strings.Join(env, " ")
+}

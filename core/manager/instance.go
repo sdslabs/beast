@@ -58,39 +58,77 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 
 	serverDeployed := selectServerForInstance()
 
-	/* handle port allocation for compose differently */
-	port, err := allocateInstancePort(serverDeployed)
-	if err != nil {
-		return nil, fmt.Errorf("failed to allocate port: %w", err)
-	}
-
 	instanceID := uuid.New().String()[:12]
 
 	expirationSeconds := config.Challenge.Metadata.GetInstanceExpiration()
 	ttl := time.Duration(expirationSeconds) * time.Second
 	expiresAt := time.Now().Add(ttl)
 
+	var port uint32
 	var containerID string
 	var deploymentType string
 
 	if config.Challenge.Env.DockerCompose != "" {
-		containerID, err = deployInstanceFromCompose(instanceID, challengeName, &config, stagingDir, serverDeployed)
+		composeFile := filepath.Join(stagingDir, challengeName, config.Challenge.Env.DockerCompose)
+		portVariables, err := utils.ExtractPortsFromCompose(composeFile)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract port variables: %w", err)
+		}
+
+		ports := make(map[string]uint32, len(portVariables))
+		for _, portVariable := range portVariables {
+			port, err = allocateInstancePort(serverDeployed)
+			if err != nil {
+				return nil, fmt.Errorf("failed to allocate instancePort: %w", err)
+			}
+
+			ports[portVariable] = port
+		}
+
+		if len(portVariables) > 0 {
+			port = ports[portVariables[0]]
+		}
+
+		containerID, err = deployInstanceFromCompose(instanceID, challengeName, &config, stagingDir, serverDeployed, ports)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
+
+		if err != nil {
+			for _, port := range ports {
+				if err := cache.FreePortOnHost(serverDeployed, port); err != nil {
+					log.Errorf("failed to free container ports: %s", err.Error())
+				}
+			}
+			return nil, fmt.Errorf("failed to deploy instance container: %s", err.Error())
+		}
+
+		for _, port := range ports {
+			err = cache.AssignFreePortOnHostToContainer(serverDeployed, containerID, port)
+			if err != nil {
+				log.Warnf("Failed to register port %d for container %s: %v", port, containerID, err)
+			}
+		}
 	} else {
+		port, err := allocateInstancePort(serverDeployed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to allocate port: %w", err)
+		}
+
 		containerID, err = deployInstanceContainer(instanceID, challengeName, port, challenge.ImageId, &config, serverDeployed)
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
-	}
 
-	if err != nil {
-		if err := cache.FreeContainerPortsOnHost(serverDeployed, containerID); err != nil {
-			return nil, fmt.Errorf("failed to free container ports: %w", err)
+		if err != nil {
+			if err := cache.FreePortOnHost(serverDeployed, port); err != nil {
+				return nil, fmt.Errorf("failed to free port %v: %w", port, err)
+			}
+
+			return nil, fmt.Errorf("failed to deploy instance container: %w", err)
 		}
-		return nil, fmt.Errorf("failed to deploy instance container: %w", err)
-	}
 
-	err = cache.AssignFreePortOnHostToContainer(serverDeployed, containerID, port)
-	if err != nil {
-		log.Warnf("Failed to register port %d for container %s: %v", port, containerID, err)
+		err = cache.AssignFreePortOnHostToContainer(serverDeployed, containerID, port)
+		if err != nil {
+			log.Warnf("Failed to register port %d for container %s: %v", port, containerID, err)
+		}
 	}
 
 	instance := &cache.Instance{
@@ -313,11 +351,11 @@ func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, 
 	return containerId, nil
 }
 
-func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string) (string, error) {
+func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string, ports map[string]uint32) (string, error) {
 	projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
 
 	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
-		primaryContainer, err := cr.DeployContainerFromCompose(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose)
+		primaryContainer, err := cr.DeployContainerFromCompose(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, ports)
 		if err != nil {
 			return "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
 		}
@@ -325,7 +363,7 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 		return primaryContainer, nil
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
-		containerId, err := remoteManager.DeployContainerFromComposeRemote(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, server)
+		containerId, err := remoteManager.DeployContainerFromComposeRemote(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, server, ports)
 		if err != nil {
 			return "", fmt.Errorf("failed to deploy compose on remote: %w", err)
 		}

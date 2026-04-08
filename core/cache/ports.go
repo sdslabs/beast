@@ -85,6 +85,26 @@ func GetContainerPortsOnHost(host string, containerId string) ([]uint32, error) 
 	return ports, nil
 }
 
+// FreePortOnHost frees a specifc port on a host machine
+func FreePortOnHost(host string, port uint32) error {
+	if Cache == nil {
+		Init()
+	}
+
+	CacheMutex.Lock()
+	defer CacheMutex.Unlock()
+
+	ctx := context.Background()
+	hostKey := utils.HostToKey(host)
+
+	_, err := Cache.SRem(ctx, hostKey, port).Result()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // FreeContainerPortsOnHost frees all allocated host ports on a machine, at present occupied by a container
 func FreeContainerPortsOnHost(host string, containerId string) error {
 	if Cache == nil {

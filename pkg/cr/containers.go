@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -299,7 +300,7 @@ func CommitContainer(containerId string) (string, error) {
 	return commitResp.ID, nil
 }
 
-func DeployContainerFromCompose(challengeName string, projectBase string, stagedPath string, composeFileName string) (string, error) {
+func DeployContainerFromCompose(challengeName string, projectBase string, stagedPath string, composeFileName string, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
 	projectName := utils.GetProjectName(projectBase)
 	composeFile := filepath.Join(extractDir, composeFileName)
@@ -312,6 +313,13 @@ func DeployContainerFromCompose(challengeName string, projectBase string, staged
 		"-f", composeFile,
 		"-p", projectName,
 		"up", "-d")
+
+	environment := os.Environ()
+	for variable, port := range ports {
+		environment = append(environment, fmt.Sprintf("%s=%s", variable, strconv.FormatUint(uint64(port), 10)))
+	}
+
+	upCmd.Env = environment
 
 	var upOutput bytes.Buffer
 	upCmd.Stdout = &upOutput

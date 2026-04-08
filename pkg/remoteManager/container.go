@@ -26,7 +26,7 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 		containerEnv += fmt.Sprintf("--env %s ", envVar)
 	}
 	for _, portMapping := range containerConfig.PortMapping {
-		portMap += fmt.Sprintf("-p 0.0.0.0:%d:%d/%s ", portMapping.ContainerPort, portMapping.HostPort, containerConfig.TrafficType())
+		portMap += fmt.Sprintf("-p 0.0.0.0:%d:%d/%s ", portMapping.HostPort, portMapping.ContainerPort, containerConfig.TrafficType())
 		exposedPorts += fmt.Sprintf("--expose %d ", portMapping.ContainerPort)
 	}
 	if containerConfig.CPUShares != 0 {
@@ -198,12 +198,12 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 	return imageID, nil
 }
 
-func DeployContainerFromComposeRemote(challengeName string, projectBase string, stagedDir string, composeFileName string, server config.AvailableServer) (string, error) {
+func DeployContainerFromComposeRemote(challengeName string, projectBase string, stagedDir string, composeFileName string, server config.AvailableServer, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedDir, challengeName)
 	projectName := utils.GetProjectName(projectBase)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
-	upCommand := fmt.Sprintf("docker compose -f %s -p %s up -d", composeFile, projectName)
+	upCommand := fmt.Sprintf("%s docker compose -f %s -p %s up -d", utils.PortMappingToEnvironmentVariable(ports), composeFile, projectName)
 	log.Debugf("Deploying challenge %s using docker compose remotely with project %s and file %s", challengeName, projectName, composeFileName)
 	upOutput, err := RunCommandOnServer(server, upCommand)
 	if err != nil {

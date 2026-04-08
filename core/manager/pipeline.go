@@ -267,19 +267,52 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		var err error
 
 		composeFileName := config.Challenge.Env.DockerCompose
+		portVariables, err := utils.ExtractPortsFromCompose(filepath.Join(stagingDir, challengeName, composeFileName))
 
+		if err != nil {
+			return fmt.Errorf("failed to extract port variables: %w", err)
+		}
+
+		var serverDeployed string
 		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
 			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-			/* Challenge Name and Project Name are the same for non instanced challenges */
-			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, challengeName, stagingDir, composeFileName, server)
+			serverDeployed = server.Host
+		} else {
+			serverDeployed = core.LOCALHOST
+		}
+
+		ports := make(map[string]uint32, len(portVariables))
+		for _, portVariable := range portVariables {
+			port, err := allocateInstancePort(serverDeployed)
 			if err != nil {
-				return fmt.Errorf("error while deploying challenge with docker-compose on remote: %v", err)
+				return fmt.Errorf("failed to allocate instancePort: %w", err)
 			}
+
+			ports[portVariable] = port
+		}
+
+		if serverDeployed != core.LOCALHOST {
+			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+			/* Challenge Name and Project Name are the same for non instanced challenges */
+			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, challengeName, stagingDir, composeFileName, server, ports)
 		} else {
 			/* Challenge Name and Project Name are the same for non instanced challenges */
-			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, challengeName, stagingDir, composeFileName)
+			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, challengeName, stagingDir, composeFileName, ports)
+		}
+
+		if err != nil {
+			for _, port := range ports {
+				if err := cache.FreePortOnHost(serverDeployed, port); err != nil {
+					log.Errorf("failed to free allocated compose port %d on host %s: %v", port, serverDeployed, err)
+				}
+			}
+			return fmt.Errorf("error while deploying challenge with docker-compose on remote: %v", err)
+		}
+
+		for _, port := range ports {
+			err = cache.AssignFreePortOnHostToContainer(serverDeployed, primaryContainerId, port)
 			if err != nil {
-				return fmt.Errorf("error while deploying challenge with docker-compose: %v", err)
+				log.Warnf("Failed to register port %d for container %s: %v", port, primaryContainerId, err)
 			}
 		}
 
