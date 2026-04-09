@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
@@ -126,7 +127,6 @@ type BeastConfig struct {
 	HealthProber         bool                       `toml:"health_prober"`
 	RemoteSyncPeriod     time.Duration              `toml:"-"`
 	Rsp                  string                     `toml:"remote_sync_period"`
-	LocalHostPortRange   string                     `toml:"local_host_port_range"`
 	InstanceConfig       InstanceConfig             `toml:"instance_config"`
 
 	CPUShares int64 `toml:"default_cpu_shares"`
@@ -225,15 +225,23 @@ func (config *BeastConfig) ValidateConfig() error {
 		log.Warn("No available servers provided for challenges. Using default localhost")
 		config.AvailableServers = map[string]AvailableServer{
 			core.LOCALHOST: {
+				Name:       core.LOCALHOST,
 				Host:       core.LOCALHOST,
 				Username:   os.Getenv("USER"),
 				SSHKeyPath: "",
 				Active:     true,
+				PortRange:  fmt.Sprintf("%v%s%v", core.ALLOWED_MIN_PORT_VALUE, core.MappingDelimeter, core.ALLOWED_MAX_PORT_VALUE),
 			},
 		}
 	}
 
-	for _, server := range config.AvailableServers {
+	for name, server := range config.AvailableServers {
+		if strings.Contains(name, ":") {
+			return fmt.Errorf("server key %q contains invalid character ':'", name)
+		}
+
+		server.Name = name
+		config.AvailableServers[name] = server
 		if server.Active {
 			err := server.ValidateServerConfig()
 			if err != nil {
@@ -284,11 +292,6 @@ func (config *BeastConfig) ValidateConfig() error {
 		}
 	}
 
-	err = ValidatePortRange(config.LocalHostPortRange)
-	if err != nil {
-		return fmt.Errorf("error while validating port range in global beast config: %s", err)
-	}
-
 	if config.CPUShares <= 0 {
 		log.Debug("Per container CPU shares not provided using default value")
 		config.CPUShares = core.DEFAULT_CPU_SHARE
@@ -314,6 +317,7 @@ func (config *BeastConfig) ValidateConfig() error {
 }
 
 type AvailableServer struct {
+	Name       string `toml:"-"`
 	Host       string `toml:"host"`
 	Username   string `toml:"username"`
 	SSHKeyPath string `toml:"ssh_key_path"`

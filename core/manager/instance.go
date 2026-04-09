@@ -269,12 +269,8 @@ func allocateInstancePort(host string) (uint32, error) {
 	var firstPort, lastPort uint32
 	var err error
 
-	if host == core.LOCALHOST || host == "" {
-		firstPort, lastPort, err = utils.ParsePortMapping(cfg.Cfg.LocalHostPortRange)
-	} else {
-		server := cfg.Cfg.AvailableServers[host]
-		firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
-	}
+	server := cfg.Cfg.AvailableServers[host]
+	firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse port range: %w", err)
@@ -291,8 +287,8 @@ func allocateInstancePort(host string) (uint32, error) {
 
 func selectServerForInstance() string {
 	availableServer, err := remoteManager.ServerQueue.GetNextAvailableInstance()
-	if err == nil && availableServer.Host != "" {
-		return availableServer.Host
+	if err == nil && availableServer.Name != "" {
+		return availableServer.Name
 	}
 	return core.LOCALHOST
 }

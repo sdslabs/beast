@@ -3,11 +3,10 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"github.com/sdslabs/beastv4/core"
 	"strconv"
 	"strings"
 )
-
-const mappingDelimeter = ":"
 
 // From a list of strings generate a list containing only unique strings
 // from the list.
@@ -48,7 +47,7 @@ func UInt32InList(a uint32, list []uint32) bool {
 // If the portMapping string is not valid, this returns an error.
 // The format of the port mapping is `PORT_FIRST:PORT_LAST`
 func ParsePortMapping(portMap string) (uint32, uint32, error) {
-	ports := strings.Split(portMap, mappingDelimeter)
+	ports := strings.Split(portMap, core.MappingDelimeter)
 
 	if len(ports) != 2 {
 		return 0, 0, errors.New("port mapping string is not valid")

@@ -256,6 +256,12 @@ func challengeInfoHandler(c *gin.Context) {
 			PreRequisite:   strings.Split(challenge.PreReqs, core.DELIMITER),
 			DeployedStatus: challenge.Status,
 		}
+		deployedHost := challenge.ServerDeployed
+		if deployedHost != core.LOCALHOST && deployedHost != "" {
+			if s, ok := cfg.Cfg.AvailableServers[deployedHost]; ok {
+				deployedHost = s.Host
+			}
+		}
 		challengeInfo := Challenge{
 			ChallengeMetadata: challMetadata,
 			Description:       challenge.Description,
@@ -265,7 +271,7 @@ func challengeInfoHandler(c *gin.Context) {
 			AdditionalLinks:   strings.Split(challenge.AdditionalLinks, core.DELIMITER),
 			PreviousTries:     previousTries,
 			MaxAttemptLimit:   challenge.MaxAttemptLimit,
-			DeployedLink:      challenge.ServerDeployed,
+			DeployedLink:      deployedHost,
 		}
 		if user.Role == core.USER_ROLES["contestant"] {
 			c.JSON(http.StatusOK, challengeInfo)

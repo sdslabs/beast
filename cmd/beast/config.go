@@ -115,11 +115,14 @@ func promptServerDetails(configuration *config.BeastConfig) {
 		var server config.AvailableServer
 
 		server.Host = utils.PromptString("Enter Host Name, leave empty for localhost")
+		if server.Host == "" {
+			server.Host = core.LOCALHOST
+		}
 		server.Username = utils.PromptString("Enter Username")
 		server.SSHKeyPath = utils.PromptString("Enter SSH Key Path")
 		server.Active = utils.PromptBinary("Enable this server?")
 
-		configuration.AvailableServers[server.Username] = server
+		configuration.AvailableServers[server.Host] = server
 	}
 }
 

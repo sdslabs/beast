@@ -273,11 +273,8 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			return fmt.Errorf("failed to extract port variables: %w", err)
 		}
 
-		var serverDeployed string
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
-			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-			serverDeployed = server.Host
-		} else {
+		serverDeployed := challenge.ServerDeployed
+		if serverDeployed == "" {
 			serverDeployed = core.LOCALHOST
 		}
 
@@ -356,17 +353,14 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	)
 
 	var err error
-	var host string
-	var firstPort, lastPort uint32
-	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
+	host := challenge.ServerDeployed
+	if host == "" {
 		host = core.LOCALHOST
-		firstPort, lastPort, err = utils.ParsePortMapping(cfg.Cfg.LocalHostPortRange)
-	} else {
-		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-
-		host = server.Host
-		firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
 	}
+
+	var firstPort, lastPort uint32
+	server := cfg.Cfg.AvailableServers[host]
+	firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
 
 	if err != nil {
 		return fmt.Errorf("error while allocating ports on server %s for challenge %s: %s", host, challenge.Name, err.Error())

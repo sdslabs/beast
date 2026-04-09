@@ -492,7 +492,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		availableServerHostname := core.LOCALHOST
 		if config.Challenge.Metadata.Type != core.STATIC_CHALLENGE_TYPE_NAME {
 			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
-			availableServerHostname = availableServer.Host
+			availableServerHostname = availableServer.Name
 		}
 		if config.Challenge.Metadata.Difficulty == "" {
 			log.Debug("Setting difficulty to default(medium)")
@@ -570,14 +570,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	}
 
 	if challEntry.ContainerId != "" {
-		var host string
-		if challEntry.ServerDeployed == core.LOCALHOST || challEntry.ServerDeployed == "" {
-			host = core.LOCALHOST
-		} else {
-			host = cfg.Cfg.AvailableServers[challEntry.ServerDeployed].Host
-		}
-
-		hostPorts, err := cache.GetContainerPortsOnHost(host, challEntry.ContainerId)
+		hostPorts, err := cache.GetContainerPortsOnHost(challEntry.ServerDeployed, challEntry.ContainerId)
 		if err != nil {
 			return fmt.Errorf("error while parsing host port for challenge %s : %s", challEntry.Name, err)
 		}

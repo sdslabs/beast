@@ -698,11 +698,9 @@ func undeployChallenge(challengeName string, purge bool) error {
 			}
 		}
 
-		var host string
-		if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
+		host := challenge.ServerDeployed
+		if host == "" {
 			host = core.LOCALHOST
-		} else {
-			host = config.Cfg.AvailableServers[challenge.ServerDeployed].Host
 		}
 
 		err = cache.FreeContainerPortsOnHost(host, challenge.ContainerId)

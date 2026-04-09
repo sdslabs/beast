@@ -87,8 +87,14 @@ func ChallengesHealthProber(waitTime int) {
 			// Do a better job at health probing mechanism.
 			if len(allocatedPorts) > 0 {
 				port := int(allocatedPorts[0].PortNo)
+				probeHost := chall.ServerDeployed
+				if probeHost != core.LOCALHOST && probeHost != "" {
+					if s, ok := config.Cfg.AvailableServers[probeHost]; ok {
+						probeHost = s.Host
+					}
+				}
 				prober := probes.NewTcpProber()
-				result, err := prober.Probe(chall.ServerDeployed, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
+				result, err := prober.Probe(probeHost, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
 				if err != nil {
 					msg := fmt.Sprintf("NETWORK HEALTH CHECK %s: %s : %s", result, chall.Name, err)
 					log.WithFields(log.Fields{
