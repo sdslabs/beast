@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -528,10 +529,26 @@ func SaveChallengeSubmission(user_challenges *UserChallenges) error {
 		return fmt.Errorf("error while saving record: %s", tx.Error)
 	}
 
-	if err := tx.FirstOrCreate(user_challenges, *user_challenges).Error; err != nil {
-		tx.Rollback()
-		return err
+	// Check if a row already exists for this user+challenge pair (created by UpdateUserChallengeTries)
+	var existing UserChallenges
+	err := tx.Where("user_id = ? AND challenge_id = ?", user_challenges.UserID, user_challenges.ChallengeID).First(&existing).Error
+	if err == nil {
+		// Row exists: update it to mark as solved with the current timestamp
+		if updateErr := tx.Model(&existing).Updates(map[string]interface{}{
+			"solved":     user_challenges.Solved,
+			"created_at": user_challenges.CreatedAt,
+		}).Error; updateErr != nil {
+			tx.Rollback()
+			return updateErr
+		}
+	} else {
+		// No existing row: create a new one
+		if createErr := tx.Create(user_challenges).Error; createErr != nil {
+			tx.Rollback()
+			return createErr
+		}
 	}
+
 	return tx.Commit().Error
 }
 
@@ -870,14 +887,22 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 	var allRows []userChallengeRow
 
 	if err := Db.Table("user_challenges").
-		Select("user_challenges.user_id, users.username, user_challenges.created_at, challenges.points").
+		Select("DISTINCT ON (user_challenges.user_id, user_challenges.challenge_id) user_challenges.user_id, users.username, user_challenges.created_at, challenges.points").
 		Joins("JOIN challenges ON user_challenges.challenge_id = challenges.id").
 		Joins("JOIN users ON user_challenges.user_id = users.id").
 		Where("user_challenges.user_id IN ? AND user_challenges.solved = ?", topUserId, true).
-		Order("user_challenges.user_id ASC, user_challenges.created_at ASC").
+		Order("user_challenges.user_id, user_challenges.challenge_id, user_challenges.created_at ASC").
 		Scan(&allRows).Error; err != nil {
 		return results
 	}
+
+	// Re-sort by user_id then created_at for proper cumulative score calculation
+	sort.Slice(allRows, func(i, j int) bool {
+		if allRows[i].UserID != allRows[j].UserID {
+			return allRows[i].UserID < allRows[j].UserID
+		}
+		return allRows[i].CreatedAt.Before(allRows[j].CreatedAt)
+	})
 
 	userRows := make(map[uint][]userChallengeRow)
 	userMap := make(map[uint]string)
