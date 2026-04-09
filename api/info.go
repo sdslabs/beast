@@ -514,7 +514,6 @@ func userInfoHandler(c *gin.Context) {
 	}
 	var user database.User
 	var err error
-	var parsedUserId uint
 	if userId != "" {
 		id, err := strconv.ParseUint(userId, 10, 64)
 		if err != nil {
@@ -523,9 +522,8 @@ func userInfoHandler(c *gin.Context) {
 			})
 			return
 		}
-		parsedUserId = uint(id)
 
-		user, err = database.QueryUserById(parsedUserId)
+		user, err = database.QueryUserById(uint(id))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
@@ -542,7 +540,7 @@ func userInfoHandler(c *gin.Context) {
 		}
 	}
 
-	challenges, err := database.GetRelatedChallenges(&user)
+	solvedChallenges, err := database.GetUserSolvedChallenges(user.ID)
 	if err != nil {
 		log.Error(err)
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -550,36 +548,29 @@ func userInfoHandler(c *gin.Context) {
 		})
 		return
 	}
-	var resp UserResp
 
-	var challNameString []string
-	for _, challenge := range challenges {
-		challNameString = append(challNameString, challenge.Name)
-	}
+	userChallenges := make([]ChallengeSolveResp, len(solvedChallenges))
+	for index, sc := range solvedChallenges {
 
-	userChallenges := make([]ChallengeSolveResp, len(challenges))
-	for index, challenge := range challenges {
-
-		challengeTags := make([]string, len(challenge.Tags))
-
-		for index, tags := range challenge.Tags {
-			challengeTags[index] = tags.TagName
+		challengeTags := make([]string, len(sc.Tags))
+		for i, tag := range sc.Tags {
+			challengeTags[i] = tag.TagName
 		}
 
 		challResp := ChallengeSolveResp{
-			Id:       challenge.ID,
-			Name:     challenge.Name,
+			Id:       sc.ChallengeID,
+			Name:     sc.Name,
 			Tags:     challengeTags,
-			Category: challenge.Type,
-			SolvedAt: challenge.CreatedAt,
-			Points:   challenge.Points,
+			Category: sc.Type,
+			SolvedAt: sc.SolvedAt,
+			Points:   sc.Points,
 		}
 		userChallenges[index] = challResp
 	}
 
 	var rank int64
 	if user.Status == 0 {
-		rank, err = database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+		rank, err = database.GetUserRank(user.ID, user.Score, user.UpdatedAt)
 	} else {
 		rank = 1e9
 	}
@@ -592,7 +583,7 @@ func userInfoHandler(c *gin.Context) {
 		return
 	}
 
-	resp = UserResp{
+	resp := UserResp{
 		Username:   user.Username,
 		Id:         user.ID,
 		Role:       user.Role,

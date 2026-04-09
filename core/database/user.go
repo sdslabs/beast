@@ -164,6 +164,63 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	return challenges, nil
 }
 
+// UserSolvedChallenge represents a challenge solved by a user with the actual solve timestamp
+type UserSolvedChallenge struct {
+	ChallengeID uint
+	Name        string
+	Type        string
+	Points      uint
+	Tags        []*Tag
+	SolvedAt    time.Time
+}
+
+// GetUserSolvedChallenges returns distinct challenges solved by a user, with the actual solve timestamps.
+// Unlike GetRelatedChallenges, this avoids duplicates from multiple user_challenges rows per challenge.
+func GetUserSolvedChallenges(userID uint) ([]UserSolvedChallenge, error) {
+	type solveRow struct {
+		ChallengeID uint
+		Name        string
+		Type        string
+		Points      uint
+		SolvedAt    time.Time
+	}
+	var rows []solveRow
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	err := Db.Table("user_challenges").
+		Select("DISTINCT ON (user_challenges.challenge_id) user_challenges.challenge_id, challenges.name, challenges.type, challenges.points, user_challenges.created_at as solved_at").
+		Joins("JOIN challenges ON challenges.id = user_challenges.challenge_id").
+		Where("user_challenges.user_id = ? AND user_challenges.solved = ?", userID, true).
+		Order("user_challenges.challenge_id, user_challenges.created_at ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]UserSolvedChallenge, 0, len(rows))
+	for _, r := range rows {
+		// Fetch tags for this challenge
+		var tags []*Tag
+		Db.Table("tags").
+			Joins("JOIN tag_challenges ON tag_challenges.tag_id = tags.id").
+			Where("tag_challenges.challenge_id = ?", r.ChallengeID).
+			Find(&tags)
+
+		results = append(results, UserSolvedChallenge{
+			ChallengeID: r.ChallengeID,
+			Name:        r.Name,
+			Type:        r.Type,
+			Points:      r.Points,
+			Tags:        tags,
+			SolvedAt:    r.SolvedAt,
+		})
+	}
+
+	return results, nil
+}
+
 // Check whether challenge is submitted by the user
 func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	var userChallenges []UserChallenges
