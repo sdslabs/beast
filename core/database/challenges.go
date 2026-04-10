@@ -883,18 +883,30 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		Username  string
 		CreatedAt time.Time
 		Points    uint
+		IsHint    bool
 	}
 	var allRows []userChallengeRow
 
 	if err := Db.Table("user_challenges").
-		Select("DISTINCT ON (user_challenges.user_id, user_challenges.challenge_id) user_challenges.user_id, users.username, user_challenges.created_at, challenges.points").
+		Select("DISTINCT ON (user_challenges.user_id, user_challenges.challenge_id) user_challenges.user_id, users.username, user_challenges.created_at, challenges.points, false AS is_hint").
 		Joins("JOIN challenges ON user_challenges.challenge_id = challenges.id").
 		Joins("JOIN users ON user_challenges.user_id = users.id").
 		Where("user_challenges.user_id IN ? AND user_challenges.solved = ?", topUserId, true).
-		Order("user_challenges.user_id, user_challenges.challenge_id, user_challenges.created_at ASC").
 		Scan(&allRows).Error; err != nil {
 		return results
 	}
+
+	var hintRows []userChallengeRow
+	if err := Db.Table("user_hints").
+		Select("user_hints.user_id, users.username, COALESCE(user_hints.created_at, NOW()) AS created_at, hints.points, true AS is_hint").
+		Joins("JOIN hints ON user_hints.hint_id = hints.hint_id").
+		Joins("JOIN users ON user_hints.user_id = users.id").
+		Where("user_hints.user_id IN ?", topUserId).
+		Scan(&hintRows).Error; err != nil {
+		return results
+	}
+
+	allRows = append(allRows, hintRows...)
 
 	// Re-sort by user_id then created_at for proper cumulative score calculation
 	sort.Slice(allRows, func(i, j int) bool {
@@ -921,7 +933,16 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		var timeSeriesRaw []TimeSeries
 		var cumulativeScore uint = 0
 		for _, r := range rows {
-			cumulativeScore += r.Points
+			if r.IsHint {
+				if cumulativeScore < r.Points {
+					cumulativeScore = 0
+				} else {
+					cumulativeScore -= r.Points
+				}
+			} else {
+				cumulativeScore += r.Points
+			}
+			
 			timeSeriesRaw = append(timeSeriesRaw, TimeSeries{
 				Timestamp: r.CreatedAt,
 				Score:     cumulativeScore,
@@ -941,7 +962,7 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		results = append(results, UserLeaderboardResp{
 			Id:             userId,
 			Username:       username,
-			Score:          cumulativeScore,
+			Score:          uint(cumulativeScore),
 			Rank:           rank,
 			TimeSeriesdata: timeSeries,
 		})

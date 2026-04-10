@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -23,6 +24,8 @@ type UserHint struct {
 
 	ChallengeID uint
 	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
+
+	CreatedAt time.Time
 }
 
 func CreateHintEntry(hint *Hint) error {
