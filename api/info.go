@@ -382,7 +382,7 @@ func challengesMetadataHandler(c *gin.Context) {
 			}
 		}
 
-		availableChallenges := make([]ChallengeMetadata, len(challenges))
+		availableChallenges := make([]ChallengeMetadata, 0, len(challenges))
 
 		authHeader := c.GetHeader("Authorization")
 		username, err := coreUtils.GetUser(authHeader)
@@ -401,7 +401,7 @@ func challengesMetadataHandler(c *gin.Context) {
 			return
 		}
 
-		for index, challenge := range challenges {
+		for _, challenge := range challenges {
 			if challenge.Status == "Undeployed" && user.Role == core.USER_ROLES["contestant"] {
 				continue
 			}
@@ -415,11 +415,11 @@ func challengesMetadataHandler(c *gin.Context) {
 			}
 			challengeTags := make([]string, len(challenge.Tags))
 
-			for index, tags := range challenge.Tags {
-				challengeTags[index] = tags.TagName
+			for i, tags := range challenge.Tags {
+				challengeTags[i] = tags.TagName
 			}
 
-			availableChallenges[index] = ChallengeMetadata{
+			availableChallenges = append(availableChallenges, ChallengeMetadata{
 				Name:               challenge.Name,
 				ChallId:            challenge.ID,
 				Tags:               challengeTags,
@@ -432,7 +432,7 @@ func challengesMetadataHandler(c *gin.Context) {
 				DeployedStatus:     challenge.Status,
 				Instanced:          challenge.Instanced,
 				InstanceExpiration: challenge.InstanceExpiration,
-			}
+			})
 		}
 
 		c.JSON(http.StatusOK, availableChallenges)
