@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"golang.org/x/crypto/ssh"
 	"log"
 	"net/http"
 	"strings"
@@ -230,13 +231,22 @@ func register(c *gin.Context) {
 		return
 	}
 
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sshKey))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "SSH Key is not valid",
+		})
+	}
+
+	sshKey = string(ssh.MarshalAuthorizedKey(key))
+
 	userEntry := database.User{
 		Name:      name,
 		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["contestant"]),
 		Email:     email,
 		SshKey:    sshKey,
 	}
-	
+
 	// skip otp verif if -n flag is enabled
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
@@ -268,7 +278,8 @@ func register(c *gin.Context) {
 			}
 		}
 	}
-	err := database.CreateUserEntry(&userEntry)
+
+	err = database.CreateUserEntry(&userEntry)
 
 	if err != nil {
 		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
