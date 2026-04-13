@@ -27,9 +27,11 @@ func GetFreePortOnHost(host string, firstPort uint32, portRange uint32) (uint32,
 			return 0, err
 		}
 
-		if result == 1 {
-			return port, nil
+		if result == 0 {
+			continue
 		}
+
+		return port, nil
 	}
 
 	return 0, fmt.Errorf("no free port found on host: %s", host)
@@ -85,7 +87,6 @@ func GetContainerPortsOnHost(host string, containerId string) ([]uint32, error) 
 	return ports, nil
 }
 
-// FreePortOnHost frees a specifc port on a host machine
 func FreePortOnHost(host string, port uint32) error {
 	if Cache == nil {
 		Init()

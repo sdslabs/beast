@@ -39,8 +39,8 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		return nil, fmt.Errorf("failed to query challenge: %w", err)
 	}
 
-	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
-	configFile := filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
+	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	configFile := filepath.Join(challengeStagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
 
 	var config cfg.BeastChallengeConfig
 	_, err = toml.DecodeFile(configFile, &config)
@@ -69,66 +69,49 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	var deploymentType string
 
 	if config.Challenge.Env.DockerCompose != "" {
-		composeFile := filepath.Join(stagingDir, challengeName, config.Challenge.Env.DockerCompose)
-		portVariables, err := utils.ExtractPortsFromCompose(composeFile)
-
+		err = config.Challenge.Env.ExtractPortsCompose(challengeStagingDir)
 		if err != nil {
-			return nil, fmt.Errorf("failed to extract port variables: %w", err)
+			return nil, fmt.Errorf("failed to extract port variables from compose file: %s", err.Error())
 		}
 
-		ports := make(map[string]uint32, len(portVariables))
-		for _, portVariable := range portVariables {
-			port, err = allocateInstancePort(serverDeployed)
-			if err != nil {
-				return nil, fmt.Errorf("failed to allocate instancePort: %w", err)
-			}
-
-			ports[portVariable] = port
+		ports, err := allocateInstancePortsCompose(serverDeployed, config.Challenge.Env)
+		if err != nil {
+			return nil, fmt.Errorf("failed to allocate instance ports: %s", err.Error())
 		}
 
-		if len(portVariables) > 0 {
-			port = ports[portVariables[0]]
-		}
+		port = ports[config.Challenge.Env.DefaultPortVar]
 
-		containerID, err = deployInstanceFromCompose(instanceID, challengeName, &config, stagingDir, serverDeployed, ports)
+		containerID, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
 
 		if err != nil {
-			for _, port := range ports {
-				if err := cache.FreePortOnHost(serverDeployed, port); err != nil {
-					log.Errorf("failed to free container ports: %s", err.Error())
-				}
-			}
-			return nil, fmt.Errorf("failed to deploy instance container: %s", err.Error())
+			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
+			return nil, err
 		}
 
-		for _, port := range ports {
-			err = cache.AssignFreePortOnHostToContainer(serverDeployed, containerID, port)
-			if err != nil {
-				log.Warnf("Failed to register port %d for container %s: %v", port, containerID, err)
-			}
-		}
+		coreUtils.AssignPortsOnContainerToHostCompose(serverDeployed, containerID, ports)
 	} else {
-		port, err = allocateInstancePort(serverDeployed)
+		err = config.Challenge.Env.ExtractPorts()
 		if err != nil {
-			return nil, fmt.Errorf("failed to allocate port: %w", err)
+			return nil, fmt.Errorf("failed to extract port variables from compose file: %s", err.Error())
 		}
+
+		ports, err := allocateInstancePorts(serverDeployed, config.Challenge.Env)
+		if err != nil {
+			return nil, fmt.Errorf("failed to allocate instance ports: %s", err.Error())
+		}
+
+		port = config.Challenge.Env.DefaultPort
 
 		containerID, err = deployInstanceContainer(instanceID, challengeName, port, challenge.ImageId, &config, serverDeployed)
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
 
 		if err != nil {
-			if err := cache.FreePortOnHost(serverDeployed, port); err != nil {
-				return nil, fmt.Errorf("failed to free port %v: %w", port, err)
-			}
-
-			return nil, fmt.Errorf("failed to deploy instance container: %w", err)
+			coreUtils.FreePortsOnHost(serverDeployed, ports)
+			return nil, fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 		}
 
-		err = cache.AssignFreePortOnHostToContainer(serverDeployed, containerID, port)
-		if err != nil {
-			log.Warnf("Failed to register port %d for container %s: %v", port, containerID, err)
-		}
+		coreUtils.AssignPortsOnContainerToHost(serverDeployed, containerID, ports)
 	}
 
 	instance := &cache.Instance{
@@ -265,7 +248,7 @@ func KillChallengeInstances(challengeName string) error {
 	return lastErr
 }
 
-func allocateInstancePort(host string) (uint32, error) {
+func allocateInstancePorts(host string, env cfg.ChallengeEnv) ([]uint32, error) {
 	var firstPort, lastPort uint32
 	var err error
 
@@ -273,16 +256,48 @@ func allocateInstancePort(host string) (uint32, error) {
 	firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse port range: %w", err)
+		return nil, fmt.Errorf("failed to parse port range: %w", err)
 	}
 
 	portRange := lastPort - firstPort + 1
-	port, err := cache.GetFreePortOnHost(host, firstPort, portRange)
-	if err != nil {
-		return 0, fmt.Errorf("failed to allocate port: %w", err)
+
+	ports := make([]uint32, len(env.Ports))
+	for i, _ := range env.Ports {
+		port, err := cache.GetFreePortOnHost(host, firstPort, portRange)
+		if err != nil {
+			return nil, fmt.Errorf("failed to allocate port: %w", err)
+		}
+
+		ports[i] = port
 	}
 
-	return port, nil
+	return ports, nil
+}
+
+func allocateInstancePortsCompose(host string, env cfg.ChallengeEnv) (map[string]uint32, error) {
+	var err error
+	var firstPort, lastPort uint32
+
+	server := cfg.Cfg.AvailableServers[host]
+	firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse port range: %w", err)
+	}
+
+	portRange := lastPort - firstPort + 1
+
+	ports := make(map[string]uint32, len(env.PortVariables))
+	for _, portVariable := range env.PortVariables {
+		port, err := cache.GetFreePortOnHost(host, firstPort, portRange)
+		if err != nil {
+			return nil, fmt.Errorf("failed to allocate instancePort: %w", err)
+		}
+
+		ports[portVariable] = port
+	}
+
+	return ports, nil
 }
 
 func selectServerForInstance() string {

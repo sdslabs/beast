@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sdslabs/beastv4/core/cache"
-
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -261,34 +259,24 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	challengeName := config.Challenge.Metadata.Name
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 
+	host := challenge.ServerDeployed
+	if host == "" {
+		host = core.LOCALHOST
+	}
+
 	if config.Challenge.Env.DockerCompose != "" {
 		// currently the first container id returned
 		var primaryContainerId string
 		var err error
 
 		composeFileName := config.Challenge.Env.DockerCompose
-		portVariables, err := utils.ExtractPortsFromCompose(filepath.Join(stagingDir, challengeName, composeFileName))
 
+		ports, err := allocateInstancePortsCompose(host, config.Challenge.Env)
 		if err != nil {
-			return fmt.Errorf("failed to extract port variables: %w", err)
+			return fmt.Errorf("failed to allocate instance ports: %w", err)
 		}
 
-		serverDeployed := challenge.ServerDeployed
-		if serverDeployed == "" {
-			serverDeployed = core.LOCALHOST
-		}
-
-		ports := make(map[string]uint32, len(portVariables))
-		for _, portVariable := range portVariables {
-			port, err := allocateInstancePort(serverDeployed)
-			if err != nil {
-				return fmt.Errorf("failed to allocate instancePort: %w", err)
-			}
-
-			ports[portVariable] = port
-		}
-
-		if serverDeployed != core.LOCALHOST {
+		if host != core.LOCALHOST {
 			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
 			/* Challenge Name and Project Name are the same for non instanced challenges */
 			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, challengeName, stagingDir, composeFileName, server, ports)
@@ -298,20 +286,11 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		}
 
 		if err != nil {
-			for _, port := range ports {
-				if err := cache.FreePortOnHost(serverDeployed, port); err != nil {
-					log.Errorf("failed to free allocated compose port %d on host %s: %v", port, serverDeployed, err)
-				}
-			}
-			return fmt.Errorf("error while deploying challenge with docker-compose on remote: %v", err)
+			coreUtils.FreePortsOnHostCompose(host, ports)
+			return err
 		}
 
-		for _, port := range ports {
-			err = cache.AssignFreePortOnHostToContainer(serverDeployed, primaryContainerId, port)
-			if err != nil {
-				log.Warnf("Failed to register port %d for container %s: %v", port, primaryContainerId, err)
-			}
-		}
+		coreUtils.AssignPortsOnContainerToHostCompose(host, primaryContainerId, ports)
 
 		// only for backward compatibility
 		if err := database.UpdateChallenge(challenge, map[string]any{
@@ -352,35 +331,16 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		config.Resources.PidsLimit,
 	)
 
-	var err error
-	host := challenge.ServerDeployed
-	if host == "" {
-		host = core.LOCALHOST
-	}
-
-	var firstPort, lastPort uint32
-	server := cfg.Cfg.AvailableServers[host]
-	firstPort, lastPort, err = utils.ParsePortMapping(server.PortRange)
-
+	ports, err := allocateInstancePorts(host, config.Challenge.Env)
 	if err != nil {
-		return fmt.Errorf("error while allocating ports on server %s for challenge %s: %s", host, challenge.Name, err.Error())
+		return fmt.Errorf("failed to allocate instance ports: %s", err.Error())
 	}
 
-	/* both ports are inclusive */
-	portRange := lastPort - firstPort + 1
-
-	ports := config.Challenge.Env.Ports
-	portMapping := make([]cr.PortMapping, len(ports))
-
-	for i, containerPort := range ports {
-		hostPort, err := cache.GetFreePortOnHost(host, firstPort, portRange)
-		if err != nil {
-			return fmt.Errorf("error while getting free port on host %s: %s", host, err)
-		}
-
+	portMapping := make([]cr.PortMapping, len(config.Challenge.Env.Ports))
+	for i, hostPort := range ports {
 		portMapping[i] = cr.PortMapping{
 			HostPort:      hostPort,
-			ContainerPort: containerPort,
+			ContainerPort: config.Challenge.Env.Ports[i],
 		}
 	}
 
@@ -398,22 +358,18 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 	log.Debugf("create container config for challenge(%s): %v", config.Challenge.Metadata.Name, containerConfig)
 	var containerId string
-	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
+	if host == core.LOCALHOST {
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
 	} else {
-		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, server)
+		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, cfg.Cfg.AvailableServers[host])
 	}
 
 	if err != nil {
+		coreUtils.FreePortsOnHost(host, ports)
 		return fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 	}
 
-	for _, portMap := range portMapping {
-		if err := cache.AssignFreePortOnHostToContainer(host, containerId, portMap.HostPort); err != nil {
-			return fmt.Errorf("error while registering port %v on host %s: %s", portMap.HostPort, host, err)
-		}
-	}
+	coreUtils.AssignPortsOnContainerToHost(host, containerId, ports)
 
 	if err = database.UpdateChallenge(challenge, map[string]any{
 		"ContainerId":    containerId,
