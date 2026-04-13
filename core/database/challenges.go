@@ -47,32 +47,32 @@ import (
 type Challenge struct {
 	gorm.Model
 
-	Name            string `gorm:"not null;type:varchar(64);unique"`
-	DynamicFlag     bool   `gorm:"not null;default:false"`
-	Flag            string `gorm:"type:text"`
-	Type            string `gorm:"type:varchar(64)"`
-	Difficulty      string `gorm:"not null;default:'medium'"`
-	MaxAttemptLimit int    `gorm:"default:-1"`
-	PreReqs         string `gorm:"type:text"`
-	Assets          string `gorm:"type:text"`
-	AdditionalLinks string `gorm:"type:text"`
-	Description     string `gorm:"type:text"`
-	Format          string `gorm:"not null"`
-	ContainerId     string `gorm:"size:64;unique"`
-	ImageId         string `gorm:"size:64;unique"`
-	Status          string `gorm:"not null;default:'Undeployed'"`
-	DeploymentType  string `gorm:"not null;default:'standard_docker'"`
-	AuthorID        uint   `gorm:"not null"`
-	HealthCheck     uint   `gorm:"not null;default:1"`
-	Points          uint   `gorm:"default:0"`
-	MaxPoints       uint   `gorm:"default:0"`
-	MinPoints       uint   `gorm:"default:0"`
-	Ports           []Port
-	Tags            []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Users           []*User `gorm:"many2many:user_challenges;"`
-	ServerDeployed  string  `gorm:"type:varchar(64)"`
-	Instanced          bool  `gorm:"not null;default:false"`
-	InstanceExpiration int64 `gorm:"default:0"`
+	Name               string `gorm:"not null;type:varchar(64);unique"`
+	DynamicFlag        bool   `gorm:"not null;default:false"`
+	Flag               string `gorm:"type:text"`
+	Type               string `gorm:"type:varchar(64)"`
+	Difficulty         string `gorm:"not null;default:'medium'"`
+	MaxAttemptLimit    int    `gorm:"default:-1"`
+	PreReqs            string `gorm:"type:text"`
+	Assets             string `gorm:"type:text"`
+	AdditionalLinks    string `gorm:"type:text"`
+	Description        string `gorm:"type:text"`
+	Format             string `gorm:"not null"`
+	ContainerId        string `gorm:"size:64;unique"`
+	ImageId            string `gorm:"size:64;unique"`
+	Status             string `gorm:"not null;default:'Undeployed'"`
+	DeploymentType     string `gorm:"not null;default:'standard_docker'"`
+	AuthorID           uint   `gorm:"not null"`
+	HealthCheck        uint   `gorm:"not null;default:1"`
+	Points             uint   `gorm:"default:0"`
+	MaxPoints          uint   `gorm:"default:0"`
+	MinPoints          uint   `gorm:"default:0"`
+	Ports              []Port
+	Tags               []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Users              []*User `gorm:"many2many:user_challenges;"`
+	ServerDeployed     string  `gorm:"type:varchar(64)"`
+	Instanced          bool    `gorm:"not null;default:false"`
+	InstanceExpiration int64   `gorm:"default:0"`
 }
 
 type UserChallenges struct {
@@ -335,7 +335,7 @@ func UpdateUserChallengeTries(userID uint, challengeID uint) error {
 	}
 
 	updates := map[string]interface{}{
-		"tries":      userChallenges.Tries + 1,
+		"tries": userChallenges.Tries + 1,
 	}
 
 	tx := Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
@@ -898,6 +898,7 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		Joins("JOIN challenges ON user_challenges.challenge_id = challenges.id").
 		Joins("JOIN users ON user_challenges.user_id = users.id").
 		Where("user_challenges.user_id IN ? AND user_challenges.solved = ?", topUserId, true).
+		Order("user_challenges.user_id, user_challenges.challenge_id, user_challenges.created_at ASC").
 		Scan(&allRows).Error; err != nil {
 		return results
 	}
@@ -948,7 +949,7 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 			} else {
 				cumulativeScore += r.Points
 			}
-			
+
 			timeSeriesRaw = append(timeSeriesRaw, TimeSeries{
 				Timestamp: r.CreatedAt,
 				Score:     cumulativeScore,
