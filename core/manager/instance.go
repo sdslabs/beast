@@ -574,6 +574,7 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 	projectName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
 	var err error
+
 	var checkHash string
 	var containerId string
 
@@ -590,11 +591,21 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 
 		checkHash, err = verifyCheckLocal(containerId)
 		if err != nil {
+			return "", "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
+		}
+
+		err = verifySSHLocal(containerId)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
+		}
+
+		checkHash, err = verifyCheckLocal(containerId)
+		if err != nil {
 			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
 		}
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
-		containerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, stagingDir, config.Challenge.Env.DockerCompose, server)
+		containerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, server, ports)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to deploy compose on remote: %w", err)
 		}
