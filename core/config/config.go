@@ -157,7 +157,7 @@ func (config *InstanceConfig) Validate() {
 
 func ValidatePortRange(portRange string) error {
 	if portRange == "" {
-		return nil
+		return fmt.Errorf("port range is empty")
 	}
 
 	firstPort, lastPort, err := utils.ParsePortMapping(portRange)
@@ -230,7 +230,7 @@ func (config *BeastConfig) ValidateConfig() error {
 				Username:   os.Getenv("USER"),
 				SSHKeyPath: "",
 				Active:     true,
-				PortRange:  fmt.Sprintf("%v%s%v", core.ALLOWED_MIN_PORT_VALUE, core.MappingDelimeter, core.ALLOWED_MAX_PORT_VALUE),
+				PortRange:  fmt.Sprintf("%v%s%v", core.ALLOWED_MIN_PORT_VALUE, core.MappingDelimiter, core.ALLOWED_MAX_PORT_VALUE),
 			},
 		}
 	}

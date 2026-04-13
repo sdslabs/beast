@@ -210,4 +210,4 @@ var NOTIFICATION_SERVICES = []string{
 	"discord",
 }
 
-const MappingDelimeter = ":"
+const MappingDelimiter = ":"

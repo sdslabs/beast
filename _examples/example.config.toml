@@ -30,9 +30,6 @@ default_cpu_shares = 1024
 default_memory_limit = 1024
 default_pids_limit = 100
 
-# Port range for localhost deployments (format: START:END)
-local_host_port_range = "30000:40000"
-
 # List of ip addresses of all the servers where challenge could be deployed for 
 # balanced load accross servers. 
 [available_servers]
@@ -129,8 +126,6 @@ password = ""
 user = ""
 
 [instance_config]
-# Port Range for localhost. per-server this is configured via `port-range`
-local_host_port_range = '10000:11000'
 default_expiration = 300
 max_extension = 600
 max_instances_per_user = 3
