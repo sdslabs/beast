@@ -540,12 +540,15 @@ func SaveFlagSubmission(user_challenges *UserChallenges) error {
 			tx.Rollback()
 			return updateErr
 		}
-	} else {
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
 		// No existing row: create a new one
 		if createErr := tx.Create(user_challenges).Error; createErr != nil {
 			tx.Rollback()
 			return createErr
 		}
+	} else {
+		tx.Rollback()
+		return err
 	}
 
 	return tx.Commit().Error
