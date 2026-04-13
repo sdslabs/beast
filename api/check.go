@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"net/http"
@@ -294,12 +293,8 @@ func checkScriptExistence(localDeploy bool, instance *cache.Instance) (bool, err
 			"sh", "-c", fileCommand,
 		})
 	} else {
-		server := manager.GetServerFromHost(instance.HostedAddress)
-		if server == nil {
-			return false, fmt.Errorf("server not found for host: %s", instance.HostedAddress)
-		}
-
-		result, err = remoteManager.RunCommandInContainerOnServer(*server, containerId, fileCommand)
+		server := config.Cfg.AvailableServers[instance.ServerDeployed]
+		result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, fileCommand)
 	}
 
 	if err != nil {
@@ -342,7 +337,7 @@ func executeCheckScript(localDeploy bool, instance *cache.Instance) (cr.ExecResu
 			"sh", "-c", core.SAD_CHECK_SCRIPT_LOCATION,
 		})
 	} else {
-		server := config.Cfg.AvailableServers[instance.HostedAddress]
+		server := config.Cfg.AvailableServers[instance.ServerDeployed]
 		return remoteManager.RunCommandInContainerOnServer(server, instance.ContainerID, core.SAD_CHECK_SCRIPT_LOCATION)
 	}
 }
