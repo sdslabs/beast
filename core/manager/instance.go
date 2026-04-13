@@ -109,7 +109,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			}
 		}
 	} else {
-		port, err := allocateInstancePort(serverDeployed)
+		port, err = allocateInstancePort(serverDeployed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to allocate port: %w", err)
 		}
