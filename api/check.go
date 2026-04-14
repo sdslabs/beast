@@ -109,6 +109,17 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
+		lockManager := GetUserLockManager()
+		lockId := fmt.Sprintf("%d_%s", user.ID, challId)
+		if !lockManager.TryLock(lockId) {
+			c.JSON(http.StatusOK, ChallengeSubmitResponse{
+				Message: "Request already in process",
+				Success: false,
+			})
+			return
+		}
+		defer lockManager.Unlock(lockId)
+
 		challenge := chall[0]
 		if challenge.Status != core.DEPLOY_STATUS["deployed"] {
 			c.JSON(http.StatusOK, ChallengeSubmitResponse{
@@ -194,7 +205,7 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
-		localDeploy := instance.ServerDeployed == core.LOCALHOST || instance.ServerDeployed == ""
+		localDeploy := config.Cfg.UseLocalDockerDaemon(instance.ServerDeployed)
 
 		exists, err := checkScriptExistence(localDeploy, instance)
 		if err != nil {
