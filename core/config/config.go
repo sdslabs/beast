@@ -129,9 +129,10 @@ type BeastConfig struct {
 	Rsp                  string                     `toml:"remote_sync_period"`
 	InstanceConfig       InstanceConfig             `toml:"instance_config"`
 
-	CPUShares int64 `toml:"default_cpu_shares"`
-	Memory    int64 `toml:"default_memory_limit"`
-	PidsLimit int64 `toml:"default_pids_limit"`
+	CPUShares int64   `toml:"default_cpu_shares"`
+	Memory    int64   `toml:"default_memory_limit"`
+	PidsLimit int64   `toml:"default_pids_limit"`
+	CPUsLimit float32 `toml:"default_cpus_limit"`
 
 	MailConfig MailConfig `toml:"mail_config"`
 }
@@ -305,6 +306,11 @@ func (config *BeastConfig) ValidateConfig() error {
 	if config.PidsLimit <= 0 {
 		log.Debug("Per container Pids Limit not provided using default value")
 		config.PidsLimit = core.DEFAULT_PIDS_LIMIT
+	}
+
+	if config.CPUsLimit <= 0 {
+		log.Debug("Per container CPUsLimit Limit not provided using default value")
+		config.CPUsLimit = core.DEFAULT_CPU_LIMIT
 	}
 
 	if config.MailConfig.From == "" || config.MailConfig.Password == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {

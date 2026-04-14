@@ -18,7 +18,7 @@ import (
 )
 
 func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, server config.AvailableServer) (string, error) {
-	var containerName, containerEnv, exposedPorts, portMap, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings string
+	var containerName, containerEnv, exposedPorts, portMap, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings string
 	if containerConfig.ContainerName != "" {
 		containerName = fmt.Sprintf("--name %s ", containerConfig.ContainerName)
 	}
@@ -30,7 +30,10 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 		exposedPorts += fmt.Sprintf("--expose %d ", portMapping.ContainerPort)
 	}
 	if containerConfig.CPUShares != 0 {
-		cpuLimit = fmt.Sprintf("--cpu-shares %d ", containerConfig.CPUShares)
+		cpuShareLimit = fmt.Sprintf("--cpu-shares %d ", containerConfig.CPUShares)
+	}
+	if containerConfig.CPUsLimit != 0 {
+		cpuLimit = fmt.Sprintf("--cpus %f ", containerConfig.CPUsLimit)
 	}
 	if containerConfig.Memory != 0 {
 		memoryLimit = fmt.Sprintf("--memory %d ", containerConfig.Memory)
@@ -44,7 +47,7 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 	for src, dest := range containerConfig.MountsMap {
 		mountBindings += fmt.Sprintf("--mount type=bind,source=%s,target=%s ", src, dest)
 	}
-	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s", containerName, containerEnv, exposedPorts, mountBindings, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
+	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s %s", containerName, containerEnv, exposedPorts, mountBindings, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
 	// fmt.Printf("%s, %s, %s, %s\n", containerName, containerEnv, exposedPorts, portMap)
 	// dockerCommand := fmt.Sprintf("docker run \\
 	// 	--name <container_name> \\

@@ -70,6 +70,7 @@ type CreateContainerConfig struct {
 	Labels           map[string]string
 
 	CPUShares int64
+	CPUsLimit float32
 	Memory    int64
 	PidsLimit int64
 }
@@ -203,6 +204,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	resources := container.Resources{
+		NanoCPUs:  int64(containerConfig.CPUsLimit * 1e9),
 		CPUShares: containerConfig.CPUShares,
 		Memory:    containerConfig.Memory,
 		PidsLimit: &containerConfig.PidsLimit,

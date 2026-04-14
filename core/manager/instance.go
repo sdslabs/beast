@@ -48,6 +48,8 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		return nil, fmt.Errorf("failed to load challenge config: %w", err)
 	}
 
+	config.Resources.ValidateRequiredFields()
+
 	if !config.Challenge.Metadata.IsInstanced() {
 		return nil, fmt.Errorf("challenge %s is not configured for instancing", challengeName)
 	}
@@ -341,6 +343,7 @@ func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, 
 		ChallengeName: challengeName,
 		ContainerEnv:  containerEnv,
 		Traffic:       config.Challenge.Env.TrafficType(),
+		CPUsLimit:     config.Resources.CPUsLimit,
 		CPUShares:     config.Resources.CPUShares,
 		Memory:        config.Resources.Memory,
 		PidsLimit:     config.Resources.PidsLimit,

@@ -128,6 +128,7 @@ func promptServerDetails(configuration *config.BeastConfig) {
 
 func promptResourceLimits(configuration *config.BeastConfig) {
 	configuration.CPUShares = utils.PromptInt64("Default CPU Share (must be over 6MB):", core.DEFAULT_CPU_SHARE)
+	configuration.CPUsLimit = utils.PromptFloat32("Default CPU Limit", core.DEFAULT_CPU_LIMIT)
 	configuration.PidsLimit = utils.PromptInt64("Default PIDs Limit:", core.DEFAULT_PIDS_LIMIT)
 	configuration.Memory = utils.PromptInt64("Default Memory Limit:", core.DEFAULT_MEMORY_LIMIT)
 

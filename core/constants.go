@@ -88,20 +88,21 @@ const ( // chall env
 	ALLOWED_MAX_PORT_VALUE       uint32 = 20000
 )
 const ( // default config
-	IMAGE_NA                 string = "IMAGE_NA"
-	CONTAINER_NA             string = "CONTAINER_NA"
-	MAX_QUEUE_SIZE           uint32 = 100
-	DEFAULT_TICKER_FREQUENCY int    = 1500
-	DEFAULT_PROBE_TIMEOUT    int    = 10
-	DEFAULT_USER_NAME        string = "ghost"
-	DEFAULT_USER_EMAIL       string = "ghost@ghost.com"
-	DEFAULT_CPU_SHARE        int64  = (1 << 9)
-	DEFAULT_MEMORY_LIMIT     int64  = (1 << 29)
-	DEFAULT_PIDS_LIMIT       int64  = 100
-	ITERATIONS               int    = 65536
-	HASH_LENGTH              int    = 32
-	TIMEPERIOD               int64  = 6 * 60 * 60
-	SSH_PORT                 int    = 22
+	IMAGE_NA                 string  = "IMAGE_NA"
+	CONTAINER_NA             string  = "CONTAINER_NA"
+	MAX_QUEUE_SIZE           uint32  = 100
+	DEFAULT_TICKER_FREQUENCY int     = 1500
+	DEFAULT_PROBE_TIMEOUT    int     = 10
+	DEFAULT_USER_NAME        string  = "ghost"
+	DEFAULT_USER_EMAIL       string  = "ghost@ghost.com"
+	DEFAULT_CPU_SHARE        int64   = (1 << 9)
+	DEFAULT_MEMORY_LIMIT     int64   = (1 << 29)
+	DEFAULT_PIDS_LIMIT       int64   = 100
+	DEFAULT_CPU_LIMIT        float32 = .25
+	ITERATIONS               int     = 65536
+	HASH_LENGTH              int     = 32
+	TIMEPERIOD               int64   = 6 * 60 * 60
+	SSH_PORT                 int     = 22
 )
 
 const ( // roles

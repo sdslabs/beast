@@ -31,3 +31,4 @@ default_port_var = "INSTANCE_PORT"
 cpu_shares = 1024
 memory_limit = 536870912
 pids_limit = 100
+cpuslimit = 0.25

@@ -67,6 +67,31 @@ func PromptInt64(prompt string, defaultValue int64) int64 {
 	return tempInt
 }
 
+func PromptFloat32(prompt string, defaultValue float32) float32 {
+	log.Println(fmt.Sprintf("%s (defaults to %v)", prompt, defaultValue))
+
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+
+	if err := scanner.Err(); err != nil {
+		log.Errorln(fmt.Sprintf("Failed to read input... defaulting to %v...", defaultValue))
+		return defaultValue
+	}
+
+	temp := scanner.Text()
+	tempFloat, err := strconv.ParseFloat(temp, 32)
+
+	if temp == "" {
+		log.Warnln(fmt.Sprintf("Input empty.. defaulting to %v...", defaultValue))
+		return defaultValue
+	} else if err != nil {
+		log.Errorln(fmt.Sprintf("Failed to read input... defaulting to %v...", defaultValue))
+		return defaultValue
+	}
+
+	return float32(tempFloat)
+}
+
 func PromptSelection(prompt string, items []string) string {
 	selection := promptui.Select{
 		Label: prompt,

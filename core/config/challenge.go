@@ -515,9 +515,10 @@ type EnvironmentVar struct {
 }
 
 type Resources struct {
-	CPUShares int64 `toml:"cpu_shares"`
-	Memory    int64 `toml:"memory_limit"`
-	PidsLimit int64 `toml:"pids_limit"`
+	CPUShares int64   `toml:"cpu_shares"`
+	Memory    int64   `toml:"memory_limit"`
+	PidsLimit int64   `toml:"pids_limit"`
+	CPUsLimit float32 `toml:"cpuslimit"`
 }
 
 func (config *Resources) ValidateRequiredFields() {
@@ -534,5 +535,10 @@ func (config *Resources) ValidateRequiredFields() {
 	if config.PidsLimit <= 0 {
 		log.Debug("Pids Limit not provided in configuration, using default.")
 		config.PidsLimit = Cfg.PidsLimit
+	}
+
+	if config.CPUsLimit <= 0 {
+		log.Debug("CPUsLimit not provided in configuration, using default.")
+		config.CPUsLimit = Cfg.CPUsLimit
 	}
 }

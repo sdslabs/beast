@@ -353,6 +353,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		ContainerNetwork: containerNetwork,
 		Traffic:          config.Challenge.Env.TrafficType(),
 		CPUShares:        config.Resources.CPUShares,
+		CPUsLimit:        config.Resources.CPUsLimit,
 		Memory:           config.Resources.Memory,
 		PidsLimit:        config.Resources.PidsLimit,
 	}
