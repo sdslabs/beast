@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"time"
 
@@ -32,6 +33,7 @@ type User struct {
 	Status      uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score       uint    `gorm:"default:0"`
 	FrozenScore uint    `gorm:"default:0"`
+	Bhawan      string  `gorm:"default:''"`
 	Hints       []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
 }
 
@@ -462,6 +464,215 @@ func QueryUsersByFrozenScoreOffsetLimit(limit, offset int) ([]User, error) {
 	}
 
 	return users, tx.Error
+}
+
+func QueryTopUsersByScoreFreshersOnly(limit int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ? AND bhawan IN ?", core.USER_ROLES["contestant"], 0, core.FresherBhawans).
+		Order("score desc, updated_at asc").
+		Limit(limit).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryUsersByScoreFreshersOnlyOffsetLimit(limit, offset int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ? AND bhawan IN ?", core.USER_ROLES["contestant"], 0, core.FresherBhawans).
+		Order("score desc, updated_at asc").
+		Limit(limit).
+		Offset(offset).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryTopUsersByFrozenScoreFreshersOnly(limit int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ? AND bhawan IN ?", core.USER_ROLES["contestant"], 0, core.FresherBhawans).
+		Order("frozen_score desc, updated_at asc").
+		Limit(limit).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryUsersByFrozenScoreFreshersOnlyOffsetLimit(limit, offset int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ? AND bhawan IN ?", core.USER_ROLES["contestant"], 0, core.FresherBhawans).
+		Order("frozen_score desc, updated_at asc").
+		Limit(limit).
+		Offset(offset).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryTopUsersByScoreForBhawan(bhawan string, limit int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ? AND bhawan = ?", core.USER_ROLES["contestant"], 0, bhawan).
+		Order("score desc, updated_at asc").
+		Limit(limit).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryUsersByScoreForBhawanOffsetLimit(bhawan string, limit, offset int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ? AND bhawan = ?", core.USER_ROLES["contestant"], 0, bhawan).
+		Order("score desc, updated_at asc").
+		Limit(limit).
+		Offset(offset).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryTopUsersByFrozenScoreForBhawan(bhawan string, limit int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ? AND bhawan = ?", core.USER_ROLES["contestant"], 0, bhawan).
+		Order("frozen_score desc, updated_at asc").
+		Limit(limit).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+func QueryUsersByFrozenScoreForBhawanOffsetLimit(bhawan string, limit, offset int) ([]User, error) {
+	var users []User
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	tx := Db.Where("role = ? AND status = ? AND bhawan = ?", core.USER_ROLES["contestant"], 0, bhawan).
+		Order("frozen_score desc, updated_at asc").
+		Limit(limit).
+		Offset(offset).
+		Find(&users)
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		log.Warn("No users found")
+		return nil, fmt.Errorf("no users found")
+	}
+
+	return users, tx.Error
+}
+
+// BhawanStanding is one hostel row for bhawan_rankings (top performer per bhawan).
+type BhawanStanding struct {
+	Rank        int64
+	Bhawan      string
+	TopUserID   uint
+	TopUsername string
+	TopScore    uint
+}
+
+type bhawanDistinctRow struct {
+	Bhawan    string
+	UserID    uint `gorm:"column:user_id"`
+	Username  string
+	TopScore  uint `gorm:"column:top_score"`
+	UpdatedAt time.Time
+}
+
+// QueryBhawanStandingsByTopScore returns each non-empty bhawan once, ranked by its top
+// contestant score (tie-break: earliest updated_at among users tied at that score).
+func QueryBhawanStandingsByTopScore(useFrozen bool) ([]BhawanStanding, error) {
+	role := core.USER_ROLES["contestant"]
+	var scoreExpr string
+	if useFrozen {
+		scoreExpr = "u.frozen_score"
+	} else {
+		scoreExpr = "u.score"
+	}
+	q := `
+SELECT DISTINCT ON (u.bhawan) u.bhawan AS bhawan, u.id AS user_id, u.username AS username, ` + scoreExpr + ` AS top_score, u.updated_at AS updated_at
+FROM users u
+WHERE u.deleted_at IS NULL AND u.role = ? AND u.status = 0 AND u.bhawan <> ''
+ORDER BY u.bhawan, ` + scoreExpr + ` DESC, u.updated_at ASC`
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	var rows []bhawanDistinctRow
+	if err := Db.Raw(q, role).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].TopScore != rows[j].TopScore {
+			return rows[i].TopScore > rows[j].TopScore
+		}
+		return rows[i].UpdatedAt.Before(rows[j].UpdatedAt)
+	})
+
+	out := make([]BhawanStanding, len(rows))
+	for i := range rows {
+		out[i] = BhawanStanding{
+			Rank:        int64(i + 1),
+			Bhawan:      rows[i].Bhawan,
+			TopUserID:   rows[i].UserID,
+			TopUsername: rows[i].Username,
+			TopScore:    rows[i].TopScore,
+		}
+	}
+	return out, nil
 }
 
 func UpdateFrozenScores() error {

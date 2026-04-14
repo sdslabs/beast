@@ -61,6 +61,29 @@ func Authorize(jwtTokenString string, roleAccess int) error {
 	return token.Claims.Valid()
 }
 
+// ParseClaims parses and validates the JWT and returns claims without role checks.
+// Use after route middleware has already authorized the request, or when you need
+// the username from the token for scoped resources.
+func ParseClaims(jwtTokenString string) (*CustomClaims, error) {
+	token, err := jwt.ParseWithClaims(jwtTokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Token invalid")
+		}
+		return []byte(JWTSECRET), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(*CustomClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("Token invalid")
+	}
+	if err := claims.Valid(); err != nil {
+		return nil, err
+	}
+	return claims, nil
+}
+
 func GenerateJWT(authEntry AuthModel) (string, error) {
 	t := time.Now().Unix()
 

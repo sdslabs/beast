@@ -65,6 +65,7 @@ type UserResp struct {
 	Score      uint                 `json:"score" example:"750"`
 	Rank       int64                `json:"rank" example:"15"`
 	Email      string               `json:"email" example:"fristonio@gmail.com"`
+	Bhawan     string               `json:"bhawan" example:"RJB"`
 	Challenges []ChallengeSolveResp `json:"challenges"`
 }
 
@@ -76,6 +77,16 @@ type UsersResp struct {
 	Score    uint   `json:"score" example:"750"`
 	Email    string `json:"email" example:"fristonio@gmail.com"`
 	Rank     int64  `json:"rank" example:"15"`
+	Bhawan   string `json:"bhawan" example:"RJB"`
+}
+
+// BhawanRankingResp is one row for mode=bhawan_rankings on the leaderboard API.
+type BhawanRankingResp struct {
+	Rank        int64  `json:"rank"`
+	Bhawan      string `json:"bhawan"`
+	TopScore    uint   `json:"top_score"`
+	TopUsername string `json:"top_username"`
+	TopUserId   uint   `json:"top_user_id"`
 }
 
 type ChallengeSolveResp struct {

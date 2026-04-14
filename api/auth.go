@@ -199,6 +199,7 @@ func login(c *gin.Context) {
 // @Param password formData string true "Password"
 // @Param email formData string true "User's email id"
 // @Param ssh-key formData string false "User's ssh-key"
+// @Param bhawan formData string true "Hostel code (e.g. RJB, RKB)"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
@@ -209,6 +210,7 @@ func register(c *gin.Context) {
 	password := c.PostForm("password")
 	email := c.PostForm("email")
 	sshKey := c.PostForm("ssh-key")
+	bhawan := strings.TrimSpace(c.PostForm("bhawan"))
 
 	name = strings.TrimSpace(name)
 	username = strings.TrimSpace(strings.ToLower(username))
@@ -220,6 +222,19 @@ func register(c *gin.Context) {
 
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: "Username, password, email, and sshKey can not be empty",
+		})
+		return
+	}
+
+	if bhawan == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Bhawan is required",
+		})
+		return
+	}
+	if !core.IsValidBhawan(bhawan) {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid bhawan",
 		})
 		return
 	}
@@ -245,6 +260,7 @@ func register(c *gin.Context) {
 		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["contestant"]),
 		Email:     email,
 		SshKey:    sshKey,
+		Bhawan:    bhawan,
 	}
 
 	// skip otp verif if -n flag is enabled

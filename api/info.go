@@ -29,6 +29,45 @@ var (
 	graphCacheStale       = true
 )
 
+const (
+	leaderboardModeOverall        = "overall"
+	leaderboardModeMyBhawan       = "my_bhawan"
+	leaderboardModeBhawanRankings = "bhawan_rankings"
+)
+
+func leaderboardEntryFromUser(user database.User, displayScore uint, rank int64) UserResp {
+	return UserResp{
+		Username: user.Username,
+		Id:       user.ID,
+		Role:     user.Role,
+		Status:   user.Status,
+		Score:    displayScore,
+		Rank:     rank,
+		Bhawan:   user.Bhawan,
+	}
+}
+
+// myBhawanFromRequest resolves the caller's bhawan for my_bhawan leaderboard mode.
+func myBhawanFromRequest(c *gin.Context) (bhawan string, status int, msg string) {
+	authHeader := c.GetHeader("Authorization")
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return "", http.StatusUnauthorized, "Authentication required for my_bhawan leaderboard mode"
+	}
+	claims, err := auth.ParseClaims(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return "", http.StatusUnauthorized, "Invalid or expired token"
+	}
+	user, err := database.QueryFirstUserEntry("username", claims.User)
+	if err != nil || user.ID == 0 {
+		return "", http.StatusUnauthorized, "User not found"
+	}
+	if user.Bhawan == "" {
+		return "", http.StatusBadRequest, "You must have a bhawan set to view this leaderboard"
+	}
+	return user.Bhawan, 0, ""
+}
+
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
 
@@ -585,6 +624,7 @@ func userInfoHandler(c *gin.Context) {
 		Score:      user.Score,
 		Rank:       rank,
 		Email:      user.Email,
+		Bhawan:     user.Bhawan,
 		Challenges: userChallenges,
 	}
 	c.JSON(http.StatusOK, resp)
@@ -640,6 +680,7 @@ func getAllUsersInfoHandler(c *gin.Context) {
 				Score:    user.Score,
 				Email:    user.Email,
 				Rank:     rank,
+				Bhawan:   user.Bhawan,
 			}
 		}
 
@@ -963,22 +1004,19 @@ func getUserCountHandler(c *gin.Context) {
 
 // Returns leaderboard
 // @Summary Returns leaderboard
-// @Description Returns leaderboard of all users
+// @Description Returns leaderboard of all users. Query mode: overall (default), my_bhawan, bhawan_rankings.
 // @Tags info
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer"
 // @Param page query string false "Page number"
+// @Param mode query string false "overall | my_bhawan | bhawan_rankings"
 // @Success 200 {object} api.UserResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/leaderboard [get]
 func getLeaderboardHandler(c *gin.Context) {
-	pageStr := c.Query("page")
-	log.Print(pageStr)
-	if pageStr == "" {
-		pageStr = "1"
-	}
+	pageStr := c.DefaultQuery("page", "1")
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
@@ -986,14 +1024,123 @@ func getLeaderboardHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	mode := strings.TrimSpace(c.DefaultQuery("mode", leaderboardModeOverall))
+	switch mode {
+	case leaderboardModeOverall, leaderboardModeMyBhawan, leaderboardModeBhawanRankings:
+	default:
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid mode; use overall, my_bhawan, or bhawan_rankings",
+		})
+		return
+	}
+
 	isLeaderboardFrozen, err := database.IsFrozenScoreSet()
 	if err != nil {
 		log.Errorf("DATABASE ERROR:: Unable to lookup FrozenLeaderboard %s. Continuing with normal leaderboard", err.Error())
 	}
+
+	if mode == leaderboardModeBhawanRankings {
+		rows, err := database.QueryBhawanStandingsByTopScore(isLeaderboardFrozen)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		out := make([]BhawanRankingResp, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, BhawanRankingResp{
+				Rank:        r.Rank,
+				Bhawan:      r.Bhawan,
+				TopScore:    r.TopScore,
+				TopUsername: r.TopUsername,
+				TopUserId:   r.TopUserID,
+			})
+		}
+		c.JSON(http.StatusOK, out)
+		return
+	}
+
+	if mode == leaderboardModeMyBhawan {
+		bhawan, st, msg := myBhawanFromRequest(c)
+		if st != 0 {
+			c.JSON(st, HTTPErrorResp{Error: msg})
+			return
+		}
+		if isLeaderboardFrozen {
+			if page == 1 {
+				users, err := database.QueryTopUsersByFrozenScoreForBhawan(bhawan, core.LEADERBOARD_SIZE)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+					return
+				}
+				var leaderboard []UserResp
+				for index, user := range users {
+					if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+						continue
+					}
+					leaderboard = append(leaderboard, leaderboardEntryFromUser(user, user.FrozenScore, int64(index+1)))
+				}
+				c.JSON(http.StatusOK, leaderboard)
+				return
+			}
+			offset := (page - 1) * core.LEADERBOARD_SIZE
+			users, err := database.QueryUsersByFrozenScoreForBhawanOffsetLimit(bhawan, core.LEADERBOARD_SIZE, offset)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+				return
+			}
+			var leaderboard []UserResp
+			rankOffset := offset
+			for index, user := range users {
+				if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+					continue
+				}
+				leaderboard = append(leaderboard, leaderboardEntryFromUser(user, user.FrozenScore, int64(rankOffset+index+1)))
+			}
+			c.JSON(http.StatusOK, leaderboard)
+			return
+		}
+		if page == 1 {
+			users, err := database.QueryTopUsersByScoreForBhawan(bhawan, core.LEADERBOARD_SIZE)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+				return
+			}
+			var leaderboard []UserResp
+			for index, user := range users {
+				if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+					continue
+				}
+				leaderboard = append(leaderboard, leaderboardEntryFromUser(user, user.Score, int64(index+1)))
+			}
+			c.JSON(http.StatusOK, leaderboard)
+			return
+		}
+		offset := (page - 1) * core.LEADERBOARD_SIZE
+		users, err := database.QueryUsersByScoreForBhawanOffsetLimit(bhawan, core.LEADERBOARD_SIZE, offset)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+			return
+		}
+		var leaderboard []UserResp
+		rankOffset := offset
+		for index, user := range users {
+			if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+				continue
+			}
+			leaderboard = append(leaderboard, leaderboardEntryFromUser(user, user.Score, int64(rankOffset+index+1)))
+		}
+		c.JSON(http.StatusOK, leaderboard)
+		return
+	}
+
+	// mode == overall (cached for page 1 only)
 	if isLeaderboardFrozen {
 		if page == 1 {
 			if leaderboardStale {
-				users, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
+				users, err := database.QueryTopUsersByFrozenScoreFreshersOnly(core.LEADERBOARD_SIZE)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 						Error: "DATABASE ERROR while processing the request.",
@@ -1005,20 +1152,241 @@ func getLeaderboardHandler(c *gin.Context) {
 					if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
 						continue
 					}
-					resp := UserResp{
-						Username: user.Username,
-						Id:       user.ID,
-						Role:     user.Role,
-						Status:   user.Status,
-						Score:    user.FrozenScore,
-						Rank:     int64(index + 1),
-					}
-					leaderboard = append(leaderboard, resp)
+					leaderboard = append(leaderboard, leaderboardEntryFromUser(user, user.FrozenScore, int64(index+1)))
 				}
 				leaderboardCache = leaderboard
 				leaderboardStale = false
 			}
 			c.JSON(http.StatusOK, leaderboardCache)
+			return
+		}
+		offset := (page - 1) * core.LEADERBOARD_SIZE
+		users, err := database.QueryUsersByFrozenScoreFreshersOnlyOffsetLimit(core.LEADERBOARD_SIZE, offset)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		var leaderboard []UserResp
+		rankOffset := offset
+		for index, user := range users {
+			if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+				continue
+			}
+			leaderboard = append(leaderboard, leaderboardEntryFromUser(user, user.FrozenScore, int64(rankOffset+index+1)))
+		}
+		c.JSON(http.StatusOK, leaderboard)
+		return
+	}
+
+	if page == 1 {
+		if leaderboardStale {
+			users, err := database.QueryTopUsersByScoreFreshersOnly(core.LEADERBOARD_SIZE)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "DATABASE ERROR while processing the request.",
+				})
+				return
+			}
+			var leaderboard []UserResp
+			for index, user := range users {
+				if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+					continue
+				}
+				leaderboard = append(leaderboard, leaderboardEntryFromUser(user, user.Score, int64(index+1)))
+			}
+			leaderboardCache = leaderboard
+			leaderboardStale = false
+		}
+		c.JSON(http.StatusOK, leaderboardCache)
+		return
+	}
+	offset := (page - 1) * core.LEADERBOARD_SIZE
+	users, err := database.QueryUsersByScoreFreshersOnlyOffsetLimit(core.LEADERBOARD_SIZE, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	var leaderboard []UserResp
+	rankOffset := offset
+	for index, user := range users {
+		if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+			continue
+		}
+		leaderboard = append(leaderboard, leaderboardEntryFromUser(user, user.Score, int64(rankOffset+index+1)))
+	}
+	c.JSON(http.StatusOK, leaderboard)
+}
+
+// Returns admin leaderboard
+// @Summary Returns admin leaderboard
+// @Description Returns admin leaderboard of all users. Query mode: overall (default), my_bhawan, bhawan_rankings.
+// @Tags info
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer"
+// @Param page query string false "Page number"
+// @Param mode query string false "overall | my_bhawan | bhawan_rankings"
+// @Success 200 {object} api.UserResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/admin/leaderboard [get]
+func adminLeaderboardHandler(c *gin.Context) {
+	pageStr := c.DefaultQuery("page", "1")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid page number",
+		})
+		return
+	}
+
+	mode := strings.TrimSpace(c.DefaultQuery("mode", leaderboardModeOverall))
+	switch mode {
+	case leaderboardModeOverall, leaderboardModeMyBhawan, leaderboardModeBhawanRankings:
+	default:
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid mode; use overall, my_bhawan, or bhawan_rankings",
+		})
+		return
+	}
+
+	isLeaderboardFrozen, err := database.IsFrozenScoreSet()
+	if err != nil {
+		log.Errorf("DATABASE ERROR:: Unable to lookup FrozenLeaderboard %s. Continuing with normal leaderboard", err.Error())
+	}
+
+	if mode == leaderboardModeBhawanRankings {
+		rows, err := database.QueryBhawanStandingsByTopScore(isLeaderboardFrozen)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		out := make([]BhawanRankingResp, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, BhawanRankingResp{
+				Rank:        r.Rank,
+				Bhawan:      r.Bhawan,
+				TopScore:    r.TopScore,
+				TopUsername: r.TopUsername,
+				TopUserId:   r.TopUserID,
+			})
+		}
+		c.JSON(http.StatusOK, out)
+		return
+	}
+
+	if mode == leaderboardModeMyBhawan {
+		bhawan, st, msg := myBhawanFromRequest(c)
+		if st != 0 {
+			c.JSON(st, HTTPErrorResp{Error: msg})
+			return
+		}
+		if isLeaderboardFrozen {
+			if page == 1 {
+				users, err := database.QueryTopUsersByFrozenScoreForBhawan(bhawan, core.LEADERBOARD_SIZE)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+					return
+				}
+				var leaderboard []UserResp
+				for index, user := range users {
+					if user.Status != 0 {
+						continue
+					}
+					u := leaderboardEntryFromUser(user, user.FrozenScore, int64(index+1))
+					u.Email = user.Email
+					leaderboard = append(leaderboard, u)
+				}
+				c.JSON(http.StatusOK, leaderboard)
+				return
+			}
+			offset := (page - 1) * core.LEADERBOARD_SIZE
+			users, err := database.QueryUsersByFrozenScoreForBhawanOffsetLimit(bhawan, core.LEADERBOARD_SIZE, offset)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+				return
+			}
+			var leaderboard []UserResp
+			rankOffset := offset
+			for index, user := range users {
+				if user.Status != 0 {
+					continue
+				}
+				u := leaderboardEntryFromUser(user, user.FrozenScore, int64(rankOffset+index+1))
+				u.Email = user.Email
+				leaderboard = append(leaderboard, u)
+			}
+			c.JSON(http.StatusOK, leaderboard)
+			return
+		}
+		if page == 1 {
+			users, err := database.QueryTopUsersByScoreForBhawan(bhawan, core.LEADERBOARD_SIZE)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+				return
+			}
+			var leaderboard []UserResp
+			for index, user := range users {
+				if user.Status != 0 {
+					continue
+				}
+				u := leaderboardEntryFromUser(user, user.Score, int64(index+1))
+				u.Email = user.Email
+				leaderboard = append(leaderboard, u)
+			}
+			c.JSON(http.StatusOK, leaderboard)
+			return
+		}
+		offset := (page - 1) * core.LEADERBOARD_SIZE
+		users, err := database.QueryUsersByScoreForBhawanOffsetLimit(bhawan, core.LEADERBOARD_SIZE, offset)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+			return
+		}
+		var leaderboard []UserResp
+		rankOffset := offset
+		for index, user := range users {
+			if user.Status != 0 {
+				continue
+			}
+			u := leaderboardEntryFromUser(user, user.Score, int64(rankOffset+index+1))
+			u.Email = user.Email
+			leaderboard = append(leaderboard, u)
+		}
+		c.JSON(http.StatusOK, leaderboard)
+		return
+	}
+
+	// overall — cache page 1 only
+	if isLeaderboardFrozen {
+		if page == 1 {
+			if adminLeaderboardStale {
+				users, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+						Error: "DATABASE ERROR while processing the request.",
+					})
+					return
+				}
+				var leaderboard []UserResp
+				for index, user := range users {
+					if user.Status != 0 {
+						continue
+					}
+					u := leaderboardEntryFromUser(user, user.FrozenScore, int64(index+1))
+					u.Email = user.Email
+					leaderboard = append(leaderboard, u)
+				}
+				adminLeaderboardCache = leaderboard
+				adminLeaderboardStale = false
+			}
+			c.JSON(http.StatusOK, adminLeaderboardCache)
 			return
 		}
 		offset := (page - 1) * core.LEADERBOARD_SIZE
@@ -1032,105 +1400,17 @@ func getLeaderboardHandler(c *gin.Context) {
 		var leaderboard []UserResp
 		rankOffset := offset
 		for index, user := range users {
-			if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
+			if user.Status != 0 {
 				continue
 			}
-			resp := UserResp{
-				Username: user.Username,
-				Id:       user.ID,
-				Role:     user.Role,
-				Status:   user.Status,
-				Score:    user.FrozenScore,
-				Rank:     int64(rankOffset + index + 1),
-			}
-			leaderboard = append(leaderboard, resp)
+			u := leaderboardEntryFromUser(user, user.FrozenScore, int64(rankOffset+index+1))
+			u.Email = user.Email
+			leaderboard = append(leaderboard, u)
 		}
 		c.JSON(http.StatusOK, leaderboard)
 		return
 	}
 
-	if page == 1 {
-		if leaderboardStale {
-			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-			var leaderboard []UserResp
-			for index, user := range users {
-				if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
-					continue
-				}
-				resp := UserResp{
-					Username: user.Username,
-					Id:       user.ID,
-					Role:     user.Role,
-					Status:   user.Status,
-					Score:    user.Score,
-					Rank:     int64(index + 1),
-				}
-				leaderboard = append(leaderboard, resp)
-			}
-			leaderboardCache = leaderboard
-			leaderboardStale = false
-		}
-		c.JSON(http.StatusOK, leaderboardCache)
-		return
-	}
-	offset := (page - 1) * core.LEADERBOARD_SIZE
-	users, err := database.QueryUsersByScoreOffsetLimit(core.LEADERBOARD_SIZE, offset)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: "DATABASE ERROR while processing the request.",
-		})
-		return
-	}
-	var leaderboard []UserResp
-	rankOffset := offset
-	for index, user := range users {
-		if user.Status != 0 || user.Role != core.USER_ROLES["contestant"] {
-			continue
-		}
-		resp := UserResp{
-			Username: user.Username,
-			Id:       user.ID,
-			Role:     user.Role,
-			Status:   user.Status,
-			Score:    user.Score,
-			Rank:     int64(rankOffset + index + 1),
-		}
-		leaderboard = append(leaderboard, resp)
-	}
-	c.JSON(http.StatusOK, leaderboard)
-}
-
-// Returns admin leaderboard
-// @Summary Returns admin leaderboard
-// @Description Returns admin leaderboard of all users
-// @Tags info
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param page query string false "Page number"
-// @Success 200 {object} api.UserResp
-// @Failure 400 {object} api.HTTPErrorResp
-// @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/admin/leaderboard [get]
-func adminLeaderboardHandler(c *gin.Context) {
-	pageStr := c.Query("page")
-	log.Print(pageStr)
-	if pageStr == "" {
-		pageStr = "1"
-	}
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Invalid page number",
-		})
-		return
-	}
 	if page == 1 {
 		if adminLeaderboardStale {
 			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
@@ -1145,16 +1425,9 @@ func adminLeaderboardHandler(c *gin.Context) {
 				if user.Status != 0 {
 					continue
 				}
-				resp := UserResp{
-					Username: user.Username,
-					Id:       user.ID,
-					Role:     user.Role,
-					Status:   user.Status,
-					Score:    user.Score,
-					Email:    user.Email,
-					Rank:     int64(index + 1),
-				}
-				leaderboard = append(leaderboard, resp)
+				u := leaderboardEntryFromUser(user, user.Score, int64(index+1))
+				u.Email = user.Email
+				leaderboard = append(leaderboard, u)
 			}
 			adminLeaderboardCache = leaderboard
 			adminLeaderboardStale = false
@@ -1176,16 +1449,9 @@ func adminLeaderboardHandler(c *gin.Context) {
 		if user.Status != 0 {
 			continue
 		}
-		resp := UserResp{
-			Username: user.Username,
-			Id:       user.ID,
-			Role:     user.Role,
-			Status:   user.Status,
-			Score:    user.Score,
-			Email:    user.Email,
-			Rank:     int64(rankOffset + index + 1),
-		}
-		leaderboard = append(leaderboard, resp)
+		u := leaderboardEntryFromUser(user, user.Score, int64(rankOffset+index+1))
+		u.Email = user.Email
+		leaderboard = append(leaderboard, u)
 	}
 	c.JSON(http.StatusOK, leaderboard)
 }
@@ -1444,25 +1710,21 @@ func getUserAttempts(c *gin.Context) {
 
 func getLeaderboardGraphHandler(c *gin.Context) {
 	var topUsers []uint
-	// TODO: Add a check for leaderboard stale to prevent stale graphs
-	// Try if graphCache and leaderboardCache can be merged.
-	// Right now graph cache gets invalidated whenver leaderboardCache gets invalidated even if no user under top 10 are changed. Fix later.
-	if leaderboardStale {
-		users, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
-		if err == nil {
-			for i := 0; i < 10 && i < len(users); i++ {
-				user := users[i]
-				topUsers = append(topUsers, user.ID)
-			}
-		}
+	// Graph shows top contestants across all bhawans (unlike public overall table, which is fresher-only).
+	isLeaderboardFrozen, _ := database.IsFrozenScoreSet()
+	var users []database.User
+	var err error
+	if isLeaderboardFrozen {
+		users, err = database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
 	} else {
-		for i := 0; i < 10 && i < len(leaderboardCache); i++ {
-			user := leaderboardCache[i]
-			topUsers = append(topUsers, user.Id)
+		users, err = database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
+	}
+	if err == nil {
+		for i := 0; i < 10 && i < len(users); i++ {
+			topUsers = append(topUsers, users[i].ID)
 		}
 	}
 	// If leaderboard is frozen then directly send the last graph instance without updating
-	isLeaderboardFrozen, _ := database.IsFrozenScoreSet()
 	if !graphCacheStale || isLeaderboardFrozen {
 		c.JSON(http.StatusOK, graphCache)
 	} else {

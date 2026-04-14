@@ -293,9 +293,10 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
+		// Public overall leaderboard is fresher-only; always refresh it on score changes.
+		leaderboardStale = true
+		graphCacheStale = true
 		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE || (len(adminLeaderboardCache) > 0 && newScore > adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
-			leaderboardStale = true
-			graphCacheStale = true
 			adminLeaderboardStale = true
 		}
 

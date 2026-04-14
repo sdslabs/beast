@@ -123,17 +123,17 @@ func writeJson(data any, location string) error {
 func saveLeaderboardCache() {
 	var topUsers []uint
 
-	/* get maximum possible number of entires */
-	leaderboardFresh, err := database.QueryTopUsersByFrozenScore(math.MaxInt)
-	if err == nil {
-		for i := 0; i < 10 && i < len(leaderboardFresh); i++ {
-			user := leaderboardFresh[i]
-			topUsers = append(topUsers, user.ID)
-		}
-	}
-
+	leaderboardFresh, err := database.QueryTopUsersByFrozenScoreFreshersOnly(math.MaxInt)
 	if err = writeJson(leaderboardFresh, BEAST_LEADERBOARD_CACHE); err != nil {
 		log.Errorln(fmt.Sprintf("Failed to write to leaderboard cache: %s", err.Error()))
+	}
+
+	// Graph file: top players across all bhawans (not fresher-only).
+	allTop, errGraph := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
+	if errGraph == nil {
+		for i := 0; i < 10 && i < len(allTop); i++ {
+			topUsers = append(topUsers, allTop[i].ID)
+		}
 	}
 
 	graphFresh := database.QueryTimeSeriesForTopUsers(topUsers)
