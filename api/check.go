@@ -6,6 +6,8 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
+	log "github.com/sirupsen/logrus"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -240,6 +242,29 @@ func checkFlagHandler(c *gin.Context) {
 		}
 
 		challengePoints := challenge.Points
+		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
+		if config.Cfg.CompetitionInfo.DynamicScore {
+			submissions, err := database.QuerySubmissions(map[string]interface{}{
+				"challenge_id": parsedChallId,
+			})
+			if err != nil {
+				log.Error(err)
+			}
+			solvers := len(submissions)
+			newPoints := dynamicScore(challenge.MaxPoints, challenge.MinPoints, uint(solvers))
+			if newPoints != challengePoints {
+				database.UpdateChallenge(&challenge, map[string]interface{}{
+					"Points": newPoints,
+				})
+				log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challengePoints)
+				err = updatePointsOfSolvers(submissions, newPoints, challengePoints)
+				if err != nil {
+					log.Error(err)
+				}
+				challengePoints = newPoints
+			}
+		}
+
 		newScore := user.Score + challengePoints
 		if newScore <= 0 {
 			newScore = 0
@@ -280,6 +305,50 @@ func checkFlagHandler(c *gin.Context) {
 
 		return
 	}
+}
+
+// dynamicScore returns dynamic score of the challenge based on number of solves
+func dynamicScore(maxPoints, minPoints, solvers uint) uint {
+	if solvers == 0 || solvers == 1 {
+		return maxPoints
+	}
+	divisor := (1 + math.Pow((float64(solvers)-1)/11.92201, 1.206069))
+	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
+}
+
+// updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes
+func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve uint) error {
+	scoreChanged := false
+	for _, submission := range submissions {
+		user, err := database.QueryUserById(submission.UserID)
+		if err != nil {
+			return err
+		}
+		if user.Role == "contestant" {
+			oldScore := user.Score
+			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
+			if newScore <= 0 {
+				newScore = 0
+			}
+			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
+			if err != nil {
+				return err
+			}
+			// Check if this user's score change could affect top 25 leaderboard
+			if !scoreChanged && (len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
+				(len(adminLeaderboardCache) > 0 && (oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
+					newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score))) {
+				scoreChanged = true
+			}
+		}
+	}
+	// Mark cache stale if any user's score change could affect top 25
+	if scoreChanged {
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
+	}
+	return nil
 }
 
 func checkScriptExistence(localDeploy bool, instance *cache.Instance) (bool, error) {
