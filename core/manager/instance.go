@@ -110,7 +110,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			return nil, fmt.Errorf("failed to allocate instance port for challenge %s", challengeName)
 		}
 
-		containerID, err = deployInstanceContainer(instanceID, challengeName, port, challenge.ImageId, &config, serverDeployed)
+		containerID, err = deployInstanceContainer(instanceID, challengeName, challenge.ImageId, &config, serverDeployed, ports)
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
 
 		if err != nil {
@@ -315,7 +315,7 @@ func selectServerForInstance() string {
 	return core.LOCALHOST
 }
 
-func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string) (string, error) {
+func deployInstanceContainer(instanceID, challengeName string, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string, ports []uint32) (string, error) {
 	containerName := fmt.Sprintf("beast_instance_%s_%s", challengeName, instanceID)
 
 	containerPort := config.Challenge.Env.DefaultPort
@@ -323,11 +323,12 @@ func deployInstanceContainer(instanceID, challengeName string, hostPort uint32, 
 		containerPort = 8080
 	}
 
-	portMapping := []cr.PortMapping{
-		{
-			HostPort:      hostPort,
-			ContainerPort: containerPort,
-		},
+	portMapping := make([]cr.PortMapping, len(ports))
+	for i, port := range ports {
+		portMapping[i] = cr.PortMapping{
+			HostPort:      port,
+			ContainerPort: config.Challenge.Env.Ports[i],
+		}
 	}
 
 	var containerEnv []string
