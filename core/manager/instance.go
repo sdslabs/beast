@@ -403,7 +403,8 @@ func killInstanceContainer(containerID, deploymentType, instanceID, challengeNam
 		server := cfg.Cfg.AvailableServers[serverDeployed]
 		if deploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
 			stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-			err := remoteManager.ComposePurgeRemote(challengeName, stagingDir, server)
+			projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
+			err := remoteManager.ComposePurgeRemote(projectName, stagingDir, server)
 			if err != nil {
 				return fmt.Errorf("failed to stop compose on remote: %w", err)
 			}
