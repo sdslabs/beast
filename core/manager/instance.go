@@ -95,12 +95,18 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, err
 		}
 
-		coreUtils.AssignPortsOnContainerToHostCompose(serverDeployed, containerID, ports)
-
-		err = addUserSSHKeyLocal(containerID, userSSHKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add user ssh key: %w", err)
+		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+			err = addUserSSHKeyLocal(containerID, userSSHKey)
+		} else {
+			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
 		}
+
+		if err != nil {
+			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to add user ssh key: %s", err.Error())
+		}
+
+		coreUtils.AssignPortsOnContainerToHostCompose(serverDeployed, containerID, ports)
 	} else {
 		err = config.Challenge.Env.ExtractPorts()
 		if err != nil {
@@ -127,12 +133,18 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 		}
 
-		coreUtils.AssignPortsOnContainerToHost(serverDeployed, containerID, ports)
-
-		err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add user ssh key: %w", err)
+		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+			err = addUserSSHKeyLocal(containerID, userSSHKey)
+		} else {
+			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
 		}
+
+		if err != nil {
+			coreUtils.FreePortsOnHost(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to add user ssh key: %s", err.Error())
+		}
+
+		coreUtils.AssignPortsOnContainerToHost(serverDeployed, containerID, ports)
 	}
 
 	instance := &cache.Instance{
