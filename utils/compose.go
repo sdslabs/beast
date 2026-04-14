@@ -5,6 +5,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"os"
 	"regexp"
+	"strings"
 )
 
 type Compose struct {
@@ -37,10 +38,17 @@ func ExtractPortsFromCompose(composeFile string) ([]string, error) {
 			}
 
 			for _, match := range matches {
-				// The same env variable can be referenced in multiple places/services. Prevent adding the same variable more than once
-				if !seen[match[1]] {
-					seen[match[1]] = true
-					portVariables = append(portVariables, match[1])
+				varName := match[1]
+
+				/* Only ${PORT} is valid, ${PORT:-DEFAULT} should fail */
+				if strings.Contains(varName, ":-") {
+					return nil, fmt.Errorf("port variable ${%s} uses default value syntax (:-) which is not supported; use ${%s} instead",
+						varName, strings.SplitN(varName, ":-", 2)[0])
+				}
+
+				if !seen[varName] {
+					seen[varName] = true
+					portVariables = append(portVariables, varName)
 				}
 			}
 		}
