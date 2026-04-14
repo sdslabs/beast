@@ -199,21 +199,47 @@ func GetUserSolvedChallenges(userID uint) ([]UserSolvedChallenge, error) {
 		return nil, err
 	}
 
+	if len(rows) == 0 {
+		return []UserSolvedChallenge{}, nil
+	}
+
+	// Load tags for all solved challenges in a single query instead of one per challenge.
+	challengeIDs := make([]uint, len(rows))
+	for i, r := range rows {
+		challengeIDs[i] = r.ChallengeID
+	}
+
+	type tagRow struct {
+		ChallengeID uint
+		TagID       uint
+		TagName     string
+	}
+	var tagRows []tagRow
+	err = Db.Table("tags").
+		Select("tag_challenges.challenge_id, tags.id as tag_id, tags.tag_name").
+		Joins("JOIN tag_challenges ON tag_challenges.tag_id = tags.id").
+		Where("tag_challenges.challenge_id IN ?", challengeIDs).
+		Scan(&tagRows).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tags for solved challenges: %w", err)
+	}
+
+	tagMap := make(map[uint][]*Tag)
+	for _, tr := range tagRows {
+		tagMap[tr.ChallengeID] = append(tagMap[tr.ChallengeID], &Tag{
+			Model:   gorm.Model{ID: tr.TagID},
+			TagName: tr.TagName,
+		})
+	}
+
 	results := make([]UserSolvedChallenge, 0, len(rows))
 	for _, r := range rows {
-		// Fetch tags for this challenge
-		var tags []*Tag
-		Db.Table("tags").
-			Joins("JOIN tag_challenges ON tag_challenges.tag_id = tags.id").
-			Where("tag_challenges.challenge_id = ?", r.ChallengeID).
-			Find(&tags)
-
 		results = append(results, UserSolvedChallenge{
 			ChallengeID: r.ChallengeID,
 			Name:        r.Name,
 			Type:        r.Type,
 			Points:      r.Points,
-			Tags:        tags,
+			Tags:        tagMap[r.ChallengeID],
 			SolvedAt:    r.SolvedAt,
 		})
 	}
@@ -476,12 +502,10 @@ func QueryAllUniqueTags() ([]string, error) {
 	var tags []string
 	DBMux.Lock()
 	defer DBMux.Unlock()
-	
+
 	tx := Db.Model(&Challenge{}).Distinct().Pluck("tag", &tags)
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
 	return tags, nil
 }
-
-
