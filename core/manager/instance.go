@@ -522,8 +522,7 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 
 	containerPort := config.Challenge.Env.DefaultPort
 	if containerPort != core.SSH_PORT {
-		log.Warnln(fmt.Sprintf("Challenge %s does not have default port set to 22", challengeName))
-		containerPort = 22
+		return "", "", fmt.Errorf("the default port is not set to %d for instance challenge %s", core.SSH_PORT, challengeName)
 	}
 
 	portMapping := make([]cr.PortMapping, len(ports))
@@ -601,8 +600,11 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 	// Instanced compose challenges are managed by the projectName
 	projectName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
-	var err error
+	if ports[config.Challenge.Env.DefaultPortVar] != core.SSH_PORT {
+		return "", "", fmt.Errorf("the default port variable does not map to %d for instance challenge %s", core.SSH_PORT, challengeName)
+	}
 
+	var err error
 	var checkHash string
 	var containerId string
 
