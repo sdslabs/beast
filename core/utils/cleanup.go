@@ -66,7 +66,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 		log.Debugf("Cleaning up Docker Compose challenge: %s", chall.Name)
 		projectName := utils.GetProjectName(chall.Name)
 
-		if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+		if !cfg.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
 			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
 			downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
 			_, err := remoteManager.RunCommandOnServer(server, downCommand)
@@ -94,17 +94,17 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 }
 
 func CleanupChallengeImage(chall *database.Challenge) error {
-	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+	if cfg.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
+		err := cr.RemoveImage(chall.ImageId)
+		if err != nil {
+			log.Errorf("Error while cleaning up image with id %s", chall.ImageId)
+			return err
+		}
+	} else {
 		server := config.Cfg.AvailableServers[chall.ServerDeployed]
 		err := remoteManager.RemoveImageRemote(chall.ImageId, server)
 		if err != nil {
 			log.Errorf("Error while cleaning up image on remote %s with id %s", chall.ServerDeployed, chall.ImageId)
-			return err
-		}
-	} else {
-		err := cr.RemoveImage(chall.ImageId)
-		if err != nil {
-			log.Errorf("Error while cleaning up image with id %s", chall.ImageId)
 			return err
 		}
 	}

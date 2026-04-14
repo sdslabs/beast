@@ -162,18 +162,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	if config.Challenge.Env.DockerCompose != "" {
 
 		//  Should add some validation for the compose file
-
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
-
-			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-			logBytes, buildErr = remoteManager.BuildImagesFromComposeRemote(
-				challengeName,
-				challengeTag,
-				stagedPath,
-				server,
-				noCache,
-			)
-		} else {
+		if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 			var buff *bytes.Buffer
 
 			buff, buildErr = cr.BuildImagesFromCompose(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCompose, noCache)
@@ -182,13 +171,30 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			} else {
 				logBytes = []byte("BuildImagesFromCompose returned nil buffer")
 			}
+		} else {
+			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+			logBytes, buildErr = remoteManager.BuildImagesFromComposeRemote(
+				challengeName,
+				challengeTag,
+				stagedPath,
+				server,
+				noCache,
+			)
 		}
 		// For Docker Compose challenges, ensure ImageId is empty in the database
 		if err := database.UpdateChallenge(challenge, map[string]any{"ImageId": ""}); err != nil {
 			return fmt.Errorf("error while setting empty ImageId for Docker Compose challenge: %s", err)
 		}
 	} else {
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+		if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+			var buff *bytes.Buffer
+			buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
+			if buff != nil {
+				logBytes = buff.Bytes()
+			} else {
+				logBytes = []byte("BuildImageFromTarContext returned nil buffer")
+			}
+		} else {
 			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
 			stagedRemoteChallengePath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 			remoteStagedPath := filepath.Join(stagedRemoteChallengePath, fmt.Sprintf("%s.tar.gz", challengeName))
@@ -197,14 +203,6 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 				return fmt.Errorf("error while checking if the challenge is staged on the remote server")
 			}
 			logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server)
-		} else {
-			var buff *bytes.Buffer
-			buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
-			if buff != nil {
-				logBytes = buff.Bytes()
-			} else {
-				logBytes = []byte("BuildImageFromTarContext returned nil buffer")
-			}
 		}
 	}
 	// Create logs directory for the challenge in staging directory.
@@ -276,13 +274,13 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			return fmt.Errorf("failed to allocate instance ports: %w", err)
 		}
 
-		if host != core.LOCALHOST {
+		if cfg.Cfg.UseLocalDockerDaemon(host) {
+			/* Challenge Name and Project Name are the same for non instanced challenges */
+			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, challengeName, stagingDir, composeFileName, ports)
+		} else {
 			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
 			/* Challenge Name and Project Name are the same for non instanced challenges */
 			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, challengeName, stagingDir, composeFileName, server, ports)
-		} else {
-			/* Challenge Name and Project Name are the same for non instanced challenges */
-			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, challengeName, stagingDir, composeFileName, ports)
 		}
 
 		if err != nil {
@@ -305,7 +303,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 
 	staticMount := make(map[string]string)
 	var staticMountDir string
-	if challenge.ServerDeployed == core.LOCALHOST || challenge.ServerDeployed == "" {
+	if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 		staticMountDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
 	} else {
 		staticMountDir = filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
@@ -359,7 +357,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 	log.Debugf("create container config for challenge(%s): %v", config.Challenge.Metadata.Name, containerConfig)
 	var containerId string
-	if host == core.LOCALHOST {
+	if cfg.Cfg.UseLocalDockerDaemon(host) {
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
 	} else {
 		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, cfg.Cfg.AvailableServers[host])
@@ -493,13 +491,13 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 			database.UpdateChallenge(&challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["undeployed"]})
 			return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, err)
 		}
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+		if !cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 			remoteManager.StageChallRemote(cfg.Cfg.AvailableServers[challenge.ServerDeployed], challenge)
 		}
 	} else {
 		log.Debugf("Checking if challenge already staged")
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
-			err := remoteManager.ValidateFileRemoteExists(cfg.Cfg.AvailableServers[challenge.ServerDeployed], stagedRemoteChallengePath)
+		if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+			err = utils.ValidateFileExists(stagedChallengePath)
 			if err != nil {
 				msg := "Challenge not already in staged(but skipping asked), could not proceed further"
 				log.WithFields(log.Fields{
@@ -509,7 +507,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 				return fmt.Errorf("STAGING ERROR: %s : %s", challengeName, msg)
 			}
 		} else {
-			err = utils.ValidateFileExists(stagedChallengePath)
+			err = remoteManager.ValidateFileRemoteExists(cfg.Cfg.AvailableServers[challenge.ServerDeployed], stagedRemoteChallengePath)
 			if err != nil {
 				msg := "Challenge not already in staged(but skipping asked), could not proceed further"
 				log.WithFields(log.Fields{

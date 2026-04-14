@@ -139,7 +139,7 @@ func hintHandler(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	oldScore := user.Score
 	newScore := oldScore - hint.Points
 	if newScore < 0 {
@@ -256,12 +256,6 @@ func challengeInfoHandler(c *gin.Context) {
 			PreRequisite:   strings.Split(challenge.PreReqs, core.DELIMITER),
 			DeployedStatus: challenge.Status,
 		}
-		deployedHost := challenge.ServerDeployed
-		if deployedHost != core.LOCALHOST && deployedHost != "" {
-			if s, ok := cfg.Cfg.AvailableServers[deployedHost]; ok {
-				deployedHost = s.Host
-			}
-		}
 		challengeInfo := Challenge{
 			ChallengeMetadata: challMetadata,
 			Description:       challenge.Description,
@@ -271,7 +265,7 @@ func challengeInfoHandler(c *gin.Context) {
 			AdditionalLinks:   strings.Split(challenge.AdditionalLinks, core.DELIMITER),
 			PreviousTries:     previousTries,
 			MaxAttemptLimit:   challenge.MaxAttemptLimit,
-			DeployedLink:      deployedHost,
+			DeployedLink:      challenge.ServerDeployed,
 		}
 		if user.Role == core.USER_ROLES["contestant"] {
 			c.JSON(http.StatusOK, challengeInfo)

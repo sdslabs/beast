@@ -35,6 +35,7 @@ const ( //names
 	ISSUER                      string = "beast-sds"
 	DELIMITER                   string = "::::"
 	LOCALHOST                   string = "localhost"
+	LOCALHOST_IP                string = "127.0.0.1"
 	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
 	DOCKER_PID                  string = "/var/run/docker.pid"
 	BEAST_GRAPH_CACHE           string = "graph_cache.json"

@@ -357,7 +357,7 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 	var containerId string
 	var err error
 
-	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
@@ -374,7 +374,7 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string, ports map[string]uint32) (string, error) {
 	projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
 
-	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		primaryContainer, err := cr.DeployContainerFromCompose(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, ports)
 		if err != nil {
 			return "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
@@ -393,7 +393,7 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 }
 
 func killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed string) error {
-	if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		if deploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
 			stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
 			projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)

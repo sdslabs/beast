@@ -322,6 +322,14 @@ func (config *BeastConfig) ValidateConfig() error {
 	return nil
 }
 
+func (config *BeastConfig) UseLocalDockerDaemon(serverName string) bool {
+	server, ok := config.AvailableServers[serverName]
+	if !ok {
+		return true
+	}
+	return server.Host == core.LOCALHOST || server.Host == core.LOCALHOST_IP
+}
+
 type AvailableServer struct {
 	Name       string `toml:"-"`
 	Host       string `toml:"host"`
@@ -332,21 +340,30 @@ type AvailableServer struct {
 }
 
 func (config *AvailableServer) ValidateServerConfig() error {
-	if config.Host == core.LOCALHOST {
-		return nil
+	if config.Host == "" {
+		return fmt.Errorf("host is empty")
 	}
-	if config.Host == "" || config.Username == "" || config.SSHKeyPath == "" {
-		log.Error("One of host, username or ssh_key_path is missing in the config")
-		return errors.New("server config not valid, config parameters missing")
-	}
-	err := utils.ValidateFileExists(config.SSHKeyPath)
-	if err != nil {
-		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.SSHKeyPath, err)
-	}
+	config.Host = strings.TrimSpace(config.Host)
 
-	err = ValidatePortRange(config.PortRange)
+	err := ValidatePortRange(config.PortRange)
 	if err != nil {
 		return fmt.Errorf("error while validating port range for server %s: %s", config.Host, err)
+	}
+
+	if config.Host == core.LOCALHOST || config.Host == core.LOCALHOST_IP {
+		return nil
+	}
+
+	if config.Username == "" {
+		return fmt.Errorf("username is empty")
+	}
+	if config.SSHKeyPath == "" {
+		return fmt.Errorf("ssh_key_path is empty")
+	}
+
+	err = utils.ValidateFileExists(config.SSHKeyPath)
+	if err != nil {
+		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.SSHKeyPath, err)
 	}
 
 	return nil

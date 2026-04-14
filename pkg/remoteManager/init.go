@@ -2,19 +2,20 @@ package remoteManager
 
 import (
 	"fmt"
+	"path/filepath"
+
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
-	"path/filepath"
 )
 
 func Init() {
 	ServerQueue = NewLoadBalancerQueue()
-	for _, server := range config.Cfg.AvailableServers {
+	for serverDeployed, server := range config.Cfg.AvailableServers {
 		if server.Active {
-			if server.Host == core.LOCALHOST {
+			// Skip SSH bootstrap for loopback workers; they use the local Docker socket from Beast.
+			if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 				continue
-				ServerQueue.Push(server)
 			}
 			client, err := CreateSSHClient(server)
 			if err != nil {

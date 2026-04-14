@@ -43,8 +43,8 @@ func CheckStaticChallenge(chall database.Challenge) error {
 
 // Check for container running or not.
 func containerProber(chall database.Challenge) error {
-	challHost := chall.ServerDeployed
-	if challHost == core.LOCALHOST || challHost == "" {
+	serverDeployed := chall.ServerDeployed
+	if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		containers, err := cr.SearchRunningContainerByFilter(map[string]string{"id": chall.ContainerId})
 		if err != nil || len(containers) <= 0 {
 			err = fmt.Errorf("error while searching for container with id %s on server: %s", chall.ContainerId, chall.ServerDeployed)
@@ -87,14 +87,14 @@ func ChallengesHealthProber(waitTime int) {
 			// Do a better job at health probing mechanism.
 			if len(allocatedPorts) > 0 {
 				port := int(allocatedPorts[0].PortNo)
-				probeHost := chall.ServerDeployed
-				if probeHost != core.LOCALHOST && probeHost != "" {
-					if s, ok := config.Cfg.AvailableServers[probeHost]; ok {
-						probeHost = s.Host
-					}
+				serverDeployed := chall.ServerDeployed
+				if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
+					serverDeployed = core.LOCALHOST
+				} else if s, ok := config.Cfg.AvailableServers[serverDeployed]; ok {
+					serverDeployed = s.Host
 				}
 				prober := probes.NewTcpProber()
-				result, err := prober.Probe(probeHost, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
+				result, err := prober.Probe(serverDeployed, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
 				if err != nil {
 					msg := fmt.Sprintf("NETWORK HEALTH CHECK %s: %s : %s", result, chall.Name, err)
 					log.WithFields(log.Fields{
@@ -134,8 +134,8 @@ func ChallengesHealthProber(waitTime int) {
 
 // Check for Remote Server running or not
 func ServerHealthProber(waitTime int) {
-	for _, server := range config.Cfg.AvailableServers {
-		if server.Active && server.Host != core.LOCALHOST {
+	for serverDeployed, server := range config.Cfg.AvailableServers {
+		if server.Active && !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 			err := remoteManager.PingServer(server)
 			if err != nil {
 				msg := fmt.Sprintf("SERVER HEALTH CHECK Faliure: %s : %s", server.Host, err)
@@ -241,10 +241,10 @@ func CleanupOrphanedInstanceContainers() {
 	cr.CleanupOrphans()
 	cr.CleanupOrphanedComposeInstances()
 
-	for host, server := range config.Cfg.AvailableServers {
-		if server.Active && host != core.LOCALHOST {
-			remoteManager.CleanupOrphanedOnServer(host)
-			remoteManager.CleanupOrphanedComposeInstancesOnServer(host)
+	for serverDeployed, server := range config.Cfg.AvailableServers {
+		if server.Active && !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
+			remoteManager.CleanupOrphanedOnServer(serverDeployed)
+			remoteManager.CleanupOrphanedComposeInstancesOnServer(serverDeployed)
 		}
 	}
 }

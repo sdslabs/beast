@@ -10,17 +10,17 @@ import (
 	"strings"
 )
 
-func CleanupOrphanedOnServer(serverHost string) {
+func CleanupOrphanedOnServer(serverDeployed string) {
 	var containers []types.Container
 	var err error
 
-	server := config.Cfg.AvailableServers[serverHost]
+	server := config.Cfg.AvailableServers[serverDeployed]
 	containers, err = SearchContainerByFilterRemote(map[string]string{
 		"label": "beast.instance=true",
 	}, server)
 
 	if err != nil {
-		log.Warnf("Failed to search for instance containers on %s: %v", serverHost, err)
+		log.Warnf("Failed to search for instance containers on %s: %v", serverDeployed, err)
 		return
 	}
 
@@ -49,16 +49,16 @@ func CleanupOrphanedOnServer(serverHost string) {
 			if len(container.Names) > 0 {
 				containerName = strings.TrimPrefix(container.Names[0], "/")
 			}
-			log.Infof("Removing orphaned instance container: %s (instance %s) on %s", containerName, instanceID, serverHost)
+			log.Infof("Removing orphaned instance container: %s (instance %s) on %s", containerName, instanceID, serverDeployed)
 
 			err = StopAndRemoveContainerRemote(container.ID, server)
 			if err != nil {
-				log.Warnf("Failed to remove orphaned container %s on %s: %v", container.ID[:12], serverHost, err)
+				log.Warnf("Failed to remove orphaned container %s on %s: %v", container.ID[:12], serverDeployed, err)
 			}
 
-			err = cache.FreeContainerPortsOnHost(serverHost, container.ID)
+			err = cache.FreeContainerPortsOnHost(serverDeployed, container.ID)
 			if err != nil {
-				log.Warnf("Failed to free port for orphan container %s on server %s: %s", container.ID[:12], serverHost, err.Error())
+				log.Warnf("Failed to free port for orphan container %s on server %s: %s", container.ID[:12], serverDeployed, err.Error())
 			}
 		}
 	}
@@ -67,15 +67,15 @@ func CleanupOrphanedOnServer(serverHost string) {
 // cleanupOrphanedComposeInstancesOnServer finds and removes orphaned docker compose instance projects.
 // Docker Compose containers don't have the beast.instance labels, but they have
 // com.docker.compose.project labels with project names starting with "beast-instance-".
-func CleanupOrphanedComposeInstancesOnServer(serverHost string) {
+func CleanupOrphanedComposeInstancesOnServer(serverDeployed string) {
 	var projectNames []string
 	var err error
 
-	server := config.Cfg.AvailableServers[serverHost]
+	server := config.Cfg.AvailableServers[serverDeployed]
 	projectNames, err = getOrphanedComposeInstanceProjectsRemote(server)
 
 	if err != nil {
-		log.Warnf("Failed to get compose instance projects on %s: %v", serverHost, err)
+		log.Warnf("Failed to get compose instance projects on %s: %v", serverDeployed, err)
 		return
 	}
 
@@ -90,10 +90,10 @@ func CleanupOrphanedComposeInstancesOnServer(serverHost string) {
 		// Check if instance still exists in cache
 		_, err := cache.GetInstance(instanceID)
 		if err != nil {
-			log.Infof("Removing orphaned compose instance project: %s (instance %s) on %s", projectName, instanceID, serverHost)
+			log.Infof("Removing orphaned compose instance project: %s (instance %s) on %s", projectName, instanceID, serverDeployed)
 
 			if err := composeDownProjectRemote(projectName, server); err != nil {
-				log.Warnf("Failed to remove orphaned compose project %s on %s: %v", projectName, serverHost, err)
+				log.Warnf("Failed to remove orphaned compose project %s on %s: %v", projectName, serverDeployed, err)
 			}
 		}
 	}
