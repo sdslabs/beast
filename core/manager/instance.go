@@ -97,17 +97,26 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, err
 		}
 
+		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+			err = addUserSSHKeyLocal(containerID, userSSHKey)
+		} else {
+			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
+		}
+
+		if err != nil {
+			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
+				log.Warnf("failed to cleanup instance %s after ssh key injection failure: %v", instanceID, cleanupErr)
+			}
+			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to add user ssh key: %s", err.Error())
+		}
+
 		if err := coreUtils.AssignPortsOnContainerToHostCompose(serverDeployed, portOwner, ports); err != nil {
 			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
 				log.Warnf("failed to cleanup instance %s after port registration failure: %v", instanceID, cleanupErr)
 			}
 			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
 			return nil, fmt.Errorf("failed to register instance ports: %w", err)
-		}
-
-		err = addUserSSHKeyLocal(containerID, userSSHKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add user ssh key: %w", err)
 		}
 	} else {
 		err = config.Challenge.Env.ExtractPorts()
@@ -136,17 +145,26 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 		}
 
+		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+			err = addUserSSHKeyLocal(containerID, userSSHKey)
+		} else {
+			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
+		}
+
+		if err != nil {
+			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
+				log.Warnf("failed to cleanup instance %s after ssh key injection failure: %v", instanceID, cleanupErr)
+			}
+			coreUtils.FreePortsOnHost(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to add user ssh key: %s", err.Error())
+		}
+
 		if err := coreUtils.AssignPortsOnContainerToHost(serverDeployed, containerID, ports); err != nil {
 			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
 				log.Warnf("failed to cleanup instance %s after port registration failure: %v", instanceID, cleanupErr)
 			}
 			coreUtils.FreePortsOnHost(serverDeployed, ports)
 			return nil, fmt.Errorf("failed to register instance ports: %w", err)
-		}
-
-		err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add user ssh key: %w", err)
 		}
 	}
 
