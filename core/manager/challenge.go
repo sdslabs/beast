@@ -236,7 +236,6 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	if coreUtils.IsImageIdValid(challenge.ImageId) {
 		var imageExist bool
 		var err error
-		log.Warnf("server: %s", challenge.ServerDeployed)
 		if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 			imageExist, err = cr.CheckIfImageExists(challenge.ImageId)
 		} else {
