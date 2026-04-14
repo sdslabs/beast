@@ -11,7 +11,7 @@ var (
 	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
 	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
 	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
-	BEAST_MOUNT_DIR = func() string {
+	BEAST_MOUNT_DIR      = func() string {
 		if hostDir := os.Getenv("BEAST_HOST_DIR"); hostDir != "" {
 			return hostDir
 		}
@@ -111,7 +111,7 @@ const ( // default config
 	ITERATIONS               int     = 65536
 	HASH_LENGTH              int     = 32
 	TIMEPERIOD               int64   = 6 * 60 * 60
-	SSH_PORT                 int     = 22
+	SSH_PORT                 uint32  = 22
 )
 
 const ( // roles
