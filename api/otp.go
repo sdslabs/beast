@@ -154,12 +154,39 @@ func sendEmail(email, otp string) error {
 	return nil
 }
 
+type sendOTPRequest struct {
+	Email string `form:"email" json:"email"`
+}
+
+type verifyOTPRequest struct {
+	Email string `form:"email" json:"email"`
+	Otp   string `form:"otp" json:"otp"`
+}
+
 func sendOTPHandler(c *gin.Context) {
 	if config.SkipAuthorization {
 		return
 	}
-	email := c.PostForm("email")
-	email = strings.TrimSpace(strings.ToLower(email))
+	var req sendOTPRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid request body",
+		})
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(req.Email))
+	if email == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email is required",
+		})
+		return
+	}
+	if !isIitrEmailAddress(email) {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Only IITR email addresses are allowed",
+		})
+		return
+	}
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -228,9 +255,33 @@ func sendOTPHandler(c *gin.Context) {
 }
 
 func verifyOTPHandler(c *gin.Context) {
-	email := c.PostForm("email")
-	otp := strings.TrimSpace(c.PostForm("otp"))
-	email = strings.TrimSpace(strings.ToLower(email))
+	var req verifyOTPRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid request body",
+		})
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(req.Email))
+	otp := strings.TrimSpace(req.Otp)
+	if email == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email is required",
+		})
+		return
+	}
+	if !isIitrEmailAddress(email) {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Only IITR email addresses are allowed",
+		})
+		return
+	}
+	if otp == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "OTP is required",
+		})
+		return
+	}
 
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
@@ -251,25 +302,18 @@ func verifyOTPHandler(c *gin.Context) {
 				c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 					Error: "OTP not found",
 				})
-			} else {
-				log.Println("Failed to query OTP:", err)
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "Failed to send OTP",
-				})
 				return
 			}
+			log.Println("Failed to query OTP:", err)
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "Failed to send OTP",
+			})
+			return
 		}
 
 		if otpEntry.Verified {
 			c.JSON(http.StatusOK, HTTPPlainResp{
 				Message: "Email already verified",
-			})
-			return
-		}
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "Failed to verify OTP",
 			})
 			return
 		}
@@ -306,8 +350,26 @@ func sendOTPForForgetHandler(c *gin.Context) {
 	if config.SkipAuthorization {
 		return
 	}
-	email := c.PostForm("email")
-	email = strings.TrimSpace(strings.ToLower(email))
+	var req sendOTPRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid request body",
+		})
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(req.Email))
+	if email == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email is required",
+		})
+		return
+	}
+	if !isIitrEmailAddress(email) {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Only IITR email addresses are allowed",
+		})
+		return
+	}
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -369,9 +431,33 @@ func sendOTPForForgetHandler(c *gin.Context) {
 }
 
 func verifyOTPForForgetHandler(c *gin.Context) {
-	email := c.PostForm("email")
-	otp := strings.TrimSpace(c.PostForm("otp"))
-	email = strings.TrimSpace(strings.ToLower(email))
+	var req verifyOTPRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid request body",
+		})
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(req.Email))
+	otp := strings.TrimSpace(req.Otp)
+	if email == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email is required",
+		})
+		return
+	}
+	if !isIitrEmailAddress(email) {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Only IITR email addresses are allowed",
+		})
+		return
+	}
+	if otp == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "OTP is required",
+		})
+		return
+	}
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
 		smtpPort := config.Cfg.MailConfig.SMTPPort

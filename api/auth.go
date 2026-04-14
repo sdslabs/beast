@@ -226,6 +226,13 @@ func register(c *gin.Context) {
 		return
 	}
 
+	if !isIitrEmailAddress(email) {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Only IITR email addresses are allowed",
+		})
+		return
+	}
+
 	if bhawan == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: "Bhawan is required",
