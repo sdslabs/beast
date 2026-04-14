@@ -20,3 +20,4 @@ points = 20
 [challenge.env]
 docker_context = "docker-file"
 ports = [10005]
+default_port = 10005

@@ -24,3 +24,4 @@ apt_deps = ["gcc", "socat"]
 setup_scripts = ["setup.sh"]
 service_path = "pwn"
 ports = [10004]
+default_port = 10004

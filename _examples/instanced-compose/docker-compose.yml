@@ -6,8 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      # Use INSTANCE_PORT env var if available, otherwise default to 8080
-      - "${INSTANCE_PORT:-8080}:80"
+      - "${INSTANCE_PORT}:80"
     environment:
       - DB_HOST=db
       - DB_USER=challenge

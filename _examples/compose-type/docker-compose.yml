@@ -2,7 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "10020:80"
+      - "${APP_PORT}:80"
     environment:
       MYSQL_HOST: mysql
       MYSQL_DATABASE: my_db
