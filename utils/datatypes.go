@@ -43,6 +43,16 @@ func UInt32InList(a uint32, list []uint32) bool {
 	return false
 }
 
+func Uint32InIndexList(a uint32, la []uint32, lb []uint32) (bool, uint32) {
+	for i, a_ := range la {
+		if a == a_ {
+			return true, lb[i]
+		}
+	}
+
+	return false, 0
+}
+
 // ParsePortMapping parses the port mapping string and return the required ports
 // If the portMapping string is not valid, this returns an error.
 // The format of the port mapping is `PORT_FIRST:PORT_LAST`

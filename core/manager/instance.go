@@ -101,7 +101,12 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			return nil, fmt.Errorf("failed to allocate instance ports: %s", err.Error())
 		}
 
-		port = config.Challenge.Env.DefaultPort
+		var found bool
+		found, port = utils.Uint32InIndexList(config.Challenge.Env.DefaultPort, config.Challenge.Env.Ports, ports)
+		if !found {
+			coreUtils.FreePortsOnHost(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to allocate instance port for challenge %s", challengeName)
+		}
 
 		containerID, err = deployInstanceContainer(instanceID, challengeName, port, challenge.ImageId, &config, serverDeployed)
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
