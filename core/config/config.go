@@ -323,7 +323,10 @@ func (config *BeastConfig) ValidateConfig() error {
 }
 
 func (config *BeastConfig) UseLocalDockerDaemon(serverName string) bool {
-	server := config.AvailableServers[serverName]
+	server, ok := config.AvailableServers[serverName]
+	if !ok {
+		return true
+	}
 	return server.Host == core.LOCALHOST || server.Host == core.LOCALHOST_IP
 }
 
