@@ -24,21 +24,6 @@ type Instance struct {
 	ServerDeployed string    `json:"server_deployed"`
 }
 
-const (
-	InstanceKeyPrefix     = "beast:instance:"
-	UserInstanceKeyPrefix = "beast:user_instance:"
-	InstancesSetKey       = "beast:instances"
-	InstanceDeletionQueue = "beast:instances:to_delete"
-)
-
-func instanceKey(instanceID string) string {
-	return InstanceKeyPrefix + instanceID
-}
-
-func userInstanceKey(userID, challengeName string) string {
-	return UserInstanceKeyPrefix + userID + ":" + challengeName
-}
-
 func SaveInstance(instance *Instance, ttl time.Duration) error {
 	if Cache == nil {
 		return fmt.Errorf("redis cache not initialized")

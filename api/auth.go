@@ -216,10 +216,10 @@ func register(c *gin.Context) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	sshKey = strings.TrimSpace(sshKey)
 
-	if username == "" || password == "" || email == "" {
+	if username == "" || password == "" || email == "" || sshKey == "" {
 
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Username, password and email can not be empty",
+			Message: "Username, password, email, and sshKey can not be empty",
 		})
 		return
 	}

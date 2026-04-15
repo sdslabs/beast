@@ -2,8 +2,12 @@ package api
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	log "github.com/sirupsen/logrus"
@@ -12,11 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/database"
-	coreUtils "github.com/sdslabs/beastv4/core/utils"
 )
 
 // Verifies and creates an entry in the database for successful submission for a challenge.
@@ -101,7 +100,7 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
-		chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
+		chall, err := database.QueryChallengeEntries("id", challId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
@@ -204,13 +203,19 @@ func checkFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+		if instance.ChallengeName != challenge.Name {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+				Error: "Unauthorized challenge",
+			})
+			return
+		}
 
 		localDeploy := config.Cfg.UseLocalDockerDaemon(instance.ServerDeployed)
 
 		exists, err := checkScriptExistence(localDeploy, instance)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while verifying the existance of check script: %s", err.Error()),
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while verifying the existence of check script: %s", err.Error()),
 			})
 			return
 		}
@@ -246,7 +251,7 @@ func checkFlagHandler(c *gin.Context) {
 
 		if result.ExitCode != 0 {
 			c.JSON(http.StatusOK, ChallengeSubmitResponse{
-				Message: fmt.Sprintf("Challenge check failed with EXIT CODE: %v\nLOGS: %s", result.ExitCode, result.Output),
+				Message: fmt.Sprintf("Challenge check failed with EXIT CODE: %v", result.ExitCode),
 				Success: false,
 			})
 			return

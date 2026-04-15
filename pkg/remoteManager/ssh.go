@@ -104,14 +104,17 @@ func RunCommandInContainerOnServer(server config.AvailableServer, containerId st
 	}
 
 	if !server.Active {
+		result.ExitCode = 1
 		return result, fmt.Errorf("server is inactive in config.toml")
 	}
 	client, err := CreateSSHClient(server)
 	if err != nil {
+		result.ExitCode = 1
 		return result, fmt.Errorf("failed to create session: %s", err)
 	}
 	session, err := client.NewSession()
 	if err != nil {
+		result.ExitCode = 1
 		return result, fmt.Errorf("failed to create session: %s", err)
 	}
 	defer session.Close()
