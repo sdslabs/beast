@@ -199,7 +199,7 @@ func login(c *gin.Context) {
 // @Param password formData string true "Password"
 // @Param email formData string true "User's email id"
 // @Param ssh-key formData string false "User's ssh-key"
-// @Param bhawan formData string true "Hostel code (e.g. RJB, RKB)"
+// @Param bhawan formData string true "Hostel code (see core.AllHostels / ValidBhawans, e.g. RJB, AB, VK)"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
