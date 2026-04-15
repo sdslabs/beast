@@ -246,6 +246,26 @@ func register(c *gin.Context) {
 		return
 	}
 
+	if !isIitrEmailAddress(email) {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Only IITR email addresses are allowed",
+		})
+		return
+	}
+
+	if bhawan == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Bhawan is required",
+		})
+		return
+	}
+	if !core.IsValidBhawan(bhawan) {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid bhawan",
+		})
+		return
+	}
+
 	if len(username) > 12 {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: "Username cannot be greater than 12 characters",
