@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"bytes"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -410,18 +409,7 @@ func verifySSHLocal(containerId string) error {
 		return err
 	}
 
-	sshAgentCheckCommand := fmt.Sprintf("[ -S \"$SSH_AUTH_SOCK\" ]")
-	result, err := cr.RunCommandInContainer(containerId, []string{
-		"sh", "-c", sshAgentCheckCommand,
-	})
-
-	if err != nil {
-		return err
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("ssh agent check failed, ssh-agent not running")
-	}
-
+	var result cr.ExecResult
 	sshServiceStartCommand := fmt.Sprintf("service ssh start")
 	result, err = cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", sshServiceStartCommand,
@@ -444,16 +432,7 @@ func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
 		return err
 	}
 
-	sshAgentCheckCommand := fmt.Sprintf("[ -S \"$SSH_AUTH_SOCK\" ]")
-	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, sshAgentCheckCommand)
-
-	if err != nil {
-		return err
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("ssh agent check failed, ssh-agent not running")
-	}
-
+	var result cr.ExecResult
 	sshServiceStartCommand := fmt.Sprintf("service ssh start")
 	result, err = cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", sshServiceStartCommand,
@@ -508,7 +487,6 @@ func addUserSSHKeyRemote(containerId string, server cfg.AvailableServer, sshKey 
 
 	return nil
 }
-
 
 func deployInstanceContainer(instanceID, challengeName string, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string, ports []uint32) (string, string, error) {
 	// Instanced non compose challenges are managed by the container ID
