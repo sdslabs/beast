@@ -94,7 +94,7 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, err
 		}
 
-		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+		if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 			err = addUserSSHKeyLocal(containerID, userSSHKey)
 		} else {
 			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
@@ -132,7 +132,7 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 		}
 
-		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+		if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 			err = addUserSSHKeyLocal(containerID, userSSHKey)
 		} else {
 			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
