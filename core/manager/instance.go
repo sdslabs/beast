@@ -427,7 +427,7 @@ func verifySSHLocal(containerId string) error {
 		return err
 	}
 
-	sshAgentCheckCommand := fmt.Sprintf("[ -z \"$SSH_AUTH_SOCK\" ]")
+	sshAgentCheckCommand := fmt.Sprintf("[ -S \"$SSH_AUTH_SOCK\" ]")
 	result, err := cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", sshAgentCheckCommand,
 	})
@@ -455,13 +455,13 @@ func verifySSHLocal(containerId string) error {
 }
 
 func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
-	portCmd := fmt.Sprintf("docker port %s %v:tcp", containerId, core.SSH_PORT)
+	portCmd := fmt.Sprintf("docker port %s %v/tcp", containerId, core.SSH_PORT)
 	_, err := remoteManager.RunCommandOnServer(server, portCmd)
 	if err != nil {
 		return err
 	}
 
-	sshAgentCheckCommand := fmt.Sprintf("[ -z \"$SSH_AUTH_SOCK\" ]")
+	sshAgentCheckCommand := fmt.Sprintf("[ -S \"$SSH_AUTH_SOCK\" ]")
 	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, sshAgentCheckCommand)
 
 	if err != nil {
