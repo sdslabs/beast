@@ -6,6 +6,7 @@ package utils
 
 import (
 	cryptorand "crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -109,11 +110,37 @@ func (fn readerFunc) Read(p []byte) (int, error) {
 	return fn(p)
 }
 
-// GetProjectName generates the standard project name for both docker and docker-compose deployments.
-// This name is used for:
-// - Docker Compose project name (-p flag)
-// - Container labels (com.sdslabs.beast.project, com.docker.compose.project)
-// - Container naming conventions
-func GetProjectName(challengeName string) string {
-	return fmt.Sprintf("beast-%s", challengeName)
+func EncodeID(a string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(a)))[:30]
+}
+
+// GetInstanceIdentifier returns the inner segment for an instanced workload (compose project key
+// or container name body) before the beast- prefix is applied. Format:
+//
+//	instance-<EncodeID(challengeName)>-<instanceId>
+func GetInstanceIdentifier(challengeName string, instanceId string) string {
+	return fmt.Sprintf("instance-%s-%s", EncodeID(challengeName), instanceId)
+}
+
+// GetChallengeIdentifier prefixes a logical key with "beast-" for Docker names and labels.
+// For compose, the full docker compose -p value is often this prefix applied to either the
+// challenge name (non-instanced) or GetInstanceIdentifier (instanced). Prefer the helpers
+// ProjectNameNotInstanced / ComposeDockerProjectNameInstanced for -p so deploy
+// and teardown stay aligned.
+func GetChallengeIdentifier(challengeIdentifier string) string {
+	return fmt.Sprintf("beast-%s", challengeIdentifier)
+}
+
+// ProjectNameNotInstanced is the exact docker compose -p project name for a
+// non-instanced (shared) compose challenge. Use this in deployPipeline, ComposeDown, ComposePurge,
+// and any cleanup that must target the same stack.
+func ProjectNameNotInstanced(challengeName string) string {
+	return GetChallengeIdentifier(EncodeID(challengeName))
+}
+
+// ComposeDockerProjectNameInstanced is the exact docker compose -p project name for an instanced
+// compose challenge. Format: beast-instance-<EncodeID(challengeName)>-<instanceId>.
+// Must match deployInstanceFromCompose and instanced ComposePurge/teardown.
+func ComposeDockerProjectNameInstanced(challengeName, instanceID string) string {
+	return GetChallengeIdentifier(GetInstanceIdentifier(challengeName, instanceID))
 }

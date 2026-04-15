@@ -157,7 +157,7 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	)
 	imageId = ""
 
-	challengeTag := coreUtils.EncodeID(challengeName)
+	challengeTag := utils.EncodeID(challengeName)
 	log.Printf("== Server for challenge %s : %s", challengeName, challenge.ServerDeployed)
 	if config.Challenge.Env.DockerCompose != "" {
 
@@ -274,13 +274,13 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			return fmt.Errorf("failed to allocate instance ports: %w", err)
 		}
 
+		// Non instanced compose challenges are identified by the challenge name (without encoding)
+		composeProjectName := utils.ProjectNameNotInstanced(challengeName)
 		if cfg.Cfg.UseLocalDockerDaemon(host) {
-			/* Challenge Name and Project Name are the same for non instanced challenges */
-			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, challengeName, stagingDir, composeFileName, ports)
+			primaryContainerId, err = cr.DeployContainerFromCompose(challengeName, composeProjectName, stagingDir, composeFileName, ports)
 		} else {
 			server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-			/* Challenge Name and Project Name are the same for non instanced challenges */
-			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, challengeName, stagingDir, composeFileName, server, ports)
+			primaryContainerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, composeProjectName, stagingDir, composeFileName, server, ports)
 		}
 
 		if err != nil {
@@ -342,11 +342,12 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		}
 	}
 
+	// Non instanced non compose challenges are managed by the containerID
 	containerConfig := cr.CreateContainerConfig{
 		PortMapping:      portMapping,
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
-		ContainerName:    coreUtils.EncodeID(config.Challenge.Metadata.Name),
+		ContainerName:    utils.ProjectNameNotInstanced(config.Challenge.Metadata.Name),
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
 		Traffic:          config.Challenge.Env.TrafficType(),

@@ -201,9 +201,8 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 	return imageID, nil
 }
 
-func DeployContainerFromComposeRemote(challengeName string, projectBase string, stagedDir string, composeFileName string, server config.AvailableServer, ports map[string]uint32) (string, error) {
+func DeployContainerFromComposeRemote(challengeName string, projectName string, stagedDir string, composeFileName string, server config.AvailableServer, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedDir, challengeName)
-	projectName := utils.GetProjectName(projectBase)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
 	upCommand := fmt.Sprintf("%s docker compose -f %s -p %s up -d", utils.PortMappingToEnvironmentVariable(ports), composeFile, projectName)
@@ -306,32 +305,26 @@ func getPrimaryComposeContainerIdRemote(projectName string, server config.Availa
 	return containerId, nil
 }
 
-func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableServer) error {
-	log.Debugf("Stopping challenge %s using docker compose on remote", challengeName)
-	projectName := utils.GetProjectName(challengeName)
-
+// ComposeDownProjectRemote runs docker compose down for an explicit -p project name.
+func ComposeDownProjectRemote(projectName string, server config.AvailableServer) error {
+	log.Debugf("Stopping docker compose project %s on remote", projectName)
 	downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
-	log.Debugf("Stopping challenge %s using docker compose remotely: %s", challengeName, downCommand)
 	downOutput, err := RunCommandOnServer(server, downCommand)
 	if err != nil {
-		return fmt.Errorf("docker compose down failed for challenge %s on remote: %v. Output: %s", challengeName, err, downOutput)
+		return fmt.Errorf("docker compose down failed for project %s on remote: %v. Output: %s", projectName, err, downOutput)
 	}
-
-	log.Debugf("Successfully stopped challenge %s on remote. Output: %s", challengeName, downOutput)
+	log.Debugf("Successfully stopped compose project %s on remote. Output: %s", projectName, downOutput)
 	return nil
 }
 
-func ComposePurgeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
-	log.Debugf("Purging challenge %s using docker compose on remote", challengeName)
-	projectName := utils.GetProjectName(challengeName)
+// ComposePurgeProjectRemote purges a compose project by explicit -p name (shared or instanced).
+func ComposePurgeProjectRemote(projectName string, server config.AvailableServer) error {
+	log.Debugf("Purging docker compose project %s on remote", projectName)
 	purgeCommand := fmt.Sprintf("docker compose -p %s down --remove-orphans --volumes --rmi all", projectName)
-	log.Debugf("Purge challenge %s using docker compose remotely: %s", challengeName, purgeCommand)
 	purgeOutput, err := RunCommandOnServer(server, purgeCommand)
 	if err != nil {
-		return fmt.Errorf("docker compose purge failed for challenge %s on remote: %v. Output: %s", challengeName, err, purgeOutput)
-
+		return fmt.Errorf("docker compose purge failed for project %s on remote: %v. Output: %s", projectName, err, purgeOutput)
 	}
-
-	log.Debugf("Successfully purged challenge %s on remote. Output: %s", challengeName, purgeOutput)
+	log.Debugf("Successfully purged compose project %s on remote. Output: %s", projectName, purgeOutput)
 	return nil
 }

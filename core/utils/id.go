@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"strings"
 
@@ -22,10 +21,6 @@ func GetTempContainerId(a string) string {
 		return b[:30]
 	}
 	return b
-}
-
-func EncodeID(a string) string {
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(a)))[:30]
 }
 
 func IsImageIdValid(a string) bool {

@@ -151,7 +151,7 @@ func StopAndRemoveContainer(containerId string) error {
 }
 
 func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
-	containerName := fmt.Sprintf("beast_%s_%s", containerConfig.ChallengeName, containerConfig.ContainerName[:3])
+	containerName := containerConfig.ContainerName
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -177,8 +177,8 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 
 	labels := map[string]string{
 		"beast.challenge":             containerConfig.ChallengeName,
-		"com.sdslabs.beast.project":   utils.GetProjectName(containerConfig.ChallengeName),
-		"com.docker.compose.project":  utils.GetProjectName(containerConfig.ChallengeName),
+		"com.sdslabs.beast.project":   utils.ProjectNameNotInstanced(containerConfig.ChallengeName),
+		"com.docker.compose.project":  utils.ProjectNameNotInstanced(containerConfig.ChallengeName),
 		"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
 	}
 	for k, v := range containerConfig.Labels {
@@ -302,9 +302,8 @@ func CommitContainer(containerId string) (string, error) {
 	return commitResp.ID, nil
 }
 
-func DeployContainerFromCompose(challengeName string, projectBase string, stagedPath string, composeFileName string, ports map[string]uint32) (string, error) {
+func DeployContainerFromCompose(challengeName string, projectName string, stagedPath string, composeFileName string, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
-	projectName := utils.GetProjectName(projectBase)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
 	log.Debugf("Deploying challenge %s using docker compose with project name %s and file %s", challengeName, projectName, composeFileName)
@@ -427,9 +426,9 @@ func getPrimaryComposeContainerId(projectName string) (string, error) {
 	return containerIds[0], nil
 }
 
-func ComposeDown(challengeName, stagedDir string) error {
-	log.Debugf("Stopping challenge %s using docker compose", challengeName)
-	projectName := utils.GetProjectName(challengeName)
+// ComposeDownProject runs docker compose down for an explicit -p project name (shared or instanced).
+func ComposeDownProject(projectName string) error {
+	log.Debugf("Stopping docker compose project %s", projectName)
 
 	downCmd := exec.Command("docker", "compose", "-p", projectName, "down")
 	var downOutput bytes.Buffer
@@ -437,16 +436,16 @@ func ComposeDown(challengeName, stagedDir string) error {
 	downCmd.Stderr = &downOutput
 
 	if err := downCmd.Run(); err != nil {
-		return fmt.Errorf("docker compose down failed for challenge %s: %v. Output: %s", challengeName, err, downOutput.String())
+		return fmt.Errorf("docker compose down failed for project %s: %v. Output: %s", projectName, err, downOutput.String())
 	}
 
-	log.Debugf("Successfully stopped challenge %s", challengeName)
+	log.Debugf("Successfully stopped compose project %s", projectName)
 	return nil
 }
 
-func ComposePurge(challengeName, stagedDir string) error {
-	log.Debugf("Purging challenge %s using docker compose", challengeName)
-	projectName := utils.GetProjectName(challengeName)
+// ComposePurgeProject runs compose down with volumes/images removal for an explicit -p name.
+func ComposePurgeProject(projectName string) error {
+	log.Debugf("Purging docker compose project %s", projectName)
 
 	purgeCmd := exec.Command("docker", "compose", "-p", projectName,
 		"down", "--remove-orphans", "--volumes", "--rmi", "all")
@@ -456,9 +455,9 @@ func ComposePurge(challengeName, stagedDir string) error {
 	purgeCmd.Stderr = &purgeOutput
 
 	if err := purgeCmd.Run(); err != nil {
-		return fmt.Errorf("docker compose purge failed for challenge %s: %v. Output: %s", challengeName, err, purgeOutput.String())
+		return fmt.Errorf("docker compose purge failed for project %s: %v. Output: %s", projectName, err, purgeOutput.String())
 	}
 
-	log.Debugf("Successfully purged challenge %s", challengeName)
+	log.Debugf("Successfully purged compose project %s", projectName)
 	return nil
 }

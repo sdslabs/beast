@@ -316,7 +316,8 @@ func selectServerForInstance() string {
 }
 
 func deployInstanceContainer(instanceID, challengeName string, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string, ports []uint32) (string, error) {
-	containerName := fmt.Sprintf("beast_instance_%s_%s", challengeName, instanceID)
+	// Instanced non compose challenges are managed by the container ID
+	containerName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
 	containerPort := config.Challenge.Env.DefaultPort
 	if containerPort == 0 {
@@ -372,7 +373,8 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 }
 
 func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string, ports map[string]uint32) (string, error) {
-	projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
+	// Instanced compose challenges are managed by the projectName
+	projectName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
 	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		primaryContainer, err := cr.DeployContainerFromCompose(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, ports)
@@ -395,14 +397,15 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 func killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed string) error {
 	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		if deploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
-			stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-			projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
+			projectName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
-			err := cr.ComposePurge(projectName, stagingDir)
+			// managed by the projectName
+			err := cr.ComposePurgeProject(projectName)
 			if err != nil {
 				return fmt.Errorf("docker compose down failed: %s", err.Error())
 			}
 		} else {
+			// managed by the containerID
 			err := cr.StopAndRemoveContainer(containerID)
 			if err != nil {
 				return fmt.Errorf("failed to stop container: %w", err)
@@ -411,13 +414,15 @@ func killInstanceContainer(containerID, deploymentType, instanceID, challengeNam
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
 		if deploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
-			stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-			projectName := fmt.Sprintf("instance-%s-%s", coreUtils.EncodeID(challengeName), instanceID)
-			err := remoteManager.ComposePurgeRemote(projectName, stagingDir, server)
+			projectName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
+
+			// managed by the projectName
+			err := remoteManager.ComposePurgeProjectRemote(projectName, server)
 			if err != nil {
 				return fmt.Errorf("failed to stop compose on remote: %w", err)
 			}
 		} else {
+			// managed by the containerID
 			err := remoteManager.StopAndRemoveContainerRemote(containerID, server)
 			if err != nil {
 				return fmt.Errorf("failed to stop container on remote: %w", err)

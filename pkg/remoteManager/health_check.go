@@ -65,8 +65,7 @@ func CleanupOrphanedOnServer(serverDeployed string) {
 }
 
 // cleanupOrphanedComposeInstancesOnServer finds and removes orphaned docker compose instance projects.
-// Docker Compose containers don't have the beast.instance labels, but they have
-// com.docker.compose.project labels with project names starting with "beast-instance-".
+// Instanced stacks use ComposeDockerProjectNameInstanced; compose ls names use prefix "beast-instance-".
 func CleanupOrphanedComposeInstancesOnServer(serverDeployed string) {
 	var projectNames []string
 	var err error

@@ -64,7 +64,8 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChallengeConfig) error {
 	if chall.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
 		log.Debugf("Cleaning up Docker Compose challenge: %s", chall.Name)
-		projectName := utils.GetProjectName(chall.Name)
+		// Same -p as deployPipeline / ComposeDown for non-instanced compose.
+		projectName := utils.ProjectNameNotInstanced(chall.Name)
 
 		if !cfg.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
 			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
@@ -89,7 +90,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
 	}
 
-	err := CleanupContainerByFilter("name", EncodeID(config.Challenge.Metadata.Name))
+	err := CleanupContainerByFilter("name", utils.EncodeID(config.Challenge.Metadata.Name))
 	return err
 }
 

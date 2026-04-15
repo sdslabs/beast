@@ -653,20 +653,20 @@ func undeployChallenge(challengeName string, purge bool) error {
 		if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
 			log.Debugf("Detected Docker Compose deployment for challenge %s", challengeName)
 
-			stagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+			composeProjectName := utils.ProjectNameNotInstanced(challengeName)
 			if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 				if !purge {
-					err = cr.ComposeDown(challengeName, stagedDir)
+					err = cr.ComposeDownProject(composeProjectName)
 				} else {
-					err = cr.ComposePurge(challengeName, stagedDir)
+					err = cr.ComposePurgeProject(composeProjectName)
 				}
 			} else {
 				server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 
 				if !purge {
-					err = remoteManager.ComposeDownRemote(challengeName, stagedDir, server)
+					err = remoteManager.ComposeDownProjectRemote(composeProjectName, server)
 				} else {
-					err = remoteManager.ComposePurgeRemote(challengeName, stagedDir, server)
+					err = remoteManager.ComposePurgeProjectRemote(composeProjectName, server)
 				}
 			}
 			if err != nil {

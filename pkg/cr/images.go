@@ -85,8 +85,8 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 		NoCache:    noCache,
 		Labels: map[string]string{
 			"beast.challenge":            challengeName,
-			"com.sdslabs.beast.project":  utils.GetProjectName(challengeName),
-			"com.docker.compose.project": utils.GetProjectName(challengeName),
+			"com.sdslabs.beast.project":  utils.ProjectNameNotInstanced(challengeName),
+			"com.docker.compose.project": utils.ProjectNameNotInstanced(challengeName),
 		},
 	}
 
