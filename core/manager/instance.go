@@ -483,11 +483,18 @@ func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
 		return fmt.Errorf("ssh start failed, ssh agent not running")
 	}
 
-	return err
+	return nil
+}
+
+func escapeForSingleQuotes(s string) string {
+	return strings.ReplaceAll(s, "'", `'\''`)
 }
 
 func addUserSSHKeyLocal(containerId string, sshKey string) error {
-	sshCmd := fmt.Sprintf("mkdir -p /home/beast/.ssh && echo '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh", sshKey)
+	sshCmd := fmt.Sprintf(
+		"mkdir -p /home/beast/.ssh && printf %%s '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh",
+		escapeForSingleQuotes(sshKey),
+	)
 
 	result, err := cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", sshCmd,
@@ -503,7 +510,10 @@ func addUserSSHKeyLocal(containerId string, sshKey string) error {
 }
 
 func addUserSSHKeyRemote(containerId string, server cfg.AvailableServer, sshKey string) error {
-	sshCmd := fmt.Sprintf("mkdir -p /home/beast/.ssh && echo '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh", sshKey)
+	sshCmd := fmt.Sprintf(
+		"mkdir -p /home/beast/.ssh && printf %%s '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh",
+		escapeForSingleQuotes(sshKey),
+	)
 
 	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, sshCmd)
 	if err != nil {
