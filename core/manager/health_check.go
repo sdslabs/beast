@@ -10,6 +10,7 @@ import (
 	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/caddy"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/notify"
 	"github.com/sdslabs/beastv4/pkg/probes"
@@ -227,6 +228,12 @@ func ProcessInstanceDeletionQueue() {
 		}
 
 		cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.ContainerID)
+
+		if caddy.Layer4Enabled(&config.Cfg.CaddySshProxy) {
+			if err := caddy.DeleteByID(config.Cfg.CaddySshProxy.AdminAPIURL, instance.InstanceID); err != nil {
+				log.Warnf("failed to remove Caddy layer4 route for expired instance %s: %v", instance.InstanceID, err)
+			}
+		}
 	}
 
 	queueLen, _ := cache.GetDeletionQueueLength()

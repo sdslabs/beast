@@ -41,7 +41,7 @@ func instanceToResponse(instance *cache.Instance) InstanceResponse {
 	return InstanceResponse{
 		InstanceID:    instance.InstanceID,
 		ChallengeName: instance.ChallengeName,
-		HostedAddress: instance.ServerDeployed,
+		HostedAddress: config.Cfg.InstanceHostedAddress(instance.ServerDeployed),
 		Port:          instance.Port,
 		CreatedAt:     instance.CreatedAt,
 		ExpiresAt:     instance.ExpiresAt,

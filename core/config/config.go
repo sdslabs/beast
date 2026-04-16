@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -128,6 +130,7 @@ type BeastConfig struct {
 	RemoteSyncPeriod     time.Duration              `toml:"-"`
 	Rsp                  string                     `toml:"remote_sync_period"`
 	InstanceConfig       InstanceConfig             `toml:"instance_config"`
+	CaddySshProxy        CaddySshProxyConfig        `toml:"caddy_ssh_proxy"`
 
 	CPUShares int64   `toml:"default_cpu_shares"`
 	Memory    int64   `toml:"default_memory_limit"`
@@ -143,6 +146,16 @@ type InstanceConfig struct {
 	MaxInstancesPerUser int   `toml:"max_instances_per_user"`
 }
 
+// CaddySshProxyConfig configures the Caddy admin API for per-instance SSH TCP (layer4) routes.
+// AdminAPIURL is the base URL of the Caddy admin socket (e.g. http://127.0.0.1:2019).
+// SSHProxyAddress is the hostname users connect to over SSH (shown as hosted_address); traffic is proxied to the Docker host.
+// LocalUpstreamHost is the upstream dial hostname used when the default server is localhost (no available_servers in config).
+type CaddySshProxyConfig struct {
+	AdminAPIURL       string `toml:"admin_api_url"`
+	SSHProxyAddress   string `toml:"ssh_proxy_address"`
+	LocalUpstreamHost string `toml:"local_upstream_host"`
+}
+
 func (config *InstanceConfig) Validate() {
 	if config.DefaultExpiration <= 0 {
 		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
@@ -154,6 +167,10 @@ func (config *InstanceConfig) Validate() {
 	if config.MaxInstancesPerUser <= 0 {
 		config.MaxInstancesPerUser = core.DEFAULT_MAXIMUM_INSTANCES_PER_USER
 	}
+}
+
+func (config *CaddySshProxyConfig) Validate() {
+	config.SSHProxyAddress = strings.TrimSpace(config.SSHProxyAddress)
 }
 
 func ValidatePortRange(portRange string) error {
@@ -224,15 +241,19 @@ func (config *BeastConfig) ValidateConfig() error {
 
 	if len(config.AvailableServers) == 0 {
 		log.Warn("No available servers provided for challenges. Using default localhost")
+		injected := AvailableServer{
+			Name:       core.LOCALHOST,
+			Host:       core.LOCALHOST,
+			Username:   os.Getenv("USER"),
+			SSHKeyPath: "",
+			Active:     true,
+			PortRange:  fmt.Sprintf("%v%s%v", core.ALLOWED_MIN_PORT_VALUE, core.MappingDelimiter, core.ALLOWED_MAX_PORT_VALUE),
+		}
+		if strings.TrimSpace(config.CaddySshProxy.LocalUpstreamHost) != "" {
+			injected.CaddyUpstreamHost = strings.TrimSpace(config.CaddySshProxy.LocalUpstreamHost)
+		}
 		config.AvailableServers = map[string]AvailableServer{
-			core.LOCALHOST: {
-				Name:       core.LOCALHOST,
-				Host:       core.LOCALHOST,
-				Username:   os.Getenv("USER"),
-				SSHKeyPath: "",
-				Active:     true,
-				PortRange:  fmt.Sprintf("%v%s%v", core.ALLOWED_MIN_PORT_VALUE, core.MappingDelimiter, core.ALLOWED_MAX_PORT_VALUE),
-			},
+			core.LOCALHOST: injected,
 		}
 	}
 
@@ -242,6 +263,9 @@ func (config *BeastConfig) ValidateConfig() error {
 		}
 
 		server.Name = name
+		if strings.TrimSpace(server.CaddyUpstreamHost) == "" {
+			server.CaddyUpstreamHost = strings.TrimSpace(server.Host)
+		}
 		config.AvailableServers[name] = server
 		if server.Active {
 			err := server.ValidateServerConfig()
@@ -317,6 +341,7 @@ func (config *BeastConfig) ValidateConfig() error {
 		log.Warn("Mail configuration not provided, email notifications will not work")
 	}
 
+	config.CaddySshProxy.Validate()
 	config.InstanceConfig.Validate()
 
 	return nil
@@ -330,13 +355,29 @@ func (config *BeastConfig) UseLocalDockerDaemon(serverName string) bool {
 	return server.Host == core.LOCALHOST || server.Host == core.LOCALHOST_IP
 }
 
+// InstanceHostedAddress returns the hostname shown to users for SSH (hosted_address).
+// When ssh_proxy_address is set, users connect there; otherwise the server map key is used.
+func (config *BeastConfig) InstanceHostedAddress(serverDeployed string) string {
+	if config.CaddySshProxy.SSHProxyAddress != "" {
+		return config.CaddySshProxy.SSHProxyAddress
+	}
+
+	return serverDeployed
+}
+
 type AvailableServer struct {
-	Name       string `toml:"-"`
-	Host       string `toml:"host"`
-	Username   string `toml:"username"`
-	SSHKeyPath string `toml:"ssh_key_path"`
-	Active     bool   `toml:"active"`
-	PortRange  string `toml:"port_range"`
+	Name              string `toml:"-"`
+	Host              string `toml:"host"`
+	Username          string `toml:"username"`
+	SSHKeyPath        string `toml:"ssh_key_path"`
+	Active            bool   `toml:"active"`
+	PortRange         string `toml:"port_range"`
+	CaddyUpstreamHost string `toml:"caddy_upstream_host"`
+}
+
+// CaddyUpstreamDial returns host:port for the layer4 proxy dial target (Caddy upstream), using the configured upstream name.
+func (s AvailableServer) CaddyUpstreamDial(hostPublishedPort uint32) string {
+	return net.JoinHostPort(s.CaddyUpstreamHost, strconv.FormatUint(uint64(hostPublishedPort), 10))
 }
 
 func (config *AvailableServer) ValidateServerConfig() error {
@@ -348,6 +389,12 @@ func (config *AvailableServer) ValidateServerConfig() error {
 	err := ValidatePortRange(config.PortRange)
 	if err != nil {
 		return fmt.Errorf("error while validating port range for server %s: %s", config.Host, err)
+	}
+
+	config.CaddyUpstreamHost = strings.TrimSpace(config.CaddyUpstreamHost)
+
+	if config.CaddyUpstreamHost == "" {
+		config.CaddyUpstreamHost = config.Host
 	}
 
 	if config.Host == core.LOCALHOST || config.Host == core.LOCALHOST_IP {

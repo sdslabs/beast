@@ -47,6 +47,9 @@ ssh_key_path = "/path/to/your/private/key1"
 # Port range for this server (format: START:END)
 port_range = "30000:40000"
 
+# Optional: hostname Caddy should dial for layer4 SSH proxy (defaults to host if empty)
+# caddy_upstream_host = ""
+
 # Status of remote server to be used
 # If it is set to false then that remote server will not be used
 active = false
@@ -129,6 +132,14 @@ user = ""
 default_expiration = 300
 max_extension = 600
 max_instances_per_user = 3
+
+# Optional: Caddy admin API for per-instance SSH TCP (layer4) proxies.
+# When admin_api_url is set, beast registers a route on spawn and removes it on teardown.
+# Users see ssh_proxy_address as hosted_address; Caddy dials caddy_upstream_host:port (per-server, or local_upstream_host for the default localhost server).
+[caddy_ssh_proxy]
+admin_api_url = ""
+ssh_proxy_address = ""
+local_upstream_host = ""
 
 # The following fields are required only while hosting a competition on beast
 # This section contains information about the competition to be hosted

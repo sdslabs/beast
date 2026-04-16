@@ -14,6 +14,7 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/pkg/caddy"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/utils"
@@ -160,8 +161,27 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		ServerDeployed: serverDeployed,
 	}
 
+	if caddy.Layer4Enabled(&cfg.Cfg.CaddySshProxy) {
+		srv := cfg.Cfg.AvailableServers[serverDeployed]
+		dial := srv.CaddyUpstreamDial(port)
+		if err := caddy.PutLayer4Server(cfg.Cfg.CaddySshProxy.AdminAPIURL, instanceID, port, dial); err != nil {
+			if err := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); err != nil {
+				log.Warnf("failed to kill instance container after Caddy registration failure: %v", err)
+			}
+			if err := cache.FreeContainerPortsOnHost(serverDeployed, containerID); err != nil {
+				log.Warnf("failed to free container ports after Caddy registration failure: %v", err)
+			}
+			return nil, fmt.Errorf("failed to register SSH proxy with Caddy: %w", err)
+		}
+	}
+
 	err = cache.SaveInstance(instance, ttl)
 	if err != nil {
+		if caddy.Layer4Enabled(&cfg.Cfg.CaddySshProxy) {
+			if err := caddy.DeleteByID(cfg.Cfg.CaddySshProxy.AdminAPIURL, instanceID); err != nil {
+				log.Warnf("failed to remove Caddy layer4 route after save failure for instance %s: %v", instanceID, err)
+			}
+		}
 		if err := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); err != nil {
 			return nil, fmt.Errorf("failed to kill instance container: %w", err)
 		}
@@ -194,6 +214,12 @@ func KillInstance(instanceID string) error {
 	err = cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.ContainerID)
 	if err != nil {
 		return fmt.Errorf("failed to free container ports: %w", err)
+	}
+
+	if caddy.Layer4Enabled(&cfg.Cfg.CaddySshProxy) {
+		if err := caddy.DeleteByID(cfg.Cfg.CaddySshProxy.AdminAPIURL, instanceID); err != nil {
+			log.Warnf("failed to remove Caddy layer4 route for instance %s: %v", instanceID, err)
+		}
 	}
 
 	err = cache.DeleteInstance(instanceID)
