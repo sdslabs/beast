@@ -86,6 +86,9 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		}
 
 		port = ports[config.Challenge.Env.DefaultPortVar]
+		for key, port := range ports {
+			log.Printf("key %s maps to %d", key, port)
+		}
 
 		containerID, checkHash, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
 		portOwner = utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
@@ -557,11 +560,13 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 
 		err = verifySSHLocal(containerId)
 		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
 			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
 		}
 
 		checkHash, err = verifyCheckLocal(containerId)
 		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
 			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
 		}
 	} else {
@@ -573,11 +578,13 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 
 		err = verifySSHRemote(containerId, server)
 		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
 			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
 		}
 
 		checkHash, err = verifyCheckRemote(containerId, server)
 		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
 			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
 		}
 	}
@@ -588,10 +595,6 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string, ports map[string]uint32) (string, string, error) {
 	// Instanced compose challenges are managed by the projectName
 	projectName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
-
-	if ports[config.Challenge.Env.DefaultPortVar] != core.SSH_PORT {
-		return "", "", fmt.Errorf("the default port variable does not map to %d for instance challenge %s", core.SSH_PORT, challengeName)
-	}
 
 	var err error
 	var checkHash string
@@ -605,22 +608,14 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 
 		err = verifySSHLocal(containerId)
 		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
 			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
 		}
 
 		checkHash, err = verifyCheckLocal(containerId)
 		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
 			return "", "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
-		}
-
-		err = verifySSHLocal(containerId)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
-		}
-
-		checkHash, err = verifyCheckLocal(containerId)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
 		}
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
@@ -631,11 +626,13 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 
 		err = verifySSHRemote(containerId, server)
 		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
 			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
 		}
 
 		checkHash, err = verifyCheckRemote(containerId, server)
 		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
 			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
 		}
 	}

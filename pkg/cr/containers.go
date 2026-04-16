@@ -17,6 +17,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/defaults"
 	utils "github.com/sdslabs/beastv4/utils"
 
@@ -364,6 +365,8 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 	extractDir := filepath.Join(stagedPath, challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
+	log.Printf("compose file: %s", composeFile)
+
 	log.Debugf("Deploying challenge %s using docker compose with project name %s and file %s", challengeName, projectName, composeFileName)
 
 	// Deploy with project name - Docker Compose automatically labels containers with
@@ -398,6 +401,8 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 		log.Warnf("Could not get primary container ID for challenge %s: %v", challengeName, err)
 		return "", nil // Return empty string but success
 	}
+
+	log.Printf("container Id: %s", primaryContainerId)
 
 	log.Debugf("Verified challenge %s services are running. Primary container: %s", challengeName, primaryContainerId)
 	return primaryContainerId, nil
@@ -462,19 +467,18 @@ func validateAllComposeServicesRunning(projectName, challengeName string) error 
 	return nil
 }
 
-// gets the first container ID from a compose project
 func getPrimaryComposeContainerId(projectName string) (string, error) {
-	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q")
+	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q", core.SSH_CONTAINER_COMPOSE)
 	var output bytes.Buffer
 	psCmd.Stdout = &output
 
 	if err := psCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to get container IDs: %v", err)
+		return "", fmt.Errorf("failed to get container ID for compose service %q: %v", core.SSH_CONTAINER_COMPOSE, err)
 	}
 
 	containerIds := strings.Fields(strings.TrimSpace(output.String()))
 	if len(containerIds) == 0 {
-		return "", fmt.Errorf("no containers found for project %s", projectName)
+		return "", fmt.Errorf("no container found for compose service %q in project %s", core.SSH_CONTAINER_COMPOSE, projectName)
 	}
 
 	// Return first 12 characters of the first container ID
