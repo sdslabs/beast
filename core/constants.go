@@ -146,6 +146,9 @@ var DEPLOYMENT_TYPES = map[string]string{
 	"standard_docker": "standard_docker",
 }
 
+// SSH_CONTAINER_COMPOSE is the compose service name (services: key) for the SSH target container.
+const SSH_CONTAINER_COMPOSE string = "ssh"
+
 var USER_ROLES = map[string]string{
 	"contestant": "contestant",
 	"admin":      "admin",

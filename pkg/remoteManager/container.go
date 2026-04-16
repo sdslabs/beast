@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
-	_ "github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
@@ -285,20 +285,19 @@ func validateAllComposeServicesRunningRemote(projectName, challengeName string, 
 	return nil
 }
 
-// gets the first container ID from a compose project on remote
 func getPrimaryComposeContainerIdRemote(projectName string, server config.AvailableServer) (string, error) {
-	psCommand := fmt.Sprintf("docker compose -p %s ps -q | head -1", projectName)
+	psCommand := fmt.Sprintf("docker compose -p %s ps -q %s", projectName, core.SSH_CONTAINER_COMPOSE)
 	output, err := RunCommandOnServer(server, psCommand)
 	if err != nil {
-		return "", fmt.Errorf("failed to get container IDs on remote: %v", err)
+		return "", fmt.Errorf("failed to get container ID for compose service %q on remote: %v", core.SSH_CONTAINER_COMPOSE, err)
 	}
 
-	containerId := strings.TrimSpace(output)
-	if containerId == "" {
-		return "", fmt.Errorf("no containers found for project %s on remote", projectName)
+	containerIds := strings.Fields(strings.TrimSpace(output))
+	if len(containerIds) == 0 {
+		return "", fmt.Errorf("no container found for compose service %q in project %s on remote", core.SSH_CONTAINER_COMPOSE, projectName)
 	}
 
-	// Return first 12 characters
+	containerId := containerIds[0]
 	if len(containerId) >= 12 {
 		return containerId[:12], nil
 	}
