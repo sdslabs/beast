@@ -85,9 +85,6 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		}
 
 		port = ports[config.Challenge.Env.DefaultPortVar]
-		for key, port := range ports {
-			log.Printf("key %s maps to %d", key, port)
-		}
 
 		containerID, checkHash, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]

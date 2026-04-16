@@ -366,8 +366,6 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 	extractDir := filepath.Join(stagedPath, challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
-	log.Printf("compose file: %s", composeFile)
-
 	log.Debugf("Deploying challenge %s using docker compose with project name %s and file %s", challengeName, projectName, composeFileName)
 
 	// Deploy with project name - Docker Compose automatically labels containers with
