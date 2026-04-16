@@ -56,6 +56,10 @@ func cleanupRunningContainers() {
 
 	for _, challenge := range challenges {
 		if challenge.Status == core.DEPLOY_STATUS["deployed"] {
+			if challenge.Instanced {
+				_ = manager.KillChallengeInstances(challenge.Name)
+			}
+
 			err = manager.UndeployChallenge(challenge.Name)
 			if err != nil {
 				log.Errorln(fmt.Sprintf("Failed to undeploy challenge [Id: %v] %s", challenge.ID, challenge.Name))
@@ -152,12 +156,12 @@ func cleanup() {
 	stopSseNotificationHub()
 	stopApiScheduler()
 
+	cleanupRunningContainers()
+
 	stopWorkerQueue()
 	stopRemoteManagers()
 
 	saveLeaderboardCache()
-
-	cleanupRunningContainers()
 
 	cleanupCacheConnections()
 	cleanupDatabaseConnections()
