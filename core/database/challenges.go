@@ -663,12 +663,28 @@ func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, er
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
+	whereMap = normalizeDynamicFlagWhereMap(whereMap)
 	tx := Db.Where(whereMap).Find(&dynamicFlags)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return []DynamicFlag{}, nil
 	}
 
 	return dynamicFlags, tx.Error
+}
+
+func normalizeDynamicFlagWhereMap(whereMap map[string]interface{}) map[string]interface{} {
+	normalized := make(map[string]interface{}, len(whereMap))
+	for key, value := range whereMap {
+		switch key {
+		case "Name":
+			normalized["name"] = value
+		case "Flag":
+			normalized["flag"] = value
+		default:
+			normalized[key] = value
+		}
+	}
+	return normalized
 }
 
 func DeleteDynamicFlagsByChallengeName(name string) error {

@@ -89,9 +89,12 @@ func Init() {
 	// UserHint must be explicitly migrated since GORM's AutoMigrate on User only handles
 	// the users table, not custom join table structs. Without this, the created_at and
 	// challenge_id columns on user_hints won't be added to existing databases.
-	err := Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{}, &OTP{}, &UserHint{})
+	err := Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &UserChallenges{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{}, &DynamicFlagClaim{}, &DynamicScoreDirty{}, &OTP{}, &UserHint{})
 	if err != nil {
 		log.Fatalf("failed to migrate database with error: %s", err)
+	}
+	if err := MigrateSubmissionGuards(); err != nil {
+		log.Fatalf("failed to migrate submission guards with error: %s", err)
 	}
 
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
