@@ -570,7 +570,12 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 	}
 
 	if challEntry.ContainerId != "" {
-		hostPorts, err := cache.GetContainerPortsOnHost(challEntry.ServerDeployed, challEntry.ContainerId)
+		portOwner := challEntry.ContainerId
+		if challEntry.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+			portOwner = utils.ProjectNameNotInstanced(challEntry.Name)
+		}
+
+		hostPorts, err := cache.GetContainerPortsOnHost(challEntry.ServerDeployed, portOwner)
 		if err != nil {
 			return fmt.Errorf("error while parsing host port for challenge %s : %s", challEntry.Name, err)
 		}

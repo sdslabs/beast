@@ -4,6 +4,7 @@ import (
 	"fmt"
 	container_types "github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -75,9 +76,15 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 				log.Errorf("Error running docker compose down on remote: %v", err)
 				return err
 			}
+		} else if err := cr.ComposeDownProject(projectName); err != nil {
+			log.Errorf("Error running docker compose down locally: %v", err)
+			return err
 		}
 
 		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
+		if err := cache.FreeContainerPortsOnHost(chall.ServerDeployed, projectName); err != nil {
+			log.Warnf("Failed to free ports for compose challenge %s: %v", chall.Name, err)
+		}
 		return nil
 	}
 
@@ -88,6 +95,9 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 		}
 
 		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
+		if err := cache.FreeContainerPortsOnHost(chall.ServerDeployed, chall.ContainerId); err != nil {
+			log.Warnf("Failed to free ports for challenge %s: %v", chall.Name, err)
+		}
 	}
 
 	err := CleanupContainerByFilter("name", utils.EncodeID(config.Challenge.Metadata.Name))

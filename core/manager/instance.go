@@ -68,6 +68,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 
 	var port uint32
 	var containerID string
+	var portOwner string
 	var deploymentType string
 
 	if config.Challenge.Env.DockerCompose != "" {
@@ -84,6 +85,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		port = ports[config.Challenge.Env.DefaultPortVar]
 
 		containerID, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
+		portOwner = utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
 
 		if err != nil {
@@ -91,7 +93,13 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			return nil, err
 		}
 
-		coreUtils.AssignPortsOnContainerToHostCompose(serverDeployed, containerID, ports)
+		if err := coreUtils.AssignPortsOnContainerToHostCompose(serverDeployed, portOwner, ports); err != nil {
+			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
+				log.Warnf("failed to cleanup instance %s after port registration failure: %v", instanceID, cleanupErr)
+			}
+			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to register instance ports: %w", err)
+		}
 	} else {
 		err = config.Challenge.Env.ExtractPorts()
 		if err != nil {
@@ -111,6 +119,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		}
 
 		containerID, err = deployInstanceContainer(instanceID, challengeName, challenge.ImageId, &config, serverDeployed, ports)
+		portOwner = containerID
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
 
 		if err != nil {
@@ -118,13 +127,20 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			return nil, fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 		}
 
-		coreUtils.AssignPortsOnContainerToHost(serverDeployed, containerID, ports)
+		if err := coreUtils.AssignPortsOnContainerToHost(serverDeployed, containerID, ports); err != nil {
+			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
+				log.Warnf("failed to cleanup instance %s after port registration failure: %v", instanceID, cleanupErr)
+			}
+			coreUtils.FreePortsOnHost(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to register instance ports: %w", err)
+		}
 	}
 
 	instance := &cache.Instance{
 		InstanceID:     instanceID,
 		ChallengeName:  challengeName,
 		ContainerID:    containerID,
+		PortOwner:      portOwner,
 		Port:           port,
 		UserID:         userID,
 		Username:       username,
@@ -139,7 +155,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		if err := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); err != nil {
 			return nil, fmt.Errorf("failed to kill instance container: %w", err)
 		}
-		if err := cache.FreeContainerPortsOnHost(serverDeployed, containerID); err != nil {
+		if err := cache.FreeContainerPortsOnHost(serverDeployed, portOwner); err != nil {
 			return nil, fmt.Errorf("failed to free container ports: %w", err)
 		}
 
@@ -165,7 +181,7 @@ func KillInstance(instanceID string) error {
 		log.Warnf("Error killing container for instance %s: %v", instanceID, err)
 	}
 
-	err = cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.ContainerID)
+	err = cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.PortOwnerID())
 	if err != nil {
 		return fmt.Errorf("failed to free container ports: %w", err)
 	}
@@ -268,14 +284,9 @@ func allocateInstancePorts(host string, env cfg.ChallengeEnv) ([]uint32, error) 
 
 	portRange := lastPort - firstPort + 1
 
-	ports := make([]uint32, len(env.Ports))
-	for i, _ := range env.Ports {
-		port, err := cache.GetFreePortOnHost(host, firstPort, portRange)
-		if err != nil {
-			return nil, fmt.Errorf("failed to allocate port: %w", err)
-		}
-
-		ports[i] = port
+	ports, err := cache.GetFreePortsOnHost(host, firstPort, portRange, len(env.Ports))
+	if err != nil {
+		return nil, fmt.Errorf("failed to allocate ports: %w", err)
 	}
 
 	return ports, nil
@@ -294,14 +305,14 @@ func allocateInstancePortsCompose(host string, env cfg.ChallengeEnv) (map[string
 
 	portRange := lastPort - firstPort + 1
 
-	ports := make(map[string]uint32, len(env.PortVariables))
-	for _, portVariable := range env.PortVariables {
-		port, err := cache.GetFreePortOnHost(host, firstPort, portRange)
-		if err != nil {
-			return nil, fmt.Errorf("failed to allocate instancePort: %w", err)
-		}
+	allocatedPorts, err := cache.GetFreePortsOnHost(host, firstPort, portRange, len(env.PortVariables))
+	if err != nil {
+		return nil, fmt.Errorf("failed to allocate instance ports: %w", err)
+	}
 
-		ports[portVariable] = port
+	ports := make(map[string]uint32, len(env.PortVariables))
+	for i, portVariable := range env.PortVariables {
+		ports[portVariable] = allocatedPorts[i]
 	}
 
 	return ports, nil

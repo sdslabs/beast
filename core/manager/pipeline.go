@@ -288,7 +288,20 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			return err
 		}
 
-		coreUtils.AssignPortsOnContainerToHostCompose(host, primaryContainerId, ports)
+		if err := coreUtils.AssignPortsOnContainerToHostCompose(host, composeProjectName, ports); err != nil {
+			if cfg.Cfg.UseLocalDockerDaemon(host) {
+				if cleanupErr := cr.ComposePurgeProject(composeProjectName); cleanupErr != nil {
+					log.Warnf("failed to cleanup compose project %s after port registration failure: %v", composeProjectName, cleanupErr)
+				}
+			} else {
+				server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+				if cleanupErr := remoteManager.ComposePurgeProjectRemote(composeProjectName, server); cleanupErr != nil {
+					log.Warnf("failed to cleanup remote compose project %s after port registration failure: %v", composeProjectName, cleanupErr)
+				}
+			}
+			coreUtils.FreePortsOnHostCompose(host, ports)
+			return fmt.Errorf("error while registering ports for challenge %s: %s", challenge.Name, err)
+		}
 
 		// only for backward compatibility
 		if err := database.UpdateChallenge(challenge, map[string]any{
@@ -369,7 +382,19 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 	}
 
-	coreUtils.AssignPortsOnContainerToHost(host, containerId, ports)
+	if err := coreUtils.AssignPortsOnContainerToHost(host, containerId, ports); err != nil {
+		if cfg.Cfg.UseLocalDockerDaemon(host) {
+			if cleanupErr := cr.StopAndRemoveContainer(containerId); cleanupErr != nil {
+				log.Warnf("failed to cleanup container %s after port registration failure: %v", containerId, cleanupErr)
+			}
+		} else {
+			if cleanupErr := remoteManager.StopAndRemoveContainerRemote(containerId, cfg.Cfg.AvailableServers[host]); cleanupErr != nil {
+				log.Warnf("failed to cleanup remote container %s after port registration failure: %v", containerId, cleanupErr)
+			}
+		}
+		coreUtils.FreePortsOnHost(host, ports)
+		return fmt.Errorf("error while registering ports for challenge %s: %s", challenge.Name, err)
+	}
 
 	if err = database.UpdateChallenge(challenge, map[string]any{
 		"ContainerId":    containerId,

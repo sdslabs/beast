@@ -699,9 +699,14 @@ func undeployChallenge(challengeName string, purge bool) error {
 			}
 		}
 
-		err = cache.FreeContainerPortsOnHost(challenge.ServerDeployed, challenge.ContainerId)
+		portOwner := challenge.ContainerId
+		if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+			portOwner = utils.ProjectNameNotInstanced(challengeName)
+		}
+
+		err = cache.FreeContainerPortsOnHost(challenge.ServerDeployed, portOwner)
 		if err != nil {
-			return fmt.Errorf("error while freeing ports for container %s on host %s: %s", challenge.ContainerId, challenge.ServerDeployed, err)
+			return fmt.Errorf("error while freeing ports for container %s on host %s: %s", portOwner, challenge.ServerDeployed, err)
 		}
 	}
 

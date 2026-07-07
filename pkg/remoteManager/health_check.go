@@ -94,6 +94,9 @@ func CleanupOrphanedComposeInstancesOnServer(serverDeployed string) {
 			if err := composeDownProjectRemote(projectName, server); err != nil {
 				log.Warnf("Failed to remove orphaned compose project %s on %s: %v", projectName, serverDeployed, err)
 			}
+			if err := cache.FreeContainerPortsOnHost(serverDeployed, projectName); err != nil {
+				log.Warnf("Failed to free ports for orphaned compose project %s on %s: %v", projectName, serverDeployed, err)
+			}
 		}
 	}
 }
