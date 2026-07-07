@@ -1,5 +1,6 @@
 *agent
 .beast-local/
+.codex/
 beast.log
 venv/
 site/
