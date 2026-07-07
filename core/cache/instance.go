@@ -14,6 +14,7 @@ type Instance struct {
 	InstanceID     string    `json:"instance_id"`
 	ChallengeName  string    `json:"challenge_name"`
 	ContainerID    string    `json:"container_id"`
+	PortOwner      string    `json:"port_owner"`
 	Port           uint32    `json:"port"`
 	UserID         string    `json:"user_id"`
 	Username       string    `json:"username"`
@@ -21,6 +22,14 @@ type Instance struct {
 	ExpiresAt      time.Time `json:"expires_at"`
 	DeploymentType string    `json:"deployment_type"`
 	ServerDeployed string    `json:"server_deployed"`
+}
+
+func (instance *Instance) PortOwnerID() string {
+	if instance.PortOwner != "" {
+		return instance.PortOwner
+	}
+
+	return instance.ContainerID
 }
 
 func SaveInstance(instance *Instance, ttl time.Duration) error {
@@ -38,9 +47,15 @@ func SaveInstance(instance *Instance, ttl time.Duration) error {
 	}
 
 	key := utils.InstanceToKey(instance.InstanceID)
-	err = Cache.Set(ctx, key, data, ttl).Err()
+	err = Cache.Set(ctx, key, data, 0).Err()
 	if err != nil {
 		return fmt.Errorf("failed to save instance: %w", err)
+	}
+
+	expiryKey := utils.InstanceExpiryToKey(instance.InstanceID)
+	err = Cache.Set(ctx, expiryKey, instance.InstanceID, ttl).Err()
+	if err != nil {
+		return fmt.Errorf("failed to save instance expiry marker: %w", err)
 	}
 
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
@@ -251,7 +266,9 @@ func DeleteInstance(instanceID string) error {
 	}
 
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
+	expiryKey := utils.InstanceExpiryToKey(instanceID)
 	Cache.Del(ctx, userKey)
+	Cache.Del(ctx, expiryKey)
 	Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
 
 	log.Debugf("Deleted instance %s for user %s, challenge %s",
@@ -295,12 +312,14 @@ func ExtendInstance(instanceID string, additionalTime time.Duration) error {
 		return fmt.Errorf("failed to marshal instance: %w", err)
 	}
 
-	err = Cache.Set(ctx, key, updatedData, newTTL).Err()
+	err = Cache.Set(ctx, key, updatedData, 0).Err()
 	if err != nil {
 		return fmt.Errorf("failed to extend instance: %w", err)
 	}
 
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
+	expiryKey := utils.InstanceExpiryToKey(instanceID)
+	Cache.Set(ctx, expiryKey, instanceID, newTTL)
 	Cache.Expire(ctx, userKey, newTTL)
 
 	log.Debugf("Extended instance %s by %v, new expiration: %v", instanceID, additionalTime, newExpiresAt)
@@ -337,8 +356,8 @@ func GetInstanceTTL(instanceID string) (time.Duration, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	key := utils.InstanceToKey(instanceID)
-	ttl, err := Cache.TTL(ctx, key).Result()
+	expiryKey := utils.InstanceExpiryToKey(instanceID)
+	ttl, err := Cache.TTL(ctx, expiryKey).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get TTL: %w", err)
 	}
@@ -374,8 +393,9 @@ func QueueInstanceForDeletion(instanceID string) error {
 	pipe.SRem(ctx, utils.InstancesSetKey, instanceID)
 
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
+	expiryKey := utils.InstanceExpiryToKey(instanceID)
 	pipe.Del(ctx, userKey)
-	pipe.Del(ctx, key)
+	pipe.Del(ctx, expiryKey)
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
@@ -413,6 +433,60 @@ func PopInstanceForDeletion() (*Instance, error) {
 
 	log.Debugf("Popped instance %s from deletion queue", instance.InstanceID)
 	return &instance, nil
+}
+
+func DeleteInstanceMetadata(instanceID string) error {
+	if Cache == nil {
+		return fmt.Errorf("redis cache not initialized")
+	}
+
+	ctx := context.Background()
+	CacheMutex.Lock()
+	defer CacheMutex.Unlock()
+
+	key := utils.InstanceToKey(instanceID)
+	expiryKey := utils.InstanceExpiryToKey(instanceID)
+
+	pipe := Cache.TxPipeline()
+	pipe.Del(ctx, key)
+	pipe.Del(ctx, expiryKey)
+	pipe.SRem(ctx, utils.InstancesSetKey, instanceID)
+
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to delete instance metadata: %w", err)
+	}
+
+	return nil
+}
+
+func RestoreQueuedInstance(instance *Instance) error {
+	if Cache == nil {
+		return fmt.Errorf("redis cache not initialized")
+	}
+	if instance == nil {
+		return fmt.Errorf("instance is nil")
+	}
+
+	ctx := context.Background()
+	CacheMutex.Lock()
+	defer CacheMutex.Unlock()
+
+	data, err := json.Marshal(instance)
+	if err != nil {
+		return fmt.Errorf("failed to marshal instance: %w", err)
+	}
+
+	pipe := Cache.TxPipeline()
+	pipe.Set(ctx, utils.InstanceToKey(instance.InstanceID), data, 0)
+	pipe.SAdd(ctx, utils.InstancesSetKey, instance.InstanceID)
+
+	_, err = pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to restore queued instance metadata: %w", err)
+	}
+
+	return nil
 }
 
 func GetDeletionQueueLength() (int64, error) {

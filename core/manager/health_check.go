@@ -1,9 +1,11 @@
 package manager
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
@@ -19,6 +21,10 @@ import (
 )
 
 var HEALTH_CHECKER = false
+var (
+	instanceCleanupOnce          sync.Once
+	instanceExpirySubscriberOnce sync.Once
+)
 
 // Check for static challenegs' assets to be present on staging server.
 // At the time of writing, Beast deploys assets to localhost only.
@@ -172,14 +178,46 @@ func BeastHeathCheckProber(waitTime int) {
 }
 
 func InstanceCleanupProber() {
-	log.Info("Starting Instance Cleanup prober with interval: ", core.DEFAULT_HEALTH_CHECK_TIME)
+	started := false
+	instanceCleanupOnce.Do(func() {
+		started = true
+	})
+	if !started {
+		log.Warn("Instance cleanup prober already running. Not starting again")
+		return
+	}
+
+	log.Info("Starting Instance Cleanup prober with event-driven expiry and reconciliation interval: ", core.DEFAULT_HEALTH_CHECK_TIME)
+	startInstanceExpirySubscriber()
 
 	for {
-		QueueExpiredInstances()
 		ProcessInstanceDeletionQueue()
 		CleanupOrphanedInstanceContainers()
+		QueueExpiredInstances()
 		time.Sleep(core.DEFAULT_HEALTH_CHECK_TIME)
 	}
+}
+
+func startInstanceExpirySubscriber() {
+	instanceExpirySubscriberOnce.Do(func() {
+		if err := cache.EnableKeyspaceExpiryNotifications(); err != nil {
+			log.Warnf("Redis keyspace expiry notifications unavailable, relying on reconciliation: %v", err)
+		}
+
+		go func() {
+			err := cache.SubscribeExpiredInstanceMarkers(context.Background(), func(instanceID string) {
+				log.Infof("Instance expiry marker fired for %s, queueing cleanup", instanceID)
+				if err := cache.QueueInstanceForDeletion(instanceID); err != nil {
+					log.Warnf("Failed to queue expired instance %s from Redis event: %v", instanceID, err)
+					return
+				}
+				ProcessInstanceDeletionQueue()
+			})
+			if err != nil {
+				log.Warnf("Redis expiry subscriber stopped, reconciliation will continue cleanup: %v", err)
+			}
+		}()
+	})
 }
 
 func QueueExpiredInstances() {
@@ -219,14 +257,32 @@ func ProcessInstanceDeletionQueue() {
 		log.Infof("Processing deletion for instance %s (challenge: %s, container: %s, server: %s)",
 			instance.InstanceID, instance.ChallengeName, instance.ContainerID, instance.ServerDeployed)
 
+		if _, err := cache.GetInstance(instance.InstanceID); err != nil {
+			log.Debugf("Skipping stale deletion queue item for instance %s: %v", instance.InstanceID, err)
+			continue
+		}
+
 		err = killInstanceContainer(instance.ContainerID, instance.DeploymentType, instance.InstanceID, instance.ChallengeName, instance.ServerDeployed)
 		if err != nil {
 			log.Warnf("Failed to kill container for instance %s: %v", instance.InstanceID, err)
-		} else {
-			log.Infof("Successfully killed container for instance %s", instance.InstanceID)
+			if restoreErr := cache.RestoreQueuedInstance(instance); restoreErr != nil {
+				log.Warnf("Failed to restore metadata for instance %s after cleanup failure: %v", instance.InstanceID, restoreErr)
+			}
+			continue
 		}
 
-		cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.ContainerID)
+		log.Infof("Successfully killed container for instance %s", instance.InstanceID)
+
+		if err := cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.PortOwnerID()); err != nil {
+			log.Warnf("Failed to free ports for instance %s: %v", instance.InstanceID, err)
+			if restoreErr := cache.RestoreQueuedInstance(instance); restoreErr != nil {
+				log.Warnf("Failed to restore metadata for instance %s after port cleanup failure: %v", instance.InstanceID, restoreErr)
+			}
+			continue
+		}
+		if err := cache.DeleteInstanceMetadata(instance.InstanceID); err != nil {
+			log.Warnf("Failed to delete metadata for instance %s: %v", instance.InstanceID, err)
+		}
 	}
 
 	queueLen, _ := cache.GetDeletionQueueLength()

@@ -69,6 +69,8 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	remoteManager.Init()
 	database.Init()
 	cache.Init()
+	startDynamicScoreWorker()
+	go manager.InstanceCleanupProber()
 
 	// Initialise and start the Hub
 	// Must be started before the Notification Router, since SSE handler has access to SSE Hub

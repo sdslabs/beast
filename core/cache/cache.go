@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,6 +78,69 @@ func Init() {
 		cacheError = ConnectCache()
 		if cacheError != nil {
 			log.Errorf("Error while initializing cache: %s", cacheError.Error())
+		}
+	}
+}
+
+func EnableKeyspaceExpiryNotifications() error {
+	if Cache == nil {
+		return fmt.Errorf("redis cache not initialized")
+	}
+
+	ctx := context.Background()
+	result, err := Cache.Do(ctx, "CONFIG", "GET", "notify-keyspace-events").Result()
+	if err != nil {
+		return err
+	}
+
+	current := ""
+	if values, ok := result.([]interface{}); ok && len(values) >= 2 {
+		current = fmt.Sprint(values[1])
+	}
+
+	next := current
+	if !strings.Contains(next, "E") {
+		next += "E"
+	}
+	if !strings.Contains(next, "x") {
+		next += "x"
+	}
+
+	if next == current {
+		return nil
+	}
+
+	return Cache.Do(ctx, "CONFIG", "SET", "notify-keyspace-events", next).Err()
+}
+
+func SubscribeExpiredInstanceMarkers(ctx context.Context, handler func(instanceID string)) error {
+	if Cache == nil {
+		return fmt.Errorf("redis cache not initialized")
+	}
+
+	pattern := fmt.Sprintf("__keyevent@%d__:expired", cacheConfig.RedisConfig.DB)
+	pubsub := Cache.PSubscribe(ctx, pattern)
+	defer pubsub.Close()
+
+	if _, err := pubsub.Receive(ctx); err != nil {
+		return err
+	}
+
+	ch := pubsub.Channel()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case msg, ok := <-ch:
+			if !ok {
+				return nil
+			}
+
+			instanceID, ok := utils.InstanceIDFromExpiryKey(msg.Payload)
+			if !ok {
+				continue
+			}
+			handler(instanceID)
 		}
 	}
 }
