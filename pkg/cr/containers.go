@@ -313,7 +313,7 @@ func RunCommandInContainer(containerID string, cmd []string) (ExecResult, error)
 		ExitCode: 1,
 	}
 
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return result, err
 	}
