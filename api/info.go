@@ -29,24 +29,6 @@ var (
 	graphCacheStale       = true
 )
 
-// Returns port in use by beast.
-// @Summary Returns ports in use by beast by looking in the hack git repository, also returns min and max value of port allowed while specifying in beast challenge config.
-// @Description Returns the ports in use by beast, which cannot be used in creating a new challenge..
-// @Tags info
-// @Accept  json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.PortsInUseResp
-// @Router /api/info/ports/used [get]
-
-func usedPortsInfoHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, PortsInUseResp{
-		MinPortValue: core.ALLOWED_MIN_PORT_VALUE,
-		MaxPortValue: core.ALLOWED_MAX_PORT_VALUE,
-		PortsInUse:   cfg.USED_PORTS_LIST,
-	})
-}
-
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
 
@@ -157,7 +139,7 @@ func hintHandler(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	oldScore := user.Score
 	newScore := oldScore - hint.Points
 	if newScore < 0 {
@@ -394,7 +376,7 @@ func challengesMetadataHandler(c *gin.Context) {
 			}
 		}
 
-		availableChallenges := make([]ChallengeMetadata, len(challenges))
+		availableChallenges := make([]ChallengeMetadata, 0, len(challenges))
 
 		authHeader := c.GetHeader("Authorization")
 		username, err := coreUtils.GetUser(authHeader)
@@ -413,7 +395,7 @@ func challengesMetadataHandler(c *gin.Context) {
 			return
 		}
 
-		for index, challenge := range challenges {
+		for _, challenge := range challenges {
 			if challenge.Status == "Undeployed" && user.Role == core.USER_ROLES["contestant"] {
 				continue
 			}
@@ -427,22 +409,24 @@ func challengesMetadataHandler(c *gin.Context) {
 			}
 			challengeTags := make([]string, len(challenge.Tags))
 
-			for index, tags := range challenge.Tags {
-				challengeTags[index] = tags.TagName
+			for i, tags := range challenge.Tags {
+				challengeTags[i] = tags.TagName
 			}
 
-			availableChallenges[index] = ChallengeMetadata{
-				Name:           challenge.Name,
-				ChallId:        challenge.ID,
-				Tags:           challengeTags,
-				CreatedAt:      challenge.CreatedAt,
-				Points:         challenge.Points,
-				SolvesNumber:   totalSolves,
-				SolveStatus:    solveStatus,
-				Difficulty:     challenge.Difficulty,
-				PreRequisite:   strings.Split(challenge.PreReqs, core.DELIMITER),
-				DeployedStatus: challenge.Status,
-			}
+			availableChallenges = append(availableChallenges, ChallengeMetadata{
+				Name:               challenge.Name,
+				ChallId:            challenge.ID,
+				Tags:               challengeTags,
+				CreatedAt:          challenge.CreatedAt,
+				Points:             challenge.Points,
+				SolvesNumber:       totalSolves,
+				SolveStatus:        solveStatus,
+				Difficulty:         challenge.Difficulty,
+				PreRequisite:       strings.Split(challenge.PreReqs, core.DELIMITER),
+				DeployedStatus:     challenge.Status,
+				Instanced:          challenge.Instanced,
+				InstanceExpiration: challenge.InstanceExpiration,
+			})
 		}
 
 		c.JSON(http.StatusOK, availableChallenges)
@@ -524,7 +508,6 @@ func userInfoHandler(c *gin.Context) {
 	}
 	var user database.User
 	var err error
-	var parsedUserId uint
 	if userId != "" {
 		id, err := strconv.ParseUint(userId, 10, 64)
 		if err != nil {
@@ -533,9 +516,8 @@ func userInfoHandler(c *gin.Context) {
 			})
 			return
 		}
-		parsedUserId = uint(id)
 
-		user, err = database.QueryUserById(parsedUserId)
+		user, err = database.QueryUserById(uint(id))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
@@ -552,7 +534,7 @@ func userInfoHandler(c *gin.Context) {
 		}
 	}
 
-	challenges, err := database.GetRelatedChallenges(&user)
+	solvedChallenges, err := database.GetUserSolvedChallenges(user.ID)
 	if err != nil {
 		log.Error(err)
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -560,36 +542,29 @@ func userInfoHandler(c *gin.Context) {
 		})
 		return
 	}
-	var resp UserResp
 
-	var challNameString []string
-	for _, challenge := range challenges {
-		challNameString = append(challNameString, challenge.Name)
-	}
+	userChallenges := make([]ChallengeSolveResp, len(solvedChallenges))
+	for index, sc := range solvedChallenges {
 
-	userChallenges := make([]ChallengeSolveResp, len(challenges))
-	for index, challenge := range challenges {
-
-		challengeTags := make([]string, len(challenge.Tags))
-
-		for index, tags := range challenge.Tags {
-			challengeTags[index] = tags.TagName
+		challengeTags := make([]string, len(sc.Tags))
+		for i, tag := range sc.Tags {
+			challengeTags[i] = tag.TagName
 		}
 
 		challResp := ChallengeSolveResp{
-			Id:       challenge.ID,
-			Name:     challenge.Name,
+			Id:       sc.ChallengeID,
+			Name:     sc.Name,
 			Tags:     challengeTags,
-			Category: challenge.Type,
-			SolvedAt: challenge.CreatedAt,
-			Points:   challenge.Points,
+			Category: sc.Type,
+			SolvedAt: sc.SolvedAt,
+			Points:   sc.Points,
 		}
 		userChallenges[index] = challResp
 	}
 
 	var rank int64
 	if user.Status == 0 {
-		rank, err = database.GetUserRank(parsedUserId, user.Score, user.UpdatedAt)
+		rank, err = database.GetUserRank(user.ID, user.Score, user.UpdatedAt)
 	} else {
 		rank = 1e9
 	}
@@ -602,7 +577,7 @@ func userInfoHandler(c *gin.Context) {
 		return
 	}
 
-	resp = UserResp{
+	resp := UserResp{
 		Username:   user.Username,
 		Id:         user.ID,
 		Role:       user.Role,

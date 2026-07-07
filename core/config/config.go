@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
@@ -108,7 +109,7 @@ import (
 // dbname = "beast"
 // host = "localhost"
 // port = "5432"
-// sslmode = "prefer" 
+// sslmode = "prefer"
 // ```
 type BeastConfig struct {
 	AuthorizedKeysFile   string                     `toml:"authorized_keys_file"`
@@ -117,6 +118,7 @@ type BeastConfig struct {
 	AvailableServers     map[string]AvailableServer `toml:"available_servers"`
 	GitRemotes           []GitRemote                `toml:"remote"`
 	PsqlConf             PsqlConfig                 `toml:"psql_config"`
+	RedisConf            RedisConfig                `toml:"redis_config"`
 	JWTSecret            string                     `toml:"jwt_secret"`
 	NotificationWebhooks []NotificationWebhook      `toml:"notification_webhooks"`
 	CompetitionInfo      CompetitionInfo            `toml:"competition_info"`
@@ -125,13 +127,58 @@ type BeastConfig struct {
 	HealthProber         bool                       `toml:"health_prober"`
 	RemoteSyncPeriod     time.Duration              `toml:"-"`
 	Rsp                  string                     `toml:"remote_sync_period"`
+	InstanceConfig       InstanceConfig             `toml:"instance_config"`
 
-	CPUShares int64 `toml:"default_cpu_shares"`
-	Memory    int64 `toml:"default_memory_limit"`
-	PidsLimit int64 `toml:"default_pids_limit"`
+	CPUShares int64   `toml:"default_cpu_shares"`
+	Memory    int64   `toml:"default_memory_limit"`
+	PidsLimit int64   `toml:"default_pids_limit"`
+	CPUsLimit float32 `toml:"default_cpus_limit"`
 
-	// For SMTP Configuration
 	MailConfig MailConfig `toml:"mail_config"`
+}
+
+type InstanceConfig struct {
+	DefaultExpiration   int64 `toml:"default_expiration"`
+	MaxExtension        int64 `toml:"max_extension"`
+	MaxInstancesPerUser int   `toml:"max_instances_per_user"`
+}
+
+func (config *InstanceConfig) Validate() {
+	if config.DefaultExpiration <= 0 {
+		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
+	}
+	if config.MaxExtension <= config.DefaultExpiration {
+		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
+		config.MaxExtension = core.DEFAULT_MAXIMUM_EXTEND_TIME
+	}
+	if config.MaxInstancesPerUser <= 0 {
+		config.MaxInstancesPerUser = core.DEFAULT_MAXIMUM_INSTANCES_PER_USER
+	}
+}
+
+func ValidatePortRange(portRange string) error {
+	if portRange == "" {
+		return fmt.Errorf("port range is empty")
+	}
+
+	firstPort, lastPort, err := utils.ParsePortMapping(portRange)
+	if err != nil {
+		return fmt.Errorf("error while parsing port range in global beast config: %s", err)
+	}
+
+	if firstPort > lastPort {
+		return fmt.Errorf("invalid port range, %v cannot be greater than %v", firstPort, lastPort)
+	}
+
+	if firstPort < core.ALLOWED_MIN_PORT_VALUE {
+		return fmt.Errorf("invalid port range, range cannot precede %v", core.ALLOWED_MIN_PORT_VALUE)
+	}
+
+	if lastPort > core.ALLOWED_MAX_PORT_VALUE {
+		return fmt.Errorf("invalid port range, range cannot exceed %v", core.ALLOWED_MAX_PORT_VALUE)
+	}
+
+	return nil
 }
 
 func (config *BeastConfig) ValidateConfig() error {
@@ -170,19 +217,32 @@ func (config *BeastConfig) ValidateConfig() error {
 		return fmt.Errorf("error while validating db config : %s", err)
 	}
 
+	err = config.RedisConf.ValidateRedisConfig()
+	if err != nil {
+		return fmt.Errorf("error while validating redis config : %s", err)
+	}
+
 	if len(config.AvailableServers) == 0 {
 		log.Warn("No available servers provided for challenges. Using default localhost")
 		config.AvailableServers = map[string]AvailableServer{
 			core.LOCALHOST: {
+				Name:       core.LOCALHOST,
 				Host:       core.LOCALHOST,
 				Username:   os.Getenv("USER"),
 				SSHKeyPath: "",
 				Active:     true,
+				PortRange:  fmt.Sprintf("%v%s%v", core.ALLOWED_MIN_PORT_VALUE, core.MappingDelimiter, core.ALLOWED_MAX_PORT_VALUE),
 			},
 		}
 	}
 
-	for _, server := range config.AvailableServers {
+	for name, server := range config.AvailableServers {
+		if strings.Contains(name, ":") {
+			return fmt.Errorf("server key %q contains invalid character ':'", name)
+		}
+
+		server.Name = name
+		config.AvailableServers[name] = server
 		if server.Active {
 			err := server.ValidateServerConfig()
 			if err != nil {
@@ -248,32 +308,64 @@ func (config *BeastConfig) ValidateConfig() error {
 		config.PidsLimit = core.DEFAULT_PIDS_LIMIT
 	}
 
+	if config.CPUsLimit <= 0 {
+		log.Debug("Per container CPUsLimit Limit not provided using default value")
+		config.CPUsLimit = core.DEFAULT_CPU_LIMIT
+	}
+
 	if config.MailConfig.From == "" || config.MailConfig.Password == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {
 		log.Warn("Mail configuration not provided, email notifications will not work")
 	}
 
+	config.InstanceConfig.Validate()
+
 	return nil
 }
 
+func (config *BeastConfig) UseLocalDockerDaemon(serverName string) bool {
+	server, ok := config.AvailableServers[serverName]
+	if !ok {
+		return true
+	}
+	return server.Host == core.LOCALHOST || server.Host == core.LOCALHOST_IP
+}
+
 type AvailableServer struct {
+	Name       string `toml:"-"`
 	Host       string `toml:"host"`
 	Username   string `toml:"username"`
 	SSHKeyPath string `toml:"ssh_key_path"`
 	Active     bool   `toml:"active"`
+	PortRange  string `toml:"port_range"`
 }
 
 func (config *AvailableServer) ValidateServerConfig() error {
-	if config.Host == core.LOCALHOST {
+	if config.Host == "" {
+		return fmt.Errorf("host is empty")
+	}
+	config.Host = strings.TrimSpace(config.Host)
+
+	err := ValidatePortRange(config.PortRange)
+	if err != nil {
+		return fmt.Errorf("error while validating port range for server %s: %s", config.Host, err)
+	}
+
+	if config.Host == core.LOCALHOST || config.Host == core.LOCALHOST_IP {
 		return nil
 	}
-	if config.Host == "" || config.Username == "" || config.SSHKeyPath == "" {
-		log.Error("One of host, username or ssh_key_path is missing in the config")
-		return errors.New("server config not valid, config parameters missing")
+
+	if config.Username == "" {
+		return fmt.Errorf("username is empty")
 	}
-	err := utils.ValidateFileExists(config.SSHKeyPath)
+	if config.SSHKeyPath == "" {
+		return fmt.Errorf("ssh_key_path is empty")
+	}
+
+	err = utils.ValidateFileExists(config.SSHKeyPath)
 	if err != nil {
 		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.SSHKeyPath, err)
 	}
+
 	return nil
 }
 
@@ -324,6 +416,14 @@ type PsqlConfig struct {
 	SslMode  string `toml:"sslmode"`
 }
 
+type RedisConfig struct {
+	User     string `toml:"user"`
+	Password string `toml:"password"`
+	Host     string `toml:"host"`
+	Port     string `toml:"port"`
+	Db       uint32 `toml:"db"`
+}
+
 func (config *PsqlConfig) ValidatePsqlConfig() error {
 	if config.User == "" || config.Password == "" || config.Dbname == "" || config.Host == "" || config.Port == "" {
 		log.Error("One of username, password, dbname, hostname, port is missing in the config")
@@ -332,6 +432,14 @@ func (config *PsqlConfig) ValidatePsqlConfig() error {
 	if config.SslMode == "" {
 		log.Warn("Ssl Mode not set. Disabling it.")
 		config.SslMode = "prefer"
+	}
+	return nil
+}
+
+func (config *RedisConfig) ValidateRedisConfig() error {
+	if config.Host == "" || config.Port == "" {
+		log.Error("One of hostname or port is missing in the config")
+		return errors.New("redis config not valid, config parameters missing")
 	}
 	return nil
 }
@@ -438,44 +546,9 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 	return config, nil
 }
 
-// Update the USED_PORT_LIST variable in config.
-// Don't do this very often, we do this once during syncing the git repository
-// then whenever you need updated used port list you need to sync the git remote
-// by beast.
-func UpdateUsedPortList() {
-	USED_PORTS_LIST = make([]uint32, 0)
-
-	beastRemoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-
-	for _, gitRemote := range Cfg.GitRemotes {
-		if !gitRemote.Active {
-			continue
-		}
-
-		challengeDir := filepath.Join(beastRemoteDir, gitRemote.RemoteName, core.BEAST_REMOTE_CHALLENGE_DIR)
-		dirs := utils.GetAllDirectoriesName(challengeDir)
-		for _, dir := range dirs {
-			configFilePath := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
-			var config BeastChallengeConfig
-			_, err := toml.DecodeFile(configFilePath, &config)
-			if err == nil {
-				hostPorts, err := config.Challenge.Env.GetAllHostPorts()
-				if err != nil {
-					log.Errorf("Error while parsing host ports for challenge %s", dir)
-					continue
-				}
-
-				USED_PORTS_LIST = append(USED_PORTS_LIST, hostPorts...)
-			}
-		}
-	}
-	log.Debugf("Used port list updated: %v", USED_PORTS_LIST)
-}
-
 var Cfg *BeastConfig
 var SkipAuthorization bool
 var NoCache bool
-var USED_PORTS_LIST []uint32
 
 // InitConfig loads the config from the global config file and populate
 // the Cfg global variable used everywhere else.

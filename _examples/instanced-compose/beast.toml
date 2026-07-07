@@ -1,0 +1,34 @@
+[author]
+name = "beast-admin"
+email = "admin@beast.local"
+ssh_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ"
+
+[challenge.metadata]
+name = "instanced-compose"
+flag = "FLAG{c0mp0s3_1nst4nc3s_r0ck!}"
+type = "web"
+description = "A web challenge with database backend. Each user gets their own isolated environment!"
+points = 200
+difficulty = "medium"
+tags = ["web", "sql", "instanced"]
+maxAttemptLimit = 100
+instanced = true
+instance_expiration = 12
+
+[[challenge.metadata.hints]]
+text = "Check for SQL injection vulnerabilities"
+points = 30
+
+[[challenge.metadata.hints]]
+text = "The admin password might be in the database..."
+points = 50
+
+[challenge.env]
+docker_compose = "docker-compose.yml"
+default_port_var = "INSTANCE_PORT"
+
+[resource]
+cpu_shares = 1024
+memory_limit = 536870912
+pids_limit = 100
+cpuslimit = 0.25

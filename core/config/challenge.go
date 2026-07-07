@@ -137,15 +137,31 @@ type ChallengeMetadata struct {
 		Text   string `toml:"text"`
 		Points uint   `toml:"points"`
 	} `toml:"hints"`
-	MaxAttemptLimit int      `toml:"maxAttemptLimit"`
-	PreReqs         []string `toml:"preReqs"`
-	DynamicFlag     bool     `toml:"dynamicFlag"`
-	Points          uint     `toml:"points"`
-	MaxPoints       uint     `toml:"maxPoints"`
-	MinPoints       uint     `toml:"minPoints"`
-	Assets          []string `toml:"assets"`
-	AdditionalLinks []string `toml:"additionalLinks"`
-	Difficulty      string   `toml:"difficulty"`
+	MaxAttemptLimit    int      `toml:"maxAttemptLimit"`
+	PreReqs            []string `toml:"preReqs"`
+	DynamicFlag        bool     `toml:"dynamicFlag"`
+	Points             uint     `toml:"points"`
+	MaxPoints          uint     `toml:"maxPoints"`
+	MinPoints          uint     `toml:"minPoints"`
+	Assets             []string `toml:"assets"`
+	AdditionalLinks    []string `toml:"additionalLinks"`
+	Difficulty         string   `toml:"difficulty"`
+	Instanced          bool     `toml:"instanced"`
+	InstanceExpiration int64    `toml:"instance_expiration"`
+}
+
+func (config *ChallengeMetadata) IsInstanced() bool {
+	return config.Instanced
+}
+
+func (config *ChallengeMetadata) GetInstanceExpiration() int64 {
+	if config.InstanceExpiration > 0 {
+		return config.InstanceExpiration
+	}
+	if Cfg != nil && Cfg.InstanceConfig.DefaultExpiration > 0 {
+		return Cfg.InstanceConfig.DefaultExpiration
+	}
+	return 300
 }
 
 // In this validation returned boolean value represents if the challenge type is
@@ -252,7 +268,8 @@ type ChallengeEnv struct {
 	AptDeps          []string         `toml:"apt_deps"`
 	Ports            []uint32         `toml:"ports"`
 	DefaultPort      uint32           `toml:"default_port"`
-	PortMappings     []string         `toml:"port_mappings"`
+	PortVariables    []string         `toml:"-"`
+	DefaultPortVar   string           `toml:"default_port_var"`
 	SetupScripts     []string         `toml:"setup_scripts"`
 	StaticContentDir string           `toml:"static_dir"`
 	RunCmd           string           `toml:"run_cmd"`
@@ -274,107 +291,15 @@ func (config *ChallengeEnv) TrafficType() cr.TrafficType {
 	return cr.TrafficType(config.Traffic)
 }
 
-// NewPortMapping returns a new port mapping instance.
-func NewPortMapping(hp, cp uint32) cr.PortMapping {
-	return cr.PortMapping{
-		HostPort:      hp,
-		ContainerPort: cp,
-	}
-}
-
-// Given a port mapping array and a port the function checks whether the port exists in the mapping
-// as a container port.
-func checkIfPortExistInMapping(portMapping []cr.PortMapping, port uint32) bool {
-	for _, portMap := range portMapping {
-		if port == portMap.ContainerPort {
-			return true
-		}
-	}
-
-	return false
-}
-
-// GetPortMappings returns the entire port mapping for the challenge from the challenge
-// environment configuration.
-func (config *ChallengeEnv) GetPortMappings() ([]cr.PortMapping, error) {
-	var mapping []cr.PortMapping
-
-	var containerPorts []uint32
-	for _, portMap := range config.PortMappings {
-		hp, cp, err := utils.ParsePortMapping(portMap)
-		if err != nil {
-			return mapping, err
-		}
-		mapping = append(mapping, NewPortMapping(hp, cp))
-		containerPorts = append(containerPorts, cp)
-	}
-
-	for _, port := range config.Ports {
-		if !utils.UInt32InList(port, containerPorts) {
-			containerPorts = append(containerPorts, port)
-			mapping = append(mapping, NewPortMapping(port, port))
-		}
-	}
-
-	return mapping, nil
-}
-
-// GetAllHostPorts is utility function for the ChallengeEnv configuration which returns
-// the entire list of all the host ports which are being used by the challenge.
-func (config *ChallengeEnv) GetAllHostPorts() ([]uint32, error) {
-	var hostPorts []uint32
-	var containerPorts []uint32
-
-	for _, portMap := range config.PortMappings {
-		hp, cp, err := utils.ParsePortMapping(portMap)
-		if err != nil {
-			return hostPorts, err
-		}
-		hostPorts = append(hostPorts, hp)
-		containerPorts = append(containerPorts, cp)
-	}
-
-	for _, port := range config.Ports {
-		if !utils.UInt32InList(port, containerPorts) {
-			hostPorts = append(hostPorts, port)
-			containerPorts = append(containerPorts, port)
-		}
-	}
-
-	return hostPorts, nil
-}
-
-// GetAllContainerPorts is utility function for the ChallengeEnv configuration which returns
-// the entire list of all the container ports which are being used by the challenge.
-func (config *ChallengeEnv) GetAllContainerPorts() ([]uint32, error) {
-	var containerPorts []uint32
-
-	for _, portMap := range config.PortMappings {
-		_, cp, err := utils.ParsePortMapping(portMap)
-		if err != nil {
-			return containerPorts, err
-		}
-		containerPorts = append(containerPorts, cp)
-	}
-
-	for _, port := range config.Ports {
-		if !utils.UInt32InList(port, containerPorts) {
-			containerPorts = append(containerPorts, port)
-		}
-	}
-
-	return containerPorts, nil
-}
-
 // GetDefaultPort returns the default port used by the challenge from the challenge environment
 // configuration.
 func (config *ChallengeEnv) GetDefaultPort() uint32 {
-	mappings, err := config.GetPortMappings()
-	if err != nil || len(mappings) == 0 {
+	ports := config.Ports
+	if len(ports) == 0 {
 		return 0
 	}
 
-	return mappings[0].ContainerPort
+	return ports[0]
 }
 
 // ValidateRequiredFields validates required fields for the Challenge environment configuration.
@@ -382,34 +307,6 @@ func (config *ChallengeEnv) GetDefaultPort() uint32 {
 // of the challenge.
 func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir string) error {
 	// Validate port related stuff for the challenge environment configuration.
-	if len(config.Ports) == 0 && len(config.PortMappings) == 0 {
-		return errors.New("some port is required to be specified by the challenge")
-	}
-
-	if len(config.Ports)+len(config.PortMappings) > int(core.MAX_PORT_PER_CHALL) {
-		return fmt.Errorf("max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
-	}
-
-	portMappings, err := config.GetPortMappings()
-	if err != nil {
-		return fmt.Errorf("error while parsing port mapping: %s", err)
-	}
-
-	// By default if no port is specified to be default, the first port
-	// from the list is assumed to be default and the service is deployed accordingly.
-	if config.DefaultPort == 0 {
-		config.DefaultPort = portMappings[0].ContainerPort
-	}
-
-	if !checkIfPortExistInMapping(portMappings, config.DefaultPort) {
-		return fmt.Errorf("`default_port` must be one of the Ports in the `ports` list")
-	}
-
-	for _, portMap := range portMappings {
-		if portMap.HostPort < core.ALLOWED_MIN_PORT_VALUE || portMap.HostPort > core.ALLOWED_MAX_PORT_VALUE {
-			return fmt.Errorf("port value must be between %d and %d", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE)
-		}
-	}
 
 	if config.StaticContentDir != "" {
 		if filepath.IsAbs(config.StaticContentDir) {
@@ -457,7 +354,15 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if len(config.SetupScripts) > 0 {
 			log.Warn("setup_scripts will be ignored when docker_compose is specified")
 		}
+
+		if err := config.ExtractPortsCompose(challdir); err != nil {
+			return err
+		}
 		return nil
+	}
+
+	if err := config.ExtractPorts(); err != nil {
+		return err
 	}
 
 	// Run command is only a required value in case of bare challenge types.
@@ -528,6 +433,49 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	return nil
 }
 
+func (config *ChallengeEnv) ExtractPorts() error {
+	if config.DockerCompose == "" {
+		if len(config.Ports) == 0 && config.DefaultPort == 0 {
+			return errors.New("some port is required to be specified by the challenge")
+		}
+		if len(config.Ports) > int(core.MAX_PORT_PER_CHALL) {
+			return fmt.Errorf("max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
+		}
+
+		if config.DefaultPort == 0 {
+			config.DefaultPort = config.Ports[0]
+			log.Warnf("default port is 0 for challenge with default port : %d", config.Ports[0])
+		} else if !utils.UInt32InList(config.DefaultPort, config.Ports) {
+			return fmt.Errorf("default port %d was not found in assigned ports", config.DefaultPort)
+		}
+	}
+
+	return nil
+}
+
+func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
+	if config.DockerCompose != "" {
+		portVariables, err := utils.ExtractPortsFromCompose(filepath.Join(challdir, config.DockerCompose))
+		if err != nil {
+			log.Warnf("failed to extract port variables from compose file with the following error : %s", err.Error())
+		}
+		if len(portVariables) == 0 {
+			return errors.New("some port is required to be specified by the challenge")
+		}
+
+		config.PortVariables = portVariables
+		if config.DefaultPortVar == "" {
+			config.DefaultPortVar = config.PortVariables[0]
+			log.Warnf("default port variable is empty, settting it to %s", config.PortVariables[0])
+		}
+		if !utils.StringInSlice(config.DefaultPortVar, config.PortVariables) {
+			return fmt.Errorf("default port variable: %s was not found", config.DefaultPortVar)
+		}
+	}
+
+	return nil
+}
+
 // Metadata related to author of the challenge, this structure includes
 //
 //   - Name - Name of the author of the challenge
@@ -567,9 +515,10 @@ type EnvironmentVar struct {
 }
 
 type Resources struct {
-	CPUShares int64 `toml:"cpu_shares"`
-	Memory    int64 `toml:"memory_limit"`
-	PidsLimit int64 `toml:"pids_limit"`
+	CPUShares int64   `toml:"cpu_shares"`
+	Memory    int64   `toml:"memory_limit"`
+	PidsLimit int64   `toml:"pids_limit"`
+	CPUsLimit float32 `toml:"cpuslimit"`
 }
 
 func (config *Resources) ValidateRequiredFields() {
@@ -586,5 +535,10 @@ func (config *Resources) ValidateRequiredFields() {
 	if config.PidsLimit <= 0 {
 		log.Debug("Pids Limit not provided in configuration, using default.")
 		config.PidsLimit = Cfg.PidsLimit
+	}
+
+	if config.CPUsLimit <= 0 {
+		log.Debug("CPUsLimit not provided in configuration, using default.")
+		config.CPUsLimit = Cfg.CPUsLimit
 	}
 }

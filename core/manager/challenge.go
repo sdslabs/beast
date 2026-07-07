@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"github.com/sdslabs/beastv4/core/cache"
 	"path/filepath"
 	"strings"
 
@@ -57,11 +58,11 @@ func CommitChallengeContainer(challName string) error {
 		return fmt.Errorf("challenge is not deployed")
 	}
 	var imageId string
-	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+	if config.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
+		imageId, err = cr.CommitContainer(chall.ContainerId)
+	} else {
 		server := config.Cfg.AvailableServers[chall.ServerDeployed]
 		imageId, err = remoteManager.CommitContainerRemote(chall.ContainerId, server)
-	} else {
-		imageId, err = cr.CommitContainer(chall.ContainerId)
 	}
 	if err != nil {
 		log.Errorf("Error while commiting the container : %s", err.Error())
@@ -181,17 +182,17 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 		}
 	} else if coreUtils.IsContainerIdValid(challenge.ContainerId) {
 		var containers, remoteContainers []containerType.Container
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+		if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+			containers, err = cr.SearchRunningContainerByFilter(map[string]string{"id": challenge.ContainerId})
+			if err != nil {
+				log.Errorf("error while searching for container with id %s", challenge.ContainerId)
+				return nil, errors.New("CONTAINER RUNTIME ERROR")
+			}
+		} else {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 			remoteContainers, err = remoteManager.SearchRunningContainerByFilterRemote(map[string]string{"id": challenge.ContainerId}, server)
 			if err != nil {
 				log.Errorf("error while searching for remote container with id %s", challenge.ContainerId)
-				return nil, errors.New("CONTAINER RUNTIME ERROR")
-			}
-		} else {
-			containers, err = cr.SearchRunningContainerByFilter(map[string]string{"id": challenge.ContainerId})
-			if err != nil {
-				log.Errorf("error while searching for container with id %s", challenge.ContainerId)
 				return nil, errors.New("CONTAINER RUNTIME ERROR")
 			}
 		}
@@ -235,11 +236,12 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	if coreUtils.IsImageIdValid(challenge.ImageId) {
 		var imageExist bool
 		var err error
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+		log.Warnf("server: %s", challenge.ServerDeployed)
+		if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+			imageExist, err = cr.CheckIfImageExists(challenge.ImageId)
+		} else {
 			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 			imageExist, err = remoteManager.CheckIfImageExistsOnRemote(challenge.ImageId, server)
-		} else {
-			imageExist, err = cr.CheckIfImageExists(challenge.ImageId)
 		}
 		if err != nil {
 			log.Errorf("Error while searching for image with id %s: %s", challenge.ImageId, err)
@@ -281,11 +283,11 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	// Check if the challenge is in staged state, it it is start the
 	// pipeline from there on, else start deploy pipeline for the challenge
 	// from remote
-	if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
+	if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+		err = utils.ValidateFileExists(stagedFileName)
+	} else {
 		server := config.Cfg.AvailableServers[challenge.ServerDeployed]
 		err = remoteManager.ValidateFileRemoteExists(server, stagedFileName)
-	} else {
-		err = utils.ValidateFileExists(stagedFileName)
 	}
 	if err != nil {
 		log.Infof("The requested challenge with Name %s is not already staged", challengeName)
@@ -640,52 +642,71 @@ func undeployChallenge(challengeName string, purge bool) error {
 		return fmt.Errorf("ChallengeName %s not valid", challengeName)
 	}
 
-	if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
-		log.Debugf("Detected Docker Compose deployment for challenge %s", challengeName)
-
-		stagedDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
-		if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
-			server := config.Cfg.AvailableServers[challenge.ServerDeployed]
-
-			if !purge {
-				err = remoteManager.ComposeDownRemote(challengeName, stagedDir, server)
-			} else {
-				err = remoteManager.ComposePurgeRemote(challengeName, stagedDir, server)
-			}
-		} else {
-			if !purge {
-				err = cr.ComposeDown(challengeName, stagedDir)
-			} else {
-				err = cr.ComposePurge(challengeName, stagedDir)
-			}
-		}
-		if err != nil {
-			log.Errorf("Error while removing challenge instance : %s", err)
-			return fmt.Errorf("error while removing challenge instance : %s", err)
+	/* TODO: verify this cleanup */
+	if challenge.Instanced {
+		// Kill all active instances of this challenge before undeploying
+		if err := KillChallengeInstances(challengeName); err != nil {
+			log.Warnf("Error killing instances for challenge %s: %v", challengeName, err)
+			// Continue with undeploy even if some instances failed to kill
 		}
 	} else {
-		// If a existing container ID is not found make sure that you atleast
-		// set the deploy status to undeployed. This earlier caused problem since if a challenge
-		// was in staging state(and deployed is cancled) then we can neither deploy new
-		// version nor we can undeploy the existing version(since it does not exist)
-		// So this....
-		if challenge.ContainerId == coreUtils.GetTempContainerId(challengeName) {
-			log.Warnf("No instance of challenge(%s) deployed", challengeName)
-		} else {
-			log.Debug("Removing challenge instance for ", challengeName)
-			if challenge.ServerDeployed != core.LOCALHOST && challenge.ServerDeployed != "" {
-				server := config.Cfg.AvailableServers[challenge.ServerDeployed]
-				err = remoteManager.StopAndRemoveContainerRemote(challenge.ContainerId, server)
+		if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+			log.Debugf("Detected Docker Compose deployment for challenge %s", challengeName)
+
+			composeProjectName := utils.ProjectNameNotInstanced(challengeName)
+			if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+				if !purge {
+					err = cr.ComposeDownProject(composeProjectName)
+				} else {
+					err = cr.ComposePurgeProject(composeProjectName)
+				}
 			} else {
-				err = cr.StopAndRemoveContainer(challenge.ContainerId)
+				server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+
+				if !purge {
+					err = remoteManager.ComposeDownProjectRemote(composeProjectName, server)
+				} else {
+					err = remoteManager.ComposePurgeProjectRemote(composeProjectName, server)
+				}
 			}
 			if err != nil {
-				// This should not return from here, this should assume that
-				// the container instance does not exist and hence should update the database
-				// with the container ID.
-				p := fmt.Errorf("error while removing challenge instance : %s", err)
-				log.Error(p.Error())
+				log.Errorf("Error while removing challenge instance : %s", err)
+				return fmt.Errorf("error while removing challenge instance : %s", err)
 			}
+		} else {
+			// If a existing container ID is not found make sure that you atleast
+			// set the deploy status to undeployed. This earlier caused problem since if a challenge
+			// was in staging state(and deployed is cancled) then we can neither deploy new
+			// version nor we can undeploy the existing version(since it does not exist)
+			// So this....
+			if challenge.ContainerId == coreUtils.GetTempContainerId(challengeName) {
+				log.Warnf("No instance of challenge(%s) deployed", challengeName)
+			} else {
+				log.Debug("Removing challenge instance for ", challengeName)
+				if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+					err = cr.StopAndRemoveContainer(challenge.ContainerId)
+				} else {
+					server := config.Cfg.AvailableServers[challenge.ServerDeployed]
+					err = remoteManager.StopAndRemoveContainerRemote(challenge.ContainerId, server)
+				}
+				if err != nil {
+					// This should not return from here, this should assume that
+					// the container instance does not exist and hence should update the database
+					// with the container ID.
+					p := fmt.Errorf("error while removing challenge instance : %s", err)
+					log.Error(p.Error())
+				}
+			}
+		}
+
+		portOwner := challenge.ContainerId
+		if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+			portOwner = utils.ProjectNameNotInstanced(challengeName)
+		}
+
+		err = cache.FreeContainerPortsOnHost(challenge.ServerDeployed, portOwner)
+		if err != nil {
+			return fmt.Errorf("error while freeing ports for container %s on host %s: %s", portOwner, challenge.ServerDeployed, err)
 		}
 	}
 

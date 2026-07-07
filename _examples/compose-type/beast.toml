@@ -11,10 +11,6 @@ type = "web"
 points = 200
 
 [challenge.env]
-# Beast still requires ports/default_port for validation and metadata.
-ports = [10020]
-default_port = 10020
-
-
 docker_compose = "docker-compose.yml"
+default_port_var = "APP_PORT"
 web_root = "challenge"

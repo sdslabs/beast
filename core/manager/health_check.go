@@ -1,12 +1,15 @@
 package manager
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
@@ -18,6 +21,10 @@ import (
 )
 
 var HEALTH_CHECKER = false
+var (
+	instanceCleanupOnce          sync.Once
+	instanceExpirySubscriberOnce sync.Once
+)
 
 // Check for static challenegs' assets to be present on staging server.
 // At the time of writing, Beast deploys assets to localhost only.
@@ -42,8 +49,8 @@ func CheckStaticChallenge(chall database.Challenge) error {
 
 // Check for container running or not.
 func containerProber(chall database.Challenge) error {
-	challHost := chall.ServerDeployed
-	if challHost == core.LOCALHOST || challHost == "" {
+	serverDeployed := chall.ServerDeployed
+	if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		containers, err := cr.SearchRunningContainerByFilter(map[string]string{"id": chall.ContainerId})
 		if err != nil || len(containers) <= 0 {
 			err = fmt.Errorf("error while searching for container with id %s on server: %s", chall.ContainerId, chall.ServerDeployed)
@@ -86,8 +93,14 @@ func ChallengesHealthProber(waitTime int) {
 			// Do a better job at health probing mechanism.
 			if len(allocatedPorts) > 0 {
 				port := int(allocatedPorts[0].PortNo)
+				serverDeployed := chall.ServerDeployed
+				if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
+					serverDeployed = core.LOCALHOST
+				} else if s, ok := config.Cfg.AvailableServers[serverDeployed]; ok {
+					serverDeployed = s.Host
+				}
 				prober := probes.NewTcpProber()
-				result, err := prober.Probe(chall.ServerDeployed, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
+				result, err := prober.Probe(serverDeployed, port, time.Duration(core.DEFAULT_PROBE_TIMEOUT)*time.Second)
 				if err != nil {
 					msg := fmt.Sprintf("NETWORK HEALTH CHECK %s: %s : %s", result, chall.Name, err)
 					log.WithFields(log.Fields{
@@ -127,8 +140,8 @@ func ChallengesHealthProber(waitTime int) {
 
 // Check for Remote Server running or not
 func ServerHealthProber(waitTime int) {
-	for _, server := range config.Cfg.AvailableServers {
-		if server.Active && server.Host != core.LOCALHOST {
+	for serverDeployed, server := range config.Cfg.AvailableServers {
+		if server.Active && !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 			err := remoteManager.PingServer(server)
 			if err != nil {
 				msg := fmt.Sprintf("SERVER HEALTH CHECK Faliure: %s : %s", server.Host, err)
@@ -145,19 +158,149 @@ func ServerHealthProber(waitTime int) {
 	}
 }
 
-// Check for beast services running or not
 func BeastHeathCheckProber(waitTime int) {
 	if !HEALTH_CHECKER {
 		log.Info("Starting Health Check prober.")
 		HEALTH_CHECKER = true
+
+		go InstanceCleanupProber()
+
 		for {
 			go ChallengesHealthProber(waitTime)
 			go ServerHealthProber(waitTime)
 			go database.BackupDatabase()
-			// Wait for some time before next probing.
+			go cache.BackupCache()
 			time.Sleep(time.Duration(waitTime) * time.Second)
 		}
 	} else {
 		log.Warn("Health Checker Already Running. Not Starting Again")
+	}
+}
+
+func InstanceCleanupProber() {
+	started := false
+	instanceCleanupOnce.Do(func() {
+		started = true
+	})
+	if !started {
+		log.Warn("Instance cleanup prober already running. Not starting again")
+		return
+	}
+
+	log.Info("Starting Instance Cleanup prober with event-driven expiry and reconciliation interval: ", core.DEFAULT_HEALTH_CHECK_TIME)
+	startInstanceExpirySubscriber()
+
+	for {
+		ProcessInstanceDeletionQueue()
+		CleanupOrphanedInstanceContainers()
+		QueueExpiredInstances()
+		time.Sleep(core.DEFAULT_HEALTH_CHECK_TIME)
+	}
+}
+
+func startInstanceExpirySubscriber() {
+	instanceExpirySubscriberOnce.Do(func() {
+		if err := cache.EnableKeyspaceExpiryNotifications(); err != nil {
+			log.Warnf("Redis keyspace expiry notifications unavailable, relying on reconciliation: %v", err)
+		}
+
+		go func() {
+			err := cache.SubscribeExpiredInstanceMarkers(context.Background(), func(instanceID string) {
+				log.Infof("Instance expiry marker fired for %s, queueing cleanup", instanceID)
+				if err := cache.QueueInstanceForDeletion(instanceID); err != nil {
+					log.Warnf("Failed to queue expired instance %s from Redis event: %v", instanceID, err)
+					return
+				}
+				ProcessInstanceDeletionQueue()
+			})
+			if err != nil {
+				log.Warnf("Redis expiry subscriber stopped, reconciliation will continue cleanup: %v", err)
+			}
+		}()
+	})
+}
+
+func QueueExpiredInstances() {
+	log.Debug("Checking for expired instances")
+
+	expired, err := cache.GetExpiredInstances()
+	if err != nil {
+		log.Warnf("Failed to get expired instances: %v", err)
+		return
+	}
+
+	for _, instance := range expired {
+		log.Infof("Instance %s expired (challenge: %s, user: %s), queueing for deletion",
+			instance.InstanceID, instance.ChallengeName, instance.UserID)
+
+		err := cache.QueueInstanceForDeletion(instance.InstanceID)
+		if err != nil {
+			log.Warnf("Failed to queue instance %s for deletion: %v", instance.InstanceID, err)
+		}
+	}
+}
+
+func ProcessInstanceDeletionQueue() {
+	log.Debug("Processing instance deletion queue")
+
+	for i := 0; i < 10; i++ {
+		instance, err := cache.PopInstanceForDeletion()
+		if err != nil {
+			log.Warnf("Error popping from deletion queue: %v", err)
+			return
+		}
+
+		if instance == nil {
+			return
+		}
+
+		log.Infof("Processing deletion for instance %s (challenge: %s, container: %s, server: %s)",
+			instance.InstanceID, instance.ChallengeName, instance.ContainerID, instance.ServerDeployed)
+
+		if _, err := cache.GetInstance(instance.InstanceID); err != nil {
+			log.Debugf("Skipping stale deletion queue item for instance %s: %v", instance.InstanceID, err)
+			continue
+		}
+
+		err = killInstanceContainer(instance.ContainerID, instance.DeploymentType, instance.InstanceID, instance.ChallengeName, instance.ServerDeployed)
+		if err != nil {
+			log.Warnf("Failed to kill container for instance %s: %v", instance.InstanceID, err)
+			if restoreErr := cache.RestoreQueuedInstance(instance); restoreErr != nil {
+				log.Warnf("Failed to restore metadata for instance %s after cleanup failure: %v", instance.InstanceID, restoreErr)
+			}
+			continue
+		}
+
+		log.Infof("Successfully killed container for instance %s", instance.InstanceID)
+
+		if err := cache.FreeContainerPortsOnHost(instance.ServerDeployed, instance.PortOwnerID()); err != nil {
+			log.Warnf("Failed to free ports for instance %s: %v", instance.InstanceID, err)
+			if restoreErr := cache.RestoreQueuedInstance(instance); restoreErr != nil {
+				log.Warnf("Failed to restore metadata for instance %s after port cleanup failure: %v", instance.InstanceID, restoreErr)
+			}
+			continue
+		}
+		if err := cache.DeleteInstanceMetadata(instance.InstanceID); err != nil {
+			log.Warnf("Failed to delete metadata for instance %s: %v", instance.InstanceID, err)
+		}
+	}
+
+	queueLen, _ := cache.GetDeletionQueueLength()
+	if queueLen > 0 {
+		log.Debugf("Deletion queue still has %d items, will process in next cycle", queueLen)
+	}
+}
+
+func CleanupOrphanedInstanceContainers() {
+	log.Debug("Checking for orphaned instance containers")
+
+	cr.CleanupOrphans()
+	cr.CleanupOrphanedComposeInstances()
+
+	for serverDeployed, server := range config.Cfg.AvailableServers {
+		if server.Active && !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
+			remoteManager.CleanupOrphanedOnServer(serverDeployed)
+			remoteManager.CleanupOrphanedComposeInstancesOnServer(serverDeployed)
+		}
 	}
 }

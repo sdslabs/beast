@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sdslabs/beastv4/pkg/defaults"
 	utils "github.com/sdslabs/beastv4/utils"
@@ -66,8 +66,10 @@ type CreateContainerConfig struct {
 	ContainerEnv     []string
 	ContainerNetwork string
 	Traffic          TrafficType
+	Labels           map[string]string
 
 	CPUShares int64
+	CPUsLimit float32
 	Memory    int64
 	PidsLimit int64
 }
@@ -87,7 +89,7 @@ type Log struct {
 
 // Function is equivalent to docker ps -a
 func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return []types.Container{}, err
 	}
@@ -107,7 +109,7 @@ func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, er
 
 // Function is equivalent to docker ps
 func SearchRunningContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return []types.Container{}, err
 	}
@@ -125,7 +127,7 @@ func SearchRunningContainerByFilter(filterMap map[string]string) ([]types.Contai
 }
 
 func StopAndRemoveContainer(containerId string) error {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return err
 	}
@@ -148,9 +150,9 @@ func StopAndRemoveContainer(containerId string) error {
 }
 
 func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
-	containerName := fmt.Sprintf("beast_%s_%s", containerConfig.ChallengeName, containerConfig.ContainerName[:3])
+	containerName := containerConfig.ContainerName
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return "", err
 	}
@@ -172,16 +174,21 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		}}
 	}
 
+	labels := map[string]string{
+		"beast.challenge":             containerConfig.ChallengeName,
+		"com.sdslabs.beast.project":   utils.ProjectNameNotInstanced(containerConfig.ChallengeName),
+		"com.docker.compose.project":  utils.ProjectNameNotInstanced(containerConfig.ChallengeName),
+		"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
+	}
+	for k, v := range containerConfig.Labels {
+		labels[k] = v
+	}
+
 	config := &container.Config{
 		Image:        containerConfig.ImageId,
 		ExposedPorts: portSet,
 		Env:          containerConfig.ContainerEnv,
-		Labels: map[string]string{
-			"beast.challenge":             containerConfig.ChallengeName,
-			"com.sdslabs.beast.project":   utils.GetProjectName(containerConfig.ChallengeName),
-			"com.docker.compose.project":  utils.GetProjectName(containerConfig.ChallengeName),
-			"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
-		},
+		Labels:       labels,
 	}
 
 	var mountBindings []mount.Mount
@@ -196,6 +203,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	resources := container.Resources{
+		NanoCPUs:  int64(containerConfig.CPUsLimit * 1e9),
 		CPUShares: containerConfig.CPUShares,
 		Memory:    containerConfig.Memory,
 		PidsLimit: &containerConfig.PidsLimit,
@@ -228,7 +236,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 }
 
 func GetContainerStdLogs(containerID string) (*Log, error) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +267,7 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 }
 
 func ShowLiveContainerLogs(containerID string) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		log.Error(err)
 	}
@@ -280,7 +288,7 @@ func ShowLiveContainerLogs(containerID string) {
 
 func CommitContainer(containerId string) (string, error) {
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return "", err
 	}
@@ -293,9 +301,8 @@ func CommitContainer(containerId string) (string, error) {
 	return commitResp.ID, nil
 }
 
-func DeployContainerFromCompose(challengeName, stagedPath, composeFileName string) (string, error) {
+func DeployContainerFromCompose(challengeName string, projectName string, stagedPath string, composeFileName string, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
-	projectName := utils.GetProjectName(challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
 	log.Debugf("Deploying challenge %s using docker compose with project name %s and file %s", challengeName, projectName, composeFileName)
@@ -306,6 +313,13 @@ func DeployContainerFromCompose(challengeName, stagedPath, composeFileName strin
 		"-f", composeFile,
 		"-p", projectName,
 		"up", "-d")
+
+	environment := os.Environ()
+	for variable, port := range ports {
+		environment = append(environment, fmt.Sprintf("%s=%s", variable, strconv.FormatUint(uint64(port), 10)))
+	}
+
+	upCmd.Env = environment
 
 	var upOutput bytes.Buffer
 	upCmd.Stdout = &upOutput
@@ -411,9 +425,9 @@ func getPrimaryComposeContainerId(projectName string) (string, error) {
 	return containerIds[0], nil
 }
 
-func ComposeDown(challengeName, stagedDir string) error {
-	log.Debugf("Stopping challenge %s using docker compose", challengeName)
-	projectName := utils.GetProjectName(challengeName)
+// ComposeDownProject runs docker compose down for an explicit -p project name (shared or instanced).
+func ComposeDownProject(projectName string) error {
+	log.Debugf("Stopping docker compose project %s", projectName)
 
 	downCmd := exec.Command("docker", "compose", "-p", projectName, "down")
 	var downOutput bytes.Buffer
@@ -421,16 +435,16 @@ func ComposeDown(challengeName, stagedDir string) error {
 	downCmd.Stderr = &downOutput
 
 	if err := downCmd.Run(); err != nil {
-		return fmt.Errorf("docker compose down failed for challenge %s: %v. Output: %s", challengeName, err, downOutput.String())
+		return fmt.Errorf("docker compose down failed for project %s: %v. Output: %s", projectName, err, downOutput.String())
 	}
 
-	log.Debugf("Successfully stopped challenge %s", challengeName)
+	log.Debugf("Successfully stopped compose project %s", projectName)
 	return nil
 }
 
-func ComposePurge(challengeName, stagedDir string) error {
-	log.Debugf("Purging challenge %s using docker compose", challengeName)
-	projectName := utils.GetProjectName(challengeName)
+// ComposePurgeProject runs compose down with volumes/images removal for an explicit -p name.
+func ComposePurgeProject(projectName string) error {
+	log.Debugf("Purging docker compose project %s", projectName)
 
 	purgeCmd := exec.Command("docker", "compose", "-p", projectName,
 		"down", "--remove-orphans", "--volumes", "--rmi", "all")
@@ -440,9 +454,9 @@ func ComposePurge(challengeName, stagedDir string) error {
 	purgeCmd.Stderr = &purgeOutput
 
 	if err := purgeCmd.Run(); err != nil {
-		return fmt.Errorf("docker compose purge failed for challenge %s: %v. Output: %s", challengeName, err, purgeOutput.String())
+		return fmt.Errorf("docker compose purge failed for project %s: %v. Output: %s", projectName, err, purgeOutput.String())
 	}
 
-	log.Debugf("Successfully purged challenge %s", challengeName)
+	log.Debugf("Successfully purged compose project %s", projectName)
 	return nil
 }

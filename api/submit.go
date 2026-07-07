@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,11 @@ import (
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/notify"
 	log "github.com/sirupsen/logrus"
+)
+
+var (
+	dynamicScoreWorkerOnce sync.Once
+	dynamicScoreNotify     = make(chan struct{}, 1)
 )
 
 // Verifies and creates an entry in the database for successful submission of flag for a challenge.
@@ -31,6 +37,7 @@ import (
 func submitFlagHandler(c *gin.Context) {
 	challId := c.PostForm("chall_id")
 	flag := c.PostForm("flag")
+	now := time.Now()
 
 	err, state := coreUtils.CheckTime()
 	if err != nil {
@@ -51,294 +58,206 @@ func submitFlagHandler(c *gin.Context) {
 		})
 		return
 	}
-	if state == 1 {
-		username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Unauthorized user",
-			})
-			return
-		}
-
-		if challId == "" {
-			c.JSON(http.StatusBadRequest, HTTPErrorResp{
-				Error: "Id of the challenge is a required parameter to process request.",
-			})
-			return
-		}
-
-		if flag == "" {
-			c.JSON(http.StatusBadRequest, HTTPErrorResp{
-				Error: "Flag for the challenge is a required parameter to process request.",
-			})
-			return
-		}
-
-		user, err := database.QueryFirstUserEntry("username", username)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Unauthorized user",
-			})
-			return
-		}
-
-		if user.Status == 1 {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Banned user",
-			})
-			return
-		}
-
-		parsedChallId, err := strconv.Atoi(challId)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		chall, err := database.QueryChallengeEntries("id", strconv.Itoa(int(parsedChallId)))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		challenge := chall[0]
-		if challenge.Status != core.DEPLOY_STATUS["deployed"] {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Challenge is unavailable",
-				Success: false,
-			})
-			return
-		}
-
-		if challenge.PreReqs != "" {
-			preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
-
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-
-			if !preReqsStatus {
-				c.JSON(http.StatusOK, FlagSubmitResp{
-					Message: "You have not solved the prerequisites of this challenge.",
-					Success: false,
-				})
-				return
-			}
-		}
-
-		if challenge.MaxAttemptLimit > 0 {
-			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request."})
-				return
-			}
-
-			if previousTries >= challenge.MaxAttemptLimit {
-				c.JSON(http.StatusOK, FlagSubmitResp{
-					Message: "You have reached the maximum number of tries for this challenge.",
-					Success: false,
-				})
-				return
-			}
-		}
-
-		// Increase user tries by 1
-		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if solved {
-			c.JSON(http.StatusOK, FlagSubmitResp{
-				Message: "Challenge has already been solved.",
-				Success: false,
-			})
-			return
-		}
-
-		// If the challenge is dynamic, then the flag is not stored in the database
-		var isCheating bool
-		if challenge.DynamicFlag {
-			whereMap := map[string]interface{}{
-				"Name": challenge.Name,
-				"Flag": flag,
-			}
-			validFlags, err := database.QueryDynamicFlagEntries(whereMap)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-
-			wheremap := map[string]interface{}{
-				"challenge_id": challenge.ID,
-				"flag":         flag,
-			}
-			submissions, err := database.QuerySubmissions(wheremap)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-
-			flagInValidFlags := len(validFlags) > 0
-			flagInSubmissions := len(submissions) > 0
-
-			// Case 1: Flag not in validFlags (incorrect flag) - no cheating detection for wrong flags
-			if !flagInValidFlags {
-				UserChallengesEntry := database.UserChallenges{
-					CreatedAt:   time.Now(),
-					UserID:      user.ID,
-					ChallengeID: challenge.ID,
-					Solved:      false,
-					Flag:        flag,
-					Cheating:    false,
-				}
-				err = database.SaveFlagSubmission(&UserChallengesEntry)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-						Error: "DATABASE ERROR while processing the request.",
-					})
-					return
-				}
-				c.JSON(http.StatusOK, FlagSubmitResp{
-					Message: "Your flag is incorrect",
-					Success: false,
-				})
-				return
-			}
-
-			// Case 2: Flag in validFlags and in submissions, cheating with valid flag
-			if flagInValidFlags && flagInSubmissions {
-				if user.ID != submissions[0].UserID {
-					subuser, _ := database.QueryUserById(submissions[0].UserID)
-					msg := "User " + user.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been solved by user " + subuser.Username
-					go notify.SendNotification(notify.Warning, msg)
-					isCheating = true
-					// Continue to end of function with Solved: true, Cheating: true
-				} else {
-					c.JSON(http.StatusOK, FlagSubmitResp{
-						Message: "You have already solved this challenge",
-						Success: false,
-					})
-					return
-				}
-			}
-
-			// Case 3: Flag in validFlags but not in submissions (solved without cheating) and saved at the end.
-
-		} else {
-			if challenge.Flag != flag {
-				UserChallengesEntry := database.UserChallenges{
-					CreatedAt:   time.Now(),
-					UserID:      user.ID,
-					ChallengeID: challenge.ID,
-					Solved:      false,
-					Flag:        flag,
-				}
-				err = database.SaveFlagSubmission(&UserChallengesEntry)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-						Error: "DATABASE ERROR while processing the request.",
-					})
-					return
-				}
-				c.JSON(http.StatusOK, FlagSubmitResp{
-					Message: "Your flag is incorrect",
-					Success: false,
-				})
-				return
-			}
-		}
-		challengePoints := challenge.Points
-		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
-		if config.Cfg.CompetitionInfo.DynamicScore {
-			submissions, err := database.QuerySubmissions(map[string]interface{}{
-				"challenge_id": parsedChallId,
-			})
-			if err != nil {
-				log.Error(err)
-			}
-			solvers := len(submissions)
-			newPoints := dynamicScore(challenge.MaxPoints, challenge.MinPoints, uint(solvers))
-			if newPoints != challengePoints {
-				database.UpdateChallenge(&challenge, map[string]interface{}{
-					"Points": newPoints,
-				})
-				log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challengePoints)
-				err = updatePointsOfSolvers(submissions, newPoints, challengePoints)
-				if err != nil {
-					log.Error(err)
-				}
-				challengePoints = newPoints
-			}
-		}
-		oldScore := user.Score
-		newScore := user.Score + challengePoints
-		if newScore <= 0 {
-			newScore = 0
-		}
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
-			(len(adminLeaderboardCache) > 0 && (newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
-				oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score)) {
-			leaderboardStale = true
-			graphCacheStale = true
-			adminLeaderboardStale = true
-		}
-
-		UserChallengesEntry := database.UserChallenges{
-			CreatedAt:   time.Now(),
-			UserID:      user.ID,
-			ChallengeID: challenge.ID,
-			Solved:      true,
-			Flag:        flag,
-			Cheating:    isCheating,
-		}
-
-		err = database.SaveFlagSubmission(&UserChallengesEntry)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, FlagSubmitResp{
-			Message: "Your flag is correct",
-			Success: true,
-		})
-
+	if state != 1 {
 		return
 	}
+
+	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	if challId == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Id of the challenge is a required parameter to process request.",
+		})
+		return
+	}
+
+	if flag == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Flag for the challenge is a required parameter to process request.",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil || user.ID == 0 {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	if user.Status == 1 {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Banned user",
+		})
+		return
+	}
+
+	parsedChallId, err := strconv.Atoi(challId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid challenge id.",
+		})
+		return
+	}
+
+	chall, err := database.QueryChallengeEntries("id", strconv.Itoa(parsedChallId))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	if len(chall) == 0 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Challenge not found.",
+		})
+		return
+	}
+
+	challenge := chall[0]
+	if challenge.Status != core.DEPLOY_STATUS["deployed"] {
+		c.JSON(http.StatusOK, FlagSubmitResp{
+			Message: "Challenge is unavailable",
+			Success: false,
+		})
+		return
+	}
+
+	if challenge.PreReqs != "" {
+		preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+
+		if !preReqsStatus {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "You have not solved the prerequisites of this challenge.",
+				Success: false,
+			})
+			return
+		}
+	}
+
+	attempt, err := database.ReserveSubmissionAttempt(user.ID, challenge.ID, challenge.MaxAttemptLimit, flag, now)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	switch attempt.Status {
+	case database.SubmissionAttemptAlreadySolved:
+		c.JSON(http.StatusOK, FlagSubmitResp{
+			Message: "Challenge has already been solved.",
+			Success: false,
+		})
+		return
+	case database.SubmissionAttemptMaxAttempts:
+		c.JSON(http.StatusOK, FlagSubmitResp{
+			Message: "You have reached the maximum number of tries for this challenge.",
+			Success: false,
+		})
+		return
+	}
+
+	isCheating := false
+	if challenge.DynamicFlag {
+		validFlags, err := database.QueryDynamicFlagEntries(map[string]interface{}{
+			"Name": challenge.Name,
+			"Flag": flag,
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		if len(validFlags) == 0 {
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "Your flag is incorrect",
+				Success: false,
+			})
+			return
+		}
+
+		claim, err := database.ClaimDynamicFlag(challenge.ID, user.ID, flag, now)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		if claim.Status == database.DynamicFlagClaimedByOtherUser {
+			subuser, _ := database.QueryUserById(claim.ClaimedByID)
+			msg := "User " + user.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been claimed by user " + subuser.Username
+			go notify.SendNotification(notify.Warning, msg)
+			if err := database.MarkSubmissionCheating(user.ID, challenge.ID, flag); err != nil {
+				log.Warnf("failed to mark duplicate dynamic flag submission as cheating: %v", err)
+			}
+			c.JSON(http.StatusOK, FlagSubmitResp{
+				Message: "This dynamic flag has already been claimed.",
+				Success: false,
+			})
+			return
+		}
+	} else if challenge.Flag != flag {
+		c.JSON(http.StatusOK, FlagSubmitResp{
+			Message: "Your flag is incorrect",
+			Success: false,
+		})
+		return
+	}
+
+	wonSolveRace, err := database.MarkSubmissionSolved(user.ID, challenge.ID, flag, isCheating, now)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	if !wonSolveRace {
+		c.JSON(http.StatusOK, FlagSubmitResp{
+			Message: "Challenge has already been solved.",
+			Success: false,
+		})
+		return
+	}
+
+	challengePoints := challenge.Points
+	if err := database.AwardUserScore(user.ID, int64(challengePoints)); err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
+	if config.Cfg.CompetitionInfo.DynamicScore {
+		if err := database.MarkDynamicScoreDirty(challenge.ID, user.ID, now); err != nil {
+			log.Errorf("failed to mark dynamic score dirty for challenge %s: %v", challenge.Name, err)
+		} else {
+			notifyDynamicScoreWorker()
+		}
+	}
+
+	leaderboardStale = true
+	graphCacheStale = true
+	adminLeaderboardStale = true
+
+	c.JSON(http.StatusOK, FlagSubmitResp{
+		Message: "Your flag is correct",
+		Success: true,
+	})
 }
 
 // dynamicScore returns dynamic score of the challenge based on number of solves
@@ -348,6 +267,84 @@ func dynamicScore(maxPoints, minPoints, solvers uint) uint {
 	}
 	divisor := (1 + math.Pow((float64(solvers)-1)/11.92201, 1.206069))
 	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
+}
+
+func startDynamicScoreWorker() {
+	dynamicScoreWorkerOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-dynamicScoreNotify:
+					processDirtyDynamicScores()
+				case <-ticker.C:
+					processDirtyDynamicScores()
+				}
+			}
+		}()
+	})
+}
+
+func notifyDynamicScoreWorker() {
+	select {
+	case dynamicScoreNotify <- struct{}{}:
+	default:
+	}
+}
+
+func processDirtyDynamicScores() {
+	dirtyScores, err := database.QueryDirtyDynamicScores(100)
+	if err != nil {
+		log.Errorf("failed to query dirty dynamic scores: %v", err)
+		return
+	}
+
+	for _, dirty := range dirtyScores {
+		if err := recomputeDynamicScore(dirty); err != nil {
+			log.Errorf("failed to recompute dynamic score for challenge %d: %v", dirty.ChallengeID, err)
+			continue
+		}
+		if err := database.ClearDynamicScoreDirty(dirty.ChallengeID, dirty.UpdatedAt); err != nil {
+			log.Errorf("failed to clear dynamic score dirty marker for challenge %d: %v", dirty.ChallengeID, err)
+		}
+	}
+}
+
+func recomputeDynamicScore(dirty database.DynamicScoreDirty) error {
+	challs, err := database.QueryChallengeEntries("id", strconv.Itoa(int(dirty.ChallengeID)))
+	if err != nil {
+		return err
+	}
+	if len(challs) == 0 {
+		return nil
+	}
+
+	challenge := challs[0]
+	if !challenge.DynamicFlag {
+		return nil
+	}
+
+	solvers, err := database.CountSolvedSubmissionsForChallenge(challenge.ID)
+	if err != nil {
+		return err
+	}
+
+	newPoints := dynamicScore(challenge.MaxPoints, challenge.MinPoints, solvers)
+	delta := int64(newPoints) - int64(challenge.Points)
+	if err := database.ApplyDynamicScoreDelta(challenge.ID, newPoints, delta); err != nil {
+		return err
+	}
+
+	if delta != 0 {
+		log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challenge.Points)
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
+	}
+
+	return nil
 }
 
 // updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes

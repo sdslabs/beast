@@ -164,6 +164,89 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	return challenges, nil
 }
 
+// UserSolvedChallenge represents a challenge solved by a user with the actual solve timestamp
+type UserSolvedChallenge struct {
+	ChallengeID uint
+	Name        string
+	Type        string
+	Points      uint
+	Tags        []*Tag
+	SolvedAt    time.Time
+}
+
+// GetUserSolvedChallenges returns distinct challenges solved by a user, with the actual solve timestamps.
+// Unlike GetRelatedChallenges, this avoids duplicates from multiple user_challenges rows per challenge.
+func GetUserSolvedChallenges(userID uint) ([]UserSolvedChallenge, error) {
+	type solveRow struct {
+		ChallengeID uint
+		Name        string
+		Type        string
+		Points      uint
+		SolvedAt    time.Time
+	}
+	var rows []solveRow
+
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	err := Db.Table("user_challenges").
+		Select("DISTINCT ON (user_challenges.challenge_id) user_challenges.challenge_id, challenges.name, challenges.type, challenges.points, user_challenges.created_at as solved_at").
+		Joins("JOIN challenges ON challenges.id = user_challenges.challenge_id").
+		Where("user_challenges.user_id = ? AND user_challenges.solved = ?", userID, true).
+		Order("user_challenges.challenge_id, user_challenges.created_at ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(rows) == 0 {
+		return []UserSolvedChallenge{}, nil
+	}
+
+	// Load tags for all solved challenges in a single query instead of one per challenge.
+	challengeIDs := make([]uint, len(rows))
+	for i, r := range rows {
+		challengeIDs[i] = r.ChallengeID
+	}
+
+	type tagRow struct {
+		ChallengeID uint
+		TagID       uint
+		TagName     string
+	}
+	var tagRows []tagRow
+	err = Db.Table("tags").
+		Select("tag_challenges.challenge_id, tags.id as tag_id, tags.tag_name").
+		Joins("JOIN tag_challenges ON tag_challenges.tag_id = tags.id").
+		Where("tag_challenges.challenge_id IN ?", challengeIDs).
+		Scan(&tagRows).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tags for solved challenges: %w", err)
+	}
+
+	tagMap := make(map[uint][]*Tag)
+	for _, tr := range tagRows {
+		tagMap[tr.ChallengeID] = append(tagMap[tr.ChallengeID], &Tag{
+			Model:   gorm.Model{ID: tr.TagID},
+			TagName: tr.TagName,
+		})
+	}
+
+	results := make([]UserSolvedChallenge, 0, len(rows))
+	for _, r := range rows {
+		results = append(results, UserSolvedChallenge{
+			ChallengeID: r.ChallengeID,
+			Name:        r.Name,
+			Type:        r.Type,
+			Points:      r.Points,
+			Tags:        tagMap[r.ChallengeID],
+			SolvedAt:    r.SolvedAt,
+		})
+	}
+
+	return results, nil
+}
+
 // Check whether challenge is submitted by the user
 func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	var userChallenges []UserChallenges
@@ -419,12 +502,10 @@ func QueryAllUniqueTags() ([]string, error) {
 	var tags []string
 	DBMux.Lock()
 	defer DBMux.Unlock()
-	
+
 	tx := Db.Model(&Challenge{}).Distinct().Pluck("tag", &tags)
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
 	return tags, nil
 }
-
-

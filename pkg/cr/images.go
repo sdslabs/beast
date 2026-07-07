@@ -10,7 +10,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/utils"
 
@@ -19,7 +18,7 @@ import (
 )
 
 func RemoveImage(imageId string) error {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return err
 	}
@@ -34,7 +33,7 @@ func RemoveImage(imageId string) error {
 
 func CheckIfImageExists(imageId string) (bool, error) {
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return false, err
 	}
@@ -52,7 +51,7 @@ func CheckIfImageExists(imageId string) (bool, error) {
 }
 
 func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, error) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return []types.ImageSummary{}, err
 	}
@@ -85,12 +84,12 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 		NoCache:    noCache,
 		Labels: map[string]string{
 			"beast.challenge":            challengeName,
-			"com.sdslabs.beast.project":  utils.GetProjectName(challengeName),
-			"com.docker.compose.project": utils.GetProjectName(challengeName),
+			"com.sdslabs.beast.project":  utils.ProjectNameNotInstanced(challengeName),
+			"com.docker.compose.project": utils.ProjectNameNotInstanced(challengeName),
 		},
 	}
 
-	dockerClient, err := client.NewEnvClient()
+	dockerClient, err := newDockerClient()
 	if err != nil {
 		return nil, "", fmt.Errorf("error while creating a docker client for beast: %s", err)
 	}

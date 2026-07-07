@@ -4,6 +4,7 @@ import (
 	"fmt"
 	container_types "github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -64,9 +65,10 @@ func CleanupContainerByFilter(filter, filterVal string) error {
 func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChallengeConfig) error {
 	if chall.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
 		log.Debugf("Cleaning up Docker Compose challenge: %s", chall.Name)
-		projectName := utils.GetProjectName(chall.Name)
+		// Same -p as deployPipeline / ComposeDown for non-instanced compose.
+		projectName := utils.ProjectNameNotInstanced(chall.Name)
 
-		if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+		if !cfg.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
 			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
 			downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
 			_, err := remoteManager.RunCommandOnServer(server, downCommand)
@@ -74,9 +76,15 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 				log.Errorf("Error running docker compose down on remote: %v", err)
 				return err
 			}
+		} else if err := cr.ComposeDownProject(projectName); err != nil {
+			log.Errorf("Error running docker compose down locally: %v", err)
+			return err
 		}
 
 		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
+		if err := cache.FreeContainerPortsOnHost(chall.ServerDeployed, projectName); err != nil {
+			log.Warnf("Failed to free ports for compose challenge %s: %v", chall.Name, err)
+		}
 		return nil
 	}
 
@@ -87,24 +95,27 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 		}
 
 		database.UpdateChallenge(chall, map[string]any{"ContainerId": GetTempContainerId(chall.Name)})
+		if err := cache.FreeContainerPortsOnHost(chall.ServerDeployed, chall.ContainerId); err != nil {
+			log.Warnf("Failed to free ports for challenge %s: %v", chall.Name, err)
+		}
 	}
 
-	err := CleanupContainerByFilter("name", EncodeID(config.Challenge.Metadata.Name))
+	err := CleanupContainerByFilter("name", utils.EncodeID(config.Challenge.Metadata.Name))
 	return err
 }
 
 func CleanupChallengeImage(chall *database.Challenge) error {
-	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+	if cfg.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
+		err := cr.RemoveImage(chall.ImageId)
+		if err != nil {
+			log.Errorf("Error while cleaning up image with id %s", chall.ImageId)
+			return err
+		}
+	} else {
 		server := config.Cfg.AvailableServers[chall.ServerDeployed]
 		err := remoteManager.RemoveImageRemote(chall.ImageId, server)
 		if err != nil {
 			log.Errorf("Error while cleaning up image on remote %s with id %s", chall.ServerDeployed, chall.ImageId)
-			return err
-		}
-	} else {
-		err := cr.RemoveImage(chall.ImageId)
-		if err != nil {
-			log.Errorf("Error while cleaning up image with id %s", chall.ImageId)
 			return err
 		}
 	}

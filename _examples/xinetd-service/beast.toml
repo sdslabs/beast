@@ -27,3 +27,10 @@ setup_scripts = ["setup.sh"]
 xinetd_config = "ctf.xinetd"
 service_path = "pwn"
 ports = [10003]
+default_port = 10003
+
+[resource]
+cpu_shares = 1024
+memory_limit = 536870912
+pids_limit = 100
+cpuslimit = 0.25

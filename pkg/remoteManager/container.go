@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
-	"github.com/sdslabs/beastv4/core"
+	_ "github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
@@ -18,7 +18,7 @@ import (
 )
 
 func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, server config.AvailableServer) (string, error) {
-	var containerName, containerEnv, exposedPorts, portMap, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings string
+	var containerName, containerEnv, exposedPorts, portMap, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings string
 	if containerConfig.ContainerName != "" {
 		containerName = fmt.Sprintf("--name %s ", containerConfig.ContainerName)
 	}
@@ -26,11 +26,14 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 		containerEnv += fmt.Sprintf("--env %s ", envVar)
 	}
 	for _, portMapping := range containerConfig.PortMapping {
-		portMap += fmt.Sprintf("-p 0.0.0.0:%d:%d/%s ", portMapping.ContainerPort, portMapping.HostPort, containerConfig.TrafficType())
+		portMap += fmt.Sprintf("-p 0.0.0.0:%d:%d/%s ", portMapping.HostPort, portMapping.ContainerPort, containerConfig.TrafficType())
 		exposedPorts += fmt.Sprintf("--expose %d ", portMapping.ContainerPort)
 	}
 	if containerConfig.CPUShares != 0 {
-		cpuLimit = fmt.Sprintf("--cpu-shares %d ", containerConfig.CPUShares)
+		cpuShareLimit = fmt.Sprintf("--cpu-shares %d ", containerConfig.CPUShares)
+	}
+	if containerConfig.CPUsLimit != 0 {
+		cpuLimit = fmt.Sprintf("--cpus %f ", containerConfig.CPUsLimit)
 	}
 	if containerConfig.Memory != 0 {
 		memoryLimit = fmt.Sprintf("--memory %d ", containerConfig.Memory)
@@ -44,7 +47,7 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 	for src, dest := range containerConfig.MountsMap {
 		mountBindings += fmt.Sprintf("--mount type=bind,source=%s,target=%s ", src, dest)
 	}
-	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s", containerName, containerEnv, exposedPorts, mountBindings, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
+	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s %s", containerName, containerEnv, exposedPorts, mountBindings, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
 	// fmt.Printf("%s, %s, %s, %s\n", containerName, containerEnv, exposedPorts, portMap)
 	// dockerCommand := fmt.Sprintf("docker run \\
 	// 	--name <container_name> \\
@@ -108,9 +111,9 @@ func SearchContainerByFilterRemote(filterMap map[string]string, server config.Av
 	for key, val := range filterMap {
 		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
 	}
-	for _, server := range config.Cfg.AvailableServers {
+	for serverDeployed, server := range config.Cfg.AvailableServers {
 		if server.Active {
-			if server.Host != core.LOCALHOST {
+			if !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
 				if err != nil {
 					return []types.Container{}, err
@@ -136,9 +139,9 @@ func SearchRunningContainerByFilterRemote(filterMap map[string]string, server co
 	for key, val := range filterMap {
 		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
 	}
-	for _, server := range config.Cfg.AvailableServers {
+	for serverDeployed, server := range config.Cfg.AvailableServers {
 		if server.Active {
-			if server.Host != core.LOCALHOST {
+			if !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
 				if err != nil {
 					return []types.Container{}, err
@@ -198,12 +201,11 @@ func CommitContainerRemote(containerID string, server config.AvailableServer) (s
 	return imageID, nil
 }
 
-func DeployContainerFromComposeRemote(challengeName, stagedDir, composeFileName string, server config.AvailableServer) (string, error) {
+func DeployContainerFromComposeRemote(challengeName string, projectName string, stagedDir string, composeFileName string, server config.AvailableServer, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedDir, challengeName)
-	projectName := utils.GetProjectName(challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
 
-	upCommand := fmt.Sprintf("docker compose -f %s -p %s up -d", composeFile, projectName)
+	upCommand := fmt.Sprintf("%s docker compose -f %s -p %s up -d", utils.PortMappingToEnvironmentVariable(ports), composeFile, projectName)
 	log.Debugf("Deploying challenge %s using docker compose remotely with project %s and file %s", challengeName, projectName, composeFileName)
 	upOutput, err := RunCommandOnServer(server, upCommand)
 	if err != nil {
@@ -303,32 +305,26 @@ func getPrimaryComposeContainerIdRemote(projectName string, server config.Availa
 	return containerId, nil
 }
 
-func ComposeDownRemote(challengeName, stagedDir string, server config.AvailableServer) error {
-	log.Debugf("Stopping challenge %s using docker compose on remote", challengeName)
-	projectName := utils.GetProjectName(challengeName)
-
+// ComposeDownProjectRemote runs docker compose down for an explicit -p project name.
+func ComposeDownProjectRemote(projectName string, server config.AvailableServer) error {
+	log.Debugf("Stopping docker compose project %s on remote", projectName)
 	downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
-	log.Debugf("Stopping challenge %s using docker compose remotely: %s", challengeName, downCommand)
 	downOutput, err := RunCommandOnServer(server, downCommand)
 	if err != nil {
-		return fmt.Errorf("docker compose down failed for challenge %s on remote: %v. Output: %s", challengeName, err, downOutput)
+		return fmt.Errorf("docker compose down failed for project %s on remote: %v. Output: %s", projectName, err, downOutput)
 	}
-
-	log.Debugf("Successfully stopped challenge %s on remote. Output: %s", challengeName, downOutput)
+	log.Debugf("Successfully stopped compose project %s on remote. Output: %s", projectName, downOutput)
 	return nil
 }
 
-func ComposePurgeRemote(challengeName, stagedDir string, server config.AvailableServer) error {
-	log.Debugf("Purging challenge %s using docker compose on remote", challengeName)
-	projectName := utils.GetProjectName(challengeName)
+// ComposePurgeProjectRemote purges a compose project by explicit -p name (shared or instanced).
+func ComposePurgeProjectRemote(projectName string, server config.AvailableServer) error {
+	log.Debugf("Purging docker compose project %s on remote", projectName)
 	purgeCommand := fmt.Sprintf("docker compose -p %s down --remove-orphans --volumes --rmi all", projectName)
-	log.Debugf("Purge challenge %s using docker compose remotely: %s", challengeName, purgeCommand)
 	purgeOutput, err := RunCommandOnServer(server, purgeCommand)
 	if err != nil {
-		return fmt.Errorf("docker compose purge failed for challenge %s on remote: %v. Output: %s", challengeName, err, purgeOutput)
-
+		return fmt.Errorf("docker compose purge failed for project %s on remote: %v. Output: %s", projectName, err, purgeOutput)
 	}
-
-	log.Debugf("Successfully purged challenge %s on remote. Output: %s", challengeName, purgeOutput)
+	log.Debugf("Successfully purged compose project %s on remote. Output: %s", projectName, purgeOutput)
 	return nil
 }

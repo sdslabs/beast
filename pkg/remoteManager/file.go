@@ -83,7 +83,7 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to extract tar: %s", err)
 	}
-	projectName := utils.GetProjectName(challengeName)
+	projectName := utils.ProjectNameNotInstanced(challengeName)
 	dockerBuildCmd := fmt.Sprintf("cd %s && docker build -t %s "+
 		"--label beast.challenge=%s "+
 		"--label com.sdslabs.beast.project=%s "+

@@ -47,21 +47,22 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 	}
 
 	if live {
-		if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
+		if config.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
+			cr.ShowLiveContainerLogs(chall.ContainerId)
+		} else {
 			server := config.Cfg.AvailableServers[chall.ServerDeployed]
 			remoteManager.ShowLiveContainerLogsRemote(chall.ContainerId, server)
-		} else {
-			cr.ShowLiveContainerLogs(chall.ContainerId)
 		}
 		return nil, nil
 	}
-	if chall.ServerDeployed != core.LOCALHOST && chall.ServerDeployed != "" {
-		server := config.Cfg.AvailableServers[chall.ServerDeployed]
-		return remoteManager.GetContainerStdLogsRemote(chall.ContainerId, server)
-	}
-	return cr.GetContainerStdLogs(chall.ContainerId)
-}
 
+	if config.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
+		return cr.GetContainerStdLogs(chall.ContainerId)
+	}
+
+	server = config.Cfg.AvailableServers[chall.ServerDeployed]
+	return remoteManager.GetContainerStdLogsRemote(chall.ContainerId, server)
+}
 
 func LogFlag(msg string, challName string) error {
 	// log the cheating attempt in a file in cheat.log

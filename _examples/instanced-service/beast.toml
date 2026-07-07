@@ -1,0 +1,38 @@
+[author]
+name = "beast-admin"
+email = "admin@beast.local"
+ssh_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ"
+
+[challenge.metadata]
+name = "instanced-service"
+flag = "FLAG{1nst4nc3d_ch4ll3ng3_w0rks!}"
+type = "service"
+description = "A simple buffer overflow challenge. Each user gets their own instance!"
+points = 150
+difficulty = "easy"
+tags = ["pwn", "beginner", "instanced"]
+maxAttemptLimit = 50
+instanced = true
+instance_expiration = 10
+
+[[challenge.metadata.hints]]
+text = "Have you tried overflowing the buffer?"
+points = 25
+
+[[challenge.metadata.hints]]
+text = "The sample() function looks interesting..."
+points = 50
+
+[challenge.env]
+ports = [9999]
+default_port = 9999
+apt_deps = ["gcc", "xinetd"]
+setup_scripts = ["setup.sh"]
+service_path = "pwn"
+base_image = "ubuntu:18.04"
+
+[resource]
+cpu_shares = 1024
+memory_limit = 536870912
+pids_limit = 100
+cpuslimit = 0.25

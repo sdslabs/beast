@@ -2,11 +2,11 @@ package probes
 
 import (
 	"fmt"
+	"github.com/sdslabs/beastv4/core"
 	"net"
 	"strconv"
 	"time"
 
-	"github.com/sdslabs/beastv4/core"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -22,8 +22,8 @@ type TcpProber struct{}
 // If the socket fails to open, it returns Failure.
 func (pr TcpProber) Probe(host string, port int, timeout time.Duration) (ProbeResult, error) {
 	var hostAddress string
-	if host == core.LOCALHOST || host == "" {
-		hostAddress = "127.0.0.1"
+	if host == core.LOCALHOST {
+		hostAddress = core.LOCALHOST_IP
 	} else {
 		ips, err := net.LookupIP(host)
 		if err != nil {

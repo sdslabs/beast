@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -46,30 +47,32 @@ import (
 type Challenge struct {
 	gorm.Model
 
-	Name            string `gorm:"not null;type:varchar(64);unique"`
-	DynamicFlag     bool   `gorm:"not null;default:false"`
-	Flag            string `gorm:"type:text"`
-	Type            string `gorm:"type:varchar(64)"`
-	Difficulty      string `gorm:"not null;default:'medium'"`
-	MaxAttemptLimit int    `gorm:"default:-1"`
-	PreReqs         string `gorm:"type:text"`
-	Assets          string `gorm:"type:text"`
-	AdditionalLinks string `gorm:"type:text"`
-	Description     string `gorm:"type:text"`
-	Format          string `gorm:"not null"`
-	ContainerId     string `gorm:"size:64;unique"`
-	ImageId         string `gorm:"size:64;unique"`
-	Status          string `gorm:"not null;default:'Undeployed'"`
-	DeploymentType  string `gorm:"not null;default:'standard_docker'"`
-	AuthorID        uint   `gorm:"not null"`
-	HealthCheck     uint   `gorm:"not null;default:1"`
-	Points          uint   `gorm:"default:0"`
-	MaxPoints       uint   `gorm:"default:0"`
-	MinPoints       uint   `gorm:"default:0"`
-	Ports           []Port
-	Tags            []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Users           []*User `gorm:"many2many:user_challenges;"`
-	ServerDeployed  string  `gorm:"type:varchar(64)"`
+	Name               string `gorm:"not null;type:varchar(64);unique"`
+	DynamicFlag        bool   `gorm:"not null;default:false"`
+	Flag               string `gorm:"type:text"`
+	Type               string `gorm:"type:varchar(64)"`
+	Difficulty         string `gorm:"not null;default:'medium'"`
+	MaxAttemptLimit    int    `gorm:"default:-1"`
+	PreReqs            string `gorm:"type:text"`
+	Assets             string `gorm:"type:text"`
+	AdditionalLinks    string `gorm:"type:text"`
+	Description        string `gorm:"type:text"`
+	Format             string `gorm:"not null"`
+	ContainerId        string `gorm:"size:64;unique"`
+	ImageId            string `gorm:"size:64;unique"`
+	Status             string `gorm:"not null;default:'Undeployed'"`
+	DeploymentType     string `gorm:"not null;default:'standard_docker'"`
+	AuthorID           uint   `gorm:"not null"`
+	HealthCheck        uint   `gorm:"not null;default:1"`
+	Points             uint   `gorm:"default:0"`
+	MaxPoints          uint   `gorm:"default:0"`
+	MinPoints          uint   `gorm:"default:0"`
+	Ports              []Port
+	Tags               []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Users              []*User `gorm:"many2many:user_challenges;"`
+	ServerDeployed     string  `gorm:"type:varchar(64)"`
+	Instanced          bool    `gorm:"not null;default:false"`
+	InstanceExpiration int64   `gorm:"default:0"`
 }
 
 type UserChallenges struct {
@@ -176,7 +179,7 @@ func QueryAllChallengesMetadata() ([]Challenge, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Select("id", "name", "created_at", "points", "difficulty").
+	tx := Db.Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
 		Preload("Tags").
 		Find(&challenges)
 
@@ -209,7 +212,7 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 	return challenges, nil
 }
 
-// QueryChallengeEntriesMetadata returns only selected columns: Name, ID, Tags, CreatedAt, Points, Difficulty
+// QueryChallengeEntriesMetadata returns only selected columns: Name, ID, Tags, CreatedAt, Points, Difficulty, Instanced, InstanceExpiration, Status
 func QueryChallengeEntriesMetadata(key string, value string) ([]Challenge, error) {
 	queryKey := fmt.Sprintf("%s = ?", key)
 
@@ -219,7 +222,7 @@ func QueryChallengeEntriesMetadata(key string, value string) ([]Challenge, error
 	defer DBMux.Unlock()
 
 	// Only select the required columns, but preload Tags for tag names
-	tx := Db.Select("id", "name", "created_at", "points", "difficulty").
+	tx := Db.Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
 		Preload("Tags").
 		Where(queryKey, value).
 		Find(&challenges)
@@ -332,7 +335,7 @@ func UpdateUserChallengeTries(userID uint, challengeID uint) error {
 	}
 
 	updates := map[string]interface{}{
-		"tries":      userChallenges.Tries + 1,
+		"tries": userChallenges.Tries + 1,
 	}
 
 	tx := Db.Model(&UserChallenges{}).Where("user_id = ? AND challenge_id = ?", userID, challengeID).Updates(updates)
@@ -525,10 +528,29 @@ func SaveFlagSubmission(user_challenges *UserChallenges) error {
 		return fmt.Errorf("error while saving record: %s", tx.Error)
 	}
 
-	if err := tx.FirstOrCreate(user_challenges, *user_challenges).Error; err != nil {
+	// Check if a row already exists for this user+challenge pair (created by UpdateUserChallengeTries)
+	var existing UserChallenges
+	err := tx.Where("user_id = ? AND challenge_id = ?", user_challenges.UserID, user_challenges.ChallengeID).First(&existing).Error
+	if err == nil {
+		// Row exists: update it to mark as solved with the current timestamp
+		if updateErr := tx.Model(&existing).Updates(map[string]interface{}{
+			"solved":     user_challenges.Solved,
+			"created_at": user_challenges.CreatedAt,
+		}).Error; updateErr != nil {
+			tx.Rollback()
+			return updateErr
+		}
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		// No existing row: create a new one
+		if createErr := tx.Create(user_challenges).Error; createErr != nil {
+			tx.Rollback()
+			return createErr
+		}
+	} else {
 		tx.Rollback()
 		return err
 	}
+
 	return tx.Commit().Error
 }
 
@@ -641,12 +663,28 @@ func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, er
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
+	whereMap = normalizeDynamicFlagWhereMap(whereMap)
 	tx := Db.Where(whereMap).Find(&dynamicFlags)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return []DynamicFlag{}, nil
 	}
 
 	return dynamicFlags, tx.Error
+}
+
+func normalizeDynamicFlagWhereMap(whereMap map[string]interface{}) map[string]interface{} {
+	normalized := make(map[string]interface{}, len(whereMap))
+	for key, value := range whereMap {
+		switch key {
+		case "Name":
+			normalized["name"] = value
+		case "Flag":
+			normalized["flag"] = value
+		default:
+			normalized[key] = value
+		}
+	}
+	return normalized
 }
 
 func DeleteDynamicFlagsByChallengeName(name string) error {
@@ -870,18 +908,39 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		Username  string
 		CreatedAt time.Time
 		Points    uint
+		IsHint    bool
 	}
 	var allRows []userChallengeRow
 
 	if err := Db.Table("user_challenges").
-		Select("user_challenges.user_id, users.username, user_challenges.created_at, challenges.points").
+		Select("DISTINCT ON (user_challenges.user_id, user_challenges.challenge_id) user_challenges.user_id, users.username, user_challenges.created_at, challenges.points, false AS is_hint").
 		Joins("JOIN challenges ON user_challenges.challenge_id = challenges.id").
 		Joins("JOIN users ON user_challenges.user_id = users.id").
 		Where("user_challenges.user_id IN ? AND user_challenges.solved = ?", topUserId, true).
-		Order("user_challenges.user_id ASC, user_challenges.created_at ASC").
+		Order("user_challenges.user_id, user_challenges.challenge_id, user_challenges.created_at ASC").
 		Scan(&allRows).Error; err != nil {
 		return results
 	}
+
+	var hintRows []userChallengeRow
+	if err := Db.Table("user_hints").
+		Select("user_hints.user_id, users.username, COALESCE(user_hints.created_at, NOW()) AS created_at, hints.points, true AS is_hint").
+		Joins("JOIN hints ON user_hints.hint_id = hints.hint_id").
+		Joins("JOIN users ON user_hints.user_id = users.id").
+		Where("user_hints.user_id IN ?", topUserId).
+		Scan(&hintRows).Error; err != nil {
+		return results
+	}
+
+	allRows = append(allRows, hintRows...)
+
+	// Re-sort by user_id then created_at for proper cumulative score calculation
+	sort.Slice(allRows, func(i, j int) bool {
+		if allRows[i].UserID != allRows[j].UserID {
+			return allRows[i].UserID < allRows[j].UserID
+		}
+		return allRows[i].CreatedAt.Before(allRows[j].CreatedAt)
+	})
 
 	userRows := make(map[uint][]userChallengeRow)
 	userMap := make(map[uint]string)
@@ -900,7 +959,16 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		var timeSeriesRaw []TimeSeries
 		var cumulativeScore uint = 0
 		for _, r := range rows {
-			cumulativeScore += r.Points
+			if r.IsHint {
+				if cumulativeScore < r.Points {
+					cumulativeScore = 0
+				} else {
+					cumulativeScore -= r.Points
+				}
+			} else {
+				cumulativeScore += r.Points
+			}
+
 			timeSeriesRaw = append(timeSeriesRaw, TimeSeries{
 				Timestamp: r.CreatedAt,
 				Score:     cumulativeScore,
@@ -920,7 +988,7 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		results = append(results, UserLeaderboardResp{
 			Id:             userId,
 			Username:       username,
-			Score:          cumulativeScore,
+			Score:          uint(cumulativeScore),
 			Rank:           rank,
 			TimeSeriesdata: timeSeries,
 		})

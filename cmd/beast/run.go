@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/sdslabs/beastv4/core/cache"
 	"math"
 	"os"
 	"os/signal"
@@ -55,6 +56,10 @@ func cleanupRunningContainers() {
 
 	for _, challenge := range challenges {
 		if challenge.Status == core.DEPLOY_STATUS["deployed"] {
+			if challenge.Instanced {
+				_ = manager.KillChallengeInstances(challenge.Name)
+			}
+
 			err = manager.UndeployChallenge(challenge.Name)
 			if err != nil {
 				log.Errorln(fmt.Sprintf("Failed to undeploy challenge [Id: %v] %s", challenge.ID, challenge.Name))
@@ -63,6 +68,26 @@ func cleanupRunningContainers() {
 				log.Infoln(fmt.Sprintf("Successfully undeployed challenge [Id: %v] %s", challenge.ID, challenge.Name))
 			}
 		}
+	}
+}
+
+func cleanupCacheConnections() {
+	log.Infoln("Cleaning up cache connections...")
+
+	err := cache.BackupCache()
+	if err != nil {
+		log.Errorln("Error while backing up cache:", err)
+	} else {
+		log.Infoln("Cache backup completed successfully")
+	}
+
+	log.Infoln("Terminating cache connection...")
+
+	err = cache.Close()
+	if err != nil {
+		log.Errorln("Unable to terminate cache connections:", err)
+	} else {
+		log.Infoln("Cache connections terminated successfully")
 	}
 }
 
@@ -131,12 +156,14 @@ func cleanup() {
 	stopSseNotificationHub()
 	stopApiScheduler()
 
+	cleanupRunningContainers()
+
 	stopWorkerQueue()
 	stopRemoteManagers()
 
 	saveLeaderboardCache()
 
-	cleanupRunningContainers()
+	cleanupCacheConnections()
 	cleanupDatabaseConnections()
 
 	// - Clean up temporary files: found no files to be cleared as of now
