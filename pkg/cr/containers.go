@@ -15,7 +15,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sdslabs/beastv4/pkg/defaults"
 	utils "github.com/sdslabs/beastv4/utils"
@@ -90,7 +89,7 @@ type Log struct {
 
 // Function is equivalent to docker ps -a
 func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return []types.Container{}, err
 	}
@@ -110,7 +109,7 @@ func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, er
 
 // Function is equivalent to docker ps
 func SearchRunningContainerByFilter(filterMap map[string]string) ([]types.Container, error) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return []types.Container{}, err
 	}
@@ -128,7 +127,7 @@ func SearchRunningContainerByFilter(filterMap map[string]string) ([]types.Contai
 }
 
 func StopAndRemoveContainer(containerId string) error {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return err
 	}
@@ -153,7 +152,7 @@ func StopAndRemoveContainer(containerId string) error {
 func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
 	containerName := containerConfig.ContainerName
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return "", err
 	}
@@ -237,7 +236,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 }
 
 func GetContainerStdLogs(containerID string) (*Log, error) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +267,7 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 }
 
 func ShowLiveContainerLogs(containerID string) {
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		log.Error(err)
 	}
@@ -289,7 +288,7 @@ func ShowLiveContainerLogs(containerID string) {
 
 func CommitContainer(containerId string) (string, error) {
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := newDockerClient()
 	if err != nil {
 		return "", err
 	}
