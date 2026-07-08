@@ -150,17 +150,12 @@ func TestConcurrentCorrectSubmissionsAwardOnce(t *testing.T) {
 				return
 			}
 
-			won, err := MarkSubmissionSolved(user.ID, challenge.ID, challenge.Flag, false, now)
+			result, err := FinalizeSubmissionSolve(user.ID, challenge.ID, challenge.Flag, false, now, false)
 			if err != nil {
 				errCh <- err
 				return
 			}
-			if !won {
-				return
-			}
-
-			if err := AwardUserScore(user.ID, int64(challenge.Points)); err != nil {
-				errCh <- err
+			if !result.Awarded {
 				return
 			}
 			atomic.AddInt32(&awards, 1)
@@ -195,6 +190,116 @@ func TestConcurrentCorrectSubmissionsAwardOnce(t *testing.T) {
 	}
 	if refreshed.Score != challenge.Points {
 		t.Fatalf("expected user score %d, got %d", challenge.Points, refreshed.Score)
+	}
+}
+
+func TestAlreadySolvedSubmissionCannotBeReAwarded(t *testing.T) {
+	cleanup := setupSubmissionTestDB(t)
+	defer cleanup()
+
+	user := createSubmissionTestUser(t, "solveduser")
+	challenge := createSubmissionTestChallenge(t, "already-solved", -1, false)
+
+	now := time.Now()
+	attempt, err := ReserveSubmissionAttempt(user.ID, challenge.ID, challenge.MaxAttemptLimit, "first", now)
+	if err != nil {
+		t.Fatalf("reserve first attempt: %v", err)
+	}
+	if attempt.Status != SubmissionAttemptAccepted {
+		t.Fatalf("expected first attempt accepted, got %v", attempt.Status)
+	}
+
+	first, err := FinalizeSubmissionSolve(user.ID, challenge.ID, "first", false, now, false)
+	if err != nil {
+		t.Fatalf("finalize first solve: %v", err)
+	}
+	if !first.Awarded {
+		t.Fatalf("expected first solve to award")
+	}
+
+	second, err := FinalizeSubmissionSolve(user.ID, challenge.ID, "second", false, time.Now(), false)
+	if err != nil {
+		t.Fatalf("finalize duplicate solve: %v", err)
+	}
+	if second.Awarded {
+		t.Fatalf("duplicate solve awarded score")
+	}
+
+	attempt, err = ReserveSubmissionAttempt(user.ID, challenge.ID, challenge.MaxAttemptLimit, "third", time.Now())
+	if err != nil {
+		t.Fatalf("reserve after solved: %v", err)
+	}
+	if attempt.Status != SubmissionAttemptAlreadySolved {
+		t.Fatalf("expected already solved status, got %v", attempt.Status)
+	}
+
+	var refreshed User
+	if err := Db.First(&refreshed, user.ID).Error; err != nil {
+		t.Fatalf("query user: %v", err)
+	}
+	if refreshed.Score != challenge.Points {
+		t.Fatalf("expected user score %d, got %d", challenge.Points, refreshed.Score)
+	}
+}
+
+func TestDynamicScoreFinalizationUsesSignedDelta(t *testing.T) {
+	cleanup := setupSubmissionTestDB(t)
+	defer cleanup()
+
+	userA := createSubmissionTestUser(t, "dynamicusera")
+	userB := createSubmissionTestUser(t, "dynamicuserb")
+	challenge := createSubmissionTestChallenge(t, "dynamic-finalize", -1, true)
+
+	if _, err := ReserveSubmissionAttempt(userA.ID, challenge.ID, challenge.MaxAttemptLimit, "first", time.Now()); err != nil {
+		t.Fatalf("reserve first dynamic attempt: %v", err)
+	}
+	first, err := FinalizeSubmissionSolve(userA.ID, challenge.ID, "first", false, time.Now(), true)
+	if err != nil {
+		t.Fatalf("finalize first dynamic solve: %v", err)
+	}
+	if !first.Awarded || first.Points != challenge.MaxPoints {
+		t.Fatalf("expected first dynamic solve to award max points, got awarded=%v points=%d", first.Awarded, first.Points)
+	}
+
+	if err := Db.Model(&User{}).Where("id = ?", userA.ID).Update("score", uint(1)).Error; err != nil {
+		t.Fatalf("force low score: %v", err)
+	}
+
+	if _, err := ReserveSubmissionAttempt(userB.ID, challenge.ID, challenge.MaxAttemptLimit, "second", time.Now()); err != nil {
+		t.Fatalf("reserve second dynamic attempt: %v", err)
+	}
+	second, err := FinalizeSubmissionSolve(userB.ID, challenge.ID, "second", false, time.Now(), true)
+	if err != nil {
+		t.Fatalf("finalize second dynamic solve: %v", err)
+	}
+	expectedPoints := DynamicChallengeScore(challenge.MaxPoints, challenge.MinPoints, 2)
+	if !second.Awarded || second.Points != expectedPoints {
+		t.Fatalf("expected second dynamic solve to award %d points, got awarded=%v points=%d", expectedPoints, second.Awarded, second.Points)
+	}
+	if second.DynamicDelta >= 0 {
+		t.Fatalf("expected negative dynamic delta, got %d", second.DynamicDelta)
+	}
+
+	var refreshedA, refreshedB User
+	if err := Db.First(&refreshedA, userA.ID).Error; err != nil {
+		t.Fatalf("query first user: %v", err)
+	}
+	if err := Db.First(&refreshedB, userB.ID).Error; err != nil {
+		t.Fatalf("query second user: %v", err)
+	}
+	if refreshedA.Score != 0 {
+		t.Fatalf("expected negative delta to clamp first user score to 0, got %d", refreshedA.Score)
+	}
+	if refreshedB.Score != expectedPoints {
+		t.Fatalf("expected second user score %d, got %d", expectedPoints, refreshedB.Score)
+	}
+
+	var refreshedChallenge Challenge
+	if err := Db.First(&refreshedChallenge, challenge.ID).Error; err != nil {
+		t.Fatalf("query challenge: %v", err)
+	}
+	if refreshedChallenge.Points != expectedPoints {
+		t.Fatalf("expected challenge points %d, got %d", expectedPoints, refreshedChallenge.Points)
 	}
 }
 

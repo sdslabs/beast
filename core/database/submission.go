@@ -3,9 +3,11 @@ package database
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DynamicFlagClaim struct {
@@ -43,6 +45,12 @@ const (
 type SubmissionAttemptResult struct {
 	Status SubmissionAttemptStatus
 	Tries  uint
+}
+
+type SolveFinalizationResult struct {
+	Awarded      bool
+	Points       uint
+	DynamicDelta int64
 }
 
 type DynamicFlagClaimStatus uint8
@@ -195,6 +203,106 @@ func MarkSubmissionSolved(userID, challengeID uint, flag string, cheating bool, 
 	}
 
 	return tx.RowsAffected > 0, nil
+}
+
+func FinalizeSubmissionSolve(userID, challengeID uint, flag string, cheating bool, now time.Time, useDynamicScore bool) (SolveFinalizationResult, error) {
+	result := SolveFinalizationResult{}
+
+	err := Db.Transaction(func(tx *gorm.DB) error {
+		var challenge Challenge
+		query := tx
+		if tx.Dialector.Name() == "postgres" {
+			query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+		}
+		if err := query.First(&challenge, challengeID).Error; err != nil {
+			return err
+		}
+
+		result.Points = challenge.Points
+
+		update := tx.Model(&UserChallenges{}).
+			Where("user_id = ? AND challenge_id = ? AND solved = ?", userID, challengeID, false).
+			Updates(map[string]interface{}{
+				"solved":     true,
+				"flag":       flag,
+				"cheating":   cheating,
+				"created_at": now,
+			})
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected == 0 {
+			return nil
+		}
+
+		result.Awarded = true
+		pointsToAward := challenge.Points
+		if useDynamicScore {
+			solvers, err := countSolvedContestantsForChallengeTx(tx, challengeID)
+			if err != nil {
+				return err
+			}
+
+			pointsToAward = DynamicChallengeScore(challenge.MaxPoints, challenge.MinPoints, solvers)
+			result.Points = pointsToAward
+			result.DynamicDelta = int64(pointsToAward) - int64(challenge.Points)
+
+			if err := tx.Model(&Challenge{}).Where("id = ?", challengeID).Update("points", pointsToAward).Error; err != nil {
+				return err
+			}
+
+			if result.DynamicDelta != 0 {
+				if err := applyDynamicScoreDeltaToPreviousSolversTx(tx, challengeID, userID, result.DynamicDelta); err != nil {
+					return err
+				}
+			}
+		}
+
+		return awardUserScoreTx(tx, userID, int64(pointsToAward))
+	})
+	if err != nil {
+		return SolveFinalizationResult{}, err
+	}
+
+	return result, nil
+}
+
+func DynamicChallengeScore(maxPoints, minPoints, solvers uint) uint {
+	if solvers == 0 || solvers == 1 {
+		return maxPoints
+	}
+	divisor := (1 + math.Pow((float64(solvers)-1)/11.92201, 1.206069))
+	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
+}
+
+func countSolvedContestantsForChallengeTx(tx *gorm.DB, challengeID uint) (uint, error) {
+	var count int64
+	err := tx.Table("user_challenges").
+		Joins("JOIN users ON users.id = user_challenges.user_id").
+		Where("user_challenges.challenge_id = ? AND user_challenges.solved = ? AND users.role = ?", challengeID, true, "contestant").
+		Count(&count).Error
+	return uint(count), err
+}
+
+func applyDynamicScoreDeltaToPreviousSolversTx(tx *gorm.DB, challengeID, newSolverID uint, delta int64) error {
+	return tx.Exec(`
+UPDATE users
+SET score = CASE WHEN users.score + ? < 0 THEN 0 ELSE users.score + ? END
+FROM user_challenges
+WHERE users.id = user_challenges.user_id
+	AND user_challenges.challenge_id = ?
+	AND user_challenges.solved = true
+	AND users.role = ?
+	AND users.id <> ?`,
+		delta, delta, challengeID, "contestant", newSolverID,
+	).Error
+}
+
+func awardUserScoreTx(tx *gorm.DB, userID uint, delta int64) error {
+	return tx.Model(&User{}).
+		Where("id = ?", userID).
+		UpdateColumn("score", gorm.Expr("CASE WHEN score + ? < 0 THEN 0 ELSE score + ? END", delta, delta)).
+		Error
 }
 
 func MarkSubmissionCheating(userID, challengeID uint, flag string) error {

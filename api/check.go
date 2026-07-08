@@ -12,9 +12,7 @@ import (
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	log "github.com/sirupsen/logrus"
-	"math"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -93,18 +91,17 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
-		parsedChallId, err := strconv.Atoi(challId)
+		chall, err := database.QueryChallengeEntries("id", challId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
-
-		chall, err := database.QueryChallengeEntries("id", challId)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
+		if len(chall) == 0 {
+			c.JSON(http.StatusOK, ChallengeSubmitResponse{
+				Message: "Challenge is unavailable",
+				Success: false,
 			})
 			return
 		}
@@ -148,48 +145,6 @@ func checkFlagHandler(c *gin.Context) {
 			}
 		}
 
-		if challenge.MaxAttemptLimit > 0 {
-			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request."})
-				return
-			}
-
-			if previousTries >= challenge.MaxAttemptLimit {
-				c.JSON(http.StatusOK, ChallengeSubmitResponse{
-					Message: "You have reached the maximum number of tries for this challenge.",
-					Success: false,
-				})
-				return
-			}
-		}
-
-		// Increase user tries by 1
-		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if solved {
-			c.JSON(http.StatusOK, ChallengeSubmitResponse{
-				Message: "Challenge has already been solved.",
-				Success: false,
-			})
-			return
-		}
-
 		instance, err := cache.GetInstance(instanceId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -207,6 +162,28 @@ func checkFlagHandler(c *gin.Context) {
 		if instance.ChallengeName != challenge.Name {
 			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 				Error: "Unauthorized challenge",
+			})
+			return
+		}
+
+		attempt, err := database.ReserveSubmissionAttempt(user.ID, challenge.ID, challenge.MaxAttemptLimit, instanceId, time.Now())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
+		}
+		switch attempt.Status {
+		case database.SubmissionAttemptAlreadySolved:
+			c.JSON(http.StatusOK, ChallengeSubmitResponse{
+				Message: "Challenge has already been solved.",
+				Success: false,
+			})
+			return
+		case database.SubmissionAttemptMaxAttempts:
+			c.JSON(http.StatusOK, ChallengeSubmitResponse{
+				Message: "You have reached the maximum number of tries for this challenge.",
+				Success: false,
 			})
 			return
 		}
@@ -291,62 +268,28 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
-		challengePoints := challenge.Points
 		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
-		if config.Cfg.CompetitionInfo.DynamicScore {
-			submissions, err := database.QuerySubmissions(map[string]interface{}{
-				"challenge_id": parsedChallId,
-			})
-			if err != nil {
-				log.Error(err)
-			}
-			solvers := len(submissions)
-			newPoints := dynamicScore(challenge.MaxPoints, challenge.MinPoints, uint(solvers))
-			if newPoints != challengePoints {
-				database.UpdateChallenge(&challenge, map[string]interface{}{
-					"Points": newPoints,
-				})
-				log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challengePoints)
-				err = updatePointsOfSolvers(submissions, newPoints, challengePoints)
-				if err != nil {
-					log.Error(err)
-				}
-				challengePoints = newPoints
-			}
-		}
-
-		newScore := user.Score + challengePoints
-		if newScore <= 0 {
-			newScore = 0
-		}
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
+		finalized, err := database.FinalizeSubmissionSolve(user.ID, challenge.ID, instanceId, false, time.Now(), config.Cfg.CompetitionInfo.DynamicScore)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
 			return
 		}
-
-		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE || (len(adminLeaderboardCache) > 0 && newScore > adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
-			leaderboardStale = true
-			graphCacheStale = true
-			adminLeaderboardStale = true
-		}
-
-		UserChallengesEntry := database.UserChallenges{
-			CreatedAt:   time.Now(),
-			UserID:      user.ID,
-			ChallengeID: challenge.ID,
-			Solved:      true,
-		}
-
-		err = database.SaveChallengeSubmission(&UserChallengesEntry)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
+		if !finalized.Awarded {
+			c.JSON(http.StatusOK, ChallengeSubmitResponse{
+				Message: "Challenge has already been solved.",
+				Success: false,
 			})
 			return
 		}
+		if config.Cfg.CompetitionInfo.DynamicScore && finalized.Points != challenge.Points {
+			log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, finalized.Points, challenge.Points)
+		}
+
+		leaderboardStale = true
+		graphCacheStale = true
+		adminLeaderboardStale = true
 
 		c.JSON(http.StatusOK, ChallengeSubmitResponse{
 			Message: "Your challenge submission has been verified",
@@ -355,50 +298,6 @@ func checkFlagHandler(c *gin.Context) {
 
 		return
 	}
-}
-
-// dynamicScore returns dynamic score of the challenge based on number of solves
-func dynamicScore(maxPoints, minPoints, solvers uint) uint {
-	if solvers == 0 || solvers == 1 {
-		return maxPoints
-	}
-	divisor := (1 + math.Pow((float64(solvers)-1)/11.92201, 1.206069))
-	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
-}
-
-// updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes
-func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve uint) error {
-	scoreChanged := false
-	for _, submission := range submissions {
-		user, err := database.QueryUserById(submission.UserID)
-		if err != nil {
-			return err
-		}
-		if user.Role == "contestant" {
-			oldScore := user.Score
-			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
-			if newScore <= 0 {
-				newScore = 0
-			}
-			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
-			if err != nil {
-				return err
-			}
-			// Check if this user's score change could affect top 25 leaderboard
-			if !scoreChanged && (len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
-				(len(adminLeaderboardCache) > 0 && (oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
-					newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score))) {
-				scoreChanged = true
-			}
-		}
-	}
-	// Mark cache stale if any user's score change could affect top 25
-	if scoreChanged {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
-	}
-	return nil
 }
 
 func checkScriptExistence(localDeploy bool, instance *cache.Instance) (bool, error) {
