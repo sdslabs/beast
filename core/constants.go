@@ -95,6 +95,9 @@ const ( // chall env
 	BEAST_STATIC_AUTH_FILE       string = ".static.beast.htpasswd"
 	ALLOWED_MIN_PORT_VALUE       uint32 = 10000
 	ALLOWED_MAX_PORT_VALUE       uint32 = 20000
+	HYDRA_NETWORK_NAME           string = "hydra-net"
+	HYDRA_BRIDGE_NAME            string = "hydra0"
+	SAD_CHECKER_IMAGE            string = "ubuntu:24.04"
 )
 const ( // default config
 	IMAGE_NA                 string  = "IMAGE_NA"
