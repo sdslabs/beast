@@ -204,6 +204,45 @@ volumes:
 
 Beast setup installs `hydra-net` through `scripts/provision/hydra-net-setup.sh`. Runtime deployment only verifies that the network exists and is compatible.
 
+### SadServers Secure Checker Mode
+
+SadServers-style challenges must opt in explicitly. This mode is intended for challenges where the contestant may become root inside the target container, so Beast does not trust checker files inside that container after spawn.
+
+```toml
+[challenge.metadata]
+instanced = true
+sadservers = true
+
+[challenge.env]
+docker_compose = "docker-compose.yml"
+default_port_var = "SSH_PORT"
+```
+
+Required challenge layout:
+
+```text
+beast.toml
+docker-compose.yml
+check.sh
+checker/
+```
+
+`check.sh` is required at the challenge root. Files under `checker/` are optional checker-only support files. During challenge commit, Beast builds a separate immutable checker image from only `check.sh` and `checker/`, installs `check.sh` as `/checker/check.sh`, and runs the checker outside the contestant-controlled target container.
+
+SadServers checker runtime environment:
+
+```text
+BEAST_INSTANCE_ID
+BEAST_CHALLENGE_NAME
+BEAST_TARGET_SERVICE=ssh
+BEAST_TARGET_HOST=ssh
+BEAST_TARGET_PORT=22
+```
+
+The checker container is attached to the compose internal network, not to the contestant's `/challenge` volume by default. It runs with a timeout, memory and PID limits, a read-only root filesystem, `--cap-drop=ALL`, `no-new-privileges`, and no Docker socket.
+
+For `sadservers = true`, Beast rejects compose files that use host bind mounts, absolute bind sources, `/var/run/docker.sock`, `privileged`, `network_mode: host`, `pid: host`, `ipc: host`, `uts: host`, `devices`, arbitrary `cap_add`, unsafe `security_opt`, extra external networks, or extra published ports. Only service `ssh` may publish one host port, and it must map the configured SSH port variable to container port `22`. Non-SSH services must remain internal-only.
+
 If you want to checkout some example challenge configuration, checkout `_example` directory in the 
 root of the repository. It has a bunch of challenge templates example to get started with. Pick one from 
 there and start building your own challenge.
