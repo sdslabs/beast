@@ -50,14 +50,14 @@ func DeployStaticContentContainer() error {
 
 	// Remove the prefix sha256:
 	imageId := images[0].ID[7:]
-	stagingDirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
+	stagingDirPath := filepath.Join(core.BEAST_MOUNT_DIR, core.BEAST_STAGING_DIR)
 	err = utils.CreateIfNotExistDir(stagingDirPath)
 	if err != nil {
 		log.Errorf("Error in validating staging mount point : %s", err)
 		return errors.New("INVALID_STAGING_AREA")
 	}
 
-	beastStaticAuthFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STATIC_AUTH_FILE)
+	beastStaticAuthFile := filepath.Join(core.BEAST_MOUNT_DIR, core.BEAST_STATIC_AUTH_FILE)
 	err = utils.ValidateFileExists(beastStaticAuthFile)
 	if err != nil {
 		p := fmt.Errorf("BEAST STATIC: Authentication file does not exist for beast static container, cannot proceed deployment")

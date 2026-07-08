@@ -25,7 +25,7 @@ points = 50
 
 [challenge.env]
 docker_compose = "docker-compose.yml"
-default_port_var = "INSTANCE_PORT"
+default_port_var = "SSH_PORT"
 
 [resource]
 cpu_shares = 1024

@@ -11,6 +11,12 @@ var (
 	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
 	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
 	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
+	BEAST_MOUNT_DIR      = func() string {
+		if hostDir := os.Getenv("BEAST_HOST_DIR"); hostDir != "" {
+			return hostDir
+		}
+		return BEAST_GLOBAL_DIR
+	}()
 )
 
 const ( //names
@@ -42,6 +48,7 @@ const ( //names
 	BEAST_LEADERBOARD_CACHE     string = "leaderboard.json"
 	POSTGRES_SUPER_USER         string = "postgres"
 	REDIS_DEFAULT_USER          string = "default"
+	SAD_CHECK_SCRIPT            string = "check.sh"
 )
 
 const ( //paths
@@ -59,6 +66,7 @@ const ( //paths
 	BEAST_SECRETS_DIR              string = "secrets"
 	BEAST_EXAMPLE_DIR              string = "_examples"
 	BEAST_CACHE_DIR                string = "cache"
+	SAD_CHECK_SCRIPT_LOCATION      string = BEAST_DOCKER_CHALLENGE_DIR + "/" + SAD_CHECK_SCRIPT
 	BEAST_BACKUP_DIR               string = "backup"
 	DB_BACKUP_DIR                  string = "db"
 	CACHE_BACKUP_DIR               string = "cache"
@@ -87,6 +95,9 @@ const ( // chall env
 	BEAST_STATIC_AUTH_FILE       string = ".static.beast.htpasswd"
 	ALLOWED_MIN_PORT_VALUE       uint32 = 10000
 	ALLOWED_MAX_PORT_VALUE       uint32 = 20000
+	HYDRA_NETWORK_NAME           string = "hydra-net"
+	HYDRA_BRIDGE_NAME            string = "hydra0"
+	SAD_CHECKER_IMAGE            string = "ubuntu:24.04"
 )
 const ( // default config
 	IMAGE_NA                 string  = "IMAGE_NA"
@@ -103,7 +114,7 @@ const ( // default config
 	ITERATIONS               int     = 65536
 	HASH_LENGTH              int     = 32
 	TIMEPERIOD               int64   = 6 * 60 * 60
-	SSH_PORT                 int     = 22
+	SSH_PORT                 uint32  = 22
 )
 
 const ( // roles
@@ -137,6 +148,9 @@ var DEPLOYMENT_TYPES = map[string]string{
 	"docker_compose":  "docker_compose",
 	"standard_docker": "standard_docker",
 }
+
+// SSH_CONTAINER_COMPOSE is the compose service name (services: key) for the SSH target container.
+const SSH_CONTAINER_COMPOSE string = "ssh"
 
 var USER_ROLES = map[string]string{
 	"contestant": "contestant",

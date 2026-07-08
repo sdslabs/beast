@@ -69,7 +69,6 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	remoteManager.Init()
 	database.Init()
 	cache.Init()
-	startDynamicScoreWorker()
 	go manager.InstanceCleanupProber()
 
 	// Initialise and start the Hub

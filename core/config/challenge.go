@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
@@ -109,6 +110,14 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 	if err != nil {
 		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
 		return err
+	}
+
+	if config.Metadata.IsInstanced() && config.Env.DockerCompose != "" {
+		err = config.Env.ValidateInstancedComposeSSHContract(challdir)
+		if err != nil {
+			log.Debugf("Error while validating instanced Docker Compose SSH contract : %s", err.Error())
+			return err
+		}
 	}
 
 	return nil
@@ -359,6 +368,9 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			return err
 		}
 		return nil
+	} else if !slices.Contains(config.AptDeps, "openssh-server") {
+		log.Warn("openssh-server not found as dependency for sad challenge... adding dependency")
+		config.AptDeps = append(config.AptDeps, "openssh-server")
 	}
 
 	if err := config.ExtractPorts(); err != nil {
@@ -474,6 +486,20 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 	}
 
 	return nil
+}
+
+func (config *ChallengeEnv) ValidateInstancedComposeSSHContract(challdir string) error {
+	if config.DockerCompose == "" {
+		return nil
+	}
+
+	return utils.ValidateInstancedComposeSSHContract(
+		filepath.Join(challdir, config.DockerCompose),
+		config.DefaultPortVar,
+		core.HYDRA_NETWORK_NAME,
+		core.SSH_CONTAINER_COMPOSE,
+		core.SSH_PORT,
+	)
 }
 
 // Metadata related to author of the challenge, this structure includes

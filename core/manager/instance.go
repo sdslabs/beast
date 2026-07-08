@@ -2,7 +2,9 @@ package manager
 
 import (
 	"fmt"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -19,7 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func SpawnInstance(challengeName, userID, username string) (*cache.Instance, error) {
+func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*cache.Instance, error) {
 	log.Infof("Spawning instance of challenge %s for user %s", challengeName, userID)
 
 	existingInstance, err := cache.GetUserInstance(userID, challengeName)
@@ -67,6 +69,8 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	expiresAt := time.Now().Add(ttl)
 
 	var port uint32
+	var checkHash string
+	var checkManifest string
 	var containerID string
 	var portOwner string
 	var deploymentType string
@@ -84,13 +88,27 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 
 		port = ports[config.Challenge.Env.DefaultPortVar]
 
-		containerID, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
+		containerID, checkManifest, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
 		portOwner = utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
 
 		if err != nil {
 			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
 			return nil, err
+		}
+
+		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+			err = addUserSSHKeyLocal(containerID, userSSHKey)
+		} else {
+			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
+		}
+
+		if err != nil {
+			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
+				log.Warnf("failed to cleanup instance %s after ssh key injection failure: %v", instanceID, cleanupErr)
+			}
+			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to add user ssh key: %s", err.Error())
 		}
 
 		if err := coreUtils.AssignPortsOnContainerToHostCompose(serverDeployed, portOwner, ports); err != nil {
@@ -118,13 +136,27 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			return nil, fmt.Errorf("failed to allocate instance port for challenge %s", challengeName)
 		}
 
-		containerID, err = deployInstanceContainer(instanceID, challengeName, challenge.ImageId, &config, serverDeployed, ports)
+		containerID, checkHash, err = deployInstanceContainer(instanceID, challengeName, challenge.ImageId, &config, serverDeployed, ports)
 		portOwner = containerID
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
 
 		if err != nil {
 			coreUtils.FreePortsOnHost(serverDeployed, ports)
 			return nil, fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
+		}
+
+		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+			err = addUserSSHKeyLocal(containerID, userSSHKey)
+		} else {
+			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
+		}
+
+		if err != nil {
+			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
+				log.Warnf("failed to cleanup instance %s after ssh key injection failure: %v", instanceID, cleanupErr)
+			}
+			coreUtils.FreePortsOnHost(serverDeployed, ports)
+			return nil, fmt.Errorf("failed to add user ssh key: %s", err.Error())
 		}
 
 		if err := coreUtils.AssignPortsOnContainerToHost(serverDeployed, containerID, ports); err != nil {
@@ -141,6 +173,8 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		ChallengeName:  challengeName,
 		ContainerID:    containerID,
 		PortOwner:      portOwner,
+		CheckHash:      checkHash,
+		CheckManifest:  checkManifest,
 		Port:           port,
 		UserID:         userID,
 		Username:       username,
@@ -326,13 +360,258 @@ func selectServerForInstance() string {
 	return core.LOCALHOST
 }
 
-func deployInstanceContainer(instanceID, challengeName string, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string, ports []uint32) (string, error) {
+func verifyCheckLocal(containerId string) (string, error) {
+	fileCommand := fmt.Sprintf("[ -f '%s' ]", core.SAD_CHECK_SCRIPT_LOCATION)
+	chmodCommand := fmt.Sprintf("command chmod +x %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	hashCommand := fmt.Sprintf("command cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
+
+	result, err := cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", fileCommand,
+	})
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to verify 'check.sh' at location: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", hashCommand,
+	})
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to hash 'check.sh' to store flag")
+	}
+
+	hash := result.Output
+
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", chmodCommand,
+	})
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to make 'check.sh' executable at: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	return strings.TrimSpace(hash), nil
+}
+
+func verifyCheckRemote(containerId string, server cfg.AvailableServer) (string, error) {
+	fileCommand := fmt.Sprintf("[ -f '%s' ]", core.SAD_CHECK_SCRIPT_LOCATION)
+	chmodCommand := fmt.Sprintf("command chmod +x %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	hashCommand := fmt.Sprintf("command cat %s | sha256sum", core.SAD_CHECK_SCRIPT_LOCATION)
+
+	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, fileCommand)
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to verify 'check.sh' at location: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, hashCommand)
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to hash 'check.sh' to store flag")
+	}
+
+	hash := result.Output
+
+	result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, chmodCommand)
+
+	if err != nil || result.ExitCode != 0 {
+		return "", fmt.Errorf("failed to make 'check.sh' executable at: %s", core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	return strings.TrimSpace(hash), nil
+}
+
+const checkManifestCommand = `if [ ! -f /challenge/check.sh ]; then exit 2; fi; { printf "%s\n" /challenge/check.sh; if [ -d /challenge/bin ]; then find /challenge/bin -type f -print; fi; } | sort | while IFS= read -r file; do sha256sum "$file"; done`
+
+func normalizeCheckerOutput(output string) string {
+	output = strings.ReplaceAll(output, "\r\n", "\n")
+	output = strings.ReplaceAll(output, "\r", "\n")
+	return strings.TrimSpace(output)
+}
+
+func verifyHydraNetwork(serverDeployed string) error {
+	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
+		return cr.VerifyHydraNetwork(core.HYDRA_NETWORK_NAME, core.HYDRA_BRIDGE_NAME)
+	}
+
+	server := cfg.Cfg.AvailableServers[serverDeployed]
+	return remoteManager.VerifyHydraNetworkRemote(server, core.HYDRA_NETWORK_NAME, core.HYDRA_BRIDGE_NAME)
+}
+
+func runCheckerCommandLocal(instanceID, containerID, command string) (cr.ExecResult, error) {
+	networkName, err := cr.GetSingleInternalNetworkForContainer(containerID, core.HYDRA_NETWORK_NAME)
+	if err != nil {
+		return cr.ExecResult{ExitCode: 1}, err
+	}
+
+	challengeVolume, err := cr.GetNamedVolumeForContainerMount(containerID, core.BEAST_DOCKER_CHALLENGE_DIR)
+	if err != nil {
+		return cr.ExecResult{ExitCode: 1}, err
+	}
+
+	return cr.RunCheckerContainer(core.SAD_CHECKER_IMAGE, networkName, challengeVolume, instanceID, []string{"sh", "-c", command})
+}
+
+func runCheckerCommandRemote(instanceID, containerID string, server cfg.AvailableServer, command string) (cr.ExecResult, error) {
+	networkName, err := remoteManager.GetSingleInternalNetworkForContainerRemote(server, containerID, core.HYDRA_NETWORK_NAME)
+	if err != nil {
+		return cr.ExecResult{ExitCode: 1}, err
+	}
+
+	challengeVolume, err := remoteManager.GetNamedVolumeForContainerMountRemote(server, containerID, core.BEAST_DOCKER_CHALLENGE_DIR)
+	if err != nil {
+		return cr.ExecResult{ExitCode: 1}, err
+	}
+
+	return remoteManager.RunCheckerContainerRemote(server, core.SAD_CHECKER_IMAGE, networkName, challengeVolume, instanceID, []string{"sh", "-c", command})
+}
+
+func generateCheckerManifestLocal(instanceID, containerID string) (string, error) {
+	result, err := runCheckerCommandLocal(instanceID, containerID, checkManifestCommand)
+	if err != nil {
+		return "", err
+	}
+	if result.ExitCode != 0 {
+		return "", fmt.Errorf("checker manifest command failed with exit code %d: %s", result.ExitCode, result.Output)
+	}
+
+	return normalizeCheckerOutput(result.Output), nil
+}
+
+func generateCheckerManifestRemote(instanceID, containerID string, server cfg.AvailableServer) (string, error) {
+	result, err := runCheckerCommandRemote(instanceID, containerID, server, checkManifestCommand)
+	if err != nil {
+		return "", err
+	}
+	if result.ExitCode != 0 {
+		return "", fmt.Errorf("remote checker manifest command failed with exit code %d: %s", result.ExitCode, result.Output)
+	}
+
+	return normalizeCheckerOutput(result.Output), nil
+}
+
+func ValidateCheckerManifest(instance *cache.Instance) (bool, error) {
+	if instance.CheckManifest == "" {
+		return false, fmt.Errorf("checker manifest is not recorded for instance %s", instance.InstanceID)
+	}
+
+	var manifest string
+	var err error
+	if cfg.Cfg.UseLocalDockerDaemon(instance.ServerDeployed) {
+		manifest, err = generateCheckerManifestLocal(instance.InstanceID, instance.ContainerID)
+	} else {
+		server := cfg.Cfg.AvailableServers[instance.ServerDeployed]
+		manifest, err = generateCheckerManifestRemote(instance.InstanceID, instance.ContainerID, server)
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return manifest == normalizeCheckerOutput(instance.CheckManifest), nil
+}
+
+func ExecuteCheckerScript(instance *cache.Instance) (cr.ExecResult, error) {
+	if cfg.Cfg.UseLocalDockerDaemon(instance.ServerDeployed) {
+		return runCheckerCommandLocal(instance.InstanceID, instance.ContainerID, core.SAD_CHECK_SCRIPT_LOCATION)
+	}
+
+	server := cfg.Cfg.AvailableServers[instance.ServerDeployed]
+	return runCheckerCommandRemote(instance.InstanceID, instance.ContainerID, server, core.SAD_CHECK_SCRIPT_LOCATION)
+}
+
+func verifySSHLocal(containerId string) error {
+	err := exec.Command("docker", "port", containerId, fmt.Sprintf("%v/tcp", core.SSH_PORT)).Run()
+	if err != nil {
+		return err
+	}
+
+	var result cr.ExecResult
+	sshServiceStartCommand := fmt.Sprintf("service ssh start")
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshServiceStartCommand,
+	})
+
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("ssh start failed, ssh agent not running")
+	}
+
+	return nil
+}
+
+func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
+	portCmd := fmt.Sprintf("docker port %s %v/tcp", containerId, core.SSH_PORT)
+	_, err := remoteManager.RunCommandOnServer(server, portCmd)
+	if err != nil {
+		return err
+	}
+
+	var result cr.ExecResult
+	sshServiceStartCommand := fmt.Sprintf("service ssh start")
+	result, err = cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshServiceStartCommand,
+	})
+
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("ssh start failed, ssh agent not running")
+	}
+
+	return nil
+}
+
+func escapeForSingleQuotes(s string) string {
+	return strings.ReplaceAll(s, "'", `'\''`)
+}
+
+func addUserSSHKeyLocal(containerId string, sshKey string) error {
+	sshCmd := fmt.Sprintf(
+		"mkdir -p /home/beast/.ssh && printf %%s '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh",
+		escapeForSingleQuotes(sshKey),
+	)
+
+	result, err := cr.RunCommandInContainer(containerId, []string{
+		"sh", "-c", sshCmd,
+	})
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("failed to add public key to container: %s", result.Output)
+	}
+
+	return nil
+}
+
+func addUserSSHKeyRemote(containerId string, server cfg.AvailableServer, sshKey string) error {
+	sshCmd := fmt.Sprintf(
+		"mkdir -p /home/beast/.ssh && printf %%s '%s' >> /home/beast/.ssh/authorized_keys && chmod 700 /home/beast/.ssh && chmod 600 /home/beast/.ssh/authorized_keys && chown -R beast:beast-grp /home/beast/.ssh",
+		escapeForSingleQuotes(sshKey),
+	)
+
+	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, sshCmd)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("failed to add public key to container: %s", result.Output)
+	}
+
+	return nil
+}
+
+func deployInstanceContainer(instanceID, challengeName string, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string, ports []uint32) (string, string, error) {
 	// Instanced non compose challenges are managed by the container ID
 	containerName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
 	containerPort := config.Challenge.Env.DefaultPort
-	if containerPort == 0 {
-		containerPort = 8080
+	if containerPort != core.SSH_PORT {
+		return "", "", fmt.Errorf("the default port is not set to %d for instance challenge %s", core.SSH_PORT, challengeName)
 	}
 
 	portMapping := make([]cr.PortMapping, len(ports))
@@ -366,43 +645,112 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 		},
 	}
 
-	var containerId string
 	var err error
+	var checkHash string
+	var containerId string
 
 	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create container from image: %w", err)
+		}
+
+		err = verifySSHLocal(containerId)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
+		}
+
+		checkHash, err = verifyCheckLocal(containerId)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
+		}
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
 		containerId, err = remoteManager.CreateContainerFromImageRemote(containerConfig, server)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create container from image: %w", err)
+		}
+
+		err = verifySSHRemote(containerId, server)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
+		}
+
+		checkHash, err = verifyCheckRemote(containerId, server)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
+		}
 	}
 
-	if err != nil {
-		return "", fmt.Errorf("failed to create container: %w", err)
-	}
-
-	return containerId, nil
+	return containerId, checkHash, nil
 }
 
-func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string, ports map[string]uint32) (string, error) {
+func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.BeastChallengeConfig, stagingDir string, serverDeployed string, ports map[string]uint32) (string, string, error) {
 	// Instanced compose challenges are managed by the projectName
 	projectName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
+	var err error
+	var checkManifest string
+	var containerId string
+
+	if err = verifyHydraNetwork(serverDeployed); err != nil {
+		return "", "", err
+	}
+
 	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
-		primaryContainer, err := cr.DeployContainerFromCompose(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, ports)
+		containerId, err = cr.DeployContainerFromCompose(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, ports)
 		if err != nil {
-			return "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
+			return "", "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
 		}
 
-		return primaryContainer, nil
+		err = verifySSHLocal(containerId)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
+		}
+
+		_, err = verifyCheckLocal(containerId)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
+		}
+
+		checkManifest, err = generateCheckerManifestLocal(instanceID, containerId)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to generate checker manifest for instance %s: %w", instanceID, err)
+		}
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
-		containerId, err := remoteManager.DeployContainerFromComposeRemote(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, server, ports)
+		containerId, err = remoteManager.DeployContainerFromComposeRemote(challengeName, projectName, stagingDir, config.Challenge.Env.DockerCompose, server, ports)
 		if err != nil {
-			return "", fmt.Errorf("failed to deploy compose on remote: %w", err)
+			return "", "", fmt.Errorf("failed to deploy compose on remote: %w", err)
 		}
 
-		return containerId, nil
+		err = verifySSHRemote(containerId, server)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
+		}
+
+		_, err = verifyCheckRemote(containerId, server)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
+		}
+
+		checkManifest, err = generateCheckerManifestRemote(instanceID, containerId, server)
+		if err != nil {
+			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+			return "", "", fmt.Errorf("failed to generate checker manifest for instance %s on host %s: %w", instanceID, server.Host, err)
+		}
 	}
+
+	return containerId, checkManifest, nil
 }
 
 func killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed string) error {
