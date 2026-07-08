@@ -11,6 +11,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -128,4 +129,68 @@ func BuildImagesFromComposeRemote(challengeName, imageTag, stagedDir string, ser
 	}
 
 	return []byte(output), nil
+}
+
+func BuildSadServersCheckerImageRemote(challengeName, stagedTarPath string, server config.AvailableServer, noCache bool) ([]byte, string, string, error) {
+	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
+	checkerDockerfile := filepath.Join(remoteExtractPath, "Dockerfile.checker")
+	imageRef := cr.SadServersCheckerImageRef(challengeName)
+
+	extractCommand := fmt.Sprintf(
+		"mkdir -p %s && tar -xf %s -C %s && mkdir -p %s",
+		shellQuote(remoteExtractPath),
+		shellQuote(stagedTarPath),
+		shellQuote(remoteExtractPath),
+		shellQuote(filepath.Join(remoteExtractPath, "checker")),
+	)
+	if output, err := RunCommandOnServer(server, extractCommand); err != nil {
+		return []byte(output), "", imageRef, fmt.Errorf("failed to extract sadservers checker context: %s\nOutput: %s", err, output)
+	}
+
+	writeDockerfileCommand := fmt.Sprintf(
+		"printf %%s %s > %s",
+		shellQuote(sadServersCheckerDockerfile()),
+		shellQuote(checkerDockerfile),
+	)
+	if output, err := RunCommandOnServer(server, writeDockerfileCommand); err != nil {
+		return []byte(output), "", imageRef, fmt.Errorf("failed to write sadservers checker Dockerfile: %s\nOutput: %s", err, output)
+	}
+
+	noCacheArg := ""
+	if noCache {
+		noCacheArg = " --no-cache"
+	}
+	projectName := utils.ProjectNameNotInstanced(challengeName)
+	buildCommand := fmt.Sprintf(
+		"cd %s && docker build%s -f %s -t %s --label %s --label %s --label %s --label %s .",
+		shellQuote(remoteExtractPath),
+		noCacheArg,
+		shellQuote(checkerDockerfile),
+		shellQuote(imageRef),
+		shellQuote("beast.checker=true"),
+		shellQuote("beast.checker.mode=sadservers"),
+		shellQuote("beast.challenge="+challengeName),
+		shellQuote("com.sdslabs.beast.project="+projectName),
+	)
+	output, err := RunCommandOnServer(server, buildCommand)
+	if err != nil {
+		return []byte(output), "", imageRef, fmt.Errorf("failed to build sadservers checker image remotely: %s\nOutput: %s", err, output)
+	}
+
+	imageID, err := RunCommandOnServer(server, fmt.Sprintf("docker image inspect %s --format '{{.ID}}'", shellQuote(imageRef)))
+	if err != nil {
+		return []byte(output), "", imageRef, fmt.Errorf("failed to inspect sadservers checker image: %s", err)
+	}
+
+	return []byte(output), strings.TrimPrefix(strings.TrimSpace(imageID), "sha256:"), imageRef, nil
+}
+
+func sadServersCheckerDockerfile() string {
+	return `FROM ubuntu:24.04
+WORKDIR /checker
+COPY check.sh /checker/check.sh
+COPY checker/ /checker/
+RUN chmod 0555 /checker/check.sh
+ENTRYPOINT ["/checker/check.sh"]
+`
 }

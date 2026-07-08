@@ -181,6 +181,13 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 				noCache,
 			)
 		}
+		if buildErr == nil && config.Challenge.Metadata.SadServers {
+			var checkerLogBytes []byte
+			checkerLogBytes, buildErr = buildSadServersCheckerImage(challenge, config, stagedPath, noCache)
+			if len(checkerLogBytes) > 0 {
+				logBytes = append(logBytes, checkerLogBytes...)
+			}
+		}
 		// For Docker Compose challenges, ensure ImageId is empty in the database
 		if err := database.UpdateChallenge(challenge, map[string]any{"ImageId": ""}); err != nil {
 			return fmt.Errorf("error while setting empty ImageId for Docker Compose challenge: %s", err)
@@ -242,6 +249,44 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	log.Infof("Image build for `%s` done", challengeName)
 
 	return nil
+}
+
+func buildSadServersCheckerImage(challenge *database.Challenge, config cfg.BeastChallengeConfig, stagedPath string, noCache bool) ([]byte, error) {
+	challengeName := config.Challenge.Metadata.Name
+
+	var (
+		logBytes []byte
+		imageID  string
+		imageRef string
+		err      error
+	)
+
+	if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+		var buff *bytes.Buffer
+		buff, imageID, imageRef, err = cr.BuildSadServersCheckerImageFromTarContext(challengeName, stagedPath, noCache)
+		if buff != nil {
+			logBytes = buff.Bytes()
+		}
+	} else {
+		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
+		remoteStagedPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, fmt.Sprintf("%s.tar.gz", challengeName))
+		logBytes, imageID, imageRef, err = remoteManager.BuildSadServersCheckerImageRemote(challengeName, remoteStagedPath, server, noCache)
+	}
+	if err != nil {
+		return logBytes, err
+	}
+	if imageID == "" || imageRef == "" {
+		return logBytes, fmt.Errorf("error while getting sadservers checker image metadata for challenge %s", challengeName)
+	}
+
+	if err := database.UpdateChallenge(challenge, map[string]any{
+		"CheckerImageId":  imageID,
+		"CheckerImageRef": imageRef,
+	}); err != nil {
+		return logBytes, fmt.Errorf("error while saving sadservers checker image metadata: %w", err)
+	}
+
+	return logBytes, nil
 }
 
 // Deploy the challenge as a docker container from the image built

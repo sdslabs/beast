@@ -112,6 +112,10 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 		return err
 	}
 
+	if config.Metadata.SadServers && (!config.Metadata.IsInstanced() || config.Env.DockerCompose == "") {
+		return fmt.Errorf("sadservers challenges must be instanced Docker Compose challenges")
+	}
+
 	if config.Metadata.IsInstanced() && config.Env.DockerCompose != "" {
 		err = config.Env.ValidateInstancedComposeSSHContract(challdir, config.Metadata.SadServers)
 		if err != nil {
