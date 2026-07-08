@@ -97,6 +97,46 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 	return string(output), nil
 }
 
+func RunCommandOnServerWithExit(server config.AvailableServer, cmd string) (cr.ExecResult, error) {
+	result := cr.ExecResult{
+		ExitCode: 0,
+	}
+
+	if !server.Active {
+		result.ExitCode = 1
+		return result, fmt.Errorf("server is inactive in config.toml")
+	}
+	client, err := CreateSSHClient(server)
+	if err != nil {
+		result.ExitCode = 1
+		return result, fmt.Errorf("failed to create session: %s", err)
+	}
+	session, err := client.NewSession()
+	if err != nil {
+		result.ExitCode = 1
+		return result, fmt.Errorf("failed to create session: %s", err)
+	}
+	defer session.Close()
+	defer client.Close()
+
+	output, err := session.CombinedOutput(cmd)
+	if err != nil {
+		var exitErr *ssh.ExitError
+		if errors.As(err, &exitErr) {
+			result.ExitCode = exitErr.ExitStatus()
+		} else {
+			result.ExitCode = 1
+			result.Output = string(output)
+			return result, err
+		}
+	}
+
+	result.Output = string(output)
+	log.Debugln(fmt.Sprintf("Command output for cmd %s on host %s: %s", cmd, server.Host, result.Output))
+	log.Debugln(fmt.Sprintf("Exit Code for cmd %s on host %s: %v", cmd, server.Host, result.ExitCode))
+	return result, nil
+}
+
 // Runs a command in a container on a remote server
 func RunCommandInContainerOnServer(server config.AvailableServer, containerId string, cmd string) (cr.ExecResult, error) {
 	result := cr.ExecResult{

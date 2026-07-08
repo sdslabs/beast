@@ -7,6 +7,7 @@ import (
 	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/core/manager"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
@@ -212,41 +213,66 @@ func checkFlagHandler(c *gin.Context) {
 
 		localDeploy := config.Cfg.UseLocalDockerDaemon(instance.ServerDeployed)
 
-		exists, err := checkScriptExistence(localDeploy, instance)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while verifying the existence of check script: %s", err.Error()),
-			})
-			return
-		}
+		var result cr.ExecResult
+		if instance.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+			verified, err := manager.ValidateCheckerManifest(instance)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while validating checker manifest: %s", err.Error()),
+				})
+				return
+			}
+			if !verified {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "VALIDATION ERROR: challenge files do not match the recorded checker manifest.",
+				})
+				return
+			}
 
-		if !exists {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("VALIDATION ERROR: check script not found at %s.", core.SAD_CHECK_SCRIPT_LOCATION),
-			})
-			return
-		}
+			result, err = manager.ExecuteCheckerScript(instance)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing checker script: %s", err.Error()),
+				})
+				return
+			}
+		} else {
+			exists, err := checkScriptExistence(localDeploy, instance)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while verifying the existence of check script: %s", err.Error()),
+				})
+				return
+			}
 
-		verified, err := validateCheckScriptHash(localDeploy, instance)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while processing the request: %s", err.Error()),
-			})
-			return
-		}
-		if !verified {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "VALIDATION ERROR: hash of check.sh does not match, file tampered with.",
-			})
-			return
-		}
+			if !exists {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("VALIDATION ERROR: check script not found at %s.", core.SAD_CHECK_SCRIPT_LOCATION),
+				})
+				return
+			}
 
-		result, err := executeCheckScript(localDeploy, instance)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing check script: %s", err.Error()),
-			})
-			return
+			verified, err := validateCheckScriptHash(localDeploy, instance)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while processing the request: %s", err.Error()),
+				})
+				return
+			}
+			if !verified {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: "VALIDATION ERROR: hash of check.sh does not match, file tampered with.",
+				})
+				return
+			}
+
+			result, err = executeCheckScript(localDeploy, instance)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing check script: %s", err.Error()),
+				})
+				return
+			}
 		}
 
 		if result.ExitCode != 0 {
