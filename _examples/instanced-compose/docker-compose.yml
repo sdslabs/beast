@@ -8,13 +8,17 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${INSTANCE_PORT}:80"
-      - "${INSTANCE_SSH_PORT}:22"
+      - "${SSH_PORT}:22"
+    volumes:
+      - challenge:/challenge
     environment:
       - DB_HOST=db
       - DB_USER=challenge
       - DB_PASS=challengepass
       - DB_NAME=ctf
+    networks:
+      - exposed
+      - internal
     depends_on:
       - db
     restart: unless-stopped
@@ -28,4 +32,17 @@ services:
       - MYSQL_PASSWORD=challengepass
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - internal
     restart: unless-stopped
+
+networks:
+  exposed:
+    external: true
+    name: hydra-net
+  internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  challenge:
