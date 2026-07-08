@@ -59,6 +59,9 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 	if challenge.ImageId == "" && config.Challenge.Env.DockerCompose == "" {
 		return nil, fmt.Errorf("challenge %s has not been committed (no image available)", challengeName)
 	}
+	if config.Challenge.Metadata.SadServers && (challenge.CheckerImageId == "" || challenge.CheckerImageRef == "") {
+		return nil, fmt.Errorf("challenge %s has no committed sadservers checker image", challengeName)
+	}
 
 	serverDeployed := selectServerForInstance()
 
@@ -71,6 +74,9 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 	var port uint32
 	var checkHash string
 	var checkManifest string
+	var checkerImageID string
+	var checkerImageRef string
+	var checkerMode string
 	var containerID string
 	var portOwner string
 	var deploymentType string
@@ -91,6 +97,11 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		containerID, checkManifest, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
 		portOwner = utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
+		if config.Challenge.Metadata.SadServers {
+			checkerImageID = challenge.CheckerImageId
+			checkerImageRef = challenge.CheckerImageRef
+			checkerMode = core.CHECKER_MODE_SAD_SERVERS
+		}
 
 		if err != nil {
 			coreUtils.FreePortsOnHostCompose(serverDeployed, ports)
@@ -169,19 +180,22 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 	}
 
 	instance := &cache.Instance{
-		InstanceID:     instanceID,
-		ChallengeName:  challengeName,
-		ContainerID:    containerID,
-		PortOwner:      portOwner,
-		CheckHash:      checkHash,
-		CheckManifest:  checkManifest,
-		Port:           port,
-		UserID:         userID,
-		Username:       username,
-		CreatedAt:      time.Now(),
-		ExpiresAt:      expiresAt,
-		DeploymentType: deploymentType,
-		ServerDeployed: serverDeployed,
+		InstanceID:      instanceID,
+		ChallengeName:   challengeName,
+		ContainerID:     containerID,
+		PortOwner:       portOwner,
+		CheckHash:       checkHash,
+		CheckManifest:   checkManifest,
+		CheckerImageID:  checkerImageID,
+		CheckerImageRef: checkerImageRef,
+		CheckerMode:     checkerMode,
+		Port:            port,
+		UserID:          userID,
+		Username:        username,
+		CreatedAt:       time.Now(),
+		ExpiresAt:       expiresAt,
+		DeploymentType:  deploymentType,
+		ServerDeployed:  serverDeployed,
 	}
 
 	err = cache.SaveInstance(instance, ttl)
@@ -512,12 +526,40 @@ func ValidateCheckerManifest(instance *cache.Instance) (bool, error) {
 }
 
 func ExecuteCheckerScript(instance *cache.Instance) (cr.ExecResult, error) {
+	if instance.CheckerMode == core.CHECKER_MODE_SAD_SERVERS {
+		return executeSadServersChecker(instance)
+	}
 	if cfg.Cfg.UseLocalDockerDaemon(instance.ServerDeployed) {
 		return runCheckerCommandLocal(instance.InstanceID, instance.ContainerID, core.SAD_CHECK_SCRIPT_LOCATION)
 	}
 
 	server := cfg.Cfg.AvailableServers[instance.ServerDeployed]
 	return runCheckerCommandRemote(instance.InstanceID, instance.ContainerID, server, core.SAD_CHECK_SCRIPT_LOCATION)
+}
+
+func executeSadServersChecker(instance *cache.Instance) (cr.ExecResult, error) {
+	image := instance.CheckerImageRef
+	if image == "" {
+		image = instance.CheckerImageID
+	}
+	if image == "" {
+		return cr.ExecResult{ExitCode: 1}, fmt.Errorf("sadservers checker image is missing for instance %s", instance.InstanceID)
+	}
+
+	if cfg.Cfg.UseLocalDockerDaemon(instance.ServerDeployed) {
+		networkName, err := cr.GetSingleInternalNetworkForContainer(instance.ContainerID, core.HYDRA_NETWORK_NAME)
+		if err != nil {
+			return cr.ExecResult{ExitCode: 1}, err
+		}
+		return cr.RunSadServersCheckerContainer(image, networkName, instance.InstanceID, instance.ChallengeName)
+	}
+
+	server := cfg.Cfg.AvailableServers[instance.ServerDeployed]
+	networkName, err := remoteManager.GetSingleInternalNetworkForContainerRemote(server, instance.ContainerID, core.HYDRA_NETWORK_NAME)
+	if err != nil {
+		return cr.ExecResult{ExitCode: 1}, err
+	}
+	return remoteManager.RunSadServersCheckerContainerRemote(server, image, networkName, instance.InstanceID, instance.ChallengeName)
 }
 
 func verifySSHLocal(containerId string) error {
@@ -713,16 +755,18 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
 		}
 
-		_, err = verifyCheckLocal(containerId)
-		if err != nil {
-			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
-			return "", "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
-		}
+		if !config.Challenge.Metadata.SadServers {
+			_, err = verifyCheckLocal(containerId)
+			if err != nil {
+				_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+				return "", "", fmt.Errorf("failed to deploy instance %s: %w", instanceID, err)
+			}
 
-		checkManifest, err = generateCheckerManifestLocal(instanceID, containerId)
-		if err != nil {
-			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
-			return "", "", fmt.Errorf("failed to generate checker manifest for instance %s: %w", instanceID, err)
+			checkManifest, err = generateCheckerManifestLocal(instanceID, containerId)
+			if err != nil {
+				_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+				return "", "", fmt.Errorf("failed to generate checker manifest for instance %s: %w", instanceID, err)
+			}
 		}
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
@@ -737,16 +781,18 @@ func deployInstanceFromCompose(instanceID, challengeName string, config *cfg.Bea
 			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
 		}
 
-		_, err = verifyCheckRemote(containerId, server)
-		if err != nil {
-			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
-			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
-		}
+		if !config.Challenge.Metadata.SadServers {
+			_, err = verifyCheckRemote(containerId, server)
+			if err != nil {
+				_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+				return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
+			}
 
-		checkManifest, err = generateCheckerManifestRemote(instanceID, containerId, server)
-		if err != nil {
-			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
-			return "", "", fmt.Errorf("failed to generate checker manifest for instance %s on host %s: %w", instanceID, server.Host, err)
+			checkManifest, err = generateCheckerManifestRemote(instanceID, containerId, server)
+			if err != nil {
+				_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["docker_compose"], instanceID, challengeName, serverDeployed)
+				return "", "", fmt.Errorf("failed to generate checker manifest for instance %s on host %s: %w", instanceID, server.Host, err)
+			}
 		}
 	}
 

@@ -105,6 +105,7 @@ const ( // default config
 	MAX_QUEUE_SIZE           uint32  = 100
 	DEFAULT_TICKER_FREQUENCY int     = 1500
 	DEFAULT_PROBE_TIMEOUT    int     = 10
+	DEFAULT_CHECKER_TIMEOUT  int     = 60
 	DEFAULT_USER_NAME        string  = "ghost"
 	DEFAULT_USER_EMAIL       string  = "ghost@ghost.com"
 	DEFAULT_CPU_SHARE        int64   = (1 << 9)
@@ -148,6 +149,8 @@ var DEPLOYMENT_TYPES = map[string]string{
 	"docker_compose":  "docker_compose",
 	"standard_docker": "standard_docker",
 }
+
+const CHECKER_MODE_SAD_SERVERS string = "sadservers"
 
 // SSH_CONTAINER_COMPOSE is the compose service name (services: key) for the SSH target container.
 const SSH_CONTAINER_COMPOSE string = "ssh"

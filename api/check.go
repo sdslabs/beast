@@ -214,7 +214,15 @@ func checkFlagHandler(c *gin.Context) {
 		localDeploy := config.Cfg.UseLocalDockerDaemon(instance.ServerDeployed)
 
 		var result cr.ExecResult
-		if instance.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		if instance.CheckerMode == core.CHECKER_MODE_SAD_SERVERS {
+			result, err = manager.ExecuteCheckerScript(instance)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing sadservers checker: %s", err.Error()),
+				})
+				return
+			}
+		} else if instance.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
 			verified, err := manager.ValidateCheckerManifest(instance)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
