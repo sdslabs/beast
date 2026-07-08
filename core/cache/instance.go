@@ -11,19 +11,22 @@ import (
 )
 
 type Instance struct {
-	InstanceID     string    `json:"instance_id"`
-	ChallengeName  string    `json:"challenge_name"`
-	ContainerID    string    `json:"container_id"`
-	PortOwner      string    `json:"port_owner"`
-	CheckHash      string    `json:"check_hash"`
-	CheckManifest  string    `json:"check_manifest"`
-	Port           uint32    `json:"port"`
-	UserID         string    `json:"user_id"`
-	Username       string    `json:"username"`
-	CreatedAt      time.Time `json:"created_at"`
-	ExpiresAt      time.Time `json:"expires_at"`
-	DeploymentType string    `json:"deployment_type"`
-	ServerDeployed string    `json:"server_deployed"`
+	InstanceID      string    `json:"instance_id"`
+	ChallengeName   string    `json:"challenge_name"`
+	ContainerID     string    `json:"container_id"`
+	PortOwner       string    `json:"port_owner"`
+	CheckHash       string    `json:"check_hash"`
+	CheckManifest   string    `json:"check_manifest"`
+	CheckerImageID  string    `json:"checker_image_id"`
+	CheckerImageRef string    `json:"checker_image_ref"`
+	CheckerMode     string    `json:"checker_mode"`
+	Port            uint32    `json:"port"`
+	UserID          string    `json:"user_id"`
+	Username        string    `json:"username"`
+	CreatedAt       time.Time `json:"created_at"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	DeploymentType  string    `json:"deployment_type"`
+	ServerDeployed  string    `json:"server_deployed"`
 }
 
 func (instance *Instance) PortOwnerID() string {

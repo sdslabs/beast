@@ -72,6 +72,9 @@ type Challenge struct {
 	Users              []*User `gorm:"many2many:user_challenges;"`
 	ServerDeployed     string  `gorm:"type:varchar(64)"`
 	Instanced          bool    `gorm:"not null;default:false"`
+	SadServers         bool    `gorm:"not null;default:false"`
+	CheckerImageId     string  `gorm:"size:64"`
+	CheckerImageRef    string  `gorm:"type:text"`
 	InstanceExpiration int64   `gorm:"default:0"`
 }
 

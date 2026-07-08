@@ -113,7 +113,7 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 	}
 
 	if config.Metadata.IsInstanced() && config.Env.DockerCompose != "" {
-		err = config.Env.ValidateInstancedComposeSSHContract(challdir)
+		err = config.Env.ValidateInstancedComposeSSHContract(challdir, config.Metadata.SadServers)
 		if err != nil {
 			log.Debugf("Error while validating instanced Docker Compose SSH contract : %s", err.Error())
 			return err
@@ -156,6 +156,7 @@ type ChallengeMetadata struct {
 	AdditionalLinks    []string `toml:"additionalLinks"`
 	Difficulty         string   `toml:"difficulty"`
 	Instanced          bool     `toml:"instanced"`
+	SadServers         bool     `toml:"sadservers"`
 	InstanceExpiration int64    `toml:"instance_expiration"`
 }
 
@@ -488,7 +489,7 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 	return nil
 }
 
-func (config *ChallengeEnv) ValidateInstancedComposeSSHContract(challdir string) error {
+func (config *ChallengeEnv) ValidateInstancedComposeSSHContract(challdir string, sadServers bool) error {
 	if config.DockerCompose == "" {
 		return nil
 	}
@@ -499,6 +500,7 @@ func (config *ChallengeEnv) ValidateInstancedComposeSSHContract(challdir string)
 		core.HYDRA_NETWORK_NAME,
 		core.SSH_CONTAINER_COMPOSE,
 		core.SSH_PORT,
+		sadServers,
 	)
 }
 

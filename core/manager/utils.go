@@ -526,6 +526,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			ServerDeployed:     availableServerHostname,
 			DeploymentType:     deploymentType,
 			Instanced:          config.Challenge.Metadata.Instanced,
+			SadServers:         config.Challenge.Metadata.SadServers,
 			InstanceExpiration: config.Challenge.Metadata.InstanceExpiration,
 		}
 

@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,8 +26,13 @@ type ComposeService struct {
 	Networks    ComposeStringSet `yaml:"networks"`
 	Volumes     []ComposeVolume  `yaml:"volumes"`
 	NetworkMode string           `yaml:"network_mode"`
+	PIDMode     string           `yaml:"pid"`
+	IPCMode     string           `yaml:"ipc"`
+	UTSMode     string           `yaml:"uts"`
 	Privileged  bool             `yaml:"privileged"`
 	CapAdd      ComposeStringSet `yaml:"cap_add"`
+	SecurityOpt ComposeStringSet `yaml:"security_opt"`
+	Devices     []string         `yaml:"devices"`
 }
 
 type ComposeNetwork struct {
@@ -230,11 +236,12 @@ func ExtractPortsFromCompose(composeFile string) ([]string, error) {
 	return portVariables, nil
 }
 
-func ValidateInstancedComposeSSHContract(composeFile, defaultPortVar, hydraNetworkName, sshServiceName string, sshPort uint32) error {
+func ValidateInstancedComposeSSHContract(composeFile, defaultPortVar, hydraNetworkName, sshServiceName string, sshPort uint32, strictSadServers ...bool) error {
 	raw, err := loadCompose(composeFile)
 	if err != nil {
 		return err
 	}
+	strict := len(strictSadServers) > 0 && strictSadServers[0]
 
 	sshService, ok := raw.Services[sshServiceName]
 	if !ok {
@@ -254,6 +261,11 @@ func ValidateInstancedComposeSSHContract(composeFile, defaultPortVar, hydraNetwo
 	for serviceName, service := range raw.Services {
 		if err := validateSafeComposeService(serviceName, service); err != nil {
 			return err
+		}
+		if strict {
+			if err := validateSadServersComposeService(serviceName, service); err != nil {
+				return err
+			}
 		}
 
 		if serviceName != sshServiceName && len(service.Ports) > 0 {
@@ -296,6 +308,15 @@ func ValidateInstancedComposeSSHContract(composeFile, defaultPortVar, hydraNetwo
 
 	if !serviceHasChallengeNamedVolume(sshService, raw.Volumes) {
 		return fmt.Errorf("service %q must mount a named compose volume at %s", sshServiceName, ComposeChallengeMountTarget)
+	}
+
+	if strict {
+		if err := validateSadServersNetworks(raw.Networks, exposedNetworkKey, internalNetworkKey); err != nil {
+			return err
+		}
+		if err := validateSadServersCheckerFiles(composeFile); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -380,6 +401,77 @@ func validateSafeComposeService(serviceName string, service ComposeService) erro
 		}
 	}
 	return nil
+}
+
+func validateSadServersComposeService(serviceName string, service ComposeService) error {
+	if service.PIDMode == "host" {
+		return fmt.Errorf("service %q must not use pid: host", serviceName)
+	}
+	if service.IPCMode == "host" {
+		return fmt.Errorf("service %q must not use ipc: host", serviceName)
+	}
+	if service.UTSMode == "host" {
+		return fmt.Errorf("service %q must not use uts: host", serviceName)
+	}
+	if len(service.Devices) > 0 {
+		return fmt.Errorf("service %q must not declare devices", serviceName)
+	}
+	if len(service.CapAdd) > 0 {
+		return fmt.Errorf("service %q must not add Linux capabilities", serviceName)
+	}
+	for _, opt := range service.SecurityOpt {
+		normalized := strings.ToLower(strings.TrimSpace(opt))
+		if normalized != "" && normalized != "no-new-privileges:true" {
+			return fmt.Errorf("service %q must not set security_opt %q", serviceName, opt)
+		}
+	}
+	for _, volume := range service.Volumes {
+		if volume.Target == "/var/run/docker.sock" || volume.Source == "/var/run/docker.sock" {
+			return fmt.Errorf("service %q must not mount Docker socket", serviceName)
+		}
+		if isHostBindMount(volume) {
+			return fmt.Errorf("service %q must not use host bind mount %q", serviceName, volume.Raw)
+		}
+	}
+	return nil
+}
+
+func validateSadServersNetworks(networks map[string]ComposeNetwork, exposedNetworkKey, internalNetworkKey string) error {
+	for key, network := range networks {
+		if key == exposedNetworkKey || key == internalNetworkKey {
+			continue
+		}
+		if network.ExternalEnabled() {
+			return fmt.Errorf("sadservers compose must not declare extra external network %q", key)
+		}
+	}
+	return nil
+}
+
+func validateSadServersCheckerFiles(composeFile string) error {
+	checkPath := filepath.Join(filepath.Dir(composeFile), "check.sh")
+	info, err := os.Stat(checkPath)
+	if err != nil {
+		return fmt.Errorf("sadservers challenges must provide root-level check.sh: %w", err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("sadservers check.sh must be a regular file")
+	}
+	return nil
+}
+
+func isHostBindMount(volume ComposeVolume) bool {
+	source := strings.TrimSpace(volume.Source)
+	if source == "" {
+		return false
+	}
+	if volume.Type == "bind" {
+		return true
+	}
+	if strings.HasPrefix(source, ".") || strings.HasPrefix(source, "/") || strings.HasPrefix(source, "~") {
+		return true
+	}
+	return strings.Contains(source, string(os.PathSeparator))
 }
 
 func serviceHasChallengeNamedVolume(service ComposeService, volumes map[string]any) bool {
