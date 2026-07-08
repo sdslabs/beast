@@ -3,6 +3,17 @@
 # Detect if running inside a Docker container
 IN_CONTAINER=false
 [ -f /.dockerenv ] && IN_CONTAINER=true
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HYDRA_SETUP_SCRIPT="${SCRIPT_DIR}/scripts/provision/hydra-net-setup.sh"
+
+setup_hydra_net() {
+    if [ ! -f "$HYDRA_SETUP_SCRIPT" ]; then
+        echo -e "\e[31mHydra network setup script not found at $HYDRA_SETUP_SCRIPT"
+        exit 1
+    fi
+    echo -e "Setting up hydra-net..."
+    bash "$HYDRA_SETUP_SCRIPT"
+}
 
 echo -e "Setting up sample environment for beast..."
 
@@ -65,6 +76,7 @@ if [ "$IN_CONTAINER" = true ]; then
         echo -e "\e[31mMount the host Docker socket and retry."
         exit 1
     fi
+    setup_hydra_net
     echo -e "Docker socket available. Starting beast..."
     BEAST_FLAGS="${BEAST_FLAGS:--v}"
     echo -e "Running: beast run ${BEAST_FLAGS}"
@@ -94,6 +106,7 @@ else
     echo -e "\e[31mPlease start docker daemon and restart again"
     exit
 fi
+setup_hydra_net
 
 echo -e "Installing air for live reloading"
 curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
