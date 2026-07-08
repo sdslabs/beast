@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -227,6 +229,184 @@ func TestInstanceMetadataOutlivesExpiryMarkerAndQueue(t *testing.T) {
 	}
 	if _, err := GetInstance(instanceID); err == nil {
 		t.Fatalf("expected instance metadata to be deleted after successful cleanup")
+	}
+}
+
+func TestConcurrentInstanceReservationSameChallengeCreatesOneActiveSlot(t *testing.T) {
+	cleanup := setupRedisIntegrationTest(t)
+	defer cleanup()
+
+	userID := fmt.Sprintf("reservation-user-%d", time.Now().UnixNano())
+	challengeName := "reservation-same-challenge"
+	const workers = 64
+
+	errCh := make(chan error, workers)
+	grantedIDs := make(chan string, workers)
+	activeCount := int32(0)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+
+			instanceID := fmt.Sprintf("reservation-%d", i)
+			result, err := ReserveInstanceSlot(userID, challengeName, instanceID, time.Minute, 10)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			switch result.Status {
+			case InstanceReservationGranted:
+				grantedIDs <- instanceID
+			case InstanceReservationChallengeActive:
+				atomic.AddInt32(&activeCount, 1)
+			default:
+				errCh <- fmt.Errorf("unexpected reservation status %v", result.Status)
+			}
+		}(i)
+	}
+
+	close(start)
+	wg.Wait()
+	close(errCh)
+	close(grantedIDs)
+
+	for err := range errCh {
+		t.Fatalf("reserve same challenge: %v", err)
+	}
+
+	var granted []string
+	for instanceID := range grantedIDs {
+		granted = append(granted, instanceID)
+	}
+	if len(granted) != 1 {
+		t.Fatalf("expected exactly one granted reservation, got %d", len(granted))
+	}
+	if activeCount != workers-1 {
+		t.Fatalf("expected %d active-conflict reservations, got %d", workers-1, activeCount)
+	}
+
+	count, err := CountUserInstances(userID)
+	if err != nil {
+		t.Fatalf("count user instances: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one active reserved slot, got %d", count)
+	}
+
+	if err := ReleaseInstanceReservation(userID, challengeName, granted[0]); err != nil {
+		t.Fatalf("release reservation: %v", err)
+	}
+}
+
+func TestConcurrentInstanceReservationRespectsUserLimit(t *testing.T) {
+	cleanup := setupRedisIntegrationTest(t)
+	defer cleanup()
+
+	userID := fmt.Sprintf("limit-user-%d", time.Now().UnixNano())
+	const workers = 64
+	const maxInstances = 3
+
+	errCh := make(chan error, workers)
+	grantedIDs := make(chan string, workers)
+	start := make(chan struct{})
+	var limitReached int32
+	var wg sync.WaitGroup
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+
+			instanceID := fmt.Sprintf("limit-instance-%d", i)
+			challengeName := fmt.Sprintf("limit-challenge-%d", i)
+			result, err := ReserveInstanceSlot(userID, challengeName, instanceID, time.Minute, maxInstances)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			switch result.Status {
+			case InstanceReservationGranted:
+				grantedIDs <- instanceID + ":" + challengeName
+			case InstanceReservationLimitReached:
+				atomic.AddInt32(&limitReached, 1)
+			default:
+				errCh <- fmt.Errorf("unexpected reservation status %v", result.Status)
+			}
+		}(i)
+	}
+
+	close(start)
+	wg.Wait()
+	close(errCh)
+	close(grantedIDs)
+
+	for err := range errCh {
+		t.Fatalf("reserve across challenges: %v", err)
+	}
+
+	var granted []string
+	for item := range grantedIDs {
+		granted = append(granted, item)
+	}
+	if len(granted) != maxInstances {
+		t.Fatalf("expected %d granted reservations, got %d", maxInstances, len(granted))
+	}
+	if limitReached != workers-maxInstances {
+		t.Fatalf("expected %d limit responses, got %d", workers-maxInstances, limitReached)
+	}
+
+	count, err := CountUserInstances(userID)
+	if err != nil {
+		t.Fatalf("count user instances: %v", err)
+	}
+	if count != maxInstances {
+		t.Fatalf("expected %d active reserved slots, got %d", maxInstances, count)
+	}
+
+	for _, item := range granted {
+		parts := strings.Split(item, ":")
+		if err := ReleaseInstanceReservation(userID, parts[1], parts[0]); err != nil {
+			t.Fatalf("release reservation %s: %v", item, err)
+		}
+	}
+}
+
+func TestReleaseInstanceReservationFreesUserSlot(t *testing.T) {
+	cleanup := setupRedisIntegrationTest(t)
+	defer cleanup()
+
+	userID := fmt.Sprintf("release-user-%d", time.Now().UnixNano())
+	first, err := ReserveInstanceSlot(userID, "release-one", "release-instance-one", time.Minute, 1)
+	if err != nil {
+		t.Fatalf("reserve first slot: %v", err)
+	}
+	if first.Status != InstanceReservationGranted {
+		t.Fatalf("expected first reservation granted, got %v", first.Status)
+	}
+
+	limited, err := ReserveInstanceSlot(userID, "release-two", "release-instance-two", time.Minute, 1)
+	if err != nil {
+		t.Fatalf("reserve over limit: %v", err)
+	}
+	if limited.Status != InstanceReservationLimitReached {
+		t.Fatalf("expected limit before release, got %v", limited.Status)
+	}
+
+	if err := ReleaseInstanceReservation(userID, "release-one", "release-instance-one"); err != nil {
+		t.Fatalf("release first slot: %v", err)
+	}
+
+	second, err := ReserveInstanceSlot(userID, "release-two", "release-instance-two", time.Minute, 1)
+	if err != nil {
+		t.Fatalf("reserve after release: %v", err)
+	}
+	if second.Status != InstanceReservationGranted {
+		t.Fatalf("expected reservation after release, got %v", second.Status)
 	}
 }
 

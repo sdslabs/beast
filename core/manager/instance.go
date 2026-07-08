@@ -21,20 +21,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*cache.Instance, error) {
+func SpawnInstance(challengeName, userID, username string, userSSHKey string) (spawned *cache.Instance, spawnErr error) {
 	log.Infof("Spawning instance of challenge %s for user %s", challengeName, userID)
-
-	existingInstance, err := cache.GetUserInstance(userID, challengeName)
-	if err == nil && existingInstance != nil {
-		return existingInstance, fmt.Errorf("user already has an active instance of this challenge")
-	}
-
-	instanceCount, err := cache.CountUserInstances(userID)
-	if err != nil {
-		log.Warnf("Failed to count user instances: %v", err)
-	} else if instanceCount >= cfg.Cfg.InstanceConfig.MaxInstancesPerUser {
-		return nil, fmt.Errorf("maximum instances limit reached (%d)", cfg.Cfg.InstanceConfig.MaxInstancesPerUser)
-	}
 
 	challenge, err := database.QueryFirstChallengeEntry("name", challengeName)
 	if err != nil {
@@ -70,6 +58,34 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 	expirationSeconds := config.Challenge.Metadata.GetInstanceExpiration()
 	ttl := time.Duration(expirationSeconds) * time.Second
 	expiresAt := time.Now().Add(ttl)
+
+	reservation, err := cache.ReserveInstanceSlot(userID, challengeName, instanceID, ttl, cfg.Cfg.InstanceConfig.MaxInstancesPerUser)
+	if err != nil {
+		return nil, err
+	}
+	reservationActive := reservation.Status == cache.InstanceReservationGranted
+	defer func() {
+		if spawnErr != nil && reservationActive {
+			if err := cache.ReleaseInstanceReservation(userID, challengeName, instanceID); err != nil {
+				log.Warnf("failed to release instance reservation %s for user %s challenge %s: %v", instanceID, userID, challengeName, err)
+			}
+		}
+	}()
+
+	switch reservation.Status {
+	case cache.InstanceReservationGranted:
+	case cache.InstanceReservationChallengeActive:
+		if reservation.ExistingInstanceID != "" {
+			if existingInstance, err := cache.GetInstance(reservation.ExistingInstanceID); err == nil {
+				return existingInstance, fmt.Errorf("user already has an active instance of this challenge")
+			}
+		}
+		return nil, fmt.Errorf("user already has an active instance or spawn in progress for this challenge")
+	case cache.InstanceReservationLimitReached:
+		return nil, fmt.Errorf("maximum instances limit reached (%d)", cfg.Cfg.InstanceConfig.MaxInstancesPerUser)
+	default:
+		return nil, fmt.Errorf("unexpected instance reservation status %d", reservation.Status)
+	}
 
 	var port uint32
 	var checkHash string

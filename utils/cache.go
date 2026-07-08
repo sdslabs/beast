@@ -6,11 +6,13 @@ import (
 )
 
 const (
-	instanceKeyPrefix     = "beast:instance"
-	instanceExpiryPrefix  = "beast:instance_expiry"
-	userInstanceKeyPrefix = "beast:user_instance"
-	InstancesSetKey       = "beast:instances"
-	InstanceDeletionQueue = "beast:instances:to_delete"
+	instanceKeyPrefix            = "beast:instance"
+	instanceExpiryPrefix         = "beast:instance_expiry"
+	instanceReservationKeyPrefix = "beast:instance_reservation"
+	userInstanceKeyPrefix        = "beast:user_instance"
+	userActiveInstancesKeyPrefix = "beast:user_instances"
+	InstancesSetKey              = "beast:instances"
+	InstanceDeletionQueue        = "beast:instances:to_delete"
 
 	hostPrefixKey      = "beast:host"
 	containerPrefixKey = "container"
@@ -26,6 +28,18 @@ func ContainerToKey(host string, containerId string) string {
 
 func InstanceToKey(instanceID string) string {
 	return fmt.Sprintf("%s:%s", instanceKeyPrefix, instanceID)
+}
+
+func InstanceKeyPrefix() string {
+	return instanceKeyPrefix + ":"
+}
+
+func InstanceReservationToKey(instanceID string) string {
+	return fmt.Sprintf("%s:%s", instanceReservationKeyPrefix, instanceID)
+}
+
+func InstanceReservationKeyPrefix() string {
+	return instanceReservationKeyPrefix + ":"
 }
 
 func InstanceExpiryToKey(instanceID string) string {
@@ -48,4 +62,8 @@ func UserChallengeToKey(userID, challengeName string) string {
 
 func UserChallengesAllKey(userID string) string {
 	return fmt.Sprintf("%s:%s:*", userInstanceKeyPrefix, userID)
+}
+
+func UserActiveInstancesToKey(userID string) string {
+	return fmt.Sprintf("%s:%s", userActiveInstancesKeyPrefix, userID)
 }

@@ -29,12 +29,168 @@ type Instance struct {
 	ServerDeployed  string    `json:"server_deployed"`
 }
 
+type InstanceReservationStatus int
+
+const (
+	InstanceReservationGranted InstanceReservationStatus = iota
+	InstanceReservationChallengeActive
+	InstanceReservationLimitReached
+)
+
+type InstanceReservationResult struct {
+	Status             InstanceReservationStatus
+	ExistingInstanceID string
+}
+
+const reserveInstanceSlotScript = `
+local user_key = KEYS[1]
+local active_set_key = KEYS[2]
+local reservation_key = KEYS[3]
+
+local instance_id = ARGV[1]
+local ttl_seconds = tonumber(ARGV[2])
+local max_instances = tonumber(ARGV[3])
+local instance_key_prefix = ARGV[4]
+local reservation_key_prefix = ARGV[5]
+
+local active_ids = redis.call("SMEMBERS", active_set_key)
+for _, active_id in ipairs(active_ids) do
+	local instance_exists = redis.call("EXISTS", instance_key_prefix .. active_id)
+	local reservation_exists = redis.call("EXISTS", reservation_key_prefix .. active_id)
+	if instance_exists == 0 and reservation_exists == 0 then
+		redis.call("SREM", active_set_key, active_id)
+	end
+end
+
+local existing_id = redis.call("GET", user_key)
+if existing_id then
+	local instance_exists = redis.call("EXISTS", instance_key_prefix .. existing_id)
+	local reservation_exists = redis.call("EXISTS", reservation_key_prefix .. existing_id)
+	if instance_exists == 1 or reservation_exists == 1 then
+		return {1, existing_id}
+	end
+
+	redis.call("DEL", user_key)
+	redis.call("SREM", active_set_key, existing_id)
+end
+
+if max_instances > 0 and redis.call("SCARD", active_set_key) >= max_instances then
+	return {2, ""}
+end
+
+if not redis.call("SET", user_key, instance_id, "EX", ttl_seconds, "NX") then
+	local current_id = redis.call("GET", user_key)
+	if current_id then
+		return {1, current_id}
+	end
+	return {1, ""}
+end
+
+redis.call("SET", reservation_key, "1", "EX", ttl_seconds)
+redis.call("SADD", active_set_key, instance_id)
+return {0, instance_id}
+`
+
+const releaseInstanceReservationScript = `
+local user_key = KEYS[1]
+local active_set_key = KEYS[2]
+local reservation_key = KEYS[3]
+local instance_id = ARGV[1]
+
+if redis.call("GET", user_key) == instance_id then
+	redis.call("DEL", user_key)
+end
+
+redis.call("DEL", reservation_key)
+redis.call("SREM", active_set_key, instance_id)
+return 1
+`
+
 func (instance *Instance) PortOwnerID() string {
 	if instance.PortOwner != "" {
 		return instance.PortOwner
 	}
 
 	return instance.ContainerID
+}
+
+func ReserveInstanceSlot(userID, challengeName, instanceID string, ttl time.Duration, maxInstancesPerUser int) (InstanceReservationResult, error) {
+	if Cache == nil {
+		return InstanceReservationResult{}, fmt.Errorf("redis cache not initialized")
+	}
+	if ttl <= 0 {
+		return InstanceReservationResult{}, fmt.Errorf("instance ttl must be positive")
+	}
+
+	ctx := context.Background()
+	CacheMutex.Lock()
+	defer CacheMutex.Unlock()
+
+	ttlSeconds := int64(ttl / time.Second)
+	if ttlSeconds <= 0 {
+		ttlSeconds = 1
+	}
+
+	userKey := utils.UserChallengeToKey(userID, challengeName)
+	activeSetKey := utils.UserActiveInstancesToKey(userID)
+	reservationKey := utils.InstanceReservationToKey(instanceID)
+
+	raw, err := Cache.Eval(ctx, reserveInstanceSlotScript, []string{
+		userKey,
+		activeSetKey,
+		reservationKey,
+	}, instanceID, ttlSeconds, maxInstancesPerUser, utils.InstanceKeyPrefix(), utils.InstanceReservationKeyPrefix()).Result()
+	if err != nil {
+		return InstanceReservationResult{}, fmt.Errorf("failed to reserve instance slot: %w", err)
+	}
+
+	values, ok := raw.([]interface{})
+	if !ok || len(values) < 2 {
+		return InstanceReservationResult{}, fmt.Errorf("unexpected instance reservation response: %#v", raw)
+	}
+
+	status, err := redisInt(values[0])
+	if err != nil {
+		return InstanceReservationResult{}, fmt.Errorf("unexpected instance reservation status: %w", err)
+	}
+
+	return InstanceReservationResult{
+		Status:             InstanceReservationStatus(status),
+		ExistingInstanceID: fmt.Sprint(values[1]),
+	}, nil
+}
+
+func ReleaseInstanceReservation(userID, challengeName, instanceID string) error {
+	if Cache == nil {
+		return fmt.Errorf("redis cache not initialized")
+	}
+
+	ctx := context.Background()
+	CacheMutex.Lock()
+	defer CacheMutex.Unlock()
+
+	userKey := utils.UserChallengeToKey(userID, challengeName)
+	activeSetKey := utils.UserActiveInstancesToKey(userID)
+	reservationKey := utils.InstanceReservationToKey(instanceID)
+
+	return Cache.Eval(ctx, releaseInstanceReservationScript, []string{
+		userKey,
+		activeSetKey,
+		reservationKey,
+	}, instanceID).Err()
+}
+
+func redisInt(value interface{}) (int64, error) {
+	switch typed := value.(type) {
+	case int64:
+		return typed, nil
+	case int:
+		return int64(typed), nil
+	case uint64:
+		return int64(typed), nil
+	default:
+		return 0, fmt.Errorf("%T", value)
+	}
 }
 
 func SaveInstance(instance *Instance, ttl time.Duration) error {
@@ -52,26 +208,22 @@ func SaveInstance(instance *Instance, ttl time.Duration) error {
 	}
 
 	key := utils.InstanceToKey(instance.InstanceID)
-	err = Cache.Set(ctx, key, data, 0).Err()
+	expiryKey := utils.InstanceExpiryToKey(instance.InstanceID)
+	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
+	activeSetKey := utils.UserActiveInstancesToKey(instance.UserID)
+	reservationKey := utils.InstanceReservationToKey(instance.InstanceID)
+
+	pipe := Cache.TxPipeline()
+	pipe.Set(ctx, key, data, 0)
+	pipe.Set(ctx, expiryKey, instance.InstanceID, ttl)
+	pipe.Set(ctx, userKey, instance.InstanceID, ttl)
+	pipe.SAdd(ctx, utils.InstancesSetKey, instance.InstanceID)
+	pipe.SAdd(ctx, activeSetKey, instance.InstanceID)
+	pipe.Del(ctx, reservationKey)
+
+	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to save instance: %w", err)
-	}
-
-	expiryKey := utils.InstanceExpiryToKey(instance.InstanceID)
-	err = Cache.Set(ctx, expiryKey, instance.InstanceID, ttl).Err()
-	if err != nil {
-		return fmt.Errorf("failed to save instance expiry marker: %w", err)
-	}
-
-	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
-	err = Cache.Set(ctx, userKey, instance.InstanceID, ttl).Err()
-	if err != nil {
-		return fmt.Errorf("failed to save user instance mapping: %w", err)
-	}
-
-	err = Cache.SAdd(ctx, utils.InstancesSetKey, instance.InstanceID).Err()
-	if err != nil {
-		log.Warnf("failed to add instance to set: %v", err)
 	}
 
 	log.Debugf("Saved instance %s for user %s, challenge %s, port %d, expires in %v",
@@ -143,17 +295,13 @@ func GetUserInstances(userID string) ([]*Instance, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	pattern := utils.UserChallengesAllKey(userID)
 	var instances []*Instance
 
-	iter := Cache.Scan(ctx, 0, pattern, 0).Iterator()
-	for iter.Next(ctx) {
-		userKey := iter.Val()
-		instanceID, err := Cache.Get(ctx, userKey).Result()
-		if err != nil {
-			continue
-		}
-
+	instanceIDs, err := pruneUserActiveInstancesLocked(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	for _, instanceID := range instanceIDs {
 		key := utils.InstanceToKey(instanceID)
 		data, err := Cache.Get(ctx, key).Bytes()
 		if err != nil {
@@ -272,9 +420,13 @@ func DeleteInstance(instanceID string) error {
 
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	expiryKey := utils.InstanceExpiryToKey(instanceID)
+	activeSetKey := utils.UserActiveInstancesToKey(instance.UserID)
+	reservationKey := utils.InstanceReservationToKey(instanceID)
 	Cache.Del(ctx, userKey)
 	Cache.Del(ctx, expiryKey)
+	Cache.Del(ctx, reservationKey)
 	Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
+	Cache.SRem(ctx, activeSetKey, instanceID)
 
 	log.Debugf("Deleted instance %s for user %s, challenge %s",
 		instanceID, instance.UserID, instance.ChallengeName)
@@ -341,15 +493,41 @@ func CountUserInstances(userID string) (int, error) {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
-	pattern := utils.UserChallengesAllKey(userID)
-	count := 0
-
-	iter := Cache.Scan(ctx, 0, pattern, 0).Iterator()
-	for iter.Next(ctx) {
-		count++
+	instanceIDs, err := pruneUserActiveInstancesLocked(ctx, userID)
+	if err != nil {
+		return 0, err
 	}
 
-	return count, nil
+	return len(instanceIDs), nil
+}
+
+func pruneUserActiveInstancesLocked(ctx context.Context, userID string) ([]string, error) {
+	activeSetKey := utils.UserActiveInstancesToKey(userID)
+	instanceIDs, err := Cache.SMembers(ctx, activeSetKey).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user active instances: %w", err)
+	}
+
+	active := make([]string, 0, len(instanceIDs))
+	for _, instanceID := range instanceIDs {
+		instanceExists, err := Cache.Exists(ctx, utils.InstanceToKey(instanceID)).Result()
+		if err != nil {
+			return nil, fmt.Errorf("failed to check instance %s: %w", instanceID, err)
+		}
+		reservationExists, err := Cache.Exists(ctx, utils.InstanceReservationToKey(instanceID)).Result()
+		if err != nil {
+			return nil, fmt.Errorf("failed to check instance reservation %s: %w", instanceID, err)
+		}
+
+		if instanceExists == 0 && reservationExists == 0 {
+			Cache.SRem(ctx, activeSetKey, instanceID)
+			continue
+		}
+
+		active = append(active, instanceID)
+	}
+
+	return active, nil
 }
 
 func GetInstanceTTL(instanceID string) (time.Duration, error) {
