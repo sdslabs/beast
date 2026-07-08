@@ -589,7 +589,6 @@ func verifySSHLocal(containerId string) error {
 	result, err = cr.RunCommandInContainer(containerId, []string{
 		"sh", "-c", sshServiceStartCommand,
 	})
-
 	if err != nil {
 		return err
 	}
@@ -601,18 +600,13 @@ func verifySSHLocal(containerId string) error {
 }
 
 func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
-	portCmd := fmt.Sprintf("docker port %s %v/tcp", containerId, core.SSH_PORT)
-	_, err := remoteManager.RunCommandOnServer(server, portCmd)
-	if err != nil {
+	if err := remoteManager.VerifyContainerPortRemote(containerId, core.SSH_PORT, server); err != nil {
 		return err
 	}
 
 	var result cr.ExecResult
 	sshServiceStartCommand := fmt.Sprintf("service ssh start")
-	result, err = cr.RunCommandInContainer(containerId, []string{
-		"sh", "-c", sshServiceStartCommand,
-	})
-
+	result, err := remoteManager.RunCommandInContainerOnServer(server, containerId, sshServiceStartCommand)
 	if err != nil {
 		return err
 	}

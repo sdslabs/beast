@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"io/ioutil"
-	"strings"
 	"sync"
 
 	"github.com/sdslabs/beastv4/core/config"
@@ -160,9 +159,7 @@ func RunCommandInContainerOnServer(server config.AvailableServer, containerId st
 	defer session.Close()
 	defer client.Close()
 
-	cmd = strings.ReplaceAll(cmd, `'`, `'\''`)
-
-	dockerCmd := fmt.Sprintf("docker exec %s sh -c '%s'", containerId, cmd)
+	dockerCmd := shellJoin("docker", "exec", containerId, "sh", "-c", cmd)
 	output, err := session.CombinedOutput(dockerCmd)
 	if err != nil {
 		var exitErr *ssh.ExitError

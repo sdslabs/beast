@@ -90,3 +90,11 @@ func GetNamedVolumeForContainerMountRemote(server config.AvailableServer, contai
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
+
+func shellJoin(args ...string) string {
+	quotedArgs := make([]string, len(args))
+	for i, arg := range args {
+		quotedArgs[i] = shellQuote(arg)
+	}
+	return strings.Join(quotedArgs, " ")
+}

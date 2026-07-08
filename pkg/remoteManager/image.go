@@ -1,8 +1,6 @@
 package remoteManager
 
 import (
-	"fmt"
-
 	"os/exec"
 
 	"github.com/sdslabs/beastv4/core/config"
@@ -10,14 +8,14 @@ import (
 
 // Remove image from remote server.
 func RemoveImageRemote(imageId string, server config.AvailableServer) error {
-	command := fmt.Sprintf("docker rmi %s", imageId)
+	command := shellJoin("docker", "rmi", imageId)
 	_, err := RunCommandOnServer(server, command)
 	return err
 }
 
 // Check for existence on image on remote server
 func CheckIfImageExistsOnRemote(imageId string, server config.AvailableServer) (bool, error) {
-	command := fmt.Sprintf("docker inspect --format='{{.ID}}' %s", imageId)
+	command := shellJoin("docker", "inspect", "--format={{.ID}}", imageId)
 	output, err := RunCommandOnServer(server, command)
 	if err != nil {
 		exitError, success := err.(*exec.ExitError)

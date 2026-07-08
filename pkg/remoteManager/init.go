@@ -24,7 +24,7 @@ func Init() {
 			}
 			defer client.Close()
 			ServerQueue.Push(server)
-			_, err = RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s", filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR)))
+			_, err = RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s", shellQuote(filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR))))
 			if err != nil {
 				log.Errorf("failed to run command on server %s: %s", server.Host, err.Error())
 			}

@@ -145,7 +145,7 @@ func getOrphanedComposeInstanceProjectsRemote(server config.AvailableServer) ([]
 
 // composeDownProjectRemote removes a docker compose project on a remote server
 func composeDownProjectRemote(projectName string, server config.AvailableServer) error {
-	cmd := fmt.Sprintf("docker compose -p %s down --remove-orphans -v", projectName)
+	cmd := shellJoin("docker", "compose", "-p", projectName, "down", "--remove-orphans", "-v")
 	output, err := RunCommandOnServer(server, cmd)
 	if err != nil {
 		return fmt.Errorf("docker compose down failed on remote: %v, output: %s", err, output)
