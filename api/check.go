@@ -165,6 +165,12 @@ func checkFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+		if err := manager.ValidateSadServersInstanceChecker(instance, challenge); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("VALIDATION ERROR: %s", err.Error()),
+			})
+			return
+		}
 
 		attempt, err := database.ReserveSubmissionAttempt(user.ID, challenge.ID, challenge.MaxAttemptLimit, instanceId, time.Now())
 		if err != nil {
@@ -191,7 +197,7 @@ func checkFlagHandler(c *gin.Context) {
 		localDeploy := config.Cfg.UseLocalDockerDaemon(instance.ServerDeployed)
 
 		var result cr.ExecResult
-		if instance.CheckerMode == core.CHECKER_MODE_SAD_SERVERS {
+		if challenge.SadServers {
 			result, err = manager.ExecuteCheckerScript(instance)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{

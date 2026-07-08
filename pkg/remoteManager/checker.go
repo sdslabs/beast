@@ -32,6 +32,7 @@ func RunSadServersCheckerContainerRemote(server config.AvailableServer, image, n
 	dockerArgs := []string{
 		"timeout", strconv.Itoa(core.DEFAULT_CHECKER_TIMEOUT),
 		"docker", "run", "--rm",
+		"--pull", "never",
 		"--network", networkName,
 		"--read-only",
 		"--cap-drop", "ALL",

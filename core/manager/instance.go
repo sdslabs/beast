@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,6 +21,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
+
+var dockerImageIDRegex = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
 
 func SpawnInstance(challengeName, userID, username string, userSSHKey string) (spawned *cache.Instance, spawnErr error) {
 	log.Infof("Spawning instance of challenge %s for user %s", challengeName, userID)
@@ -553,13 +556,33 @@ func ExecuteCheckerScript(instance *cache.Instance) (cr.ExecResult, error) {
 	return runCheckerCommandRemote(instance.InstanceID, instance.ContainerID, server, core.SAD_CHECK_SCRIPT_LOCATION)
 }
 
-func executeSadServersChecker(instance *cache.Instance) (cr.ExecResult, error) {
-	image := instance.CheckerImageRef
-	if image == "" {
-		image = instance.CheckerImageID
+func ValidateSadServersInstanceChecker(instance *cache.Instance, challenge database.Challenge) error {
+	if !challenge.SadServers {
+		return nil
 	}
-	if image == "" {
-		return cr.ExecResult{ExitCode: 1}, fmt.Errorf("sadservers checker image is missing for instance %s", instance.InstanceID)
+	if instance.CheckerMode != core.CHECKER_MODE_SAD_SERVERS {
+		return fmt.Errorf("sadservers instance %s is missing secure checker mode", instance.InstanceID)
+	}
+
+	instanceImage, err := sadServersCheckerImage(instance.CheckerImageID)
+	if err != nil {
+		return fmt.Errorf("sadservers instance %s has invalid checker image ID: %w", instance.InstanceID, err)
+	}
+	challengeImage, err := sadServersCheckerImage(challenge.CheckerImageId)
+	if err != nil {
+		return fmt.Errorf("sadservers challenge %s has invalid checker image ID: %w", challenge.Name, err)
+	}
+	if instanceImage != challengeImage {
+		return fmt.Errorf("sadservers instance %s checker image does not match committed challenge checker image", instance.InstanceID)
+	}
+
+	return nil
+}
+
+func executeSadServersChecker(instance *cache.Instance) (cr.ExecResult, error) {
+	image, err := sadServersCheckerImage(instance.CheckerImageID)
+	if err != nil {
+		return cr.ExecResult{ExitCode: 1}, fmt.Errorf("sadservers checker image is missing for instance %s: %w", instance.InstanceID, err)
 	}
 
 	if cfg.Cfg.UseLocalDockerDaemon(instance.ServerDeployed) {
@@ -576,6 +599,15 @@ func executeSadServersChecker(instance *cache.Instance) (cr.ExecResult, error) {
 		return cr.ExecResult{ExitCode: 1}, err
 	}
 	return remoteManager.RunSadServersCheckerContainerRemote(server, image, networkName, instance.InstanceID, instance.ChallengeName)
+}
+
+func sadServersCheckerImage(imageID string) (string, error) {
+	trimmed := strings.TrimSpace(imageID)
+	trimmed = strings.TrimPrefix(trimmed, "sha256:")
+	if !dockerImageIDRegex.MatchString(trimmed) {
+		return "", fmt.Errorf("expected sha256 image ID")
+	}
+	return "sha256:" + strings.ToLower(trimmed), nil
 }
 
 func verifySSHLocal(containerId string) error {

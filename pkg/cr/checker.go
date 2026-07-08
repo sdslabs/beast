@@ -16,6 +16,7 @@ func RunCheckerContainer(image, networkName, volumeName, instanceID string, comm
 	result := ExecResult{ExitCode: 1}
 	args := []string{
 		"run", "--rm",
+		"--pull", "never",
 		"--network", networkName,
 		"--mount", fmt.Sprintf("type=volume,source=%s,target=/challenge,readonly", volumeName),
 		"--label", "beast.checker=true",
