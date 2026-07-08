@@ -410,6 +410,73 @@ func TestReleaseInstanceReservationFreesUserSlot(t *testing.T) {
 	}
 }
 
+func TestRestoreQueuedInstanceRestoresUserMappings(t *testing.T) {
+	cleanup := setupRedisIntegrationTest(t)
+	defer cleanup()
+	if os.Getenv("BEAST_TEST_REDIS_FLUSH") != "1" {
+		t.Skip("set BEAST_TEST_REDIS_FLUSH=1 for deletion queue tests")
+	}
+
+	instanceID := fmt.Sprintf("restore-%d", time.Now().UnixNano())
+	instance := &Instance{
+		InstanceID:     instanceID,
+		ChallengeName:  "restore-challenge",
+		ContainerID:    "container-" + instanceID,
+		PortOwner:      "owner-" + instanceID,
+		Port:           31338,
+		UserID:         "restore-user",
+		Username:       "restore-user",
+		CreatedAt:      time.Now(),
+		ExpiresAt:      time.Now().Add(time.Minute),
+		DeploymentType: "standard_docker",
+		ServerDeployed: "localhost",
+	}
+
+	if err := SaveInstance(instance, time.Minute); err != nil {
+		t.Fatalf("save instance: %v", err)
+	}
+	if err := QueueInstanceForDeletion(instanceID); err != nil {
+		t.Fatalf("queue instance: %v", err)
+	}
+	count, err := CountUserInstances(instance.UserID)
+	if err != nil {
+		t.Fatalf("count after queue: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected queued instance to leave active set, got %d", count)
+	}
+
+	queued, err := PopInstanceForDeletion()
+	if err != nil {
+		t.Fatalf("pop queued instance: %v", err)
+	}
+	if err := RestoreQueuedInstance(queued); err != nil {
+		t.Fatalf("restore queued instance: %v", err)
+	}
+
+	restored, err := GetUserInstance(instance.UserID, instance.ChallengeName)
+	if err != nil {
+		t.Fatalf("get restored user instance: %v", err)
+	}
+	if restored.InstanceID != instanceID {
+		t.Fatalf("expected restored instance %s, got %s", instanceID, restored.InstanceID)
+	}
+	count, err = CountUserInstances(instance.UserID)
+	if err != nil {
+		t.Fatalf("count after restore: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected restored instance in active set, got %d", count)
+	}
+	ttl, err := GetInstanceTTL(instanceID)
+	if err != nil {
+		t.Fatalf("get restored ttl: %v", err)
+	}
+	if ttl <= 0 {
+		t.Fatalf("expected restored expiry marker ttl > 0, got %v", ttl)
+	}
+}
+
 func TestRedisExpiryMarkerSubscription(t *testing.T) {
 	cleanup := setupRedisIntegrationTest(t)
 	defer cleanup()

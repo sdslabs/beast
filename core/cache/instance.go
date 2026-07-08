@@ -577,8 +577,12 @@ func QueueInstanceForDeletion(instanceID string) error {
 
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	expiryKey := utils.InstanceExpiryToKey(instanceID)
+	activeSetKey := utils.UserActiveInstancesToKey(instance.UserID)
+	reservationKey := utils.InstanceReservationToKey(instanceID)
 	pipe.Del(ctx, userKey)
 	pipe.Del(ctx, expiryKey)
+	pipe.Del(ctx, reservationKey)
+	pipe.SRem(ctx, activeSetKey, instanceID)
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
@@ -628,14 +632,31 @@ func DeleteInstanceMetadata(instanceID string) error {
 	defer CacheMutex.Unlock()
 
 	key := utils.InstanceToKey(instanceID)
+	data, err := Cache.Get(ctx, key).Bytes()
+	if err != nil {
+		Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
+		return fmt.Errorf("instance not found: %w", err)
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(data, &instance); err != nil {
+		return fmt.Errorf("failed to unmarshal instance: %w", err)
+	}
+
 	expiryKey := utils.InstanceExpiryToKey(instanceID)
+	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
+	activeSetKey := utils.UserActiveInstancesToKey(instance.UserID)
+	reservationKey := utils.InstanceReservationToKey(instanceID)
 
 	pipe := Cache.TxPipeline()
 	pipe.Del(ctx, key)
 	pipe.Del(ctx, expiryKey)
+	pipe.Del(ctx, userKey)
+	pipe.Del(ctx, reservationKey)
 	pipe.SRem(ctx, utils.InstancesSetKey, instanceID)
+	pipe.SRem(ctx, activeSetKey, instanceID)
 
-	_, err := pipe.Exec(ctx)
+	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to delete instance metadata: %w", err)
 	}
@@ -663,6 +684,15 @@ func RestoreQueuedInstance(instance *Instance) error {
 	pipe := Cache.TxPipeline()
 	pipe.Set(ctx, utils.InstanceToKey(instance.InstanceID), data, 0)
 	pipe.SAdd(ctx, utils.InstancesSetKey, instance.InstanceID)
+	pipe.SAdd(ctx, utils.UserActiveInstancesToKey(instance.UserID), instance.InstanceID)
+
+	ttl := time.Until(instance.ExpiresAt)
+	if ttl <= 0 {
+		ttl = time.Second
+	}
+	pipe.Set(ctx, utils.InstanceExpiryToKey(instance.InstanceID), instance.InstanceID, ttl)
+	pipe.Set(ctx, utils.UserChallengeToKey(instance.UserID, instance.ChallengeName), instance.InstanceID, ttl)
+	pipe.Del(ctx, utils.InstanceReservationToKey(instance.InstanceID))
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
