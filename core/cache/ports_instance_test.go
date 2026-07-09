@@ -279,6 +279,23 @@ func TestInstanceMetadataOutlivesExpiryMarkerAndQueue(t *testing.T) {
 	if queued.StateOrActive() != InstanceStateDeleting {
 		t.Fatalf("expected popped instance state %q, got %q", InstanceStateDeleting, queued.StateOrActive())
 	}
+	if err := QueueInstanceForDeletion(instanceID); err != nil {
+		t.Fatalf("requeue popped instance after simulated worker crash: %v", err)
+	}
+	queueLen, err = GetDeletionQueueLength()
+	if err != nil {
+		t.Fatalf("get deletion queue length after crash requeue: %v", err)
+	}
+	if queueLen != 1 {
+		t.Fatalf("expected popped instance to be requeueable, got %d", queueLen)
+	}
+	queued, err = PopInstanceForDeletion()
+	if err != nil {
+		t.Fatalf("pop requeued instance: %v", err)
+	}
+	if queued == nil || queued.InstanceID != instanceID {
+		t.Fatalf("expected requeued instance %s, got %#v", instanceID, queued)
+	}
 
 	if err := DeleteInstanceMetadata(instanceID); err != nil {
 		t.Fatalf("delete instance metadata: %v", err)

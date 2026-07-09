@@ -672,6 +672,7 @@ func PopInstanceForDeletion() (*Instance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal instance from queue: %w", err)
 	}
+	Cache.SRem(ctx, utils.InstanceDeletionSet, instance.InstanceID)
 
 	log.Debugf("Popped instance %s from deletion queue", instance.InstanceID)
 	return &instance, nil
