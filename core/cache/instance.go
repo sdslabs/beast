@@ -23,11 +23,17 @@ type Instance struct {
 	Port            uint32    `json:"port"`
 	UserID          string    `json:"user_id"`
 	Username        string    `json:"username"`
+	State           string    `json:"state,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	ExpiresAt       time.Time `json:"expires_at"`
 	DeploymentType  string    `json:"deployment_type"`
 	ServerDeployed  string    `json:"server_deployed"`
 }
+
+const (
+	InstanceStateActive   = "active"
+	InstanceStateDeleting = "deleting"
+)
 
 type InstanceReservationStatus int
 
@@ -106,12 +112,51 @@ redis.call("SREM", active_set_key, instance_id)
 return 1
 `
 
+const queueInstanceForDeletionScript = `
+local instance_key = KEYS[1]
+local queue_key = KEYS[2]
+local deletion_set_key = KEYS[3]
+local instances_set_key = KEYS[4]
+local user_key = KEYS[5]
+local expiry_key = KEYS[6]
+local active_set_key = KEYS[7]
+local reservation_key = KEYS[8]
+
+local instance_id = ARGV[1]
+local instance_data = ARGV[2]
+
+redis.call("SET", instance_key, instance_data)
+redis.call("SADD", instances_set_key, instance_id)
+redis.call("SADD", active_set_key, instance_id)
+redis.call("SET", user_key, instance_id)
+redis.call("DEL", expiry_key)
+redis.call("DEL", reservation_key)
+
+local added = redis.call("SADD", deletion_set_key, instance_id)
+if added == 1 then
+	redis.call("LPUSH", queue_key, instance_data)
+end
+
+return added
+`
+
 func (instance *Instance) PortOwnerID() string {
 	if instance.PortOwner != "" {
 		return instance.PortOwner
 	}
 
 	return instance.ContainerID
+}
+
+func (instance *Instance) StateOrActive() string {
+	if instance == nil || instance.State == "" {
+		return InstanceStateActive
+	}
+	return instance.State
+}
+
+func (instance *Instance) ActiveAt(now time.Time) bool {
+	return instance != nil && instance.StateOrActive() == InstanceStateActive && instance.ExpiresAt.After(now)
 }
 
 func ReserveInstanceSlot(userID, challengeName, instanceID string, ttl time.Duration, maxInstancesPerUser int) (InstanceReservationResult, error) {
@@ -196,6 +241,9 @@ func redisInt(value interface{}) (int64, error) {
 func SaveInstance(instance *Instance, ttl time.Duration) error {
 	if Cache == nil {
 		return fmt.Errorf("redis cache not initialized")
+	}
+	if instance.State == "" {
+		instance.State = InstanceStateActive
 	}
 
 	ctx := context.Background()
@@ -426,6 +474,7 @@ func DeleteInstance(instanceID string) error {
 	Cache.Del(ctx, expiryKey)
 	Cache.Del(ctx, reservationKey)
 	Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
+	Cache.SRem(ctx, utils.InstanceDeletionSet, instanceID)
 	Cache.SRem(ctx, activeSetKey, instanceID)
 
 	log.Debugf("Deleted instance %s for user %s, challenge %s",
@@ -562,6 +611,7 @@ func QueueInstanceForDeletion(instanceID string) error {
 	data, err := Cache.Get(ctx, key).Bytes()
 	if err != nil {
 		Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
+		Cache.SRem(ctx, utils.InstanceDeletionSet, instanceID)
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
@@ -571,21 +621,26 @@ func QueueInstanceForDeletion(instanceID string) error {
 		return fmt.Errorf("failed to unmarshal instance: %w", err)
 	}
 
-	pipe := Cache.TxPipeline()
-	pipe.LPush(ctx, utils.InstanceDeletionQueue, data)
-	pipe.SRem(ctx, utils.InstancesSetKey, instanceID)
-
+	instance.State = InstanceStateDeleting
+	queuedData, err := json.Marshal(&instance)
+	if err != nil {
+		return fmt.Errorf("failed to marshal queued instance: %w", err)
+	}
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	expiryKey := utils.InstanceExpiryToKey(instanceID)
 	activeSetKey := utils.UserActiveInstancesToKey(instance.UserID)
 	reservationKey := utils.InstanceReservationToKey(instanceID)
-	pipe.Del(ctx, userKey)
-	pipe.Del(ctx, expiryKey)
-	pipe.Del(ctx, reservationKey)
-	pipe.SRem(ctx, activeSetKey, instanceID)
 
-	_, err = pipe.Exec(ctx)
-	if err != nil {
+	if err := Cache.Eval(ctx, queueInstanceForDeletionScript, []string{
+		key,
+		utils.InstanceDeletionQueue,
+		utils.InstanceDeletionSet,
+		utils.InstancesSetKey,
+		userKey,
+		expiryKey,
+		activeSetKey,
+		reservationKey,
+	}, instanceID, queuedData).Err(); err != nil {
 		return fmt.Errorf("failed to queue instance for deletion: %w", err)
 	}
 
@@ -635,11 +690,23 @@ func DeleteInstanceMetadata(instanceID string) error {
 	data, err := Cache.Get(ctx, key).Bytes()
 	if err != nil {
 		Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
-		return fmt.Errorf("instance not found: %w", err)
+		Cache.SRem(ctx, utils.InstanceDeletionSet, instanceID)
+		Cache.Del(ctx, utils.InstanceExpiryToKey(instanceID))
+		Cache.Del(ctx, utils.InstanceReservationToKey(instanceID))
+		return nil
 	}
 
 	var instance Instance
 	if err := json.Unmarshal(data, &instance); err != nil {
+		pipe := Cache.TxPipeline()
+		pipe.Del(ctx, key)
+		pipe.Del(ctx, utils.InstanceExpiryToKey(instanceID))
+		pipe.Del(ctx, utils.InstanceReservationToKey(instanceID))
+		pipe.SRem(ctx, utils.InstancesSetKey, instanceID)
+		pipe.SRem(ctx, utils.InstanceDeletionSet, instanceID)
+		if _, execErr := pipe.Exec(ctx); execErr != nil {
+			return fmt.Errorf("failed to delete corrupt instance metadata: %w", execErr)
+		}
 		return fmt.Errorf("failed to unmarshal instance: %w", err)
 	}
 
@@ -654,6 +721,7 @@ func DeleteInstanceMetadata(instanceID string) error {
 	pipe.Del(ctx, userKey)
 	pipe.Del(ctx, reservationKey)
 	pipe.SRem(ctx, utils.InstancesSetKey, instanceID)
+	pipe.SRem(ctx, utils.InstanceDeletionSet, instanceID)
 	pipe.SRem(ctx, activeSetKey, instanceID)
 
 	_, err = pipe.Exec(ctx)
@@ -676,6 +744,7 @@ func RestoreQueuedInstance(instance *Instance) error {
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
+	instance.State = InstanceStateActive
 	data, err := json.Marshal(instance)
 	if err != nil {
 		return fmt.Errorf("failed to marshal instance: %w", err)
@@ -693,6 +762,7 @@ func RestoreQueuedInstance(instance *Instance) error {
 	pipe.Set(ctx, utils.InstanceExpiryToKey(instance.InstanceID), instance.InstanceID, ttl)
 	pipe.Set(ctx, utils.UserChallengeToKey(instance.UserID, instance.ChallengeName), instance.InstanceID, ttl)
 	pipe.Del(ctx, utils.InstanceReservationToKey(instance.InstanceID))
+	pipe.SRem(ctx, utils.InstanceDeletionSet, instance.InstanceID)
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {

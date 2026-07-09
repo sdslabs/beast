@@ -13,6 +13,7 @@ const (
 	userActiveInstancesKeyPrefix = "beast:user_instances"
 	InstancesSetKey              = "beast:instances"
 	InstanceDeletionQueue        = "beast:instances:to_delete"
+	InstanceDeletionSet          = "beast:instances:to_delete:set"
 
 	hostPrefixKey      = "beast:host"
 	containerPrefixKey = "container"

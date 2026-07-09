@@ -63,6 +63,28 @@ func setupRedisIntegrationTest(t *testing.T) func() {
 	}
 }
 
+func TestInstanceActiveAtDefaultsMissingStateToActive(t *testing.T) {
+	now := time.Now()
+	instance := &Instance{ExpiresAt: now.Add(time.Minute)}
+	if instance.StateOrActive() != InstanceStateActive {
+		t.Fatalf("expected missing state to default to active, got %q", instance.StateOrActive())
+	}
+	if !instance.ActiveAt(now) {
+		t.Fatalf("expected unexpired missing-state instance to be active")
+	}
+
+	instance.State = InstanceStateDeleting
+	if instance.ActiveAt(now) {
+		t.Fatalf("expected deleting instance to be inactive")
+	}
+
+	instance.State = InstanceStateActive
+	instance.ExpiresAt = now.Add(-time.Second)
+	if instance.ActiveAt(now) {
+		t.Fatalf("expected expired instance to be inactive")
+	}
+}
+
 func TestConcurrentMultiPortReservationDoesNotOverlap(t *testing.T) {
 	cleanup := setupRedisIntegrationTest(t)
 	defer cleanup()
@@ -212,8 +234,39 @@ func TestInstanceMetadataOutlivesExpiryMarkerAndQueue(t *testing.T) {
 	if err := QueueInstanceForDeletion(instanceID); err != nil {
 		t.Fatalf("queue instance for deletion: %v", err)
 	}
-	if _, err := GetInstance(instanceID); err != nil {
+	deleting, err := GetInstance(instanceID)
+	if err != nil {
 		t.Fatalf("queueing deletion should keep durable metadata readable: %v", err)
+	}
+	if deleting.StateOrActive() != InstanceStateDeleting {
+		t.Fatalf("expected queued instance state %q, got %q", InstanceStateDeleting, deleting.StateOrActive())
+	}
+	count, err := CountUserInstances(instance.UserID)
+	if err != nil {
+		t.Fatalf("count after queue: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected queued instance to keep user slot, got %d", count)
+	}
+	if userInstance, err := GetUserInstance(instance.UserID, instance.ChallengeName); err != nil || userInstance.InstanceID != instanceID {
+		t.Fatalf("expected queued instance to keep user mapping, got %#v err=%v", userInstance, err)
+	}
+	queueLen, err := GetDeletionQueueLength()
+	if err != nil {
+		t.Fatalf("get deletion queue length: %v", err)
+	}
+	if queueLen != 1 {
+		t.Fatalf("expected one queued deletion, got %d", queueLen)
+	}
+	if err := QueueInstanceForDeletion(instanceID); err != nil {
+		t.Fatalf("queue instance for deletion twice: %v", err)
+	}
+	queueLen, err = GetDeletionQueueLength()
+	if err != nil {
+		t.Fatalf("get deletion queue length after duplicate queue: %v", err)
+	}
+	if queueLen != 1 {
+		t.Fatalf("expected duplicate queue to be deduped, got %d", queueLen)
 	}
 
 	queued, err := PopInstanceForDeletion()
@@ -223,12 +276,25 @@ func TestInstanceMetadataOutlivesExpiryMarkerAndQueue(t *testing.T) {
 	if queued == nil || queued.InstanceID != instanceID {
 		t.Fatalf("expected queued instance %s, got %#v", instanceID, queued)
 	}
+	if queued.StateOrActive() != InstanceStateDeleting {
+		t.Fatalf("expected popped instance state %q, got %q", InstanceStateDeleting, queued.StateOrActive())
+	}
 
 	if err := DeleteInstanceMetadata(instanceID); err != nil {
 		t.Fatalf("delete instance metadata: %v", err)
 	}
+	if err := DeleteInstanceMetadata(instanceID); err != nil {
+		t.Fatalf("delete instance metadata should be idempotent: %v", err)
+	}
 	if _, err := GetInstance(instanceID); err == nil {
 		t.Fatalf("expected instance metadata to be deleted after successful cleanup")
+	}
+	count, err = CountUserInstances(instance.UserID)
+	if err != nil {
+		t.Fatalf("count after metadata delete: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected deleted instance to free user slot, got %d", count)
 	}
 }
 
@@ -442,8 +508,29 @@ func TestRestoreQueuedInstanceRestoresUserMappings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("count after queue: %v", err)
 	}
-	if count != 0 {
-		t.Fatalf("expected queued instance to leave active set, got %d", count)
+	if count != 1 {
+		t.Fatalf("expected queued instance to keep active slot, got %d", count)
+	}
+	deleting, err := GetUserInstance(instance.UserID, instance.ChallengeName)
+	if err != nil {
+		t.Fatalf("get deleting user instance: %v", err)
+	}
+	if deleting.StateOrActive() != InstanceStateDeleting {
+		t.Fatalf("expected queued user instance state %q, got %q", InstanceStateDeleting, deleting.StateOrActive())
+	}
+	sameChallenge, err := ReserveInstanceSlot(instance.UserID, instance.ChallengeName, "restore-same-challenge", time.Minute, 10)
+	if err != nil {
+		t.Fatalf("reserve same challenge while deleting: %v", err)
+	}
+	if sameChallenge.Status != InstanceReservationChallengeActive || sameChallenge.ExistingInstanceID != instanceID {
+		t.Fatalf("expected deleting instance to keep challenge active, got %#v", sameChallenge)
+	}
+	limited, err := ReserveInstanceSlot(instance.UserID, "restore-other-challenge", "restore-other", time.Minute, 1)
+	if err != nil {
+		t.Fatalf("reserve other challenge while deleting: %v", err)
+	}
+	if limited.Status != InstanceReservationLimitReached {
+		t.Fatalf("expected deleting instance to keep user slot occupied, got %#v", limited)
 	}
 
 	queued, err := PopInstanceForDeletion()
@@ -461,6 +548,9 @@ func TestRestoreQueuedInstanceRestoresUserMappings(t *testing.T) {
 	if restored.InstanceID != instanceID {
 		t.Fatalf("expected restored instance %s, got %s", instanceID, restored.InstanceID)
 	}
+	if restored.StateOrActive() != InstanceStateActive {
+		t.Fatalf("expected restored instance state %q, got %q", InstanceStateActive, restored.StateOrActive())
+	}
 	count, err = CountUserInstances(instance.UserID)
 	if err != nil {
 		t.Fatalf("count after restore: %v", err)
@@ -474,6 +564,16 @@ func TestRestoreQueuedInstanceRestoresUserMappings(t *testing.T) {
 	}
 	if ttl <= 0 {
 		t.Fatalf("expected restored expiry marker ttl > 0, got %v", ttl)
+	}
+	if err := QueueInstanceForDeletion(instanceID); err != nil {
+		t.Fatalf("queue restored instance again: %v", err)
+	}
+	queueLen, err := GetDeletionQueueLength()
+	if err != nil {
+		t.Fatalf("get deletion queue length after restored retry: %v", err)
+	}
+	if queueLen != 1 {
+		t.Fatalf("expected restored instance to be requeueable, got queue length %d", queueLen)
 	}
 }
 

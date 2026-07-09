@@ -165,6 +165,21 @@ func checkFlagHandler(c *gin.Context) {
 			})
 			return
 		}
+		now := time.Now()
+		if instance.StateOrActive() != cache.InstanceStateActive {
+			c.JSON(http.StatusOK, ChallengeSubmitResponse{
+				Message: "Instance is no longer active.",
+				Success: false,
+			})
+			return
+		}
+		if !instance.ExpiresAt.After(now) {
+			c.JSON(http.StatusOK, ChallengeSubmitResponse{
+				Message: "Instance has expired.",
+				Success: false,
+			})
+			return
+		}
 		if err := manager.ValidateSadServersInstanceChecker(instance, challenge); err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: fmt.Sprintf("VALIDATION ERROR: %s", err.Error()),
@@ -172,7 +187,7 @@ func checkFlagHandler(c *gin.Context) {
 			return
 		}
 
-		attempt, err := database.ReserveSubmissionAttempt(user.ID, challenge.ID, challenge.MaxAttemptLimit, instanceId, time.Now())
+		attempt, err := database.ReserveSubmissionAttempt(user.ID, challenge.ID, challenge.MaxAttemptLimit, instanceId, now)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
