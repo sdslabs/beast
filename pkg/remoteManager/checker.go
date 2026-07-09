@@ -29,9 +29,11 @@ func RunCheckerContainerRemote(server config.AvailableServer, image, networkName
 }
 
 func RunSadServersCheckerContainerRemote(server config.AvailableServer, image, networkName, instanceID, challengeName string) (cr.ExecResult, error) {
+	checkerName := cr.SadServersCheckerContainerName(instanceID)
 	dockerArgs := []string{
 		"timeout", strconv.Itoa(core.DEFAULT_CHECKER_TIMEOUT),
 		"docker", "run", "--rm",
+		"--name", checkerName,
 		"--pull", "never",
 		"--network", networkName,
 		"--read-only",
@@ -48,12 +50,11 @@ func RunSadServersCheckerContainerRemote(server config.AvailableServer, image, n
 		"--label", "beast.checker=true",
 		"--label", "beast.checker.mode=sadservers",
 		"--label", fmt.Sprintf("beast.instance.id=%s", instanceID),
+		"--label", fmt.Sprintf("beast.checker.name=%s", checkerName),
 		image,
 	}
 
-	quotedArgs := make([]string, len(dockerArgs))
-	for i, arg := range dockerArgs {
-		quotedArgs[i] = shellQuote(arg)
-	}
-	return RunCommandOnServerWithExit(server, strings.Join(quotedArgs, " "))
+	runCommand := shellJoin(dockerArgs...)
+	cleanupCommand := shellJoin("docker", "rm", "--force", checkerName) + " >/dev/null 2>&1 || true"
+	return RunCommandOnServerWithExit(server, fmt.Sprintf("%s; status=$?; %s; exit $status", runCommand, cleanupCommand))
 }
