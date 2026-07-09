@@ -194,6 +194,37 @@ func BuildSadServersCheckerImageFromTarContext(challengeName, tarContextPath str
 	return buf, "", imageRef, err
 }
 
+func WriteSadServersCheckerContextArchive(tarContextPath, destinationPath string) error {
+	builderContext, err := buildSadServersCheckerContext(tarContextPath)
+	if err != nil {
+		return err
+	}
+	if err := utils.CreateIfNotExistDir(filepath.Dir(destinationPath)); err != nil {
+		return fmt.Errorf("failed to create checker context directory: %w", err)
+	}
+
+	destination, err := os.Create(destinationPath)
+	if err != nil {
+		return fmt.Errorf("failed to create checker context archive %s: %w", destinationPath, err)
+	}
+
+	gzipWriter := gzip.NewWriter(destination)
+	_, copyErr := io.Copy(gzipWriter, builderContext)
+	closeGzipErr := gzipWriter.Close()
+	closeFileErr := destination.Close()
+	if copyErr != nil {
+		return fmt.Errorf("failed to write checker context archive %s: %w", destinationPath, copyErr)
+	}
+	if closeGzipErr != nil {
+		return fmt.Errorf("failed to close checker context gzip archive %s: %w", destinationPath, closeGzipErr)
+	}
+	if closeFileErr != nil {
+		return fmt.Errorf("failed to close checker context archive %s: %w", destinationPath, closeFileErr)
+	}
+
+	return nil
+}
+
 func buildSadServersCheckerContext(tarContextPath string) (io.Reader, error) {
 	source, err := os.Open(tarContextPath)
 	if err != nil {

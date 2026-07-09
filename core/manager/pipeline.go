@@ -269,8 +269,19 @@ func buildSadServersCheckerImage(challenge *database.Challenge, config cfg.Beast
 		}
 	} else {
 		server := cfg.Cfg.AvailableServers[challenge.ServerDeployed]
-		remoteStagedPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, fmt.Sprintf("%s.tar.gz", challengeName))
-		logBytes, imageID, imageRef, err = remoteManager.BuildSadServersCheckerImageRemote(challengeName, remoteStagedPath, server, noCache)
+		checkerContextName := fmt.Sprintf("%s-checker-context.tar.gz", challengeName)
+		checkerContextPath := filepath.Join(filepath.Dir(stagedPath), checkerContextName)
+		if err = cr.WriteSadServersCheckerContextArchive(stagedPath, checkerContextPath); err != nil {
+			return logBytes, fmt.Errorf("failed to build sadservers checker context: %w", err)
+		}
+
+		remoteStagingDir := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+		if err = remoteManager.RsyncFileToServer(server, checkerContextPath, remoteStagingDir); err != nil {
+			return logBytes, fmt.Errorf("failed to copy sadservers checker context to remote server: %w", err)
+		}
+
+		remoteCheckerContextPath := filepath.Join(remoteStagingDir, checkerContextName)
+		logBytes, imageID, imageRef, err = remoteManager.BuildSadServersCheckerImageRemote(challengeName, remoteCheckerContextPath, server, noCache)
 	}
 	if err != nil {
 		return logBytes, err
