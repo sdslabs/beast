@@ -22,17 +22,27 @@ type Compose struct {
 }
 
 type ComposeService struct {
-	Ports       []ComposePort    `yaml:"ports"`
-	Networks    ComposeStringSet `yaml:"networks"`
-	Volumes     []ComposeVolume  `yaml:"volumes"`
-	NetworkMode string           `yaml:"network_mode"`
-	PIDMode     string           `yaml:"pid"`
-	IPCMode     string           `yaml:"ipc"`
-	UTSMode     string           `yaml:"uts"`
-	Privileged  bool             `yaml:"privileged"`
-	CapAdd      ComposeStringSet `yaml:"cap_add"`
-	SecurityOpt ComposeStringSet `yaml:"security_opt"`
-	Devices     []string         `yaml:"devices"`
+	Ports        []ComposePort          `yaml:"ports"`
+	Networks     ComposeServiceNetworks `yaml:"networks"`
+	Volumes      []ComposeVolume        `yaml:"volumes"`
+	NetworkMode  string                 `yaml:"network_mode"`
+	PIDMode      string                 `yaml:"pid"`
+	IPCMode      string                 `yaml:"ipc"`
+	UTSMode      string                 `yaml:"uts"`
+	UsernsMode   string                 `yaml:"userns_mode"`
+	CgroupnsMode string                 `yaml:"cgroupns_mode"`
+	CgroupParent string                 `yaml:"cgroup_parent"`
+	Privileged   bool                   `yaml:"privileged"`
+	CapAdd       ComposeStringSet       `yaml:"cap_add"`
+	SecurityOpt  ComposeStringSet       `yaml:"security_opt"`
+	Devices      []string               `yaml:"devices"`
+	ExtraHosts   ComposePresence        `yaml:"extra_hosts"`
+	VolumesFrom  ComposePresence        `yaml:"volumes_from"`
+	EnvFile      ComposePresence        `yaml:"env_file"`
+	Secrets      ComposePresence        `yaml:"secrets"`
+	Configs      ComposePresence        `yaml:"configs"`
+	Sysctls      ComposePresence        `yaml:"sysctls"`
+	Ulimits      ComposePresence        `yaml:"ulimits"`
 }
 
 type ComposeNetwork struct {
@@ -56,6 +66,81 @@ type ComposeVolume struct {
 }
 
 type ComposeStringSet []string
+
+type ComposeServiceNetworks struct {
+	Names      []string
+	HasOptions bool
+}
+
+type ComposePresence bool
+
+func (networks *ComposeServiceNetworks) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var stringsValue []string
+	if err := unmarshal(&stringsValue); err == nil {
+		networks.Names = stringsValue
+		return nil
+	}
+
+	var mapValue map[string]any
+	if err := unmarshal(&mapValue); err == nil {
+		names := make([]string, 0, len(mapValue))
+		hasOptions := false
+		for key, value := range mapValue {
+			names = append(names, key)
+			if !isEmptyComposeValue(value) {
+				hasOptions = true
+			}
+		}
+		networks.Names = names
+		networks.HasOptions = hasOptions
+		return nil
+	}
+
+	var stringValue string
+	if err := unmarshal(&stringValue); err == nil {
+		networks.Names = []string{stringValue}
+		return nil
+	}
+
+	return nil
+}
+
+func (networks ComposeServiceNetworks) Contains(name string) bool {
+	return stringInSlice(name, networks.Names)
+}
+
+func (presence *ComposePresence) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var raw interface{}
+	if err := unmarshal(&raw); err != nil {
+		return err
+	}
+	*presence = ComposePresence(!isEmptyComposeValue(raw))
+	return nil
+}
+
+func (presence ComposePresence) Present() bool {
+	return bool(presence)
+}
+
+func isEmptyComposeValue(value interface{}) bool {
+	if value == nil {
+		return true
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed) == ""
+	case []interface{}:
+		return len(typed) == 0
+	case []string:
+		return len(typed) == 0
+	case map[interface{}]interface{}:
+		return len(typed) == 0
+	case map[string]any:
+		return len(typed) == 0
+	default:
+		return false
+	}
+}
 
 var portRegex = regexp.MustCompile(`\$\{([^}]+)}`)
 
@@ -272,8 +357,15 @@ func ValidateInstancedComposeSSHContract(composeFile, defaultPortVar, hydraNetwo
 			return fmt.Errorf("service %q must not publish host ports; only %q may publish SSH", serviceName, sshServiceName)
 		}
 
-		hasHydra := stringInSlice(exposedNetworkKey, service.Networks)
-		hasInternal := stringInSlice(internalNetworkKey, service.Networks)
+		if strict {
+			if err := validateSadServersServiceNetworks(serviceName, service.Networks, exposedNetworkKey, internalNetworkKey, sshServiceName); err != nil {
+				return err
+			}
+			continue
+		}
+
+		hasHydra := service.Networks.Contains(exposedNetworkKey)
+		hasInternal := service.Networks.Contains(internalNetworkKey)
 		if serviceName == sshServiceName {
 			if !hasHydra {
 				return fmt.Errorf("service %q must attach to external network %q", sshServiceName, exposedNetworkKey)
@@ -404,6 +496,9 @@ func validateSafeComposeService(serviceName string, service ComposeService) erro
 }
 
 func validateSadServersComposeService(serviceName string, service ComposeService) error {
+	if strings.TrimSpace(service.NetworkMode) != "" {
+		return fmt.Errorf("service %q must not set network_mode", serviceName)
+	}
 	if service.PIDMode == "host" {
 		return fmt.Errorf("service %q must not use pid: host", serviceName)
 	}
@@ -413,8 +508,38 @@ func validateSadServersComposeService(serviceName string, service ComposeService
 	if service.UTSMode == "host" {
 		return fmt.Errorf("service %q must not use uts: host", serviceName)
 	}
+	if strings.TrimSpace(service.UsernsMode) != "" {
+		return fmt.Errorf("service %q must not set userns_mode", serviceName)
+	}
+	if strings.TrimSpace(service.CgroupnsMode) != "" {
+		return fmt.Errorf("service %q must not set cgroupns_mode", serviceName)
+	}
+	if strings.TrimSpace(service.CgroupParent) != "" {
+		return fmt.Errorf("service %q must not set cgroup_parent", serviceName)
+	}
 	if len(service.Devices) > 0 {
 		return fmt.Errorf("service %q must not declare devices", serviceName)
+	}
+	if service.ExtraHosts.Present() {
+		return fmt.Errorf("service %q must not set extra_hosts", serviceName)
+	}
+	if service.VolumesFrom.Present() {
+		return fmt.Errorf("service %q must not set volumes_from", serviceName)
+	}
+	if service.EnvFile.Present() {
+		return fmt.Errorf("service %q must not set env_file", serviceName)
+	}
+	if service.Secrets.Present() {
+		return fmt.Errorf("service %q must not set secrets", serviceName)
+	}
+	if service.Configs.Present() {
+		return fmt.Errorf("service %q must not set configs", serviceName)
+	}
+	if service.Sysctls.Present() {
+		return fmt.Errorf("service %q must not set sysctls", serviceName)
+	}
+	if service.Ulimits.Present() {
+		return fmt.Errorf("service %q must not set ulimits", serviceName)
 	}
 	if len(service.CapAdd) > 0 {
 		return fmt.Errorf("service %q must not add Linux capabilities", serviceName)
@@ -437,15 +562,50 @@ func validateSadServersComposeService(serviceName string, service ComposeService
 }
 
 func validateSadServersNetworks(networks map[string]ComposeNetwork, exposedNetworkKey, internalNetworkKey string) error {
-	for key, network := range networks {
+	for key := range networks {
 		if key == exposedNetworkKey || key == internalNetworkKey {
 			continue
 		}
-		if network.ExternalEnabled() {
-			return fmt.Errorf("sadservers compose must not declare extra external network %q", key)
-		}
+		return fmt.Errorf("sadservers compose must not declare extra network %q", key)
+	}
+	if len(networks) != 2 {
+		return fmt.Errorf("sadservers compose must define exactly the hydra network and one internal network")
 	}
 	return nil
+}
+
+func validateSadServersServiceNetworks(serviceName string, networks ComposeServiceNetworks, exposedNetworkKey, internalNetworkKey, sshServiceName string) error {
+	if networks.HasOptions {
+		return fmt.Errorf("service %q must not set per-service network options", serviceName)
+	}
+
+	if serviceName == sshServiceName {
+		if !sameStringSet(networks.Names, []string{exposedNetworkKey, internalNetworkKey}) {
+			return fmt.Errorf("service %q must attach exactly to networks %q and %q", serviceName, exposedNetworkKey, internalNetworkKey)
+		}
+		return nil
+	}
+
+	if !sameStringSet(networks.Names, []string{internalNetworkKey}) {
+		return fmt.Errorf("service %q must attach exactly to internal network %q", serviceName, internalNetworkKey)
+	}
+	return nil
+}
+
+func sameStringSet(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, value := range got {
+		seen[value] = true
+	}
+	for _, value := range want {
+		if !seen[value] {
+			return false
+		}
+	}
+	return true
 }
 
 func validateSadServersCheckerFiles(composeFile string) error {

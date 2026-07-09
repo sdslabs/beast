@@ -190,6 +190,63 @@ func TestValidateSadServersComposeContractRejectsUnsafeOptions(t *testing.T) {
 			want:    "pid: host",
 		},
 		{
+			name:    "non empty network mode",
+			service: `network_mode: bridge`,
+			want:    "network_mode",
+		},
+		{
+			name:    "user namespace mode",
+			service: `userns_mode: host`,
+			want:    "userns_mode",
+		},
+		{
+			name:    "cgroup namespace mode",
+			service: `cgroupns_mode: host`,
+			want:    "cgroupns_mode",
+		},
+		{
+			name:    "cgroup parent",
+			service: `cgroup_parent: beast.slice`,
+			want:    "cgroup_parent",
+		},
+		{
+			name:    "extra hosts",
+			service: `extra_hosts: ["host.docker.internal:host-gateway"]`,
+			want:    "extra_hosts",
+		},
+		{
+			name:    "volumes from",
+			service: `volumes_from: ["ssh"]`,
+			want:    "volumes_from",
+		},
+		{
+			name:    "env file",
+			service: `env_file: [".env"]`,
+			want:    "env_file",
+		},
+		{
+			name:    "secrets",
+			service: `secrets: ["db_password"]`,
+			want:    "secrets",
+		},
+		{
+			name:    "configs",
+			service: `configs: ["app_config"]`,
+			want:    "configs",
+		},
+		{
+			name: "sysctls",
+			service: `sysctls:
+      net.ipv4.ip_forward: "1"`,
+			want: "sysctls",
+		},
+		{
+			name: "ulimits",
+			service: `ulimits:
+      nofile: 65535`,
+			want: "ulimits",
+		},
+		{
 			name:    "cap add",
 			service: `cap_add: ["SYS_ADMIN"]`,
 			want:    "capabilities",
@@ -262,8 +319,70 @@ volumes:
 `)
 
 	err := ValidateInstancedComposeSSHContract(composeFile, "SSH_PORT", "hydra-net", "ssh", 22, true)
-	if err == nil || !strings.Contains(err.Error(), "extra external network") {
-		t.Fatalf("expected extra external network rejection, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "extra network") {
+		t.Fatalf("expected extra network rejection, got %v", err)
+	}
+}
+
+func TestValidateSadServersComposeContractRejectsExtraInternalNetwork(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckScript(t, dir)
+	composeFile := writeComposeTestFileInDir(t, dir, `
+services:
+  ssh:
+    image: ubuntu:24.04
+    ports:
+      - "${SSH_PORT}:22"
+    volumes:
+      - challenge:/challenge
+    networks: [exposed, internal]
+networks:
+  exposed:
+    external: true
+    name: hydra-net
+  internal:
+    internal: true
+  debug:
+    internal: true
+volumes:
+  challenge:
+`)
+
+	err := ValidateInstancedComposeSSHContract(composeFile, "SSH_PORT", "hydra-net", "ssh", 22, true)
+	if err == nil || !strings.Contains(err.Error(), "exactly one non-exposed internal network") {
+		t.Fatalf("expected extra internal network rejection, got %v", err)
+	}
+}
+
+func TestValidateSadServersComposeContractRejectsServiceNetworkOptions(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckScript(t, dir)
+	composeFile := writeComposeTestFileInDir(t, dir, `
+services:
+  ssh:
+    image: ubuntu:24.04
+    ports:
+      - "${SSH_PORT}:22"
+    volumes:
+      - challenge:/challenge
+    networks:
+      exposed:
+      internal:
+        aliases:
+          - shell
+networks:
+  exposed:
+    external: true
+    name: hydra-net
+  internal:
+    internal: true
+volumes:
+  challenge:
+`)
+
+	err := ValidateInstancedComposeSSHContract(composeFile, "SSH_PORT", "hydra-net", "ssh", 22, true)
+	if err == nil || !strings.Contains(err.Error(), "network options") {
+		t.Fatalf("expected per-service network options rejection, got %v", err)
 	}
 }
 
