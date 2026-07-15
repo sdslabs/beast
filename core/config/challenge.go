@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
@@ -301,6 +300,28 @@ func (config *ChallengeEnv) GetDefaultPort() uint32 {
 	return ports[0]
 }
 
+func validateChallengeFile(challengeDir, relativePath, field string) error {
+	resolvedPath, err := utils.ResolvePathWithin(challengeDir, relativePath)
+	if err != nil {
+		return fmt.Errorf("invalid %s %q: %w", field, relativePath, err)
+	}
+	if err := utils.ValidateFileExists(resolvedPath); err != nil {
+		return fmt.Errorf("invalid %s %q: %w", field, relativePath, err)
+	}
+	return nil
+}
+
+func validateChallengeDir(challengeDir, relativePath, field string) error {
+	resolvedPath, err := utils.ResolvePathWithin(challengeDir, relativePath)
+	if err != nil {
+		return fmt.Errorf("invalid %s %q: %w", field, relativePath, err)
+	}
+	if err := utils.ValidateDirExists(resolvedPath); err != nil {
+		return fmt.Errorf("invalid %s %q: %w", field, relativePath, err)
+	}
+	return nil
+}
+
 // ValidateRequiredFields validates required fields for the Challenge environment configuration.
 // This requires challenge type to be passed so that we can verfiy based on type
 // of the challenge.
@@ -308,10 +329,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	// Validate port related stuff for the challenge environment configuration.
 
 	if config.StaticContentDir != "" {
-		if filepath.IsAbs(config.StaticContentDir) {
-			return fmt.Errorf("static content directory path should be relative to challenge directory root")
-		}
-		if err := utils.ValidateDirExists(filepath.Join(challdir, config.StaticContentDir)); err != nil {
+		if err := validateChallengeDir(challdir, config.StaticContentDir, "static_dir"); err != nil {
 			return err
 		}
 	}
@@ -321,11 +339,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	if config.DockerCompose != "" {
-		if filepath.IsAbs(config.DockerCompose) {
-			return fmt.Errorf("docker_compose path should be relative to challenge directory root")
-		}
-		if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCompose)); err != nil {
-			return fmt.Errorf("docker_compose file does not exist: %s", config.DockerCompose)
+		if err := validateChallengeFile(challdir, config.DockerCompose, "docker_compose"); err != nil {
+			return err
 		}
 
 		// Warn if other configuration fields are specified when docker_compose is provided
@@ -376,16 +391,23 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	if !utils.StringInSlice(config.BaseImage, Cfg.AllowedBaseImages) {
 		return fmt.Errorf("the base image: %s is not supported", config.BaseImage)
 	}
+	if config.DockerCtx != "" {
+		if err := validateChallengeFile(challdir, config.DockerCtx, "docker_context"); err != nil {
+			return err
+		}
+	}
+	if config.XinetdConf != "" {
+		if err := validateChallengeFile(challdir, config.XinetdConf, "xinetd_conf"); err != nil {
+			return err
+		}
+	}
 
 	if challType == core.SERVICE_CHALLENGE_TYPE_NAME {
 		// Challenge type is service.
 		// ServicePath must be relative.
 		if config.ServicePath != "" {
-			if filepath.IsAbs(config.ServicePath) {
-				return fmt.Errorf("for challenge type `services` service_path is a required variable, which should be relative path to executable")
-			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
-				// Skip this, we might create service later too.
-				log.Warnf("Service path file %s does not exist", config.ServicePath)
+			if err := validateChallengeFile(challdir, config.ServicePath, "service_path"); err != nil {
+				return err
 			}
 		}
 	} else if strings.HasPrefix(challType, core.WEB_CHALLENGE_TYPE_NAME) {
@@ -393,35 +415,27 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if config.WebRoot == "" && config.DockerCtx == "" && config.DockerCompose == "" {
 			return errors.New("web root can not be empty for web challenges without custom dockerfile or docker-compose")
 		} else if config.WebRoot != "" {
-			if filepath.IsAbs(config.WebRoot) {
-				return fmt.Errorf("web Root directory path should be relative to challenge directory root")
-			} else if err := utils.ValidateDirExists(filepath.Join(challdir, config.WebRoot)); err != nil {
-				return fmt.Errorf("web Root directory does not exist")
+			if err := validateChallengeDir(challdir, config.WebRoot, "web_root"); err != nil {
+				return err
 			}
 		}
 	}
 
 	for _, script := range config.SetupScripts {
-		if filepath.IsAbs(script) {
-			return fmt.Errorf("script path is absolute : %s", script)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, script)); err != nil {
-			return fmt.Errorf("file %s does not exist", script)
+		if err := validateChallengeFile(challdir, script, "setup_scripts"); err != nil {
+			return err
 		}
 	}
 
 	for _, env := range config.EnvironmentVars {
-		if filepath.IsAbs(env.Value) {
-			return fmt.Errorf("environment Variable contains absolute path : %s", env.Value)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
-			return fmt.Errorf("file %s does not exist", env.Value)
+		if err := validateChallengeFile(challdir, env.Value, "environment variable value"); err != nil {
+			return err
 		}
 	}
 
 	if config.Entrypoint != "" {
-		if filepath.IsAbs(config.Entrypoint) {
-			return fmt.Errorf("entrypoint contains absolute path : %s", config.Entrypoint)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.Entrypoint)); err != nil {
-			return fmt.Errorf("file %s does not exist", config.Entrypoint)
+		if err := validateChallengeFile(challdir, config.Entrypoint, "entrypoint"); err != nil {
+			return err
 		}
 	}
 
@@ -454,7 +468,11 @@ func (config *ChallengeEnv) ExtractPorts() error {
 
 func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 	if config.DockerCompose != "" {
-		portVariables, err := utils.ExtractPortsFromCompose(filepath.Join(challdir, config.DockerCompose))
+		composePath, err := utils.ResolvePathWithin(challdir, config.DockerCompose)
+		if err != nil {
+			return err
+		}
+		portVariables, err := utils.ExtractPortsFromCompose(composePath)
 		if err != nil {
 			log.Warnf("failed to extract port variables from compose file with the following error : %s", err.Error())
 		}
