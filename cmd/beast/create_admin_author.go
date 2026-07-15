@@ -44,7 +44,9 @@ var createAuthorCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		createAuthorAdminPrereq()
-		utils.CreateAdminOrAuthor(Name, Username, Email, Password, "author")
+		if err := utils.CreateAdminOrAuthor(Name, Username, Email, Password, "author"); err != nil {
+			fmt.Printf("Unable to create author: %v\n", err)
+		}
 	},
 }
 
@@ -75,6 +77,8 @@ var createAdminCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		createAuthorAdminPrereq()
-		utils.CreateAdminOrAuthor(Name, Username, Email, Password, "admin")
+		if err := utils.CreateAdminOrAuthor(Name, Username, Email, Password, "admin"); err != nil {
+			fmt.Printf("Unable to create admin: %v\n", err)
+		}
 	},
 }

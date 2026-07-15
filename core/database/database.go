@@ -105,15 +105,19 @@ func Init() {
 	if len(users) == 0 {
 		log.Info("Creating dummy user entry")
 
-		salt := make([]byte, 16)
-		rand.Read(salt)
 		randPass := make([]byte, 32)
-		rand.Read(randPass)
+		if _, err := rand.Read(randPass); err != nil {
+			log.Fatalf("failed to generate dummy user password: %s", err)
+		}
+		authModel, err := auth.CreateModel(core.DEFAULT_USER_NAME, string(randPass), core.USER_ROLES["author"])
+		if err != nil {
+			log.Fatalf("failed to hash dummy user password: %s", err)
+		}
 
-		err := CreateUserEntry(&User{
+		err = CreateUserEntry(&User{
 			Name:      core.DEFAULT_USER_NAME,
 			Email:     core.DEFAULT_USER_EMAIL,
-			AuthModel: auth.CreateModel(core.DEFAULT_USER_NAME, string(randPass), core.USER_ROLES["author"]),
+			AuthModel: authModel,
 		})
 
 		if err != nil {

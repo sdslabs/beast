@@ -286,7 +286,9 @@ func initAdmin() error {
 		database.Init()
 
 		createAuthorAdminPrereq()
-		coreUtils.CreateAdminOrAuthor(name, username, email, password, "admin")
+		if err := coreUtils.CreateAdminOrAuthor(name, username, email, password, "admin"); err != nil {
+			return err
+		}
 	}
 
 	return nil

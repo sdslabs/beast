@@ -451,9 +451,13 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			// 	return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
 			// }
 			log.Infof("User with the given email does not exist : %v, creating this user", config.Author.Email)
+			authModel, err := auth.CreateModel(config.Author.Email, defaultauthorpassword, core.USER_ROLES["author"])
+			if err != nil {
+				return fmt.Errorf("create author credentials: %w", err)
+			}
 			newUser := database.User{
 				Name:      config.Author.Name,
-				AuthModel: auth.CreateModel(config.Author.Email, defaultauthorpassword, core.USER_ROLES["author"]),
+				AuthModel: authModel,
 				Email:     config.Author.Email,
 			}
 			err = database.CreateUserEntry(&newUser)

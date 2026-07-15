@@ -227,9 +227,14 @@ func register(c *gin.Context) {
 		return
 	}
 
+	authModel, err := auth.CreateModel(username, password, core.USER_ROLES["contestant"])
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Failed to secure user credentials"})
+		return
+	}
 	userEntry := database.User{
 		Name:      name,
-		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["contestant"]),
+		AuthModel: authModel,
 		Email:     email,
 	}
 
@@ -264,7 +269,7 @@ func register(c *gin.Context) {
 			}
 		}
 	}
-	err := database.CreateUserEntry(&userEntry)
+	err = database.CreateUserEntry(&userEntry)
 
 	if err != nil {
 		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
@@ -309,7 +314,11 @@ func resetPasswordHandler(c *gin.Context) {
 		})
 	}
 
-	authModel := auth.CreateModel(username, newPass, user.Role)
+	authModel, err := auth.CreateModel(username, newPass, user.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPPlainResp{Message: "Failed to secure user credentials"})
+		return
+	}
 
 	err = database.UpdateUser(&user, map[string]interface{}{"Password": authModel.Password, "Salt": authModel.Salt})
 	if err != nil {

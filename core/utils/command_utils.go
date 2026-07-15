@@ -6,19 +6,23 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/auth"
-	log "github.com/sirupsen/logrus"
 )
 
-func CreateAdminOrAuthor(name string, username string, email string, password string, role string) {
+func CreateAdminOrAuthor(name string, username string, email string, password string, role string) error {
+	authModel, err := auth.CreateModel(username, password, core.USER_ROLES[role])
+	if err != nil {
+		return err
+	}
 	userEntry := database.User{
 		Name:      name,
-		AuthModel: auth.CreateModel(username, password, core.USER_ROLES[role]),
+		AuthModel: authModel,
 		Email:     email,
 	}
-	err := database.CreateUserEntry(&userEntry)
+	err = database.CreateUserEntry(&userEntry)
 	if err != nil {
-		log.Errorf("Error while creating author entry : %v", err)
+		return fmt.Errorf("create author entry: %w", err)
 	}
+	return nil
 }
 
 func DeleteChallengeEntryWithPorts(challname string) error {
