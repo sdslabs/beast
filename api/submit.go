@@ -266,6 +266,14 @@ func dynamicScore(maxPoints, minPoints, solvers uint) uint {
 	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
 }
 
+func scoreAfterPointChange(currentScore, newPoints, oldPoints uint) uint {
+	score := int64(currentScore) + int64(newPoints) - int64(oldPoints)
+	if score < 0 {
+		return 0
+	}
+	return uint(score)
+}
+
 func startDynamicScoreWorker(ctx context.Context) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
@@ -354,10 +362,7 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 			return err
 		}
 		if user.Role == "contestant" {
-			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
-			if newScore <= 0 {
-				newScore = 0
-			}
+			newScore := scoreAfterPointChange(user.Score, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve)
 			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
 			if err != nil {
 				return err
