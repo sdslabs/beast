@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -428,14 +428,16 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 		return
 	}
 
-	t := time.Now().Unix()
+	now := time.Now()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, auth.CustomClaims{
-		User:      userEntry.Username,
-		Role:      userEntry.Role,
-		ExpiresAt: t + 300,
-		IssuedAt:  t,
-		Issuer:    auth.ISSUER,
+		User: userEntry.Username,
+		Role: userEntry.Role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(5 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			Issuer:    auth.ISSUER,
+		},
 	})
 
 	tempToken, err := token.SignedString([]byte(auth.JWTSECRET))

@@ -4,15 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 type CustomClaims struct {
-	User      string `json:"usr"`
-	Role      string `json:"eml"`
-	ExpiresAt int64  `json:"exp"`
-	IssuedAt  int64  `json:"iat"`
-	Issuer    string `json:"iss"`
+	User string `json:"usr"`
+	Role string `json:"role"`
+	jwt.RegisteredClaims
 }
 
 const (
@@ -27,49 +25,51 @@ var (
 	UserRoles    []string
 )
 
-func (c CustomClaims) Valid() error {
-	if c.ExpiresAt < time.Now().Unix() {
-		return fmt.Errorf("Token Expired")
-	}
-
-	return nil
-}
-
-func Authorize(jwtTokenString string, roleAccess int) error {
+func AuthorizeClaims(jwtTokenString string, roleAccess int) (*CustomClaims, error) {
 	token, err := jwt.ParseWithClaims(jwtTokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Token invalid")
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("token signing method is invalid")
 		}
 		return []byte(JWTSECRET), nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	claims, ok := token.Claims.(*CustomClaims)
 	if !ok || !token.Valid {
-		return fmt.Errorf("Token invalid")
+		return nil, fmt.Errorf("token is invalid")
+	}
+	if claims.Issuer != ISSUER {
+		return nil, fmt.Errorf("token issuer is invalid")
 	}
 
 	if !((roleAccess&MANAGER) != 0 && contains(ManagerRoles, claims.Role) ||
 		(roleAccess&ADMIN) != 0 && contains(AdminRoles, claims.Role) ||
 		(roleAccess&USER) != 0 && contains(UserRoles, claims.Role)) {
-		return fmt.Errorf("Role Access Error")
+		return nil, fmt.Errorf("role access error")
 	}
 
-	return token.Claims.Valid()
+	return claims, nil
+}
+
+func Authorize(jwtTokenString string, roleAccess int) error {
+	_, err := AuthorizeClaims(jwtTokenString, roleAccess)
+	return err
 }
 
 func GenerateJWT(authEntry AuthModel) (string, error) {
-	t := time.Now().Unix()
+	now := time.Now()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, CustomClaims{
-		User:      authEntry.Username,
-		Role:      authEntry.Role,
-		ExpiresAt: t + TIME_PERIOD,
-		IssuedAt:  t,
-		Issuer:    ISSUER,
+		User: authEntry.Username,
+		Role: authEntry.Role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(TIME_PERIOD) * time.Second)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			Issuer:    ISSUER,
+		},
 	})
 
 	return token.SignedString([]byte(JWTSECRET))
