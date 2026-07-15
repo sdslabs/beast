@@ -39,7 +39,6 @@ func initDirectories() error {
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CACHE_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR),
-		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SECRETS_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, core.BEAST_LOGO_DIR),

@@ -18,69 +18,13 @@ import (
 )
 
 var (
-	MINIMUM_MEMORY_LIMIT int64  = (1 << 23) /* a little over 6MB */
-	AUTHORIZED_KEYS_FILE string = filepath.Join(core.BEAST_GLOBAL_DIR, core.DEFAULT_AUTH_KEYS_FILE)
+	MINIMUM_MEMORY_LIMIT int64 = (1 << 23) /* a little over 6MB */
 
 	BEAST_GLOBAL_CONFIG string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
 
 	BEAST_EXAMPLE_DIRECTORY string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_EXAMPLE_DIR)
 	BEAST_EXAMPLE_CONFIG    string = filepath.Join(BEAST_EXAMPLE_DIRECTORY, core.BEAST_EX_CONFIG_FILE_NAME)
 )
-
-func copySSHKey() error {
-	location, err := utils.PromptPublicKeyFile()
-	if err != nil {
-		return err
-	}
-
-	if location == "" {
-		log.Warnln("No public key file selected... aborting")
-		return nil
-	}
-
-	publicKeyFile, err := os.Open(location)
-	if err != nil {
-		return err
-	}
-	defer publicKeyFile.Close()
-
-	authorizedKeyFile, err := os.OpenFile(AUTHORIZED_KEYS_FILE, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	defer authorizedKeyFile.Close()
-
-	_, err = io.Copy(authorizedKeyFile, publicKeyFile)
-	if err != nil {
-		return err
-	}
-
-	_, err = authorizedKeyFile.WriteString("\n\n")
-	if err != nil {
-		return err
-	}
-
-	log.Infoln(fmt.Sprintf("Added ssh key at %s", location))
-	return nil
-}
-
-func initAuthorizedKeysFile() error {
-	log.Infoln("Defaulting Authorized keys file:", AUTHORIZED_KEYS_FILE, "... can be changed later")
-
-	err := os.WriteFile(AUTHORIZED_KEYS_FILE, []byte{}, 0666)
-	if err != nil {
-		return err
-	}
-
-	for utils.PromptBinary("Would you like to add a public key to the authorized_keys file?") {
-		err = copySSHKey()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
 
 func downloadExampleBeastConfig() error {
 	log.Println("Downloading example config file from GitHub...")
@@ -296,10 +240,6 @@ func tryCopyExampleConfig() error {
 }
 
 func initBeastConfig() error {
-	if err := initAuthorizedKeysFile(); err != nil {
-		return err
-	}
-
 	if _, err := os.Stat(BEAST_GLOBAL_CONFIG); os.IsNotExist(err) {
 		return tryCopyExampleConfig()
 	}
@@ -311,7 +251,7 @@ func initBeastConfig() error {
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Run interactive beast configuration setup",
-	Long:  "Creates the default Authorized Keys File and Global Beast Config file while prompting the user interactively whenever needed.",
+	Long:  "Creates the global Beast config file while prompting the user interactively whenever needed.",
 
 	Run: func(cmd *cobra.Command, args []string) {
 		err := initBeastConfig()

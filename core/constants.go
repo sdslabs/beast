@@ -8,9 +8,8 @@ import (
 
 var (
 	// BEAST_GLOBAL_DIR should always be used only on local deployment
-	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
-	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
-	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
+	BEAST_GLOBAL_DIR = filepath.Join(os.Getenv("HOME"), ".beast")
+	BEAST_TEMP_DIR   = filepath.Join(os.TempDir(), "beast")
 )
 
 const ( //names
@@ -47,9 +46,7 @@ const ( //names
 const ( //paths
 	BEAST_DOCKER_CHALLENGE_DIR     string = "/challenge"
 	BEAST_CHALLENGE_LOGS_DIR       string = "logs"
-	DEFAULT_AUTH_KEYS_FILE         string = "beast_authorized_keys"
 	BEAST_STAGING_DIR              string = "staging"
-	BEAST_SCRIPTS_DIR              string = "scripts"
 	BEAST_REMOTES_DIR              string = "remote"
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
 	BEAST_UPLOADS_DIR              string = "uploads"
