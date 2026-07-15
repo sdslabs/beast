@@ -225,8 +225,12 @@ func tryCopyExampleConfig() error {
 
 	promptBeastConfiguration(&configuration)
 
-	file, err := os.Create(BEAST_GLOBAL_CONFIG)
+	file, err := os.OpenFile(BEAST_GLOBAL_CONFIG, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
+		return err
+	}
+	if err := file.Chmod(0600); err != nil {
+		file.Close()
 		return err
 	}
 	defer file.Close()

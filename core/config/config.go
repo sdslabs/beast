@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -484,7 +483,21 @@ func GetCompetitionInfo() (CompetitionInfo, error) {
 func LoadBeastConfig(configPath string) (BeastConfig, error) {
 	var config BeastConfig
 
-	err := utils.ValidateFileExists(configPath)
+	info, err := os.Lstat(configPath)
+	if err != nil {
+		return config, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return config, fmt.Errorf("global config must not be a symbolic link: %s", configPath)
+	}
+	if !info.Mode().IsRegular() {
+		return config, fmt.Errorf("global config is not a regular file: %s", configPath)
+	}
+	if info.Mode().Perm() != 0600 {
+		return config, fmt.Errorf("global config permissions must be 0600, got %04o", info.Mode().Perm())
+	}
+
+	err = utils.ValidateFileExists(configPath)
 	if err != nil {
 		return config, err
 	}
@@ -492,9 +505,6 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 	if err = decodeTOMLFileStrict(configPath, &config); err != nil {
 		return config, err
 	}
-
-	prettyJSON, _ := json.MarshalIndent(config, "", "  ")
-	log.Debugf("Parsed beast global config file is : %s", string(prettyJSON))
 
 	err = config.ValidateConfig()
 	if err != nil {
@@ -525,7 +535,6 @@ func InitConfig() {
 		os.Exit(1)
 	}
 
-	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
 	Cfg = &cfg
 }
 
@@ -540,6 +549,5 @@ func ReloadBeastConfig() error {
 	}
 
 	Cfg = &cfg
-	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
 	return nil
 }

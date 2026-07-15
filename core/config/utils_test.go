@@ -86,3 +86,32 @@ func TestChallengeMetadataRejectsUnsafeNames(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadBeastConfigRejectsInsecurePermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadBeastConfig(path)
+	if err == nil || !strings.Contains(err.Error(), "must be 0600") {
+		t.Fatalf("expected permissions error, got %v", err)
+	}
+}
+
+func TestLoadBeastConfigRejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.toml")
+	if err := os.WriteFile(target, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "config.toml")
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadBeastConfig(path)
+	if err == nil || !strings.Contains(err.Error(), "must not be a symbolic link") {
+		t.Fatalf("expected symlink error, got %v", err)
+	}
+}
