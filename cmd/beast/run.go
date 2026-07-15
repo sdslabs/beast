@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/sdslabs/beastv4/core"
@@ -20,6 +21,39 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+const controllerLockFile = "controller.lock"
+
+func acquireControllerLock(directory string) (*os.File, error) {
+	path := filepath.Join(directory, controllerLockFile)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("open controller lock: %w", err)
+	}
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		file.Close()
+		return nil, fmt.Errorf("another Beast controller is already active: %w", err)
+	}
+	if err := file.Truncate(0); err != nil {
+		syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		file.Close()
+		return nil, fmt.Errorf("truncate controller lock: %w", err)
+	}
+	if _, err := file.WriteString(strconv.Itoa(os.Getpid()) + "\n"); err != nil {
+		syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		file.Close()
+		return nil, fmt.Errorf("write controller lock: %w", err)
+	}
+	return file, nil
+}
+
+func releaseControllerLock(file *os.File) {
+	if file == nil {
+		return
+	}
+	_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	_ = file.Close()
+}
 
 var (
 	BEAST_GRAPH_CACHE       = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CACHE_DIR, core.BEAST_GRAPH_CACHE)
@@ -190,6 +224,12 @@ var runCmd = &cobra.Command{
 
 			log.Infoln("beast bootsteps complete... starting beast server")
 		}
+		controllerLock, err := acquireControllerLock(core.BEAST_GLOBAL_DIR)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		defer releaseControllerLock(controllerLock)
 
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
