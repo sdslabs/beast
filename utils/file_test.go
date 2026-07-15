@@ -59,3 +59,27 @@ func TestResolvePathWithinAcceptsContainedPath(t *testing.T) {
 		t.Fatalf("resolved %q, want %q", resolved, file)
 	}
 }
+
+func TestValidateSecretFileRequiresPrivateRegularFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "secret")
+	if err := os.WriteFile(path, nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateSecretFile(path); err == nil {
+		t.Fatal("expected insecure permissions error")
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateSecretFile(path); err != nil {
+		t.Fatal(err)
+	}
+	symlink := filepath.Join(dir, "link")
+	if err := os.Symlink(path, symlink); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateSecretFile(symlink); err == nil {
+		t.Fatal("expected symlink error")
+	}
+}

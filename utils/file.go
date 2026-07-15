@@ -69,6 +69,23 @@ func ValidateFileExists(filePath string) error {
 	return nil
 }
 
+func ValidateSecretFile(filePath string) error {
+	info, err := os.Lstat(filePath)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("secret file must not be a symbolic link: %s", filePath)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("secret path is not a regular file: %s", filePath)
+	}
+	if info.Mode().Perm() != 0600 {
+		return fmt.Errorf("secret file permissions must be 0600, got %04o", info.Mode().Perm())
+	}
+	return nil
+}
+
 // ResolvePathWithin resolves an existing relative path and verifies that it
 // remains inside root, including after following symbolic links.
 func ResolvePathWithin(root, relativePath string) (string, error) {
