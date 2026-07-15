@@ -70,6 +70,10 @@ func stopApiScheduler() {
 
 func stopWorkerQueue() {
 	log.Infoln("Stopping the worker queue...")
+	if manager.Q == nil {
+		log.Infoln("Worker queue was not started")
+		return
+	}
 	manager.Q.Stop()
 	log.Infoln("Worker queue stopped")
 }
@@ -188,12 +192,12 @@ func stopSseNotificationHub() {
 func cleanup() {
 	log.Info("Starting graceful shutdown cleanup...")
 
-	stopSseNotificationHub()
 	stopApiScheduler()
+	stopWorkerQueue()
+	stopSseNotificationHub()
 
 	cleanupRunningContainers()
 
-	stopWorkerQueue()
 	stopRemoteManagers()
 
 	saveLeaderboardCache()
