@@ -38,7 +38,6 @@ func (config *BeastChallengeConfig) PopulateDefaultValues() {
 func (Author *Author) PopulateAuthor() {
 	Author.Name = "AuthorName"
 	Author.Email = "AuthorMail"
-	Author.SSHKey = "AuthorPubKey"
 }
 
 func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
@@ -480,8 +479,6 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 //
 //   - Name - Name of the author of the challenge
 //   - Email - Email of the author
-//   - SSHKey - Public SSH key for the challenge author, to give the access
-//     to the challenge container.
 //
 // ```toml
 // # Optional fields
@@ -489,17 +486,15 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 //
 // # Required Fields
 // email = ""
-// ssh_key = "" # Public ssh Key of the author.
 // ```
 type Author struct {
-	Name   string `toml:"name"`
-	Email  string `toml:"email"`
-	SSHKey string `toml:"ssh_key"`
+	Name  string `toml:"name"`
+	Email string `toml:"email"`
 }
 
 func (config *Author) ValidateRequiredFields() error {
-	if config.Email == "" || config.SSHKey == "" {
-		return errors.New("Challenge `email` and `ssh_key` are required")
+	if config.Email == "" {
+		return errors.New("challenge author email is required")
 	}
 
 	if config.Name == "" {

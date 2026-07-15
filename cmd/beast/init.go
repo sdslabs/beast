@@ -284,18 +284,10 @@ func initAdmin() error {
 			return errors.New("admin password is required")
 		}
 
-		publicKeyPath, err := utils.PromptPublicKeyFile()
-		if err != nil {
-			return err
-		}
-		if publicKeyPath == "" {
-			log.Warnln("No public key provided... proceeding without it")
-		}
-
 		database.Init()
 
 		createAuthorAdminPrereq()
-		coreUtils.CreateAdminOrAuthor(name, username, email, publicKeyPath, password, "admin")
+		coreUtils.CreateAdminOrAuthor(name, username, email, password, "admin")
 	}
 
 	return nil

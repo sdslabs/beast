@@ -4,7 +4,6 @@ var CHALLENGE_CONFIG_FILE_TEMPLATE string = `# This a sample challenge configura
 [author]
 name      = {{.Author.Name}}                      # Required: Name of the challenge creator
 email     = {{.Author.Email}}                      # Required: Email for contact
-ssh_key   = {{.Author.SSHKey}}                    # Required: Public SSH key for the challenge author
 
 [challenge.metadata]
 name            = {{.Challenge.Metadata.Name}}         # Required: Name of the challenge, should be same as directory.

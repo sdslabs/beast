@@ -457,7 +457,6 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				Name:      config.Author.Name,
 				AuthModel: auth.CreateModel(config.Author.Email, defaultauthorpassword, core.USER_ROLES["author"]),
 				Email:     config.Author.Email,
-				SshKey:    config.Author.SSHKey,
 			}
 			err = database.CreateUserEntry(&newUser)
 			if err != nil {
@@ -467,7 +466,6 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
-				(userEntry.SshKey != config.Author.SSHKey || config.Author.SSHKey == "") &&
 				(userEntry.Name != config.Author.Name || config.Author.Name == "") &&
 				userEntry.Role != core.USER_ROLES["author"] {
 				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", userEntry.Email)

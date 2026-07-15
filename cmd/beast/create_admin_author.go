@@ -36,10 +36,6 @@ var createAuthorCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if PublicKeyPath == "" {
-			fmt.Printf("Public Key Path not provided")
-		}
-
 		if Password == "" {
 			fmt.Printf("Password not provided")
 			os.Exit(1)
@@ -48,7 +44,7 @@ var createAuthorCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		createAuthorAdminPrereq()
-		utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "author")
+		utils.CreateAdminOrAuthor(Name, Username, Email, Password, "author")
 	},
 }
 
@@ -71,10 +67,6 @@ var createAdminCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if PublicKeyPath == "" {
-			fmt.Printf("Public Key Path not provided")
-		}
-
 		if Password == "" {
 			fmt.Printf("Password not provided")
 			os.Exit(1)
@@ -83,6 +75,6 @@ var createAdminCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		createAuthorAdminPrereq()
-		utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "admin")
+		utils.CreateAdminOrAuthor(Name, Username, Email, Password, "admin")
 	},
 }

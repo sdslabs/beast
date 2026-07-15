@@ -19,7 +19,6 @@ var (
 	Username              string
 	Email                 string
 	Password              string
-	PublicKeyPath         string
 	SkipAuthorization     bool
 	AllChalls             bool
 	AutoDeploy            bool
@@ -92,13 +91,11 @@ func init() {
 	createAuthorCmd.PersistentFlags().StringVarP(&Username, "username", "", "", "Username of the new author")
 	createAuthorCmd.PersistentFlags().StringVarP(&Password, "password", "", "", "Password of the author")
 	createAuthorCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new author")
-	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new author")
 
 	createAdminCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Username, "username", "", "", "Username of the new admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Password, "password", "", "", "Password of the admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new admin")
-	createAdminCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new admin")
 
 	challengeCmd.PersistentFlags().BoolVarP(&AllChalls, "all", "a", false, "Performs action to all challs")
 	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")

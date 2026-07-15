@@ -197,7 +197,6 @@ func login(c *gin.Context) {
 // @Param username formData string true "Username"
 // @Param password formData string true "Password"
 // @Param email formData string true "User's email id"
-// @Param ssh-key formData string false "User's ssh-key"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
@@ -207,13 +206,11 @@ func register(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 	email := c.PostForm("email")
-	sshKey := c.PostForm("ssh-key")
 
 	name = strings.TrimSpace(name)
 	username = strings.TrimSpace(strings.ToLower(username))
 	password = strings.TrimSpace(password)
 	email = strings.TrimSpace(strings.ToLower(email))
-	sshKey = strings.TrimSpace(sshKey)
 
 	if username == "" || password == "" || email == "" {
 
@@ -234,7 +231,6 @@ func register(c *gin.Context) {
 		Name:      name,
 		AuthModel: auth.CreateModel(username, password, core.USER_ROLES["contestant"]),
 		Email:     email,
-		SshKey:    sshKey,
 	}
 
 	// skip otp verif if -n flag is enabled
