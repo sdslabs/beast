@@ -98,11 +98,26 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 	cache.Init()
 	backgroundCtx, stopBackground := context.WithCancel(ctx)
 	dynamicScoreDone := startDynamicScoreWorker(backgroundCtx)
+	instanceCleanupDone := make(chan struct{})
+	go func() {
+		defer close(instanceCleanupDone)
+		manager.InstanceCleanupProber(backgroundCtx)
+	}()
+	healthCheckDone := make(chan struct{})
+	if healthProbe || config.Cfg.HealthProber {
+		go func() {
+			defer close(healthCheckDone)
+			manager.BeastHealthCheckProber(backgroundCtx, config.Cfg.TickerFrequency)
+		}()
+	} else {
+		close(healthCheckDone)
+	}
 	defer func() {
 		stopBackground()
 		<-dynamicScoreDone
+		<-instanceCleanupDone
+		<-healthCheckDone
 	}()
-	go manager.InstanceCleanupProber()
 
 	// Initialise and start the Hub
 	// Must be started before the Notification Router, since SSE handler has access to SSE Hub
@@ -136,10 +151,6 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 	if periodicSync {
 		log.Infof("Scheduling periodic remote sync and auto update for beast with period: %v", config.Cfg.RemoteSyncPeriod)
 		BeastScheduler.ScheduleEvery(config.Cfg.RemoteSyncPeriod, manager.AutoUpdate)
-	}
-
-	if healthProbe || config.Cfg.HealthProber {
-		go manager.BeastHeathCheckProber(config.Cfg.TickerFrequency)
 	}
 
 	if autoDeploy {

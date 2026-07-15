@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -20,11 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var HEALTH_CHECKER = false
-var (
-	instanceCleanupOnce          sync.Once
-	instanceExpirySubscriberOnce sync.Once
-)
+var instanceDeletionMutex sync.Mutex
 
 // Check for static challenegs' assets to be present on staging server.
 // At the time of writing, Beast deploys assets to localhost only.
@@ -158,66 +155,94 @@ func ServerHealthProber(waitTime int) {
 	}
 }
 
-func BeastHeathCheckProber(waitTime int) {
-	if !HEALTH_CHECKER {
-		log.Info("Starting Health Check prober.")
-		HEALTH_CHECKER = true
+func runHealthCheckCycle(waitTime int) {
+	var group sync.WaitGroup
+	checks := []func(){
+		func() { ChallengesHealthProber(waitTime) },
+		func() { ServerHealthProber(waitTime) },
+		func() { _ = database.BackupDatabase() },
+		func() { _ = cache.BackupCache() },
+	}
+	group.Add(len(checks))
+	for _, check := range checks {
+		go func(check func()) {
+			defer group.Done()
+			check()
+		}(check)
+	}
+	group.Wait()
+}
 
-		go InstanceCleanupProber()
-
-		for {
-			go ChallengesHealthProber(waitTime)
-			go ServerHealthProber(waitTime)
-			go database.BackupDatabase()
-			go cache.BackupCache()
-			time.Sleep(time.Duration(waitTime) * time.Second)
+func BeastHealthCheckProber(ctx context.Context, waitTime int) {
+	if waitTime <= 0 {
+		log.Error("Health check interval must be positive")
+		return
+	}
+	if ctx.Err() != nil {
+		return
+	}
+	log.Info("Starting Health Check prober.")
+	ticker := time.NewTicker(time.Duration(waitTime) * time.Second)
+	defer ticker.Stop()
+	for {
+		if ctx.Err() != nil {
+			return
 		}
-	} else {
-		log.Warn("Health Checker Already Running. Not Starting Again")
+		runHealthCheckCycle(waitTime)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
 	}
 }
 
-func InstanceCleanupProber() {
-	started := false
-	instanceCleanupOnce.Do(func() {
-		started = true
-	})
-	if !started {
-		log.Warn("Instance cleanup prober already running. Not starting again")
+func InstanceCleanupProber(ctx context.Context) {
+	if ctx.Err() != nil {
 		return
 	}
-
 	log.Info("Starting Instance Cleanup prober with event-driven expiry and reconciliation interval: ", core.DEFAULT_HEALTH_CHECK_TIME)
-	startInstanceExpirySubscriber()
+	subscriberDone := startInstanceExpirySubscriber(ctx)
+	defer func() { <-subscriberDone }()
+	ticker := time.NewTicker(core.DEFAULT_HEALTH_CHECK_TIME)
+	defer ticker.Stop()
 
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 		ProcessInstanceDeletionQueue()
 		CleanupOrphanedInstanceContainers()
 		QueueExpiredInstances()
-		time.Sleep(core.DEFAULT_HEALTH_CHECK_TIME)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
 	}
 }
 
-func startInstanceExpirySubscriber() {
-	instanceExpirySubscriberOnce.Do(func() {
-		if err := cache.EnableKeyspaceExpiryNotifications(); err != nil {
-			log.Warnf("Redis keyspace expiry notifications unavailable, relying on reconciliation: %v", err)
-		}
+func startInstanceExpirySubscriber(ctx context.Context) <-chan struct{} {
+	done := make(chan struct{})
+	if err := cache.EnableKeyspaceExpiryNotifications(); err != nil {
+		log.Warnf("Redis keyspace expiry notifications unavailable, relying on reconciliation: %v", err)
+	}
 
-		go func() {
-			err := cache.SubscribeExpiredInstanceMarkers(context.Background(), func(instanceID string) {
-				log.Infof("Instance expiry marker fired for %s, queueing cleanup", instanceID)
-				if err := cache.QueueInstanceForDeletion(instanceID); err != nil {
-					log.Warnf("Failed to queue expired instance %s from Redis event: %v", instanceID, err)
-					return
-				}
-				ProcessInstanceDeletionQueue()
-			})
-			if err != nil {
-				log.Warnf("Redis expiry subscriber stopped, reconciliation will continue cleanup: %v", err)
+	go func() {
+		defer close(done)
+		err := cache.SubscribeExpiredInstanceMarkers(ctx, func(instanceID string) {
+			log.Infof("Instance expiry marker fired for %s, queueing cleanup", instanceID)
+			if err := cache.QueueInstanceForDeletion(instanceID); err != nil {
+				log.Warnf("Failed to queue expired instance %s from Redis event: %v", instanceID, err)
+				return
 			}
-		}()
-	})
+			ProcessInstanceDeletionQueue()
+		})
+		if err != nil && !errors.Is(err, context.Canceled) {
+			log.Warnf("Redis expiry subscriber stopped, reconciliation will continue cleanup: %v", err)
+		}
+	}()
+	return done
 }
 
 func QueueExpiredInstances() {
@@ -241,6 +266,8 @@ func QueueExpiredInstances() {
 }
 
 func ProcessInstanceDeletionQueue() {
+	instanceDeletionMutex.Lock()
+	defer instanceDeletionMutex.Unlock()
 	log.Debug("Processing instance deletion queue")
 
 	for i := 0; i < 10; i++ {
