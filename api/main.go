@@ -1,7 +1,12 @@
 package api
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/cache"
@@ -23,6 +28,7 @@ import (
 
 const (
 	DEFAULT_BEAST_PORT = ":5005"
+	shutdownTimeout    = 30 * time.Second
 )
 
 var BeastScheduler scheduler.Scheduler = scheduler.NewScheduler()
@@ -51,15 +57,36 @@ func runBeastApiBootsteps(defaultauthorpassword string) error {
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) {
+func listenAddress(port string) (string, error) {
+	if port == "" {
+		return DEFAULT_BEAST_PORT, nil
+	}
+	value, err := strconv.Atoi(port)
+	if err != nil || value < 1 || value > 65535 {
+		return "", fmt.Errorf("invalid API port %q", port)
+	}
+	return ":" + strconv.Itoa(value), nil
+}
+
+func newHTTPServer(address string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              address,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    64 << 10,
+	}
+}
+
+func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) error {
 	log.Info("Bootstrapping Beast API server")
 
 	config.InitConfig()
 
-	if port != "" {
-		port = ":" + port
-	} else {
-		port = DEFAULT_BEAST_PORT
+	address, err := listenAddress(port)
+	if err != nil {
+		return err
 	}
 
 	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
@@ -117,5 +144,28 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	if noCache {
 		log.Infof("Starting Beast server in no cache mode")
 	}
-	router.Run(port)
+	server := newHTTPServer(address, router)
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- server.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serverErr:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return fmt.Errorf("serve Beast API: %w", err)
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shut down Beast API: %w", err)
+		}
+		err := <-serverErr
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("serve Beast API: %w", err)
+		}
+		return nil
+	}
 }

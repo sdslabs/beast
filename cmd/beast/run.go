@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/sdslabs/beastv4/core/cache"
@@ -224,6 +225,13 @@ var runCmd = &cobra.Command{
 
 			log.Infoln("beast bootsteps complete... starting beast server")
 		}
+		if Port != "" {
+			port, err := strconv.Atoi(Port)
+			if err != nil || port < 1 || port > 65535 {
+				log.Errorf("invalid API port %q", Port)
+				return
+			}
+		}
 		controllerLock, err := acquireControllerLock(core.BEAST_GLOBAL_DIR)
 		if err != nil {
 			log.Error(err)
@@ -231,13 +239,16 @@ var runCmd = &cobra.Command{
 		}
 		defer releaseControllerLock(controllerLock)
 
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		ctx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stopSignals()
 
-		go api.RunBeastApiServer(Port, DefaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
-		<-sigChan
-
-		log.Infoln("\nShutdown signal received.")
+		err = api.RunBeastApiServer(ctx, Port, DefaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
+		if err != nil {
+			log.Errorf("Beast API stopped: %v", err)
+		}
+		if ctx.Err() != nil {
+			log.Infoln("Shutdown signal received.")
+		}
 		cleanup()
 		log.Infoln("Server stopped gracefully.")
 	},
