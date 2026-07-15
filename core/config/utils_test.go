@@ -73,3 +73,16 @@ func TestChallengeEnvRejectsEscapingComposeSymlink(t *testing.T) {
 		t.Fatalf("expected escaping symlink error, got %v", err)
 	}
 }
+
+func TestChallengeMetadataRejectsUnsafeNames(t *testing.T) {
+	tests := []string{"../../escape", "name; touch pwned", "UPPERCASE", strings.Repeat("a", 65)}
+	for _, name := range tests {
+		t.Run(name, func(t *testing.T) {
+			metadata := ChallengeMetadata{Name: name, Flag: "flag", Type: "static"}
+			err, _ := metadata.ValidateRequiredFields()
+			if err == nil || !strings.Contains(err.Error(), "must match") {
+				t.Fatalf("expected unsafe name error, got %v", err)
+			}
+		})
+	}
+}

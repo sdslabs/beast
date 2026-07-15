@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
@@ -14,6 +15,8 @@ import (
 
 const SERVICE_CONTAINER_DEPS string = "xinetd"
 const SERVICE_CHALL_RUN_CMD string = "xinetd -dontfork"
+
+var challengeNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
@@ -167,6 +170,9 @@ func (config *ChallengeMetadata) GetInstanceExpiration() int64 {
 func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if config.Name == "" || (config.Flag == "" && !config.DynamicFlag) {
 		return fmt.Errorf("name and flag required for the challenge"), false
+	}
+	if !challengeNamePattern.MatchString(config.Name) {
+		return fmt.Errorf("challenge name must match %s", challengeNamePattern.String()), false
 	}
 
 	// Checks if fail solve limit is provided and is greater than 0
