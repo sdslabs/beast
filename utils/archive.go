@@ -51,6 +51,12 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 	if err != nil {
 		return fmt.Errorf("error while creating tar :: %s", target)
 	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = os.Remove(target)
+		}
+	}()
 	defer targetFile.Close()
 
 	// Create a Gzipped tar file writer from the file we just opened
@@ -115,31 +121,33 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 	for fileName, filePath := range additionalCtx {
 		fileInfo, err := CheckPathValid(filePath)
 		if err != nil || !fileInfo.Mode().IsRegular() {
-			log.Errorf("Cannot find a valid file for %s while creating tar... Continuing", filePath)
-			continue
+			return fmt.Errorf("invalid additional archive file %s", filePath)
 		}
 
 		header, err := tar.FileInfoHeader(fileInfo, fileInfo.Name())
 		if err != nil {
-			log.Errorf("Cannot create a valid tar header for %s while creating tar... Continuing", filePath)
-			continue
+			return fmt.Errorf("create archive header for %s: %w", filePath, err)
 		}
 
 		header.Name = filepath.Join(fileName)
 
 		if err := tarFileWriter.WriteHeader(header); err != nil {
-			log.Errorf("Cannot write tar header for %s while creating tar... Continuing", filePath)
-			continue
+			return fmt.Errorf("write archive header for %s: %w", filePath, err)
 		}
 
-		curFile, _ := os.Open(filePath)
+		curFile, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("open additional archive file %s: %w", filePath, err)
+		}
 
 		_, err = io.Copy(tarFileWriter, curFile)
+		closeErr := curFile.Close()
 		if err != nil {
-			log.Errorf("Cannot write file to tar %s... Continuing", filePath)
-			continue
+			return fmt.Errorf("write additional archive file %s: %w", filePath, err)
 		}
-		curFile.Close()
+		if closeErr != nil {
+			return fmt.Errorf("close additional archive file %s: %w", filePath, closeErr)
+		}
 	}
 
 	if err != nil {
@@ -153,6 +161,16 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 
 		return fmt.Errorf("error while creating Tar :: %s", err)
 	}
+	if err := tarFileWriter.Close(); err != nil {
+		return fmt.Errorf("finalize tar archive: %w", err)
+	}
+	if err := fileWriter.Close(); err != nil {
+		return fmt.Errorf("finalize gzip archive: %w", err)
+	}
+	if err := targetFile.Close(); err != nil {
+		return fmt.Errorf("close archive: %w", err)
+	}
+	complete = true
 
 	return nil
 }

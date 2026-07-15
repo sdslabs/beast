@@ -33,3 +33,25 @@ func TestTarRejectsSymlinks(t *testing.T) {
 		t.Fatalf("partial archive was not removed: %v", statErr)
 	}
 }
+
+func TestTarFailsWhenAdditionalContextIsMissing(t *testing.T) {
+	parent := t.TempDir()
+	contextDir := filepath.Join(parent, "challenge")
+	destinationDir := filepath.Join(parent, "staging")
+	if err := os.Mkdir(contextDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(destinationDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Tar(contextDir, Gzip, destinationDir, map[string]string{
+		"Dockerfile": filepath.Join(parent, "missing"),
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid additional archive file") {
+		t.Fatalf("expected missing additional file error, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(destinationDir, "challenge.tar.gz")); !os.IsNotExist(statErr) {
+		t.Fatalf("partial archive was not removed: %v", statErr)
+	}
+}
