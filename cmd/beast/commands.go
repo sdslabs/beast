@@ -113,7 +113,6 @@ func init() {
 
 	restoreDatabaseCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Backup file to be used for restoration.")
 
-
 	restoreCacheCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Restore file to be used for restoration.")
 
 	rootCmd.AddCommand(versionCmd)
@@ -127,7 +126,6 @@ func init() {
 	rootCmd.AddCommand(healthProbeCmd)
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(challengeCmd)
-	rootCmd.AddCommand(disableUserSSH)
 	rootCmd.AddCommand(cmdRef)
 	rootCmd.AddCommand(generateTemplateCmd)
 	rootCmd.AddCommand(challDetailsCmd)

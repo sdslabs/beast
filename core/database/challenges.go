@@ -1,13 +1,8 @@
 package database
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"html/template"
-	"io/ioutil"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -16,7 +11,6 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
-	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
 
 	"gorm.io/gorm"
@@ -552,88 +546,6 @@ func SaveFlagSubmission(user_challenges *UserChallenges) error {
 	}
 
 	return tx.Commit().Error
-}
-
-// hook after update of challenge
-func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
-	iFace, _ := tx.InstanceGet("gorm:update_attrs")
-	if iFace == nil {
-		return nil
-	}
-	updatedAttr := iFace.(map[string]interface{})
-	if _, ok := updatedAttr["container_id"]; ok {
-		var users []*User
-		Db.Model(challenge).Association("Users")
-		go updateScripts(users)
-	}
-	return nil
-}
-
-// hook after create of challenge
-func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
-	var users []*User
-	Db.Model(challenge).Association("Users")
-	go updateScripts(users)
-
-	return nil
-}
-
-// hook after deleting the challenge
-func (challenge *Challenge) AfterDelete(tx *gorm.DB) error {
-	var users []*User
-	Db.Model(challenge).Association("Users")
-	go updateScripts(users)
-	return nil
-}
-
-type ScriptFile struct {
-	User       string
-	Challenges map[string]string
-}
-
-// updates users' script
-func updateScripts(users []*User) {
-	for _, user := range users {
-		go updateScript(user)
-	}
-}
-
-// updates user script
-func updateScript(user *User) error {
-
-	time.Sleep(3 * time.Second)
-
-	SHA256 := sha256.New()
-	SHA256.Write([]byte(user.Email))
-	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
-	challs, err := GetRelatedChallenges(user)
-	if err != nil {
-		return fmt.Errorf("error while getting related challenges : %v", err)
-	}
-
-	mapOfChall := make(map[string]string)
-
-	for _, chall := range challs {
-		mapOfChall[chall.Name] = chall.ContainerId
-	}
-
-	data := ScriptFile{
-		User:       user.Name,
-		Challenges: mapOfChall,
-	}
-
-	var script bytes.Buffer
-	scriptTemplate, err := template.New("script").Parse(tools.SSH_LOGIN_SCRIPT_TEMPLATE)
-	if err != nil {
-		return fmt.Errorf("error while parsing script template :: %s", err)
-	}
-
-	err = scriptTemplate.Execute(&script, data)
-	if err != nil {
-		return fmt.Errorf("error while executing script template :: %s", err)
-	}
-
-	return ioutil.WriteFile(scriptPath, script.Bytes(), 0755)
 }
 
 // Create a new entry in the DynamicFlag table
