@@ -1,10 +1,10 @@
 package api
 
 import (
+	"context"
 	"math"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,8 +17,7 @@ import (
 )
 
 var (
-	dynamicScoreWorkerOnce sync.Once
-	dynamicScoreNotify     = make(chan struct{}, 1)
+	dynamicScoreNotify = make(chan struct{}, 1)
 )
 
 // Verifies and creates an entry in the database for successful submission of flag for a challenge.
@@ -269,22 +268,25 @@ func dynamicScore(maxPoints, minPoints, solvers uint) uint {
 	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
 }
 
-func startDynamicScoreWorker() {
-	dynamicScoreWorkerOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(30 * time.Second)
-			defer ticker.Stop()
+func startDynamicScoreWorker(ctx context.Context) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
 
-			for {
-				select {
-				case <-dynamicScoreNotify:
-					processDirtyDynamicScores()
-				case <-ticker.C:
-					processDirtyDynamicScores()
-				}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-dynamicScoreNotify:
+				processDirtyDynamicScores()
+			case <-ticker.C:
+				processDirtyDynamicScores()
 			}
-		}()
-	})
+		}
+	}()
+	return done
 }
 
 func notifyDynamicScoreWorker() {

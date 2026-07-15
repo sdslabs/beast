@@ -96,7 +96,12 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 	remoteManager.Init()
 	database.Init()
 	cache.Init()
-	startDynamicScoreWorker()
+	backgroundCtx, stopBackground := context.WithCancel(ctx)
+	dynamicScoreDone := startDynamicScoreWorker(backgroundCtx)
+	defer func() {
+		stopBackground()
+		<-dynamicScoreDone
+	}()
 	go manager.InstanceCleanupProber()
 
 	// Initialise and start the Hub
