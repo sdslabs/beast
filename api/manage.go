@@ -120,9 +120,7 @@ func manageChallengeHandler(c *gin.Context) {
 	}
 
 	if action == core.MANAGE_ACTION_PURGE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		markLeaderboardCachesStale()
 	}
 
 	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
@@ -183,9 +181,7 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	}
 
 	if action == core.MANAGE_ACTION_PURGE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		markLeaderboardCachesStale()
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainMapResp{

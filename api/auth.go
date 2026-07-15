@@ -273,11 +273,7 @@ func register(c *gin.Context) {
 		return
 	}
 
-	if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
-	}
+	markLeaderboardCachesStale()
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User created successfully",

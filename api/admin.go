@@ -69,8 +69,7 @@ func userActionHandler(c *gin.Context) {
 		return
 	}
 	if val, _ := database.IsFrozenScoreSet(); !val {
-		leaderboardStale = true
-		graphCacheStale = true
+		markLeaderboardCachesStale()
 	}
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: fmt.Sprintf("Successfully %sned the user with id %s", action, userId),

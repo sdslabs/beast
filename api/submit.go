@@ -249,9 +249,7 @@ func submitFlagHandler(c *gin.Context) {
 		}
 	}
 
-	leaderboardStale = true
-	graphCacheStale = true
-	adminLeaderboardStale = true
+	markLeaderboardCachesStale()
 
 	c.JSON(http.StatusOK, FlagSubmitResp{
 		Message: "Your flag is correct",
@@ -341,9 +339,7 @@ func recomputeDynamicScore(dirty database.DynamicScoreDirty) error {
 
 	if delta != 0 {
 		log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challenge.Points)
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		markLeaderboardCachesStale()
 	}
 
 	return nil
@@ -358,7 +354,6 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 			return err
 		}
 		if user.Role == "contestant" {
-			oldScore := user.Score
 			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
 			if newScore <= 0 {
 				newScore = 0
@@ -367,19 +362,12 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 			if err != nil {
 				return err
 			}
-			// Check if this user's score change could affect top 25 leaderboard
-			if !scoreChanged && (len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
-				(len(adminLeaderboardCache) > 0 && (oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
-					newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score))) {
-				scoreChanged = true
-			}
+			scoreChanged = true
 		}
 	}
 	// Mark cache stale if any user's score change could affect top 25
 	if scoreChanged {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		markLeaderboardCachesStale()
 	}
 	return nil
 }

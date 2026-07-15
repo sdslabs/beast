@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
@@ -27,7 +28,16 @@ var (
 	adminLeaderboardStale = true
 	graphCache            []database.UserLeaderboardResp
 	graphCacheStale       = true
+	leaderboardCacheMu    sync.Mutex
 )
+
+func markLeaderboardCachesStale() {
+	leaderboardCacheMu.Lock()
+	leaderboardStale = true
+	adminLeaderboardStale = true
+	graphCacheStale = true
+	leaderboardCacheMu.Unlock()
+}
 
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
@@ -140,18 +150,7 @@ func hintHandler(c *gin.Context) {
 		return
 	}
 
-	oldScore := user.Score
-	newScore := oldScore - hint.Points
-	if newScore < 0 {
-		newScore = 0
-	}
-
-	if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
-		(len(adminLeaderboardCache) > 0 && oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
-	}
+	markLeaderboardCachesStale()
 
 	// Return the hint description after successfully taking it
 	c.JSON(http.StatusOK, HTTPPlainResp{
@@ -992,6 +991,8 @@ func getLeaderboardHandler(c *gin.Context) {
 	}
 	if isLeaderboardFrozen {
 		if page == 1 {
+			leaderboardCacheMu.Lock()
+			defer leaderboardCacheMu.Unlock()
 			if leaderboardStale {
 				users, err := database.QueryTopUsersByFrozenScore(core.LEADERBOARD_SIZE)
 				if err != nil {
@@ -1050,6 +1051,8 @@ func getLeaderboardHandler(c *gin.Context) {
 	}
 
 	if page == 1 {
+		leaderboardCacheMu.Lock()
+		defer leaderboardCacheMu.Unlock()
 		if leaderboardStale {
 			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
 			if err != nil {
@@ -1132,6 +1135,8 @@ func adminLeaderboardHandler(c *gin.Context) {
 		return
 	}
 	if page == 1 {
+		leaderboardCacheMu.Lock()
+		defer leaderboardCacheMu.Unlock()
 		if adminLeaderboardStale {
 			users, err := database.QueryTopUsersByScore(core.LEADERBOARD_SIZE)
 			if err != nil {
@@ -1209,8 +1214,7 @@ func freezeLeaderboardHandler(c *gin.Context) {
 			Message: "DATABASE ERROR while processing the request.",
 		})
 	}
-	leaderboardStale = true
-	graphCacheStale = true
+	markLeaderboardCachesStale()
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User leaderboard frozen successfully",
 	})
@@ -1235,8 +1239,7 @@ func unfreezeLeaderboardHandler(c *gin.Context) {
 			Message: "DATABASE ERROR while processing the request.",
 		})
 	}
-	leaderboardStale = true
-	graphCacheStale = true
+	markLeaderboardCachesStale()
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User leaderboard unfrozen successfully",
 	})
@@ -1443,6 +1446,8 @@ func getUserAttempts(c *gin.Context) {
 }
 
 func getLeaderboardGraphHandler(c *gin.Context) {
+	leaderboardCacheMu.Lock()
+	defer leaderboardCacheMu.Unlock()
 	var topUsers []uint
 	// TODO: Add a check for leaderboard stale to prevent stale graphs
 	// Try if graphCache and leaderboardCache can be merged.
