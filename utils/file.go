@@ -69,6 +69,42 @@ func ValidateFileExists(filePath string) error {
 	return nil
 }
 
+// ResolvePathWithin resolves an existing relative path and verifies that it
+// remains inside root, including after following symbolic links.
+func ResolvePathWithin(root, relativePath string) (string, error) {
+	if relativePath == "" || filepath.IsAbs(relativePath) {
+		return "", fmt.Errorf("path must be relative: %q", relativePath)
+	}
+
+	rootPath, err := filepath.Abs(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve root path: %w", err)
+	}
+	rootPath, err = filepath.EvalSymlinks(rootPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve root symlinks: %w", err)
+	}
+
+	targetPath, err := filepath.Abs(filepath.Join(rootPath, relativePath))
+	if err != nil {
+		return "", fmt.Errorf("resolve path: %w", err)
+	}
+	resolvedPath, err := filepath.EvalSymlinks(targetPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve path symlinks: %w", err)
+	}
+
+	rel, err := filepath.Rel(rootPath, resolvedPath)
+	if err != nil {
+		return "", fmt.Errorf("compare path to root: %w", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path escapes root: %q", relativePath)
+	}
+
+	return resolvedPath, nil
+}
+
 // Create the directory sequence in dirPath if it does not exist
 // if there was an error while creating the directory it returns the error
 // else it returns nil indicating success
