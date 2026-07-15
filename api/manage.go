@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -505,8 +504,7 @@ func manageUploadHandler(c *gin.Context) {
 	challengeName := filepath.Base(challengeUploadDirectory)
 	configFile := filepath.Join(challengeUploadDirectory, core.CHALLENGE_CONFIG_FILE_NAME)
 
-	var config cfg.BeastChallengeConfig
-	_, err = toml.DecodeFile(configFile, &config)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
 		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{

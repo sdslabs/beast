@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	containerType "github.com/docker/docker/api/types"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
@@ -726,8 +725,8 @@ func undeployChallenge(challengeName string, purge bool) error {
 	// and then remove the challenge from the staging directory.
 	if purge {
 		configFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.CHALLENGE_CONFIG_FILE_NAME)
-		var cfg config.BeastChallengeConfig
-		_, err = toml.DecodeFile(configFile, &cfg)
+		cfg, loadErr := config.LoadChallengeConfig(configFile)
+		err = loadErr
 		if err != nil {
 			return err
 		}

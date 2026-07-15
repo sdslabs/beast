@@ -16,7 +16,6 @@ import (
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/utils"
 
-	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -440,8 +439,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	challengeName := filepath.Base(challengeDir)
 	configFile := filepath.Join(challengeDir, core.CHALLENGE_CONFIG_FILE_NAME)
 
-	var config cfg.BeastChallengeConfig
-	_, err := toml.DecodeFile(configFile, &config)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
 		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
 		return fmt.Errorf("CONFIG ERROR: %s : %s", challengeName, err)

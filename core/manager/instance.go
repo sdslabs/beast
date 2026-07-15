@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/google/uuid"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/cache"
@@ -42,8 +41,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	configFile := filepath.Join(challengeStagingDir, core.CHALLENGE_CONFIG_FILE_NAME)
 
-	var config cfg.BeastChallengeConfig
-	_, err = toml.DecodeFile(configFile, &config)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load challenge config: %w", err)
 	}

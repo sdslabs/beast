@@ -23,7 +23,6 @@ import (
 	tools "github.com/sdslabs/beastv4/templates"
 	"github.com/sdslabs/beastv4/utils"
 
-	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -74,8 +73,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return err
 	}
 
-	var config cfg.BeastChallengeConfig
-	_, err = toml.DecodeFile(configFile, &config)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
 		return err
 	}
@@ -619,8 +617,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 // Provides the Static Content Folder Name from the config
 func GetStaticContentDir(configFile, contextDir string) (string, error) {
-	var config cfg.BeastChallengeConfig
-	_, err := toml.DecodeFile(configFile, &config)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
 		return "", fmt.Errorf("error while decoding file : %s", configFile)
 	}
@@ -872,8 +869,7 @@ func UpdateChallenges(defaultauthorpassword string) {
 		for _, dir := range dirs {
 
 			configFile := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
-			var config cfg.BeastChallengeConfig
-			_, err := toml.DecodeFile(configFile, &config)
+			config, err := cfg.LoadChallengeConfig(configFile)
 			if err != nil {
 				log.Errorf("Error while decoding challenge config file for challenge dir %s: %s", dir, err.Error())
 				continue
