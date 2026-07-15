@@ -80,6 +80,9 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 				log.Debugf("skipping a dir without errors: %s", info.Name())
 				return filepath.SkipDir
 			}
+			if !info.IsDir() && !info.Mode().IsRegular() {
+				return fmt.Errorf("unsupported file type in archive context: %s", path)
+			}
 
 			header, err := tar.FileInfoHeader(info, info.Name())
 			if err != nil {
