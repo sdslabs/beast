@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -117,8 +116,10 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 func BuildImagesFromCompose(challengeName, challengeTag, stagedPath, ComposeFile string, noCache bool) (*bytes.Buffer, error) {
 	extractPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
 
-	extractCmd := fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", extractPath, stagedPath, extractPath)
-	err := exec.Command("bash", "-c", extractCmd).Run()
+	if err := os.MkdirAll(extractPath, 0750); err != nil {
+		return nil, fmt.Errorf("create compose extraction directory %s: %w", extractPath, err)
+	}
+	err := exec.Command("tar", "-xf", stagedPath, "-C", extractPath).Run()
 	if err != nil {
 		return nil, fmt.Errorf("error while extracting tar file %s to %s: %v", stagedPath, extractPath, err)
 	}
@@ -129,11 +130,10 @@ func BuildImagesFromCompose(challengeName, challengeTag, stagedPath, ComposeFile
 	}
 	// Note: docker compose build does not support --label flag
 	// Labels are automatically added to containers during 'docker compose up -p <project>'
-	composeCmd := fmt.Sprintf("docker %s", strings.Join(cmdArgs, " "))
 	log.Debugf("Building image for challenge %s with tag %s", challengeName, challengeTag)
 	log.Debugf("Running the command: docker %v", cmdArgs)
 
-	cmd := exec.Command("bash", "-c", composeCmd)
+	cmd := exec.Command("docker", cmdArgs...)
 	cmd.Dir = extractPath
 	var outBuffer bytes.Buffer
 	cmd.Stdout = &outBuffer
