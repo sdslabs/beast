@@ -12,11 +12,10 @@ help:
 	@echo "* check_format: Check for formatting errors using gofmt"
 	@echo "* format: format the go files using go_fmt in the project directory."
 	@echo "* test: Run tests for beast"
-	@echo "* tools: Set up required tools for beast which includes - docker-enter, importenv"
 	@echo ""
 
 # Build beast
-build: tools
+build:
 	@./scripts/build/build.sh
 
 # Run development environment
@@ -47,25 +46,6 @@ govet:
 	@echo "[*] Vetting code, checking for mistakes"
 	@$(GO) vet $(pkgs)
 
-# Ensure that the required tools are installed for beast to work
-tools:
-	@if ! test -x "`which nsenter 2>&1;true`"; then \
-	  echo 'Error: nsenter is not installed, Install it first' >&2 ; \
-	fi
-
-	@if ! test -x "`which docker-enter 2>&1;true`"; then \
-	  echo 'Warn: docker-enter is not installed, building....' >&2 ; \
-	  sudo cp ./scripts/docker-enter "/usr/bin/" ; \
-	  sudo cp ./scripts/docker_enter "/usr/bin/"; \
-	  sudo chown root "/usr/bin/docker_enter"; \
-	  sudo chmod u+s "/usr/bin/docker_enter"; \
-	fi
-
-	@if ! test -x "`which importenv 2>&1;true`"; then \
-	  echo 'Warn: importenv is not installed, building....' >&2 ; \
-	  sudo gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
-	fi
-
 requirements:
 	@echo ">>> Building beast extras..."
 	@./scripts/build/extras.sh
@@ -80,4 +60,4 @@ installenv:
 	@echo 'Setting up environment for beast.'
 	@./scripts/installenv.sh
 
-.PHONY: build format test check_format tools docs installenv
+.PHONY: build format test check_format docs installenv
