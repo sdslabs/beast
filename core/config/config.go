@@ -489,8 +489,7 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 		return config, err
 	}
 
-	_, err = toml.DecodeFile(configPath, &config)
-	if err != nil {
+	if err = decodeTOMLFileStrict(configPath, &config); err != nil {
 		return config, err
 	}
 
