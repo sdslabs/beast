@@ -46,7 +46,9 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		return nil, fmt.Errorf("failed to load challenge config: %w", err)
 	}
 
-	config.Resources.ValidateRequiredFields()
+	if err := config.Resources.ValidateRequiredFields(); err != nil {
+		return nil, fmt.Errorf("invalid challenge resource limits: %w", err)
+	}
 
 	if !config.Challenge.Metadata.IsInstanced() {
 		return nil, fmt.Errorf("challenge %s is not configured for instancing", challengeName)

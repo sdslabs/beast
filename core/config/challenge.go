@@ -72,7 +72,9 @@ func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) erro
 		return err
 	}
 
-	config.Resources.ValidateRequiredFields()
+	if err = config.Resources.ValidateRequiredFields(); err != nil {
+		return err
+	}
 
 	for _, maintainer := range config.Maintainers {
 		err = maintainer.ValidateRequiredFields()
@@ -540,7 +542,10 @@ type Resources struct {
 	CPUsLimit float32 `toml:"cpuslimit"`
 }
 
-func (config *Resources) ValidateRequiredFields() {
+func (config *Resources) ValidateRequiredFields() error {
+	if Cfg == nil {
+		return errors.New("global configuration is not initialized")
+	}
 	if config.CPUShares <= 0 {
 		log.Debug("CPU shares not provided in configuration, using default.")
 		config.CPUShares = Cfg.CPUShares
@@ -560,4 +565,17 @@ func (config *Resources) ValidateRequiredFields() {
 		log.Debug("CPUsLimit not provided in configuration, using default.")
 		config.CPUsLimit = Cfg.CPUsLimit
 	}
+	if config.CPUShares > Cfg.CPUShares {
+		return fmt.Errorf("cpu_shares %d exceeds global limit %d", config.CPUShares, Cfg.CPUShares)
+	}
+	if config.Memory > Cfg.Memory {
+		return fmt.Errorf("memory_limit %d exceeds global limit %d", config.Memory, Cfg.Memory)
+	}
+	if config.PidsLimit > Cfg.PidsLimit {
+		return fmt.Errorf("pids_limit %d exceeds global limit %d", config.PidsLimit, Cfg.PidsLimit)
+	}
+	if config.CPUsLimit > Cfg.CPUsLimit {
+		return fmt.Errorf("cpuslimit %.2f exceeds global limit %.2f", config.CPUsLimit, Cfg.CPUsLimit)
+	}
+	return nil
 }
