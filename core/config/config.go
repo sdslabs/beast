@@ -324,7 +324,7 @@ func (config *AvailableServer) ValidateServerConfig() error {
 		config.KnownHostsFile = filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
 	}
 
-	err = utils.ValidateFileExists(config.SSHKeyPath)
+	err = utils.ValidateSecretFile(config.SSHKeyPath)
 	if err != nil {
 		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.SSHKeyPath, err)
 	}
@@ -364,7 +364,7 @@ func (config *GitRemote) ValidateGitConfig() error {
 		config.Branch = core.GIT_REMOTE_DEFAULT_BRANCH
 	}
 
-	err = utils.ValidateFileExists(config.Secret)
+	err = utils.ValidateSecretFile(config.Secret)
 	log.Debugf("Using git ssh secret : %s", config.Secret)
 	if err != nil {
 		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.Secret, err)
