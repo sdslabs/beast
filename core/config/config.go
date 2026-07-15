@@ -290,12 +290,13 @@ func (config *BeastConfig) UseLocalDockerDaemon(serverName string) bool {
 }
 
 type AvailableServer struct {
-	Name       string `toml:"-"`
-	Host       string `toml:"host"`
-	Username   string `toml:"username"`
-	SSHKeyPath string `toml:"ssh_key_path"`
-	Active     bool   `toml:"active"`
-	PortRange  string `toml:"port_range"`
+	Name           string `toml:"-"`
+	Host           string `toml:"host"`
+	Username       string `toml:"username"`
+	SSHKeyPath     string `toml:"ssh_key_path"`
+	KnownHostsFile string `toml:"known_hosts_file"`
+	Active         bool   `toml:"active"`
+	PortRange      string `toml:"port_range"`
 }
 
 func (config *AvailableServer) ValidateServerConfig() error {
@@ -319,10 +320,16 @@ func (config *AvailableServer) ValidateServerConfig() error {
 	if config.SSHKeyPath == "" {
 		return fmt.Errorf("ssh_key_path is empty")
 	}
+	if config.KnownHostsFile == "" {
+		config.KnownHostsFile = filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
+	}
 
 	err = utils.ValidateFileExists(config.SSHKeyPath)
 	if err != nil {
 		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.SSHKeyPath, err)
+	}
+	if err := utils.ValidateFileExists(config.KnownHostsFile); err != nil {
+		return fmt.Errorf("provided known_hosts file(%s) does not exist: %s", config.KnownHostsFile, err)
 	}
 
 	return nil

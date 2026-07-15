@@ -9,6 +9,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 type LoadBalancerQueue struct {
@@ -100,6 +101,10 @@ func CreateSSHClient(remoteServer config.AvailableServer) (*ssh.Client, error) {
 	if !remoteServer.Active {
 		return nil, fmt.Errorf("server is inactive in config.toml")
 	}
+	hostKeyCallback, err := knownhosts.New(remoteServer.KnownHostsFile)
+	if err != nil {
+		return nil, fmt.Errorf("load known_hosts file: %s", err)
+	}
 	key, err := ioutil.ReadFile(remoteServer.SSHKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read private key: %s", err)
@@ -109,13 +114,12 @@ func CreateSSHClient(remoteServer config.AvailableServer) (*ssh.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse private key: %s", err)
 	}
-
 	config := &ssh.ClientConfig{
 		User: remoteServer.Username,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Insecure for now. Integrate proper callback for host key verification.
+		HostKeyCallback: hostKeyCallback,
 	}
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", remoteServer.Host), config)
