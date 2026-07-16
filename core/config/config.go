@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,6 +18,11 @@ import (
 	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
+
+var configIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+var hostnamePattern = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$`)
+var scpGitURLPattern = regexp.MustCompile(`^[^@\s]+@[^:\s]+:[^\s]+$`)
+var gitBranchPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$`)
 
 // This is the global beast configuration structure
 //
@@ -228,8 +234,8 @@ func (config *BeastConfig) ValidateConfig() error {
 	}
 
 	for name, server := range config.AvailableServers {
-		if strings.Contains(name, ":") {
-			return fmt.Errorf("server key %q contains invalid character ':'", name)
+		if !configIdentifierPattern.MatchString(name) {
+			return fmt.Errorf("server key %q is not a valid identifier", name)
 		}
 
 		server.Name = name
@@ -237,31 +243,31 @@ func (config *BeastConfig) ValidateConfig() error {
 		if server.Active {
 			err := server.ValidateServerConfig()
 			if err != nil {
-				return fmt.Errorf("error while validating config : %s", server.Host)
+				return fmt.Errorf("validate server %q: %w", name, err)
 			}
 		}
 	}
 
-	_, err = url.Parse(config.BeastStaticUrl)
-
-	if err != nil {
-		return fmt.Errorf("invalid beast static URL provided : %s", config.BeastStaticUrl)
+	if config.BeastStaticUrl != "" {
+		staticURL, err := url.ParseRequestURI(config.BeastStaticUrl)
+		if err != nil || (staticURL.Scheme != "http" && staticURL.Scheme != "https") || staticURL.Host == "" {
+			return fmt.Errorf("invalid beast static URL provided: %s", config.BeastStaticUrl)
+		}
 	}
 
 	if !utils.StringInSlice(core.DEFAULT_BASE_IMAGE, config.AllowedBaseImages) {
 		config.AllowedBaseImages = append(config.AllowedBaseImages, core.DEFAULT_BASE_IMAGE)
 	}
 
-	if config.JWTSecret == "" {
-		log.Error("The secret string is empty in beast config")
-		return fmt.Errorf("invalid config")
+	if len(config.JWTSecret) < 32 {
+		return fmt.Errorf("jwt_secret must contain at least 32 bytes")
 	}
 
 	for _, gitRemote := range config.GitRemotes {
 		if gitRemote.Active {
 			err := gitRemote.ValidateGitConfig()
 			if err != nil {
-				return fmt.Errorf("error while validating config : %s", gitRemote.RemoteName)
+				return fmt.Errorf("validate git remote %q: %w", gitRemote.RemoteName, err)
 			}
 		}
 	}
@@ -319,7 +325,7 @@ func (config *BeastConfig) ValidateConfig() error {
 func (config *BeastConfig) UseLocalDockerDaemon(serverName string) bool {
 	server, ok := config.AvailableServers[serverName]
 	if !ok {
-		return true
+		return false
 	}
 	return server.Host == core.LOCALHOST || server.Host == core.LOCALHOST_IP
 }
@@ -339,6 +345,9 @@ func (config *AvailableServer) ValidateServerConfig() error {
 		return fmt.Errorf("host is empty")
 	}
 	config.Host = strings.TrimSpace(config.Host)
+	if net.ParseIP(config.Host) == nil && !hostnamePattern.MatchString(config.Host) {
+		return fmt.Errorf("host %q is not a valid IP address or hostname", config.Host)
+	}
 
 	err := ValidatePortRange(config.PortRange)
 	if err != nil {
@@ -397,19 +406,21 @@ func (config *GitRemote) ValidateGitConfig() error {
 		return err
 	}
 
-	gitUrlRegexp, err := regexp.Compile(config.Url)
-	if err != nil {
-		eMsg := fmt.Errorf("error while compiling git url regex : %s", err)
-		return eMsg
+	if !configIdentifierPattern.MatchString(config.RemoteName) {
+		return fmt.Errorf("git remote name %q is not a valid identifier", config.RemoteName)
 	}
-
-	if !gitUrlRegexp.MatchString(config.Url) {
-		return errors.New("the provided git url is not valid")
-	}
-
 	if config.Branch == "" {
-		log.Warnf("branch for git remote not provided, using %s", core.GIT_REMOTE_DEFAULT_BRANCH)
 		config.Branch = core.GIT_REMOTE_DEFAULT_BRANCH
+	}
+	if !gitBranchPattern.MatchString(config.Branch) || strings.Contains(config.Branch, "..") || strings.Contains(config.Branch, "@{") {
+		return fmt.Errorf("git branch %q is not valid", config.Branch)
+	}
+	validURL := scpGitURLPattern.MatchString(config.Url)
+	if parsed, err := url.Parse(config.Url); err == nil && parsed.Scheme == "ssh" && parsed.Host != "" && parsed.Path != "" {
+		validURL = true
+	}
+	if !validURL {
+		return errors.New("the provided git url is not valid")
 	}
 
 	err = utils.ValidateSecretFile(config.Secret)

@@ -279,3 +279,32 @@ func TestGetDefaultPortHonorsConfiguredPort(t *testing.T) {
 		t.Fatalf("GetDefaultPort() = %d, want 9000", got)
 	}
 }
+
+func TestUnknownServerDoesNotUseLocalDocker(t *testing.T) {
+	config := BeastConfig{AvailableServers: map[string]AvailableServer{
+		"localhost": {Host: "localhost", Active: true},
+	}}
+	if config.UseLocalDockerDaemon("missing") {
+		t.Fatal("unknown server silently selected the local Docker daemon")
+	}
+}
+
+func TestGitRemoteRejectsUnsafeIdentifiersAndURLs(t *testing.T) {
+	tests := []GitRemote{
+		{Url: "git@example.com:repo.git", RemoteName: "../../escape", Branch: "main", Secret: "key"},
+		{Url: "git@example.com:repo.git", RemoteName: "origin", Branch: "../main", Secret: "key"},
+		{Url: "https://example.com/repo.git", RemoteName: "origin", Branch: "main", Secret: "key"},
+	}
+	for _, remote := range tests {
+		if err := remote.ValidateGitConfig(); err == nil {
+			t.Fatalf("expected unsafe git remote error: %+v", remote)
+		}
+	}
+}
+
+func TestServerRejectsInvalidHostname(t *testing.T) {
+	server := AvailableServer{Host: "host;id", PortRange: "10000:20000", Active: true}
+	if err := server.ValidateServerConfig(); err == nil {
+		t.Fatal("expected invalid hostname error")
+	}
+}
