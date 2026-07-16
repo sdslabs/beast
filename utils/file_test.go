@@ -83,3 +83,20 @@ func TestValidateSecretFileRequiresPrivateRegularFile(t *testing.T) {
 		t.Fatal("expected symlink error")
 	}
 }
+
+func TestExpandHomePathOnlyExpandsHomePrefix(t *testing.T) {
+	t.Setenv("HOME", "/tmp/beast-home")
+	for _, input := range []string{"~/secret", "$HOME/secret", "${HOME}/secret"} {
+		got, err := ExpandHomePath(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "/tmp/beast-home/secret" {
+			t.Fatalf("ExpandHomePath(%q) = %q", input, got)
+		}
+	}
+	got, err := ExpandHomePath("$UNTRUSTED/secret")
+	if err != nil || got != "$UNTRUSTED/secret" {
+		t.Fatalf("unexpected arbitrary expansion: %q, %v", got, err)
+	}
+}

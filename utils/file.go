@@ -86,6 +86,25 @@ func ValidateSecretFile(filePath string) error {
 	return nil
 }
 
+func ExpandHomePath(filePath string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home directory: %w", err)
+	}
+	switch {
+	case filePath == "~" || filePath == "$HOME" || filePath == "${HOME}":
+		return home, nil
+	case strings.HasPrefix(filePath, "~/"):
+		return filepath.Join(home, strings.TrimPrefix(filePath, "~/")), nil
+	case strings.HasPrefix(filePath, "$HOME/"):
+		return filepath.Join(home, strings.TrimPrefix(filePath, "$HOME/")), nil
+	case strings.HasPrefix(filePath, "${HOME}/"):
+		return filepath.Join(home, strings.TrimPrefix(filePath, "${HOME}/")), nil
+	default:
+		return filePath, nil
+	}
+}
+
 // ResolvePathWithin resolves an existing relative path and verifies that it
 // remains inside root, including after following symbolic links.
 func ResolvePathWithin(root, relativePath string) (string, error) {
