@@ -153,6 +153,16 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	return challenges, nil
 }
 
+func IsChallengeMaintainer(userID, challengeID uint) (bool, error) {
+	var count int64
+	DBMux.Lock()
+	defer DBMux.Unlock()
+	err := Db.Table("user_challenges").
+		Where("user_id = ? AND challenge_id = ?", userID, challengeID).
+		Count(&count).Error
+	return count > 0, err
+}
+
 // UserSolvedChallenge represents a challenge solved by a user with the actual solve timestamp
 type UserSolvedChallenge struct {
 	ChallengeID uint
