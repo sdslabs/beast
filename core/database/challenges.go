@@ -63,7 +63,7 @@ type Challenge struct {
 	MinPoints          uint   `gorm:"default:0"`
 	Ports              []Port
 	Tags               []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Users              []*User `gorm:"many2many:user_challenges;"`
+	Users              []*User `gorm:"many2many:challenge_maintainers;"`
 	ServerDeployed     string  `gorm:"type:varchar(64)"`
 	Instanced          bool    `gorm:"not null;default:false"`
 	InstanceExpiration int64   `gorm:"default:0"`
@@ -81,6 +81,11 @@ type UserChallenges struct {
 	Solved      bool   `gorm:"not null;default:false;index"`
 	Flag        string `gorm:"type:text"`
 	Cheating    bool   `gorm:"not null;default:false"`
+}
+
+type ChallengeMaintainer struct {
+	UserID      uint `gorm:"primaryKey"`
+	ChallengeID uint `gorm:"primaryKey"`
 }
 
 type ChallengeAttempt struct {

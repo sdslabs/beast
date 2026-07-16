@@ -8,7 +8,7 @@ func TestIsChallengeMaintainer(t *testing.T) {
 
 	user := createSubmissionTestUser(t, "author")
 	challenge := createSubmissionTestChallenge(t, "challenge", 0, false)
-	if err := Db.Create(&UserChallenges{UserID: user.ID, ChallengeID: challenge.ID}).Error; err != nil {
+	if err := Db.Create(&ChallengeMaintainer{UserID: user.ID, ChallengeID: challenge.ID}).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -25,5 +25,36 @@ func TestIsChallengeMaintainer(t *testing.T) {
 	}
 	if allowed {
 		t.Fatal("unrelated user was treated as maintainer")
+	}
+}
+
+func TestMigrateChallengeMaintainersPreservesManagers(t *testing.T) {
+	cleanup := setupSubmissionTestDB(t)
+	defer cleanup()
+
+	author := createSubmissionTestUser(t, "challenge-author")
+	if err := Db.Model(&author).Update("role", "author").Error; err != nil {
+		t.Fatal(err)
+	}
+	maintainer := createSubmissionTestUser(t, "challenge-maintainer")
+	if err := Db.Model(&maintainer).Update("role", "maintainer").Error; err != nil {
+		t.Fatal(err)
+	}
+	challenge := createSubmissionTestChallenge(t, "managed-challenge", 0, false)
+	if err := Db.Model(&challenge).Update("author_id", author.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := Db.Create(&UserChallenges{UserID: maintainer.ID, ChallengeID: challenge.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := MigrateChallengeMaintainers(); err != nil {
+		t.Fatal(err)
+	}
+	for _, userID := range []uint{author.ID, maintainer.ID} {
+		allowed, err := IsChallengeMaintainer(userID, challenge.ID)
+		if err != nil || !allowed {
+			t.Fatalf("manager %d was not migrated: allowed=%t err=%v", userID, allowed, err)
+		}
 	}
 }

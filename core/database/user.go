@@ -15,7 +15,7 @@ type User struct {
 	gorm.Model
 	auth.AuthModel
 
-	Challenges  []*Challenge `gorm:"many2many:user_challenges;"`
+	Challenges  []*Challenge `gorm:"many2many:challenge_maintainers;"`
 	Name        string       `gorm:"not null"`
 	Email       string       `gorm:"non null;unique"`
 	Status      uint         `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
@@ -157,7 +157,7 @@ func IsChallengeMaintainer(userID, challengeID uint) (bool, error) {
 	var count int64
 	DBMux.Lock()
 	defer DBMux.Unlock()
-	err := Db.Table("user_challenges").
+	err := Db.Table("challenge_maintainers").
 		Where("user_id = ? AND challenge_id = ?", userID, challengeID).
 		Count(&count).Error
 	return count > 0, err

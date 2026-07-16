@@ -52,7 +52,7 @@ func setupSubmissionTestDB(t *testing.T) func() {
 	Db = testDB
 	DBMux = &sync.Mutex{}
 
-	if err := Db.AutoMigrate(&Challenge{}, &User{}, &UserChallenges{}, &DynamicFlag{}, &DynamicFlagClaim{}, &DynamicScoreDirty{}); err != nil {
+	if err := Db.AutoMigrate(&Challenge{}, &User{}, &UserChallenges{}, &ChallengeMaintainer{}, &DynamicFlag{}, &DynamicFlagClaim{}, &DynamicScoreDirty{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	if err := MigrateSubmissionGuards(); err != nil {
