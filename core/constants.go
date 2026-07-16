@@ -79,7 +79,7 @@ const ( // chall actions
 const ( // chall env
 	MAX_PORT_PER_CHALL           uint32 = 3
 	BEAST_CHALLENGES_STATIC_PORT uint32 = 80
-	DEFAULT_BASE_IMAGE           string = "ubuntu:24.03"
+	DEFAULT_BASE_IMAGE           string = "ubuntu:24.04"
 	DEFAULT_XINETD_CONF_FILE     string = "xinetd.conf"
 	BEAST_STATIC_AUTH_FILE       string = ".static.beast.htpasswd"
 	ALLOWED_MIN_PORT_VALUE       uint32 = 10000

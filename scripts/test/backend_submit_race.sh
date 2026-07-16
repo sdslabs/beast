@@ -198,7 +198,7 @@ psql_root -v ON_ERROR_STOP=1 -c "CREATE DATABASE $PGDATABASE" >/dev/null
 cat >"$TEST_HOME/.beast/config.toml" <<EOF
 authorized_keys_file = "$TEST_HOME/.beast/beast_authorized_keys"
 scripts_dir = "$TEST_HOME/.beast/scripts"
-allowed_base_images = ["ubuntu:24.03"]
+allowed_base_images = ["ubuntu:24.04"]
 beast_static_url = "http://localhost:$SERVER_PORT"
 jwt_secret = "backend_submit_race_secret"
 health_prober = false
