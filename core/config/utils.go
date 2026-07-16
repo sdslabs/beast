@@ -37,7 +37,11 @@ func LoadChallengeConfig(path string) (BeastChallengeConfig, error) {
 }
 
 func GetAvailableChallengeTypes() []string {
-	types := core.AVAILABLE_CHALLENGE_TYPES
+	types := append([]string(nil), core.AVAILABLE_CHALLENGE_TYPES...)
+	seen := make(map[string]bool, len(types))
+	for _, challengeType := range types {
+		seen[challengeType] = true
+	}
 
 	// Extract all the web challenges type.
 	for k := range core.DockerBaseImageForWebChall {
@@ -45,10 +49,14 @@ func GetAvailableChallengeTypes() []string {
 			for k2 := range core.DockerBaseImageForWebChall[k][k1] {
 				newType := "web:" + k + ":" + k1 + ":" + k2
 				newType = strings.TrimRight(strings.Replace(newType, "default", "", -1), ":")
-				types = append(types, newType)
+				if !seen[newType] {
+					types = append(types, newType)
+					seen[newType] = true
+				}
 			}
 		}
 	}
+	sort.Strings(types)
 
 	return types
 }

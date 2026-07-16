@@ -190,3 +190,18 @@ func TestExampleChallengeConfigsHaveNoUnknownKeys(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAvailableChallengeTypesIsStable(t *testing.T) {
+	first := GetAvailableChallengeTypes()
+	second := GetAvailableChallengeTypes()
+	if len(first) != len(second) {
+		t.Fatalf("challenge types grew between calls: %d then %d", len(first), len(second))
+	}
+	seen := make(map[string]bool, len(first))
+	for _, challengeType := range first {
+		if seen[challengeType] {
+			t.Fatalf("duplicate challenge type %q", challengeType)
+		}
+		seen[challengeType] = true
+	}
+}
