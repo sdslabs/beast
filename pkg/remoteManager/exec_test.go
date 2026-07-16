@@ -20,3 +20,16 @@ func TestCappedCommandBufferDiscardsExcess(t *testing.T) {
 		t.Fatalf("unexpected buffer state: written=%d value=%q truncated=%t", written, buffer.buffer.String(), buffer.truncated)
 	}
 }
+
+func TestEnvironmentNamesAreConstrained(t *testing.T) {
+	for _, name := range []string{"PORT", "INSTANCE_PORT_1", "_PRIVATE"} {
+		if !environmentNamePattern.MatchString(name) {
+			t.Fatalf("valid environment name rejected: %q", name)
+		}
+	}
+	for _, name := range []string{"BAD-NAME", "NAME;id", "1PORT"} {
+		if environmentNamePattern.MatchString(name) {
+			t.Fatalf("invalid environment name accepted: %q", name)
+		}
+	}
+}

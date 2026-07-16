@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"regexp"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/sdslabs/beastv4/core/config"
@@ -18,6 +21,22 @@ type LoadBalancerQueue struct {
 }
 
 var ServerQueue LoadBalancerQueue
+
+var environmentNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+type RemoteCommandError struct {
+	ExitStatus int
+	Output     string
+	Err        error
+}
+
+func (commandError *RemoteCommandError) Error() string {
+	return fmt.Sprintf("remote command exited with status %d: %v", commandError.ExitStatus, commandError.Err)
+}
+
+func (commandError *RemoteCommandError) Unwrap() error {
+	return commandError.Err
+}
 
 // Returns a Queue of all available server to achive Round-Robin load balancing
 func NewLoadBalancerQueue() LoadBalancerQueue {
@@ -89,11 +108,55 @@ func RunCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
-		return "", fmt.Errorf("failed to execute command: %s\nOutput: %s", err, output)
+		exitStatus := -1
+		var exitError *ssh.ExitError
+		if errors.As(err, &exitError) {
+			exitStatus = exitError.ExitStatus()
+		}
+		return string(output), &RemoteCommandError{ExitStatus: exitStatus, Output: string(output), Err: err}
 	}
 
 	log.Debugf("Command output for cmd %s : %s\n", cmd, output)
 	return string(output), nil
+}
+
+func RunArgsOnServer(server config.AvailableServer, arguments ...string) (string, error) {
+	if len(arguments) == 0 {
+		return "", fmt.Errorf("remote command arguments are empty")
+	}
+	return RunCommandOnServer(server, "exec "+shellJoin(arguments))
+}
+
+func RunArgsInDirOnServer(server config.AvailableServer, directory string, arguments ...string) (string, error) {
+	if directory == "" || len(arguments) == 0 {
+		return "", fmt.Errorf("remote directory and command arguments are required")
+	}
+	command := "cd -- " + shellQuote(directory) + " && exec " + shellJoin(arguments)
+	return RunCommandOnServer(server, command)
+}
+
+func RunArgsWithEnvOnServer(server config.AvailableServer, environment map[string]string, arguments ...string) (string, error) {
+	if len(arguments) == 0 {
+		return "", fmt.Errorf("remote command arguments are empty")
+	}
+	keys := make([]string, 0, len(environment))
+	for key := range environment {
+		if !environmentNamePattern.MatchString(key) {
+			return "", fmt.Errorf("invalid environment variable name %q", key)
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	assignments := make([]string, 0, len(keys))
+	for _, key := range keys {
+		assignments = append(assignments, key+"="+shellQuote(environment[key]))
+	}
+	command := strings.Join(assignments, " ")
+	if command != "" {
+		command += " "
+	}
+	command += "exec " + shellJoin(arguments)
+	return RunCommandOnServer(server, command)
 }
 
 // Creates an SSH client to connect to the remote server.
