@@ -577,9 +577,9 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			}
 		}
 
-		database.Db.Model(challEntry).Association("Tags").Append(tags)
-
-		database.Db.Model(challEntry).Association("Users").Append(users)
+		if err := database.SetChallengeRelations(challEntry, tags, users); err != nil {
+			return fmt.Errorf("set challenge relations: %w", err)
+		}
 	}
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)

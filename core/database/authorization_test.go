@@ -1,6 +1,22 @@
 package database
 
-import "testing"
+import (
+	"testing"
+
+	"gorm.io/gorm"
+)
+
+func TestSetChallengeRelationsRequiresPersistedModels(t *testing.T) {
+	if err := SetChallengeRelations(nil, nil, nil); err == nil {
+		t.Fatal("expected missing challenge error")
+	}
+	if err := SetChallengeRelations(&Challenge{}, nil, nil); err == nil {
+		t.Fatal("expected unpersisted challenge error")
+	}
+	if err := SetChallengeRelations(&Challenge{Model: gorm.Model{ID: 1}}, nil, []*User{{}}); err == nil {
+		t.Fatal("expected unpersisted manager error")
+	}
+}
 
 func TestIsChallengeMaintainer(t *testing.T) {
 	cleanup := setupSubmissionTestDB(t)
