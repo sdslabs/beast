@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/mail"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -17,6 +19,7 @@ const SERVICE_CONTAINER_DEPS string = "xinetd"
 const SERVICE_CHALL_RUN_CMD string = "xinetd -dontfork"
 
 var challengeNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
+var environmentKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
@@ -105,7 +108,13 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 		return err
 	} else if staticChall {
 		log.Debugf("Challenge provided is a static challenge.")
-		return nil
+		if config.Env.StaticContentDir == "" {
+			config.Env.StaticContentDir = core.PUBLIC
+		}
+		if err := validateChallengeDir(challdir, config.Env.StaticContentDir, "static_dir"); err != nil {
+			return err
+		}
+		return config.Metadata.ValidateAssets(challdir, config.Env.StaticContentDir)
 	}
 
 	err = config.Env.ValidateRequiredFields(config.Metadata.Type, challdir)
@@ -113,8 +122,7 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
 		return err
 	}
-
-	return nil
+	return config.Metadata.ValidateAssets(challdir, config.Env.StaticContentDir)
 }
 
 // This contains challenge meta data
@@ -176,6 +184,26 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if !challengeNamePattern.MatchString(config.Name) {
 		return fmt.Errorf("challenge name must match %s", challengeNamePattern.String()), false
 	}
+	if config.MaxPoints > 0 && config.MinPoints > config.MaxPoints {
+		return fmt.Errorf("minPoints cannot exceed maxPoints"), false
+	}
+	if config.MaxPoints == 0 && config.Points > 0 && config.MinPoints > config.Points {
+		return fmt.Errorf("minPoints cannot exceed points when maxPoints is omitted"), false
+	}
+	if config.MaxPoints > 0 && config.Points > config.MaxPoints {
+		return fmt.Errorf("points cannot exceed maxPoints"), false
+	}
+	for _, prerequisite := range config.PreReqs {
+		if !challengeNamePattern.MatchString(prerequisite) {
+			return fmt.Errorf("invalid prerequisite challenge name %q", prerequisite), false
+		}
+	}
+	for _, link := range config.AdditionalLinks {
+		parsed, err := url.ParseRequestURI(link)
+		if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
+			return fmt.Errorf("invalid additional link %q", link), false
+		}
+	}
 
 	// Checks if fail solve limit is provided and is greater than 0
 	if config.MaxAttemptLimit < 0 {
@@ -203,6 +231,29 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	}
 
 	return fmt.Errorf("not a valid challenge type : %s", config.Type), false
+}
+
+func (config *ChallengeMetadata) ValidateAssets(challengeDir, staticContentDir string) error {
+	if len(config.Assets) == 0 {
+		return nil
+	}
+	if staticContentDir == "" {
+		staticContentDir = core.PUBLIC
+	}
+	staticRoot, err := utils.ResolvePathWithin(challengeDir, staticContentDir)
+	if err != nil {
+		return fmt.Errorf("invalid static asset root: %w", err)
+	}
+	for _, asset := range config.Assets {
+		assetPath, err := utils.ResolvePathWithin(staticRoot, asset)
+		if err != nil {
+			return fmt.Errorf("invalid challenge asset %q: %w", asset, err)
+		}
+		if err := utils.ValidateFileExists(assetPath); err != nil {
+			return fmt.Errorf("invalid challenge asset %q: %w", asset, err)
+		}
+	}
+	return nil
 }
 
 // This contains challenge specific properties which includes the following toml fields
@@ -436,6 +487,9 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	for _, env := range config.EnvironmentVars {
+		if !environmentKeyPattern.MatchString(env.Key) {
+			return fmt.Errorf("invalid environment variable key %q", env.Key)
+		}
 		if err := validateChallengeFile(challdir, env.Value, "environment variable value"); err != nil {
 			return err
 		}
@@ -462,6 +516,16 @@ func (config *ChallengeEnv) ExtractPorts() error {
 		if len(config.Ports) > int(core.MAX_PORT_PER_CHALL) {
 			return fmt.Errorf("max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
 		}
+		seen := make(map[uint32]bool, len(config.Ports))
+		for _, port := range config.Ports {
+			if port == 0 || port > 65535 {
+				return fmt.Errorf("container port %d is outside 1-65535", port)
+			}
+			if seen[port] {
+				return fmt.Errorf("container port %d is duplicated", port)
+			}
+			seen[port] = true
+		}
 
 		if config.DefaultPort == 0 {
 			config.DefaultPort = config.Ports[0]
@@ -482,10 +546,13 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 		}
 		portVariables, err := utils.ExtractPortsFromCompose(composePath)
 		if err != nil {
-			log.Warnf("failed to extract port variables from compose file with the following error : %s", err.Error())
+			return fmt.Errorf("extract compose ports: %w", err)
 		}
 		if len(portVariables) == 0 {
 			return errors.New("some port is required to be specified by the challenge")
+		}
+		if len(portVariables) > int(core.MAX_PORT_PER_CHALL) {
+			return fmt.Errorf("max ports allowed for challenge: %d given: %d", core.MAX_PORT_PER_CHALL, len(portVariables))
 		}
 
 		config.PortVariables = portVariables
@@ -521,6 +588,10 @@ type Author struct {
 func (config *Author) ValidateRequiredFields() error {
 	if config.Email == "" {
 		return errors.New("challenge author email is required")
+	}
+	address, err := mail.ParseAddress(config.Email)
+	if err != nil || address.Address != config.Email {
+		return fmt.Errorf("invalid challenge author email %q", config.Email)
 	}
 
 	if config.Name == "" {

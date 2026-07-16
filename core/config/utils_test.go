@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/sdslabs/beastv4/core"
 )
 
 func TestLoadChallengeConfigRejectsUnknownKeys(t *testing.T) {
@@ -203,5 +205,70 @@ func TestGetAvailableChallengeTypesIsStable(t *testing.T) {
 			t.Fatalf("duplicate challenge type %q", challengeType)
 		}
 		seen[challengeType] = true
+	}
+}
+
+func TestChallengeMetadataRejectsInvalidScoringAndLinks(t *testing.T) {
+	tests := []ChallengeMetadata{
+		{Name: "challenge", Flag: "flag", Type: "static", MinPoints: 200, MaxPoints: 100},
+		{Name: "challenge", Flag: "flag", Type: "static", Points: 100, MinPoints: 200},
+		{Name: "challenge", Flag: "flag", Type: "static", Points: 200, MaxPoints: 100},
+		{Name: "challenge", Flag: "flag", Type: "static", PreReqs: []string{"../escape"}},
+		{Name: "challenge", Flag: "flag", Type: "static", AdditionalLinks: []string{"javascript:alert(1)"}},
+	}
+	for _, metadata := range tests {
+		if err, _ := metadata.ValidateRequiredFields(); err == nil {
+			t.Fatalf("expected invalid metadata error: %+v", metadata)
+		}
+	}
+}
+
+func TestChallengeEnvRejectsInvalidPortsAndEnvironmentKeys(t *testing.T) {
+	for _, ports := range [][]uint32{{0}, {80, 80}, {65536}} {
+		env := ChallengeEnv{Ports: ports}
+		if err := env.ExtractPorts(); err == nil {
+			t.Fatalf("expected invalid ports error: %v", ports)
+		}
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "value"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	previous := Cfg
+	Cfg = &BeastConfig{AllowedBaseImages: []string{core.DEFAULT_BASE_IMAGE}}
+	defer func() { Cfg = previous }()
+	env := ChallengeEnv{
+		Ports:           []uint32{8080},
+		RunCmd:          "true",
+		EnvironmentVars: []EnvironmentVar{{Key: "BAD-NAME", Value: "value"}},
+	}
+	if err := env.ValidateRequiredFields("bare", dir); err == nil || !strings.Contains(err.Error(), "environment variable key") {
+		t.Fatalf("expected invalid environment key error, got %v", err)
+	}
+}
+
+func TestAuthorRequiresCanonicalEmail(t *testing.T) {
+	for _, email := range []string{"not-an-email", "Author <author@example.com>"} {
+		author := Author{Email: email}
+		if err := author.ValidateRequiredFields(); err == nil {
+			t.Fatalf("expected invalid email error for %q", email)
+		}
+	}
+}
+
+func TestChallengeAssetsStayInsideStaticRoot(t *testing.T) {
+	parent := t.TempDir()
+	challenge := filepath.Join(parent, "challenge")
+	static := filepath.Join(challenge, "static")
+	if err := os.MkdirAll(static, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parent, "secret"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	metadata := ChallengeMetadata{Assets: []string{"../../secret"}}
+	if err := metadata.ValidateAssets(challenge, "static"); err == nil || !strings.Contains(err.Error(), "escapes root") {
+		t.Fatalf("expected escaping asset error, got %v", err)
 	}
 }
