@@ -66,6 +66,7 @@ func initGinRouter() *gin.Engine {
 			manageGroup.POST("/challenge/upload", manageUploadHandler)
 			manageGroup.POST("/challenge/validateflag", validateFlagHandler)
 			manageGroup.GET("/logs", challengeLogsHandler)
+			manageGroup.POST("/challenge/:name/exec", execChallengeHandler)
 		}
 
 		// Status route group
