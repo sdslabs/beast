@@ -351,6 +351,9 @@ func (config *ChallengeEnv) TrafficType() cr.TrafficType {
 // GetDefaultPort returns the default port used by the challenge from the challenge environment
 // configuration.
 func (config *ChallengeEnv) GetDefaultPort() uint32 {
+	if config.DefaultPort != 0 {
+		return config.DefaultPort
+	}
 	ports := config.Ports
 	if len(ports) == 0 {
 		return 0

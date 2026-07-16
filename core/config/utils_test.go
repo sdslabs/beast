@@ -272,3 +272,10 @@ func TestChallengeAssetsStayInsideStaticRoot(t *testing.T) {
 		t.Fatalf("expected escaping asset error, got %v", err)
 	}
 }
+
+func TestGetDefaultPortHonorsConfiguredPort(t *testing.T) {
+	env := ChallengeEnv{Ports: []uint32{8080, 9000}, DefaultPort: 9000}
+	if got := env.GetDefaultPort(); got != 9000 {
+		t.Fatalf("GetDefaultPort() = %d, want 9000", got)
+	}
+}
