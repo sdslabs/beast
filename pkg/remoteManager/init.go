@@ -1,7 +1,6 @@
 package remoteManager
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
@@ -24,7 +23,7 @@ func Init() {
 			}
 			defer client.Close()
 			ServerQueue.Push(server)
-			_, err = RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s", filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR)))
+			_, err = RunArgsOnServer(server, "mkdir", "-p", filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR))
 			if err != nil {
 				log.Errorf("failed to run command on server %s: %s", server.Host, err.Error())
 			}

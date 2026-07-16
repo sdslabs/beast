@@ -70,9 +70,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 
 		if !cfg.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
 			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
-			downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
-			_, err := remoteManager.RunCommandOnServer(server, downCommand)
-			if err != nil {
+			if err := remoteManager.ComposeDownProjectRemote(projectName, server); err != nil {
 				log.Errorf("Error running docker compose down on remote: %v", err)
 				return err
 			}

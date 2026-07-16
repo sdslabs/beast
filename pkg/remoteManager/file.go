@@ -58,11 +58,6 @@ func StageChallRemote(server config.AvailableServer, challenge database.Challeng
 
 	stagingDirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
 	stagingRemoteDirPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-	// err = RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s/%s", remoteStagingDir, challenge.Name))
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create directory: %s", err)
-	// }
-
 	// Rsync the challenge files to the server
 	err = RsyncFileToServer(server, filepath.Join(stagingDirPath, challenge.Name), stagingRemoteDirPath)
 	if err != nil {

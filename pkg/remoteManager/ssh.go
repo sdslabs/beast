@@ -91,7 +91,7 @@ func PingServer(server config.AvailableServer) error {
 }
 
 // Run the command passed as argument on the remote server
-func RunCommandOnServer(server config.AvailableServer, cmd string) (string, error) {
+func runCommandOnServer(server config.AvailableServer, cmd string) (string, error) {
 	if !server.Active {
 		return "", fmt.Errorf("server is inactive in config.toml")
 	}
@@ -124,7 +124,7 @@ func RunArgsOnServer(server config.AvailableServer, arguments ...string) (string
 	if len(arguments) == 0 {
 		return "", fmt.Errorf("remote command arguments are empty")
 	}
-	return RunCommandOnServer(server, "exec "+shellJoin(arguments))
+	return runCommandOnServer(server, "exec "+shellJoin(arguments))
 }
 
 func RunArgsInDirOnServer(server config.AvailableServer, directory string, arguments ...string) (string, error) {
@@ -132,7 +132,7 @@ func RunArgsInDirOnServer(server config.AvailableServer, directory string, argum
 		return "", fmt.Errorf("remote directory and command arguments are required")
 	}
 	command := "cd -- " + shellQuote(directory) + " && exec " + shellJoin(arguments)
-	return RunCommandOnServer(server, command)
+	return runCommandOnServer(server, command)
 }
 
 func RunArgsWithEnvOnServer(server config.AvailableServer, environment map[string]string, arguments ...string) (string, error) {
@@ -156,7 +156,7 @@ func RunArgsWithEnvOnServer(server config.AvailableServer, environment map[strin
 		command += " "
 	}
 	command += "exec " + shellJoin(arguments)
-	return RunCommandOnServer(server, command)
+	return runCommandOnServer(server, command)
 }
 
 // Creates an SSH client to connect to the remote server.
