@@ -12,21 +12,14 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 func ValidateFileRemoteExists(server config.AvailableServer, stagedChallengePath string) error {
-	output, err := RunCommandOnServer(server, fmt.Sprintf("test -e %s&&echo exists||echo not exists", stagedChallengePath))
+	_, err := RunArgsOnServer(server, "test", "-e", stagedChallengePath)
 	if err != nil {
-		log.Errorf("Error while checking file existence: %s\n", err)
-		return err
-	}
-	log.Printf("Output: %s\n", output)
-	if strings.TrimSpace(output) == "exists" {
-		return nil
-	} else {
 		return fmt.Errorf("path %s does not exist in remote server %s", stagedChallengePath, server.Host)
 	}
+	return nil
 }
 
 // Rsync any file to other servers for chall deployment
@@ -36,8 +29,11 @@ func RsyncFileToServer(server config.AvailableServer, localFilePath, remoteFileP
 		return fmt.Errorf("file %s does not exist: %s", localFilePath, err)
 	}
 	fmt.Printf("Rsyncing %s to %s:%s\n", localFilePath, server.Host, remoteFilePath)
-	cmd := exec.Command("rsync", "-avz",
-		"-e", fmt.Sprintf("ssh -i %s", server.SSHKeyPath),
+	remoteShell := "ssh -i " + shellQuote(server.SSHKeyPath) +
+		" -o " + shellQuote("UserKnownHostsFile="+server.KnownHostsFile) +
+		" -o StrictHostKeyChecking=yes"
+	cmd := exec.Command("rsync", "-az", "--protect-args",
+		"-e", remoteShell, "--",
 		localFilePath,
 		fmt.Sprintf("%s@%s:%s", server.Username, server.Host, remoteFilePath))
 	var out bytes.Buffer
@@ -68,7 +64,7 @@ func StageChallRemote(server config.AvailableServer, challenge database.Challeng
 	// }
 
 	// Rsync the challenge files to the server
-	err = RsyncFileToServer(server, fmt.Sprintf("%s/%s", stagingDirPath, challenge.Name), stagingRemoteDirPath)
+	err = RsyncFileToServer(server, filepath.Join(stagingDirPath, challenge.Name), stagingRemoteDirPath)
 	if err != nil {
 		return fmt.Errorf("failed to rsync challenge files: %s", err)
 	}
@@ -79,27 +75,25 @@ func StageChallRemote(server config.AvailableServer, challenge database.Challeng
 // BuildImageFromTarContextRemote builds a Docker image from the tar context on the remote server.
 func BuildImageFromTarContextRemote(challengeName string, imageTag string, stagedDir string, server config.AvailableServer) ([]byte, string, error) {
 	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
-	_, err := RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", remoteExtractPath, stagedDir, remoteExtractPath))
+	_, err := RunArgsOnServer(server, "mkdir", "-p", remoteExtractPath)
+	if err == nil {
+		_, err = RunArgsOnServer(server, "tar", "-xf", stagedDir, "-C", remoteExtractPath)
+	}
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to extract tar: %s", err)
 	}
 	projectName := utils.ProjectNameNotInstanced(challengeName)
-	dockerBuildCmd := fmt.Sprintf("cd %s && docker build -t %s "+
-		"--label beast.challenge=%s "+
-		"--label com.sdslabs.beast.project=%s "+
-		"--label com.docker.compose.project=%s .",
-		remoteExtractPath, imageTag, challengeName, projectName, projectName)
-	output, err := RunCommandOnServer(server, dockerBuildCmd)
+	output, err := RunArgsInDirOnServer(server, remoteExtractPath,
+		"docker", "build", "-t", imageTag,
+		"--label", "beast.challenge="+challengeName,
+		"--label", "com.sdslabs.beast.project="+projectName,
+		"--label", "com.docker.compose.project="+projectName, ".")
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to build docker image: %s\nOutput: %s", err, output)
 	}
-	getImageIDCmd := fmt.Sprintf(
-		"docker images --format '{{.Repository}} {{.ID}}' | grep %s | awk '{print $2}'",
-		imageTag,
-	)
-	imageID, err := RunCommandOnServer(server, getImageIDCmd)
+	imageID, err := RunArgsOnServer(server, "docker", "image", "inspect", "--format", "{{.Id}}", imageTag)
 	if err != nil {
-		log.Fatalf("Failed to retrieve Docker image ID: %v", err)
+		return []byte(output), "", fmt.Errorf("retrieve Docker image ID: %w", err)
 	}
 	if imageID == "" {
 		return []byte{}, "", fmt.Errorf("failed to retrieve Docker image ID")
@@ -109,20 +103,20 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 
 func BuildImagesFromComposeRemote(challengeName, imageTag, stagedDir string, server config.AvailableServer, noCache bool) ([]byte, error) {
 	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
-	_, err := RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", remoteExtractPath, stagedDir, remoteExtractPath))
+	_, err := RunArgsOnServer(server, "mkdir", "-p", remoteExtractPath)
+	if err == nil {
+		_, err = RunArgsOnServer(server, "tar", "-xf", stagedDir, "-C", remoteExtractPath)
+	}
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to extract tar: %s", err)
 	}
-	cmdBase := "docker compose build"
+	arguments := []string{"docker", "compose", "build"}
 	if noCache {
-		cmdBase += " --no-cache"
+		arguments = append(arguments, "--no-cache")
 	}
 	// Note: docker compose build does not support --label flag
 	// Labels are automatically added to containers during 'docker compose up -p <project>'
-	dockerComposeBuildCmd := fmt.Sprintf("cd %s && %s", remoteExtractPath, cmdBase)
-
-	// Execute the command on the remote server
-	output, err := RunCommandOnServer(server, dockerComposeBuildCmd)
+	output, err := RunArgsInDirOnServer(server, remoteExtractPath, arguments...)
 	if err != nil {
 		return []byte(output), fmt.Errorf("failed to build docker compose images remotely: %s\nOutput: %s", err, output)
 	}
