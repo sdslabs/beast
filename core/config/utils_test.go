@@ -165,3 +165,11 @@ func TestServerConfigExpandsHomePaths(t *testing.T) {
 		t.Fatalf("paths were not expanded: %+v", server)
 	}
 }
+
+func TestExampleGlobalConfigHasNoUnknownKeys(t *testing.T) {
+	var config BeastConfig
+	path := filepath.Join("..", "..", "_examples", "example.config.toml")
+	if err := decodeTOMLFileStrict(path, &config); err != nil {
+		t.Fatal(err)
+	}
+}
