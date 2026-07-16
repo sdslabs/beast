@@ -153,3 +153,15 @@ func TestServerConfigRequiresTLSFiles(t *testing.T) {
 		t.Fatalf("expected required TLS files error, got %v", err)
 	}
 }
+
+func TestServerConfigExpandsHomePaths(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	server := ServerConfig{TLSCertFile: "$HOME/cert.pem", TLSKeyFile: "${HOME}/key.pem"}
+	if err := server.Validate(); err == nil {
+		t.Fatal("expected missing certificate error")
+	}
+	if server.TLSCertFile != filepath.Join(home, "cert.pem") || server.TLSKeyFile != filepath.Join(home, "key.pem") {
+		t.Fatalf("paths were not expanded: %+v", server)
+	}
+}

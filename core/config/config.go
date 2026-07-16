@@ -141,6 +141,15 @@ func (config *ServerConfig) Validate() error {
 	if config.TLSCertFile == "" || config.TLSKeyFile == "" {
 		return errors.New("server tls_cert_file and tls_key_file are required")
 	}
+	var err error
+	config.TLSCertFile, err = utils.ExpandHomePath(config.TLSCertFile)
+	if err != nil {
+		return err
+	}
+	config.TLSKeyFile, err = utils.ExpandHomePath(config.TLSKeyFile)
+	if err != nil {
+		return err
+	}
 	if err := utils.ValidateFileExists(config.TLSCertFile); err != nil {
 		return fmt.Errorf("invalid TLS certificate file: %w", err)
 	}
@@ -349,6 +358,14 @@ func (config *AvailableServer) ValidateServerConfig() error {
 	if config.KnownHostsFile == "" {
 		config.KnownHostsFile = filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
 	}
+	config.SSHKeyPath, err = utils.ExpandHomePath(config.SSHKeyPath)
+	if err != nil {
+		return err
+	}
+	config.KnownHostsFile, err = utils.ExpandHomePath(config.KnownHostsFile)
+	if err != nil {
+		return err
+	}
 
 	err = utils.ValidateSecretFile(config.SSHKeyPath)
 	if err != nil {
@@ -373,6 +390,11 @@ func (config *GitRemote) ValidateGitConfig() error {
 	if config.Url == "" || config.RemoteName == "" || config.Secret == "" {
 		log.Error("One of url, RemoteName or ssh_key is missing in the config")
 		return errors.New("git remote config not valid, config parameters missing")
+	}
+	var err error
+	config.Secret, err = utils.ExpandHomePath(config.Secret)
+	if err != nil {
+		return err
 	}
 
 	gitUrlRegexp, err := regexp.Compile(config.Url)
