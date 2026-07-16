@@ -173,3 +173,20 @@ func TestExampleGlobalConfigHasNoUnknownKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestExampleChallengeConfigsHaveNoUnknownKeys(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join("..", "..", "_examples", "*", "beast.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("no example challenge configs found")
+	}
+	for _, path := range paths {
+		t.Run(filepath.Base(filepath.Dir(path)), func(t *testing.T) {
+			if _, err := LoadChallengeConfig(path); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

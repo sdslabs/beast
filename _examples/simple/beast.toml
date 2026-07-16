@@ -1,7 +1,6 @@
 [author]
 name = "hi"
 email = "hi@gmail.com"
-ssh_key = "hi"
 
 [challenge.metadata]
 name = "simple"
@@ -25,7 +24,7 @@ ports = [10005]
 default_port = 10005
 
 [resource]
-cpu_shares = 1024
+cpu_shares = 512
 memory_limit = 536870912
 pids_limit = 100
 cpuslimit = 0.25

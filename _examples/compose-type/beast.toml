@@ -1,7 +1,6 @@
 [author]
 name = "example"
 email = "example@local"
-ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
 name = "compose-type"
