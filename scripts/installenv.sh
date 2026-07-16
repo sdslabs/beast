@@ -1,70 +1,37 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -euxo pipefail
+set -euo pipefail
 
-GO_VERSION='1.13.1'
+install_dev_tools=false
+case "${1:-}" in
+  "") ;;
+  --dev) install_dev_tools=true ;;
+  *) echo "usage: $0 [--dev]" >&2; exit 2 ;;
+esac
 
-function update() {
-    sudo apt-get update
-}
+required_commands=(go docker git make)
+missing=()
+for command in "${required_commands[@]}"; do
+  if ! command -v "${command}" >/dev/null 2>&1; then
+    missing+=("${command}")
+  fi
+done
+if ((${#missing[@]} > 0)); then
+  echo "missing required commands: ${missing[*]}" >&2
+  echo "install them with your operating system's trusted package manager" >&2
+  exit 1
+fi
 
-function upgrade() {
-    sudo apt-get -y upgrade
-}
+go version
+docker version --format '{{.Client.Version}}' >/dev/null
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker is installed but the daemon is unavailable to the current user" >&2
+  exit 1
+fi
 
-echo 'Installing dependecies for beast.'
+if [[ "${install_dev_tools}" == true ]]; then
+  echo "installing pinned Air development tool"
+  go install github.com/air-verse/air@v1.61.7
+fi
 
-function install_docker() {
-    if ! [ -x "$(command -v docker)" ]; then
-        echo 'Info: docker is not installed, Installing...'
-        
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-        sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-
-        update
-
-        sudo apt-cache policy docker-ce
-
-        sudo apt-get install -y docker-ce
-
-        echo 'Docker installed.'
-    fi
-
-    sudo usermod -aG docker ${USER}
-}
-
-function install_go() {
-    if ! [ -x "$(command -v go)" ]; then
-        echo 'Info: golang is not installed, Installing...'
-        
-        wget -O "/tmp/go${GO_VERSION}.linux-amd64.tar.gz" "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz"
-        sudo tar -xvf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz" -C /usr/local/
-
-        rm -rf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
-
-        echo 'export GOROOT=/usr/local/go' | tee -a $HOME/.bashrc
-        echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin/' | tee -a $HOME/.bashrc
-        echo 'export GOPATH=$HOME/go' | tee -a $HOME/.bashrc
-
-        source ~/.bashrc
-
-        echo 'Golang installed.'
-    fi
-
-    /usr/local/go/bin/go version
-}
-
-function install_air(){
-  curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
-}
-
-update
-upgrade
-
-sudo apt-get install -y apt-transport-https libsqlite3-dev build-essential gcc g++
-
-install_docker
-install_go
-install_air
-
-exit 0
+echo "Beast prerequisites are available"
