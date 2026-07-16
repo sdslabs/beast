@@ -23,16 +23,9 @@ import (
 // @Produce json
 // @Failure 401 {object} api.HTTPPlainResp
 // @Security ApiKeyAuth
-func authorize(c *gin.Context) {
-	if config.SkipAuthorization {
-		return
-	}
-
-	authHeader := c.GetHeader("Authorization")
-
-	values := strings.Split(authHeader, " ")
-
-	if len(values) < 2 || values[0] != "Bearer" {
+func authorizeRoles(c *gin.Context, roles int) {
+	values := strings.Fields(c.GetHeader("Authorization"))
+	if len(values) != 2 || values[0] != "Bearer" {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "No Token Provided",
 		})
@@ -40,8 +33,7 @@ func authorize(c *gin.Context) {
 		return
 	}
 
-	err := auth.Authorize(values[1], core.MANAGER|core.ADMIN|core.USER)
-
+	claims, err := auth.AuthorizeClaims(values[1], roles)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: err.Error(),
@@ -49,8 +41,12 @@ func authorize(c *gin.Context) {
 		c.Abort()
 		return
 	}
-
+	c.Set("authClaims", claims)
 	c.Next()
+}
+
+func authorize(c *gin.Context) {
+	authorizeRoles(c, core.MANAGER|core.ADMIN|core.USER)
 }
 
 // Acts as a middleware to authorize manager roles
@@ -62,33 +58,7 @@ func authorize(c *gin.Context) {
 // @Failure 401 {object} api.HTTPPlainResp
 // @Security ApiKeyAuth
 func managerAuthorize(c *gin.Context) {
-	if config.SkipAuthorization {
-		return
-	}
-
-	authHeader := c.GetHeader("Authorization")
-
-	values := strings.Split(authHeader, " ")
-
-	if len(values) < 2 || values[0] != "Bearer" {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-			Message: "No Token Provided",
-		})
-		c.Abort()
-		return
-	}
-
-	err := auth.Authorize(values[1], core.MANAGER|core.ADMIN)
-
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-			Message: err.Error(),
-		})
-		c.Abort()
-		return
-	}
-
-	c.Next()
+	authorizeRoles(c, core.MANAGER|core.ADMIN)
 }
 
 // Acts as a middleware to authorize admin roles
@@ -100,33 +70,7 @@ func managerAuthorize(c *gin.Context) {
 // @Failure 401 {object} api.HTTPPlainResp
 // @Security ApiKeyAuth
 func adminAuthorize(c *gin.Context) {
-	if config.SkipAuthorization {
-		return
-	}
-
-	authHeader := c.GetHeader("Authorization")
-
-	values := strings.Split(authHeader, " ")
-
-	if len(values) < 2 || values[0] != "Bearer" {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-			Message: "No Token Provided",
-		})
-		c.Abort()
-		return
-	}
-
-	err := auth.Authorize(values[1], core.ADMIN)
-
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
-			Message: err.Error(),
-		})
-		c.Abort()
-		return
-	}
-
-	c.Next()
+	authorizeRoles(c, core.ADMIN)
 }
 
 // Handles route related to receive JWT token
@@ -238,36 +182,25 @@ func register(c *gin.Context) {
 		Email:     email,
 	}
 
-	// skip otp verif if -n flag is enabled
-	if !config.SkipAuthorization {
-		smtpHost := config.Cfg.MailConfig.SMTPHost
-		smtpPort := config.Cfg.MailConfig.SMTPPort
-
-		if smtpHost == "" || smtpPort == "" {
-			log.Printf("WARNING: %s", "SMTP not configured")
+	smtpHost := config.Cfg.MailConfig.SMTPHost
+	smtpPort := config.Cfg.MailConfig.SMTPPort
+	if smtpHost == "" || smtpPort == "" {
+		c.JSON(http.StatusServiceUnavailable, HTTPErrorResp{Error: "SMTP not configured"})
+		return
+	}
+	otpEntry, err := database.QueryOTPEntry(email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusUnauthorized, HTTPErrorResp{Error: "OTP not found, email not verified"})
 		} else {
-			otpEntry, err := database.QueryOTPEntry(email)
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-						Error: "OTP not found, email not verified",
-					})
-					return
-				} else {
-					log.Println("Failed to query OTP:", err)
-					c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-						Error: "Failed to send OTP",
-					})
-					return
-				}
-			}
-			if !otpEntry.Verified {
-				c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
-					Error: "Email not verified, cannot register user",
-				})
-				return
-			}
+			log.Println("Failed to query OTP:", err)
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Failed to verify OTP"})
 		}
+		return
+	}
+	if !otpEntry.Verified {
+		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{Error: "Email not verified, cannot register user"})
+		return
 	}
 	err = database.CreateUserEntry(&userEntry)
 

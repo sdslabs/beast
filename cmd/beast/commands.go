@@ -19,7 +19,6 @@ var (
 	Username              string
 	Email                 string
 	Password              string
-	SkipAuthorization     bool
 	AllChalls             bool
 	AutoDeploy            bool
 	PeriodicSync          bool
@@ -44,12 +43,6 @@ var rootCmd = &cobra.Command{
 			debug.Enable()
 		} else {
 			debug.Disable()
-		}
-
-		if SkipAuthorization {
-			config.SkipAuthorization = true
-		} else {
-			config.SkipAuthorization = false
 		}
 
 		config.NoCache = NoCache
@@ -80,7 +73,6 @@ func init() {
 	runCmd.PersistentFlags().BoolVarP(&AutoDeploy, "auto-deploy", "a", false, "Auto deploy all challenges from remote on server start.")
 	runCmd.PersistentFlags().BoolVarP(&HealthProbe, "health-probe", "k", false, "Run health check service for beast deployed challenges")
 	runCmd.PersistentFlags().BoolVarP(&PeriodicSync, "periodic-sync", "s", false, "Periodically sync remote with beast and auto update challenges.")
-	runCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
 	runCmd.PersistentFlags().BoolVarP(&NoCache, "no-cache", "c", false, "Build image of challenge without using cache")
 
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")

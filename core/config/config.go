@@ -523,7 +523,6 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 }
 
 var Cfg *BeastConfig
-var SkipAuthorization bool
 var NoCache bool
 
 // InitConfig loads the config from the global config file and populate
