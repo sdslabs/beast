@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -57,6 +58,23 @@ type ChallengePreview struct {
 	AdditionalLinks []string
 	Desc            string
 	Points          uint
+}
+
+func activeLocalServerName() (string, bool) {
+	if server, exists := cfg.Cfg.AvailableServers[core.LOCALHOST]; exists && server.Active && cfg.Cfg.UseLocalDockerDaemon(core.LOCALHOST) {
+		return core.LOCALHOST, true
+	}
+	names := make([]string, 0, len(cfg.Cfg.AvailableServers))
+	for name := range cfg.Cfg.AvailableServers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if server := cfg.Cfg.AvailableServers[name]; server.Active && cfg.Cfg.UseLocalDockerDaemon(name) {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 // This if the function which validates the challenge directory
@@ -443,13 +461,16 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			if err != nil {
 				return fmt.Errorf("error while querying user with email %s", user.Email)
 			}
+			if u.ID == 0 || u.Status != 0 || (u.Role != core.USER_ROLES["author"] && u.Role != core.USER_ROLES["maintainer"] && u.Role != core.USER_ROLES["admin"]) {
+				return fmt.Errorf("maintainer %s is not an active manager account", user.Email)
+			}
 			users[i] = &u
 		}
 
 		if userEntry.Email == "" {
-			// if defaultauthorpassword == "" {
-			// 	return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
-			// }
+			if defaultauthorpassword == "" {
+				return fmt.Errorf("author %s does not exist and no creation password was provided", config.Author.Email)
+			}
 			log.Infof("User with the given email does not exist : %v, creating this user", config.Author.Email)
 			authModel, err := auth.CreateModel(config.Author.Email, defaultauthorpassword, core.USER_ROLES["author"])
 			if err != nil {
@@ -464,13 +485,14 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			if err != nil {
 				return err
 			}
+			userEntry = newUser
 			log.Infof("Author with the email address %v is created", config.Author.Email)
-			// return nil
 		} else {
-			if userEntry.Email != config.Author.Email &&
-				(userEntry.Name != config.Author.Name || config.Author.Name == "") &&
-				userEntry.Role != core.USER_ROLES["author"] {
-				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", userEntry.Email)
+			if userEntry.Status != 0 || (userEntry.Role != core.USER_ROLES["author"] && userEntry.Role != core.USER_ROLES["admin"]) {
+				return fmt.Errorf("author %s is not an active author account", userEntry.Email)
+			}
+			if config.Author.Name != "" && userEntry.Name != config.Author.Name {
+				return fmt.Errorf("author name for %s does not match the existing account", userEntry.Email)
 			}
 		}
 
@@ -491,8 +513,16 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 		availableServerHostname := core.LOCALHOST
 		if config.Challenge.Metadata.Type != core.STATIC_CHALLENGE_TYPE_NAME {
-			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
-			availableServerHostname = availableServer.Name
+			availableServer, serverErr := remoteManager.ServerQueue.GetNextAvailableInstance()
+			if serverErr == nil {
+				availableServerHostname = availableServer.Name
+			} else {
+				localServerName, exists := activeLocalServerName()
+				if !exists {
+					return fmt.Errorf("no active challenge server is available")
+				}
+				availableServerHostname = localServerName
+			}
 		}
 		if config.Challenge.Metadata.Difficulty == "" {
 			log.Debug("Setting difficulty to default(medium)")
