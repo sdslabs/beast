@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/url"
@@ -115,6 +116,7 @@ type BeastConfig struct {
 	RemoteSyncPeriod     time.Duration              `toml:"-"`
 	Rsp                  string                     `toml:"remote_sync_period"`
 	InstanceConfig       InstanceConfig             `toml:"instance_config"`
+	ServerConfig         ServerConfig               `toml:"server"`
 
 	CPUShares int64   `toml:"default_cpu_shares"`
 	Memory    int64   `toml:"default_memory_limit"`
@@ -128,6 +130,27 @@ type InstanceConfig struct {
 	DefaultExpiration   int64 `toml:"default_expiration"`
 	MaxExtension        int64 `toml:"max_extension"`
 	MaxInstancesPerUser int   `toml:"max_instances_per_user"`
+}
+
+type ServerConfig struct {
+	TLSCertFile string `toml:"tls_cert_file"`
+	TLSKeyFile  string `toml:"tls_key_file"`
+}
+
+func (config *ServerConfig) Validate() error {
+	if config.TLSCertFile == "" || config.TLSKeyFile == "" {
+		return errors.New("server tls_cert_file and tls_key_file are required")
+	}
+	if err := utils.ValidateFileExists(config.TLSCertFile); err != nil {
+		return fmt.Errorf("invalid TLS certificate file: %w", err)
+	}
+	if err := utils.ValidateSecretFile(config.TLSKeyFile); err != nil {
+		return fmt.Errorf("invalid TLS private key file: %w", err)
+	}
+	if _, err := tls.LoadX509KeyPair(config.TLSCertFile, config.TLSKeyFile); err != nil {
+		return fmt.Errorf("load TLS certificate and key: %w", err)
+	}
+	return nil
 }
 
 func (config *InstanceConfig) Validate() {
@@ -277,6 +300,9 @@ func (config *BeastConfig) ValidateConfig() error {
 	}
 
 	config.InstanceConfig.Validate()
+	if err := config.ServerConfig.Validate(); err != nil {
+		return err
+	}
 
 	return nil
 }

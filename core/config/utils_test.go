@@ -147,3 +147,9 @@ func TestResourcesUseGlobalDefaults(t *testing.T) {
 		t.Fatalf("unexpected defaults: %+v", resources)
 	}
 }
+
+func TestServerConfigRequiresTLSFiles(t *testing.T) {
+	if err := (&ServerConfig{}).Validate(); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("expected required TLS files error, got %v", err)
+	}
+}

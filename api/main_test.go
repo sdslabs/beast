@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/tls"
 	"net/http"
 	"testing"
 	"time"
@@ -27,5 +28,8 @@ func TestHTTPServerHasDefensiveTimeouts(t *testing.T) {
 	}
 	if server.ReadHeaderTimeout > 30*time.Second {
 		t.Fatalf("read header timeout is too permissive: %v", server.ReadHeaderTimeout)
+	}
+	if server.TLSConfig == nil || server.TLSConfig.MinVersion < tls.VersionTLS12 {
+		t.Fatalf("missing minimum TLS version: %+v", server.TLSConfig)
 	}
 }

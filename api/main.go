@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -76,6 +77,9 @@ func newHTTPServer(address string, handler http.Handler) *http.Server {
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 		MaxHeaderBytes:    64 << 10,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
 	}
 }
 
@@ -163,7 +167,7 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 	server := newHTTPServer(address, router)
 	serverErr := make(chan error, 1)
 	go func() {
-		serverErr <- server.ListenAndServe()
+		serverErr <- server.ListenAndServeTLS(config.Cfg.ServerConfig.TLSCertFile, config.Cfg.ServerConfig.TLSKeyFile)
 	}()
 
 	select {
