@@ -38,7 +38,7 @@ func TestManagerAuthorizationRequiresVerifiedToken(t *testing.T) {
 	request.Header.Set("Authorization", "Bearer "+token)
 	authorized := httptest.NewRecorder()
 	router.ServeHTTP(authorized, request)
-	if authorized.Code != http.StatusNoContent {
-		t.Fatalf("authorized status = %d, body = %s", authorized.Code, authorized.Body.String())
+	if authorized.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unbacked token status = %d, body = %s", authorized.Code, authorized.Body.String())
 	}
 }

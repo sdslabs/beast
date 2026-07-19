@@ -54,6 +54,26 @@ func authorizeRoles(c *gin.Context, roles int) {
 		c.Abort()
 		return
 	}
+	if database.Db == nil || database.DBMux == nil {
+		c.JSON(http.StatusServiceUnavailable, HTTPPlainResp{Message: "Authorization could not be verified"})
+		c.Abort()
+		return
+	}
+	user, err := database.QueryFirstUserEntry("username", claims.User)
+	if err != nil {
+		status := http.StatusServiceUnavailable
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = http.StatusUnauthorized
+		}
+		c.JSON(status, HTTPPlainResp{Message: "Authorization could not be verified"})
+		c.Abort()
+		return
+	}
+	if user.Status != 0 || user.Role != claims.Role {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{Message: "Authorization is no longer valid"})
+		c.Abort()
+		return
+	}
 	c.Set("authClaims", claims)
 	c.Next()
 }
