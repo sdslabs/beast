@@ -1,10 +1,8 @@
 package notify
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
 )
 
@@ -49,19 +47,5 @@ func (s *SlackNotificationProvider) SendNotification(nType NotificationType, msg
 		return fmt.Errorf("Error while converting payload to JSON : %s", err)
 	}
 
-	payloadReader := bytes.NewReader(payload)
-	req, err := http.NewRequest("POST", s.Request.WebHookURL, payloadReader)
-	if err != nil {
-		return fmt.Errorf("Error while connecting to webhook url host : %s", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	client := http.Client{}
-	_, err = client.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("Error while posting payload for notification : %s", err)
-	}
-
-	return nil
+	return postWebhookJSON(s.Request.WebHookURL, payload)
 }

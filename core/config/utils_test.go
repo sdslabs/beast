@@ -176,6 +176,30 @@ func TestExampleGlobalConfigHasNoUnknownKeys(t *testing.T) {
 	}
 }
 
+func TestNotificationWebhookValidation(t *testing.T) {
+	valid := []NotificationWebhook{
+		{Active: true, ServiceName: "slack", URL: "https://hooks.slack.com/services/a/b/c"},
+		{Active: true, ServiceName: "discord", URL: "https://discord.com/api/webhooks/1/token"},
+	}
+	for _, webhook := range valid {
+		if err := webhook.Validate(); err != nil {
+			t.Fatalf("expected valid webhook: %v", err)
+		}
+	}
+
+	invalid := []NotificationWebhook{
+		{Active: true, ServiceName: "slack", URL: "http://hooks.slack.com/services/a/b/c"},
+		{Active: true, ServiceName: "slack", URL: "https://127.0.0.1/services/a"},
+		{Active: true, ServiceName: "discord", URL: "https://discord.com.evil.test/api/webhooks/1/token"},
+		{Active: true, ServiceName: "custom", URL: "https://example.com/hook"},
+	}
+	for _, webhook := range invalid {
+		if err := webhook.Validate(); err == nil {
+			t.Fatalf("expected invalid webhook to fail: %+v", webhook)
+		}
+	}
+}
+
 func TestExampleChallengeConfigsHaveNoUnknownKeys(t *testing.T) {
 	paths, err := filepath.Glob(filepath.Join("..", "..", "_examples", "*", "beast.toml"))
 	if err != nil {

@@ -299,6 +299,11 @@ func (config *BeastConfig) ValidateConfig() error {
 			}
 		}
 	}
+	for index := range config.NotificationWebhooks {
+		if err := config.NotificationWebhooks[index].Validate(); err != nil {
+			return fmt.Errorf("validate notification webhook %d: %w", index+1, err)
+		}
+	}
 
 	if config.TickerFrequency <= 0 {
 		log.Debug("Time is not provided or is less than equal to zero so default time is taken")
@@ -530,6 +535,35 @@ type NotificationWebhook struct {
 	URL         string `toml:"url"`
 	ServiceName string `toml:"service_name"`
 	Active      bool   `toml:"active"`
+}
+
+func (webhook NotificationWebhook) Validate() error {
+	if !webhook.Active {
+		return nil
+	}
+	if len(webhook.URL) > 2048 {
+		return errors.New("webhook URL is too long")
+	}
+	parsed, err := url.Parse(webhook.URL)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.Fragment != "" {
+		return errors.New("active webhook must use a valid HTTPS URL without credentials or fragments")
+	}
+	if parsed.Port() != "" && parsed.Port() != "443" {
+		return errors.New("webhook URL may only use the default HTTPS port")
+	}
+	switch webhook.ServiceName {
+	case "slack":
+		if parsed.Hostname() != "hooks.slack.com" || !strings.HasPrefix(parsed.EscapedPath(), "/services/") {
+			return errors.New("Slack webhook must use hooks.slack.com/services")
+		}
+	case "discord":
+		if (parsed.Hostname() != "discord.com" && parsed.Hostname() != "discordapp.com") || !strings.HasPrefix(parsed.EscapedPath(), "/api/webhooks/") {
+			return errors.New("Discord webhook must use the official API webhook endpoint")
+		}
+	default:
+		return fmt.Errorf("unsupported notification service %q", webhook.ServiceName)
+	}
+	return nil
 }
 
 type CompetitionInfo struct {
