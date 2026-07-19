@@ -67,6 +67,21 @@ func checkDockerDaemon() error {
 	return nil
 }
 
+func beastRedisACLRules(password string) []string {
+	return []string{
+		"reset", "on", ">" + password,
+		"~beast:*", "&__keyevent@*__:expired",
+		"+ping", "+select", "+client|setinfo",
+		"+get", "+set", "+del", "+expire", "+ttl", "+scan",
+		"+sadd", "+srem", "+smembers", "+sismember",
+		"+lpush", "+rpop", "+llen",
+		"+eval", "+multi", "+exec", "+discard", "+watch", "+unwatch",
+		"+psubscribe", "+punsubscribe",
+		"+config|get", "+config|set",
+		"+flushdb", "+psync", "+replconf",
+	}
+}
+
 func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig) error {
 	ctx := context.Background()
 	log.Warnln("Beast expects Redis ACLs to be enabled. If ACLs are not configured, some features may not function correctly.")
@@ -83,7 +98,8 @@ func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig
 		}
 	}
 
-	_, err = cache.ACLSetUser(ctx, configuration.User, "on", ">"+configuration.Password, "~beast:*", "+@all").Result()
+	rules := beastRedisACLRules(configuration.Password)
+	_, err = cache.ACLSetUser(ctx, configuration.User, rules...).Result()
 	if err != nil {
 		return err
 	}
