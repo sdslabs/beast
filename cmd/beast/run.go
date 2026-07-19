@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sdslabs/beastv4/core/cache"
+	"io"
 	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/sdslabs/beastv4/core"
@@ -17,6 +19,7 @@ import (
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/pkg/sse"
+	"github.com/sdslabs/beastv4/utils"
 
 	"github.com/sdslabs/beastv4/api"
 	log "github.com/sirupsen/logrus"
@@ -24,6 +27,33 @@ import (
 )
 
 const controllerLockFile = "controller.lock"
+
+func loadDefaultAuthorPassword(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	expanded, err := utils.ExpandHomePath(path)
+	if err != nil {
+		return "", err
+	}
+	if err := utils.ValidateSecretFile(expanded); err != nil {
+		return "", fmt.Errorf("validate default author password file: %w", err)
+	}
+	file, err := os.Open(expanded)
+	if err != nil {
+		return "", fmt.Errorf("open default author password file: %w", err)
+	}
+	defer file.Close()
+	contents, err := io.ReadAll(io.LimitReader(file, 130))
+	if err != nil {
+		return "", fmt.Errorf("read default author password file: %w", err)
+	}
+	password := strings.TrimSuffix(strings.TrimSuffix(string(contents), "\n"), "\r")
+	if len(password) < 12 || len(password) > 128 || strings.TrimSpace(password) == "" {
+		return "", fmt.Errorf("default author password must contain between 12 and 128 non-whitespace bytes")
+	}
+	return password, nil
+}
 
 func acquireControllerLock(directory string) (*os.File, error) {
 	path := filepath.Join(directory, controllerLockFile)
@@ -246,7 +276,12 @@ var runCmd = &cobra.Command{
 		ctx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stopSignals()
 
-		err = api.RunBeastApiServer(ctx, Port, DefaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
+		defaultAuthorPassword, err := loadDefaultAuthorPassword(DefaultAuthorPasswordFile)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		err = api.RunBeastApiServer(ctx, Port, defaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
 		if err != nil {
 			log.Errorf("Beast API stopped: %v", err)
 		}

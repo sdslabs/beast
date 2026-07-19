@@ -1,12 +1,18 @@
 package client
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"time"
 )
+
+const maxAuthorizeResponseBytes = 1 << 20
 
 type Response struct {
 	Message   string `json:"message"`
@@ -14,52 +20,59 @@ type Response struct {
 	Token     string `json:"token"`
 }
 
-func Authorize(password string, host string, username string) {
-
-	u, err := url.Parse("auth/login")
-	if err != nil {
-		fmt.Printf("Error while parsing url : %v", err)
-		return
-	}
-
+func Authorize(password, host, username, caFile string) (Response, error) {
 	base, err := url.Parse(host)
-	if err != nil {
-		fmt.Printf("Error while parsing url : %v", err)
-		return
+	if err != nil || base.Scheme != "https" || base.Host == "" || base.User != nil {
+		return Response{}, fmt.Errorf("Beast host must be a valid HTTPS URL")
 	}
-
-	res, err := http.PostForm(base.ResolveReference(u).String(), url.Values{
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
+	if caFile != "" {
+		certificate, err := os.ReadFile(caFile)
+		if err != nil {
+			return Response{}, fmt.Errorf("read CA file: %w", err)
+		}
+		roots, err := x509.SystemCertPool()
+		if err != nil || roots == nil {
+			roots = x509.NewCertPool()
+		}
+		if !roots.AppendCertsFromPEM(certificate) {
+			return Response{}, fmt.Errorf("CA file contains no certificates")
+		}
+		tlsConfig.RootCAs = roots
+	}
+	httpClient := &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	endpoint := base.ResolveReference(&url.URL{Path: "auth/login"})
+	response, err := httpClient.PostForm(endpoint.String(), url.Values{
 		"username": {username},
 		"password": {password},
 	})
 	if err != nil {
-		fmt.Printf("Error while making post request : %v", err)
-		return
+		return Response{}, fmt.Errorf("authorize request: %w", err)
 	}
-
-	body, err := ioutil.ReadAll(res.Body)
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxAuthorizeResponseBytes+1))
 	if err != nil {
-		fmt.Printf("Error while making post request : %v", err)
-		return
+		return Response{}, fmt.Errorf("read authorize response: %w", err)
+	}
+	if len(body) > maxAuthorizeResponseBytes {
+		return Response{}, fmt.Errorf("authorize response exceeds 1 MiB")
+	}
+	if response.StatusCode != http.StatusOK {
+		return Response{}, fmt.Errorf("authorization failed with HTTP status %d", response.StatusCode)
 	}
 
-	if res.StatusCode != http.StatusOK {
-		fmt.Printf("Response code : %v \nBody : %v", res.StatusCode, string(body))
-		return
+	var result Response
+	if err := json.Unmarshal(body, &result); err != nil {
+		return Response{}, fmt.Errorf("parse authorize response: %w", err)
 	}
-
-	var response Response
-
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		fmt.Printf("Error while parsing response : %v", err)
-		return
+	if result.Token == "" {
+		return Response{}, fmt.Errorf("authorize response did not contain a token")
 	}
-
-	fmt.Printf(`
-The response:
-Token 	: %v
-Message	: %v
-	`, response.Token, response.Message)
-
+	return result, nil
 }
