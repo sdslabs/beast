@@ -3,14 +3,16 @@ package database
 import (
 	"crypto/rand"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/sdslabs/beastv4/core"
+	beastConfig "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
@@ -21,44 +23,46 @@ import (
 var (
 	DBMux *sync.Mutex
 	Db    *gorm.DB
-	dberr error
 )
 
-var (
-	BEAST_GLOBAL_DIR string = filepath.Join(os.Getenv("HOME"), ".beast")
-	dbConfig         Config
-)
+var dbConfig beastConfig.PsqlConfig
 
-type Config struct {
-	PsqlConf PSQLConfig `toml:"psql_config"`
-}
-type PSQLConfig struct {
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	Dbname   string `toml:"dbname"`
-	Host     string `toml:"host"`
-	Port     string `toml:"port"`
-	SslMode  string `toml:"sslmode"`
-}
-
-// Db config is loaded separately here for temp use because init() function is
-// called during initialization of package.
-// It is also loaded during db backup/reset
-func LoadDbConfig() {
-	if _, err := toml.DecodeFile(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME), &dbConfig); err != nil {
-		log.Fatalf("Error loading TOML file: %v", err)
+func LoadDbConfig() error {
+	if beastConfig.Cfg != nil {
+		dbConfig = beastConfig.Cfg.PsqlConf
+		return nil
 	}
+	cfg, err := beastConfig.LoadBeastConfig(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME))
+	if err != nil {
+		return fmt.Errorf("load database config: %w", err)
+	}
+	dbConfig = cfg.PsqlConf
+	return nil
+}
+
+func postgresDSN(config beastConfig.PsqlConfig) string {
+	dsn := &url.URL{
+		Scheme: "postgresql",
+		User:   url.UserPassword(config.User, config.Password),
+		Host:   net.JoinHostPort(config.Host, config.Port),
+		Path:   config.Dbname,
+	}
+	query := dsn.Query()
+	query.Set("sslmode", config.SslMode)
+	dsn.RawQuery = query.Encode()
+	return dsn.String()
 }
 
 // Connect psql database
 func ConnectDatabase() error {
-	LoadDbConfig()
-	dsn := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", dbConfig.PsqlConf.User, dbConfig.PsqlConf.Password, dbConfig.PsqlConf.Dbname, dbConfig.PsqlConf.Host, dbConfig.PsqlConf.Port, dbConfig.PsqlConf.SslMode)
-	Db, dberr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if dberr != nil {
-		log.Error("Error while initializing the database.", dberr)
-		return dberr
+	if err := LoadDbConfig(); err != nil {
+		return err
 	}
+	db, err := gorm.Open(postgres.Open(postgresDSN(dbConfig)), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+	Db = db
 	log.Debug("Database initialized")
 	return nil
 }
@@ -67,26 +71,25 @@ func ConnectDatabase() error {
 // Postgresql database for beast. The Db variable is the connection variable for the
 // database, which is not closed after creating a connection here and can
 // be used further after this.
-func Init() {
+func Init() error {
 	DBMux = &sync.Mutex{}
 	if Db == nil {
-		dberr = ConnectDatabase()
-		if dberr != nil {
-			log.Error("Error while initializing the database.", dberr)
+		if err := ConnectDatabase(); err != nil {
+			return fmt.Errorf("initialize database: %w", err)
 		}
 	}
 	if err := Db.SetupJoinTable(&Challenge{}, "Users", &UserChallenges{}); err != nil {
-		log.Fatalf("Cannot create related models: %s", err)
+		return fmt.Errorf("configure user challenge relation: %w", err)
 	}
 	if err := Db.SetupJoinTable(&User{}, "Challenges", &ChallengeMaintainer{}); err != nil {
-		log.Fatalf("Cannot create related models: %s", err)
+		return fmt.Errorf("configure user maintainer relation: %w", err)
 	}
 	if err := Db.SetupJoinTable(&Challenge{}, "Users", &ChallengeMaintainer{}); err != nil {
-		log.Fatalf("Cannot create related models: %s", err)
+		return fmt.Errorf("configure challenge maintainer relation: %w", err)
 	}
 
 	if err := Db.SetupJoinTable(&User{}, "Hints", &UserHint{}); err != nil {
-		log.Fatalf("Cannot create related models: %s", err)
+		return fmt.Errorf("configure user hint relation: %w", err)
 	}
 
 	// UserHint must be explicitly migrated since GORM's AutoMigrate on User only handles
@@ -94,18 +97,18 @@ func Init() {
 	// challenge_id columns on user_hints won't be added to existing databases.
 	err := Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &UserChallenges{}, &ChallengeMaintainer{}, &Tag{}, &Notification{}, &Hint{}, &DynamicFlag{}, &DynamicFlagClaim{}, &DynamicScoreDirty{}, &OTP{}, &UserHint{})
 	if err != nil {
-		log.Fatalf("failed to migrate database with error: %s", err)
+		return fmt.Errorf("migrate database: %w", err)
 	}
 	if err := MigrateSubmissionGuards(); err != nil {
-		log.Fatalf("failed to migrate submission guards with error: %s", err)
+		return fmt.Errorf("migrate submission guards: %w", err)
 	}
 	if err := MigrateChallengeMaintainers(); err != nil {
-		log.Fatalf("failed to migrate challenge maintainers with error: %s", err)
+		return fmt.Errorf("migrate challenge maintainers: %w", err)
 	}
 
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
-		log.Fatalf("Error while checking dummy user entry.")
+		return fmt.Errorf("check dummy user entry: %w", err)
 	}
 
 	if len(users) == 0 {
@@ -113,11 +116,11 @@ func Init() {
 
 		randPass := make([]byte, 32)
 		if _, err := rand.Read(randPass); err != nil {
-			log.Fatalf("failed to generate dummy user password: %s", err)
+			return fmt.Errorf("generate dummy user password: %w", err)
 		}
 		authModel, err := auth.CreateModel(core.DEFAULT_USER_NAME, string(randPass), core.USER_ROLES["author"])
 		if err != nil {
-			log.Fatalf("failed to hash dummy user password: %s", err)
+			return fmt.Errorf("hash dummy user password: %w", err)
 		}
 
 		err = CreateUserEntry(&User{
@@ -127,14 +130,17 @@ func Init() {
 		})
 
 		if err != nil {
-			log.Errorf("Error while creating dummy user entry.")
-			os.Exit(1)
+			return fmt.Errorf("create dummy user entry: %w", err)
 		}
 	}
+	return nil
 }
 
 func BackupAndReset() {
-	LoadDbConfig()
+	if err := LoadDbConfig(); err != nil {
+		log.Error(err)
+		return
+	}
 
 	err := BackupDatabase()
 	if err != nil {
@@ -180,8 +186,10 @@ func BackupAndReset() {
 }
 
 func BackupDatabase() error {
-	if dbConfig == (Config{}) {
-		LoadDbConfig()
+	if dbConfig == (beastConfig.PsqlConfig{}) {
+		if err := LoadDbConfig(); err != nil {
+			return err
+		}
 	}
 
 	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.DB_BACKUP_DIR)
@@ -191,9 +199,9 @@ func BackupDatabase() error {
 		return err
 	}
 
-	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.PsqlConf.Dbname, time.Now().Format("20060102150405"))
-	cmd := exec.Command("pg_dump", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.PsqlConf.Dbname)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.Dbname, time.Now().Format("20060102150405"))
+	cmd := exec.Command("pg_dump", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.Dbname)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Backup error: %s\n", string(output))
@@ -204,8 +212,10 @@ func BackupDatabase() error {
 }
 
 func ResetDatabase() error {
-	if dbConfig == (Config{}) {
-		LoadDbConfig()
+	if dbConfig == (beastConfig.PsqlConfig{}) {
+		if err := LoadDbConfig(); err != nil {
+			return err
+		}
 	}
 	err := TerminateDatabaseConnections()
 	if err != nil {
@@ -213,8 +223,8 @@ func ResetDatabase() error {
 		return err
 	}
 
-	dropCmd := exec.Command("dropdb", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "--force", dbConfig.PsqlConf.Dbname)
-	dropCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+	dropCmd := exec.Command("dropdb", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "--force", dbConfig.Dbname)
+	dropCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
 
 	output, err := dropCmd.CombinedOutput()
 	if err != nil {
@@ -222,8 +232,8 @@ func ResetDatabase() error {
 		return err
 	}
 
-	createCmd := exec.Command("psql", "-U", dbConfig.PsqlConf.User, "-h", dbConfig.PsqlConf.Host, "-p", dbConfig.PsqlConf.Port, "-d", "postgres", "-c", "CREATE DATABASE "+dbConfig.PsqlConf.Dbname+";")
-	createCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+	createCmd := exec.Command("psql", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-d", "postgres", "-c", "CREATE DATABASE "+dbConfig.Dbname+";")
+	createCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
 
 	output, err = createCmd.CombinedOutput()
 	if err != nil {
@@ -236,19 +246,21 @@ func ResetDatabase() error {
 
 // Terminate all active connections before dropping
 func TerminateDatabaseConnections() error {
-	if dbConfig == (Config{}) {
-		LoadDbConfig()
+	if dbConfig == (beastConfig.PsqlConfig{}) {
+		if err := LoadDbConfig(); err != nil {
+			return err
+		}
 	}
 	terminateCmd := exec.Command(
 		"psql",
-		"-U", dbConfig.PsqlConf.User,
-		"-h", dbConfig.PsqlConf.Host,
-		"-p", dbConfig.PsqlConf.Port,
+		"-U", dbConfig.User,
+		"-h", dbConfig.Host,
+		"-p", dbConfig.Port,
 		"-d", "postgres",
 		"-c",
-		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid();", dbConfig.PsqlConf.Dbname),
+		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid();", dbConfig.Dbname),
 	)
-	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
 
 	output, err := terminateCmd.CombinedOutput()
 	outputStr := string(output)
@@ -261,7 +273,9 @@ func TerminateDatabaseConnections() error {
 }
 
 func RestoreDatabase(backupFile string) error {
-	LoadDbConfig()
+	if err := LoadDbConfig(); err != nil {
+		return err
+	}
 
 	err := TerminateDatabaseConnections()
 	if err != nil {
@@ -276,16 +290,16 @@ func RestoreDatabase(backupFile string) error {
 
 	restoreCmd := exec.Command(
 		"pg_restore",
-		"-U", dbConfig.PsqlConf.User,
-		"-h", dbConfig.PsqlConf.Host,
-		"-p", dbConfig.PsqlConf.Port,
-		"-d", dbConfig.PsqlConf.Dbname,
+		"-U", dbConfig.User,
+		"-h", dbConfig.Host,
+		"-p", dbConfig.Port,
+		"-d", dbConfig.Dbname,
 		"--no-owner",
 		"--clean",
 		"--if-exists",
 		backupFile,
 	)
-	restoreCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.PsqlConf.Password))
+	restoreCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
 
 	output, err := restoreCmd.CombinedOutput()
 	if err != nil {

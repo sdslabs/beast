@@ -100,7 +100,9 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"], core.USER_ROLES["maintainer"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 	remoteManager.Init()
-	database.Init()
+	if err := database.Init(); err != nil {
+		return err
+	}
 	cache.Init()
 	backgroundCtx, stopBackground := context.WithCancel(ctx)
 	dynamicScoreDone := startDynamicScoreWorker(backgroundCtx)

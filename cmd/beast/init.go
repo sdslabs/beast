@@ -285,7 +285,9 @@ func initAdmin() error {
 			return errors.New("admin password is required")
 		}
 
-		database.Init()
+		if err := database.Init(); err != nil {
+			return err
+		}
 
 		if err := createAuthorAdminPrereq(); err != nil {
 			return err
