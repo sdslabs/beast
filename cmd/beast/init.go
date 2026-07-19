@@ -261,7 +261,9 @@ func initDb() error {
 
 func initAdmin() error {
 	if result := utils.PromptBinary("Create an administrative user for beast?"); result {
-		config.InitConfig()
+		if err := config.InitConfig(); err != nil {
+			return err
+		}
 
 		name := utils.PromptString("Enter admin name")
 		if name == "" {
@@ -285,7 +287,9 @@ func initAdmin() error {
 
 		database.Init()
 
-		createAuthorAdminPrereq()
+		if err := createAuthorAdminPrereq(); err != nil {
+			return err
+		}
 		if err := coreUtils.CreateAdminOrAuthor(name, username, email, password, "admin"); err != nil {
 			return err
 		}
@@ -321,7 +325,9 @@ func runBeastBootsteps() error {
 
 	log.Infoln("Successfully installed air for live reloading...")
 
-	config.InitConfig()
+	if err := config.InitConfig(); err != nil {
+		return err
+	}
 
 	if err := initCache(); err != nil {
 		return err

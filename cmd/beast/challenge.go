@@ -19,7 +19,10 @@ var challengeCmd = &cobra.Command{
 	Long:  "Performs actions like : deploy, undeploy, redeploy, purge to the challs",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		config.InitConfig()
+		if err := config.InitConfig(); err != nil {
+			log.Error(err)
+			return
+		}
 
 		// Since action is already verfied to exist it does not make sense to check
 		// its existence here therefore we directly parse the action from the command.

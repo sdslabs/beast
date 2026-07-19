@@ -15,7 +15,10 @@ var verifyCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		config.InitConfig()
+		if err := config.InitConfig(); err != nil {
+			log.Error(err)
+			return
+		}
 		challengeName := args[0]
 
 		challengeDir := coreUtils.GetChallengeDir(challengeName)

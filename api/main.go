@@ -86,7 +86,9 @@ func newHTTPServer(address string, handler http.Handler) *http.Server {
 func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) error {
 	log.Info("Bootstrapping Beast API server")
 
-	config.InitConfig()
+	if err := config.InitConfig(); err != nil {
+		return err
+	}
 
 	address, err := listenAddress(port)
 	if err != nil {

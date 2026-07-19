@@ -541,21 +541,19 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 var Cfg *BeastConfig
 var NoCache bool
 
-// InitConfig loads the config from the global config file and populate
-// the Cfg global variable used everywhere else.
-func InitConfig() {
+// InitConfig loads the config from the global config file and populates Cfg.
+func InitConfig() error {
 	log.Info("Loading up beast configuration.")
 	if Cfg != nil {
 		log.Warn("Config is already initialized; restart Beast to load configuration changes")
-		return
+		return nil
 	}
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
 	cfg, err := LoadBeastConfig(configPath)
-
 	if err != nil {
-		log.Errorf("Error while loading the beast global config : %s", err)
-		os.Exit(1)
+		return fmt.Errorf("load Beast global config: %w", err)
 	}
 
 	Cfg = &cfg
+	return nil
 }

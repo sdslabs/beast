@@ -19,7 +19,10 @@ var healthProbeCmd = &cobra.Command{
 	Long:  "Run Health Probe only without API server",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		config.InitConfig()
+		if err := config.InitConfig(); err != nil {
+			log.Error(err)
+			return
+		}
 		controllerLock, err := acquireControllerLock(core.BEAST_GLOBAL_DIR)
 		if err != nil {
 			log.Error(err)

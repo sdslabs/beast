@@ -11,10 +11,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createAuthorAdminPrereq() {
-	config.InitConfig()
+func createAuthorAdminPrereq() error {
+	if err := config.InitConfig(); err != nil {
+		return err
+	}
 
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"], core.USER_ROLES["maintainer"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
+	return nil
 }
 
 var createAuthorCmd = &cobra.Command{
@@ -43,7 +46,10 @@ var createAuthorCmd = &cobra.Command{
 	},
 
 	Run: func(cmd *cobra.Command, args []string) {
-		createAuthorAdminPrereq()
+		if err := createAuthorAdminPrereq(); err != nil {
+			fmt.Printf("Unable to initialize configuration: %v\n", err)
+			return
+		}
 		if err := utils.CreateAdminOrAuthor(Name, Username, Email, Password, "author"); err != nil {
 			fmt.Printf("Unable to create author: %v\n", err)
 		}
@@ -76,7 +82,10 @@ var createAdminCmd = &cobra.Command{
 	},
 
 	Run: func(cmd *cobra.Command, args []string) {
-		createAuthorAdminPrereq()
+		if err := createAuthorAdminPrereq(); err != nil {
+			fmt.Printf("Unable to initialize configuration: %v\n", err)
+			return
+		}
 		if err := utils.CreateAdminOrAuthor(Name, Username, Email, Password, "admin"); err != nil {
 			fmt.Printf("Unable to create admin: %v\n", err)
 		}
