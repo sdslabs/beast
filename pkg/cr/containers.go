@@ -1,6 +1,7 @@
 package cr
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,7 +20,6 @@ import (
 	utils "github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 type PortMapping struct {
@@ -97,13 +97,15 @@ func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, er
 		return []types.Container{}, err
 	}
 	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {
 		filterArgs.Add(key, val)
 	}
 
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{
 		All:     true,
 		Filters: filterArgs,
 	})
@@ -118,13 +120,15 @@ func SearchRunningContainerByFilter(filterMap map[string]string) ([]types.Contai
 		return []types.Container{}, err
 	}
 	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {
 		filterArgs.Add(key, val)
 	}
 
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{
 		Filters: filterArgs,
 	})
 
@@ -137,16 +141,18 @@ func StopAndRemoveContainer(containerId string) error {
 		return err
 	}
 	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
 	// Try to stop using default timeout we are using for beast
-	err = cli.ContainerStop(context.Background(), containerId, &defaults.DefaultDockerStopTimeout)
+	err = cli.ContainerStop(ctx, containerId, &defaults.DefaultDockerStopTimeout)
 	if err != nil {
 		return err
 	}
 	log.Debug("Stopped container with ID ", containerId)
 
 	log.Debug("Removing container with ID ", containerId)
-	err = cli.ContainerRemove(context.Background(), containerId, types.ContainerRemoveOptions{
+	err = cli.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{
 		RemoveVolumes: false,
 		RemoveLinks:   false,
 		Force:         true,
@@ -157,7 +163,8 @@ func StopAndRemoveContainer(containerId string) error {
 
 func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
 	containerName := containerConfig.ContainerName
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPILongTimeout)
+	defer cancel()
 	cli, err := newDockerClient()
 	if err != nil {
 		return "", err
@@ -262,8 +269,10 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 		return nil, err
 	}
 	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
-	stdout, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	stdout, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{
 		ShowStdout: true,
 		Details:    true,
 	})
@@ -277,7 +286,7 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 		return nil, fmt.Errorf("read container stdout: %w", err)
 	}
 
-	stderr, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	stderr, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{
 		ShowStderr: true,
 		Details:    true,
 	})
@@ -311,8 +320,10 @@ func ShowLiveContainerLogs(containerID string) error {
 		return err
 	}
 	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
-	stream, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	stream, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Details:    true,
@@ -331,7 +342,8 @@ func ShowLiveContainerLogs(containerID string) error {
 }
 
 func CommitContainer(containerId string) (string, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPILongTimeout)
+	defer cancel()
 	cli, err := newDockerClient()
 	if err != nil {
 		return "", err

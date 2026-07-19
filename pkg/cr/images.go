@@ -69,8 +69,10 @@ func RemoveImage(imageId string) error {
 		return err
 	}
 	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
-	_, err = cli.ImageRemove(context.Background(), imageId, types.ImageRemoveOptions{
+	_, err = cli.ImageRemove(ctx, imageId, types.ImageRemoveOptions{
 		Force:         false,
 		PruneChildren: true,
 	})
@@ -79,7 +81,8 @@ func RemoveImage(imageId string) error {
 }
 
 func CheckIfImageExists(imageId string) (bool, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 	cli, err := newDockerClient()
 	if err != nil {
 		return false, err
@@ -104,13 +107,15 @@ func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, err
 		return []types.ImageSummary{}, err
 	}
 	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {
 		filterArgs.Add(key, val)
 	}
 
-	images, err := cli.ImageList(context.Background(), types.ImageListOptions{
+	images, err := cli.ImageList(ctx, types.ImageListOptions{
 		All:     false,
 		Filters: filterArgs,
 	})
