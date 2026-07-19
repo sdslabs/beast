@@ -589,7 +589,7 @@ var NoCache bool
 func InitConfig() {
 	log.Info("Loading up beast configuration.")
 	if Cfg != nil {
-		log.Warn("Config is already initialized, reinitilize/reload using ReloadBeastConfig method")
+		log.Warn("Config is already initialized; restart Beast to load configuration changes")
 		return
 	}
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
@@ -601,18 +601,4 @@ func InitConfig() {
 	}
 
 	Cfg = &cfg
-}
-
-// ReloadBeastConfig reloads the beast configuration and reinitializes the Cfg global
-// variable.
-func ReloadBeastConfig() error {
-	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
-	cfg, err := LoadBeastConfig(configPath)
-
-	if err != nil {
-		return fmt.Errorf("error while loading beast config: %s", err)
-	}
-
-	Cfg = &cfg
-	return nil
 }
