@@ -25,6 +25,7 @@ dev:
 	@$(AIR)
 
 cmdref: build
+	@rm -rf docs/cmdref
 	@"$(BEAST_BIN)" cmdref --reference-directory docs/cmdref
 
 # Check go formatting

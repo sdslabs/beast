@@ -21,6 +21,7 @@ var cmdRef = &cobra.Command{
 		if err := os.MkdirAll(directory, 0750); err != nil {
 			return fmt.Errorf("create command reference directory: %w", err)
 		}
+		rootCmd.DisableAutoGenTag = true
 		return doc.GenMarkdownTree(rootCmd, directory)
 	},
 }
