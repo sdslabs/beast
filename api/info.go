@@ -166,12 +166,12 @@ func hintHandler(c *gin.Context) {
 // @Accept  json
 // @Produce json
 // @Param Authorization header string true "Bearer"
-// @Param name query string true "Name of challenge"
-// @Success 200 {object} api.ChallengeInfoResp
+// @Param name path string true "Name of challenge"
+// @Success 200 {object} api.Challenge
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/challenge/info [get]
+// @Router /api/info/challenge/{name} [get]
 func challengeInfoHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
@@ -308,7 +308,7 @@ func canViewChallengeSecrets(user *database.User, challenge *database.Challenge)
 // @Param filter query string false "Filter parameter by which challenges are filtered"
 // @Param value query string false "Value of filtered parameter"
 // @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.ChallengeInfoResp
+// @Success 200 {array} api.ChallengeMetadata
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/challenges [get]
@@ -485,6 +485,9 @@ func challengeLogsHandler(c *gin.Context) {
 		})
 		return
 	}
+	if !authorizeChallengeManagement(c, chall, false) {
+		return
+	}
 
 	logs, err := utils.GetLogs(chall, false)
 	if err != nil {
@@ -621,8 +624,11 @@ func userInfoHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer"
-// @Param sort, order, filter
-// @Success 200 {object} api.UserResp
+// @Param sort query string false "Sort by username or score"
+// @Param order query string false "Score order: asc or desc"
+// @Param filter query string false "Filter by banned, active, or hidden"
+// @Param format query string false "Response format: json or csv"
+// @Success 200 {array} api.UsersResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/users [get]
@@ -838,7 +844,7 @@ func submissionsHandler(c *gin.Context) {
 // @Success 200 {object} api.UsersStatisticsResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/admin/statistics [get]
+// @Router /api/info/competition-info [get]
 func getUsersStatisticsHandler(c *gin.Context) {
 	users, err := database.QueryAllUsers()
 	if err != nil {
@@ -884,7 +890,7 @@ func getUsersStatisticsHandler(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.CompetitionInfoResp
 // @Failure 400 {object} api.HTTPErrorResp
-// @Router /api/admin/statistics [get]
+// @Router /api/info/tags [get]
 func competitionInfoHandler(c *gin.Context) {
 	competitionInfo, err := config.GetCompetitionInfo()
 	if err != nil {

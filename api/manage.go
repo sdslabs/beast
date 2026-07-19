@@ -51,7 +51,7 @@ func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// Since upto this point the request is already authorized, we use a default
 	// username if any error occurs while getting the username.
 	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
-	if err == nil {
+	if err != nil {
 		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
 		username = core.DEFAULT_USER_NAME
 	}
@@ -105,6 +105,9 @@ func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
 	authorization := c.GetHeader("Authorization")
+	if !authorizeChallengeManagement(c, identifier, action == core.MANAGE_ACTION_DEPLOY) {
+		return
+	}
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 	if msgs := manager.LogTransaction(identifier, action, authorization); msgs != nil {
@@ -222,9 +225,26 @@ func deployLocalChallengeHandler(c *gin.Context) {
 		})
 		return
 	}
+	if err := manager.ValidateChallengeConfig(challDir); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: err.Error()})
+		return
+	}
+	configuration, err := cfg.LoadChallengeConfig(filepath.Join(challDir, core.CHALLENGE_CONFIG_FILE_NAME))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: "challenge configuration is invalid"})
+		return
+	}
+	user, ok := authenticatedManager(c)
+	if !ok {
+		return
+	}
+	if !userOwnsChallengeConfig(user, configuration) {
+		c.JSON(http.StatusForbidden, HTTPErrorResp{Error: "challenge management access denied"})
+		return
+	}
 
 	log.Info("In local deploy challenge Handler")
-	err := manager.DeployChallengePipeline(challDir)
+	err = manager.DeployChallengePipeline(challDir)
 	if msgs := manager.LogTransaction(strings.Split(challDir, "/")[len(strings.Split(challDir, "/"))-1], action, authorization); msgs != nil {
 		log.Warn("Error while saving transaction")
 	}
@@ -302,9 +322,12 @@ func beastStaticContentHandler(c *gin.Context) {
 // @Param challenge query string true "Name of the challenge to commit"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/manage/commit/ [post]
+// @Router /api/manage/challenge/verify [post]
 func commitChallenge(c *gin.Context) {
 	challenge := c.PostForm("challenge")
+	if !authorizeChallengeManagement(c, challenge, false) {
+		return
+	}
 
 	err := manager.CommitChallengeContainer(challenge)
 
@@ -331,6 +354,9 @@ func commitChallenge(c *gin.Context) {
 // @Router /api/manage/commit/ [post]
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
+	if !authorizeChallengeManagement(c, challengeName, true) {
+		return
+	}
 	challengeRemoteDir := coreUtils.GetChallengeDir(challengeName)
 	if challengeRemoteDir == "" {
 		log.Errorf("Challenge does not exist")
@@ -373,7 +399,7 @@ func manageScheduledAction(c *gin.Context) {
 
 	authorization := c.GetHeader("Authorization")
 	username, err := coreUtils.GetUser(authorization)
-	if err == nil {
+	if err != nil {
 		log.Warn("Error while getting user from authorization header, using default user(since already authorized)")
 		username = core.DEFAULT_USER_NAME
 	}
@@ -426,12 +452,18 @@ func manageScheduledAction(c *gin.Context) {
 	if tag != "" {
 		manager.LogTransaction(fmt.Sprintf("TAG:%s", tag), "SCHEDULE::"+action, authorization)
 
-		BeastScheduler.ScheduleAfter(duration, manager.HandleTagRelatedChallenges, action, tag, username)
+		if err := BeastScheduler.ScheduleAfter(duration, manager.HandleTagRelatedChallenges, action, tag, username); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "failed to schedule challenge action"})
+			return
+		}
 		log.Infof("Scheduled %s for challenges with tag %s", action, tag)
 	} else {
 		manager.LogTransaction(challenge, "SCHEDULE::"+action, authorization)
 
-		BeastScheduler.ScheduleAfter(duration, actionHandler, challenge)
+		if err := BeastScheduler.ScheduleAfter(duration, actionHandler, challenge); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "failed to schedule challenge action"})
+			return
+		}
 		log.Infof("Scheduled %s for challenge %s", action, challenge)
 	}
 
@@ -514,6 +546,14 @@ func manageUploadHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: fmt.Sprintf("CONFIG ERROR: %s", err),
 		})
+		return
+	}
+	user, ok := authenticatedManager(c)
+	if !ok {
+		return
+	}
+	if !userOwnsChallengeConfig(user, config) {
+		c.AbortWithStatusJSON(http.StatusForbidden, HTTPErrorResp{Error: "challenge management access denied"})
 		return
 	}
 	if err := persistUploadedChallenge(tempStageDir, config.Challenge.Metadata.Name); err != nil {
@@ -620,7 +660,9 @@ func persistUploadedChallenge(source, challengeName string) error {
 func validateFlagHandler(c *gin.Context) {
 	flag := c.PostForm("flag")
 	challenge_name := c.PostForm("challenge_name")
-	authorization := c.GetHeader("Authorization")
+	if !authorizeChallengeManagement(c, challenge_name, false) {
+		return
+	}
 
 	challenges, err := database.QueryChallengeEntries("name", challenge_name)
 	if err != nil {
@@ -637,7 +679,7 @@ func validateFlagHandler(c *gin.Context) {
 		return
 	}
 
-	if msgs := manager.LogTransaction(challenge_name, "VALIDATE_FLAG: "+flag, authorization); msgs != nil {
+	if msgs := manager.LogTransaction(challenge_name, "VALIDATE_FLAG", c.GetHeader("Authorization")); msgs != nil {
 		log.Warn("Error while saving transaction")
 	}
 
