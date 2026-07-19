@@ -9,7 +9,9 @@ import (
 	"html/template"
 	"log"
 	"math/big"
+	"net"
 	"net/http"
+	"net/mail"
 	"net/smtp"
 	"os"
 	"path/filepath"
@@ -39,6 +41,14 @@ func sendEmail(email, otp string) error {
 	password := config.Cfg.MailConfig.Password
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
+	fromAddress, err := canonicalMailbox(from)
+	if err != nil {
+		return fmt.Errorf("invalid SMTP sender: %w", err)
+	}
+	recipientAddress, err := canonicalMailbox(email)
+	if err != nil {
+		return fmt.Errorf("invalid OTP recipient: %w", err)
+	}
 
 	// Email subject
 	subject := "Your OTP Code"
@@ -53,7 +63,8 @@ func sendEmail(email, otp string) error {
 
 	// Check if template file exists
 	var body bytes.Buffer
-	_, err := os.Stat(emailTemplatePath)
+	htmlBody := false
+	_, err = os.Stat(emailTemplatePath)
 	if err == nil {
 		// Template exists, parse and execute
 		tmpl, err := template.ParseFiles(emailTemplatePath)
@@ -70,6 +81,7 @@ func sendEmail(email, otp string) error {
 			log.Println("Failed to execute email template:", err)
 			return err
 		}
+		htmlBody = true
 	} else {
 		// Template does not exist, send plain text email
 		log.Println("Template not found, sending plain text email.")
@@ -77,13 +89,13 @@ func sendEmail(email, otp string) error {
 	}
 
 	// Create email headers
-	message := fmt.Sprintf("From: %s\r\n", from) +
-		fmt.Sprintf("To: %s\r\n", email) +
+	message := fmt.Sprintf("From: %s\r\n", fromAddress) +
+		fmt.Sprintf("To: %s\r\n", recipientAddress) +
 		fmt.Sprintf("Subject: %s\r\n", subject) +
 		"MIME-Version: 1.0\r\n"
 
 	// Set Content-Type based on template availability
-	if body.String()[0] == '<' {
+	if htmlBody {
 		message += "Content-Type: text/html; charset=\"utf-8\"\r\n\r\n"
 	} else {
 		message += "Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n"
@@ -93,38 +105,48 @@ func sendEmail(email, otp string) error {
 
 	// Setup TLS connection
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true, // Set true only if SMTP server uses self-signed certs
-		ServerName:         smtpHost,
+		MinVersion: tls.VersionTLS12,
+		ServerName: smtpHost,
 	}
 
-	// Connect to SMTP server
-	conn, err := tls.Dial("tcp", smtpHost+":"+smtpPort, tlsConfig)
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	rawConn, err := dialer.Dial("tcp", net.JoinHostPort(smtpHost, smtpPort))
 	if err != nil {
 		log.Println("Failed to connect to SMTP server:", err)
 		return err
 	}
+	conn := tls.Client(rawConn, tlsConfig)
+	if err := conn.SetDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		_ = conn.Close()
+		return err
+	}
+	if err := conn.Handshake(); err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("verify SMTP TLS connection: %w", err)
+	}
 
 	client, err := smtp.NewClient(conn, smtpHost)
 	if err != nil {
+		_ = conn.Close()
 		log.Println("Failed to create SMTP client:", err)
 		return err
 	}
 	defer client.Close()
 
 	// Authenticate
-	auth := smtp.PlainAuth("", from, password, smtpHost)
+	auth := smtp.PlainAuth("", fromAddress, password, smtpHost)
 	if err := client.Auth(auth); err != nil {
 		log.Println("SMTP authentication failed:", err)
 		return err
 	}
 
 	// Set sender and recipient
-	if err := client.Mail(from); err != nil {
+	if err := client.Mail(fromAddress); err != nil {
 		log.Println("Failed to set sender:", err)
 		return err
 	}
 
-	if err := client.Rcpt(email); err != nil {
+	if err := client.Rcpt(recipientAddress); err != nil {
 		log.Println("Failed to set recipient:", err)
 		return err
 	}
@@ -154,8 +176,18 @@ func sendEmail(email, otp string) error {
 		return err
 	}
 
-	fmt.Println("OTP email sent successfully to", email)
 	return nil
+}
+
+func canonicalMailbox(value string) (string, error) {
+	if strings.ContainsAny(value, "\r\n") {
+		return "", errors.New("mailbox contains a line break")
+	}
+	parsed, err := mail.ParseAddress(value)
+	if err != nil || parsed.Address != value {
+		return "", fmt.Errorf("mailbox must be a bare email address")
+	}
+	return parsed.Address, nil
 }
 
 func sendOTPHandler(c *gin.Context) {
