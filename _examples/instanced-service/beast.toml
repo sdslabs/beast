@@ -28,7 +28,7 @@ default_port = 9999
 apt_deps = ["gcc", "xinetd"]
 setup_scripts = ["setup.sh"]
 service_path = "pwn"
-base_image = "ubuntu:18.04"
+base_image = "ubuntu:24.04"
 
 [resource]
 cpu_shares = 512

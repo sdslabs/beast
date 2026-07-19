@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/mail"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -20,6 +22,7 @@ const SERVICE_CHALL_RUN_CMD string = "xinetd -dontfork"
 
 var challengeNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 var environmentKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+var generatedPathPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$`)
 
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
@@ -393,6 +396,22 @@ func validateChallengeDir(challengeDir, relativePath, field string) error {
 	return nil
 }
 
+func validateGeneratedChallengeFile(challengeDir, relativePath, field string, setupScripts []string) error {
+	cleaned := filepath.ToSlash(filepath.Clean(relativePath))
+	if !generatedPathPattern.MatchString(cleaned) || cleaned == "." || strings.Contains(cleaned, "../") {
+		return fmt.Errorf("invalid %s path %q", field, relativePath)
+	}
+	if err := validateChallengeFile(challengeDir, cleaned, field); err == nil {
+		return nil
+	} else if _, statErr := os.Lstat(filepath.Join(challengeDir, filepath.FromSlash(cleaned))); !os.IsNotExist(statErr) {
+		return err
+	}
+	if len(setupScripts) == 0 {
+		return fmt.Errorf("%s %q does not exist and no setup script generates it", field, relativePath)
+	}
+	return nil
+}
+
 // ValidateRequiredFields validates required fields for the Challenge environment configuration.
 // This requires challenge type to be passed so that we can verfiy based on type
 // of the challenge.
@@ -477,7 +496,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		// Challenge type is service.
 		// ServicePath must be relative.
 		if config.ServicePath != "" {
-			if err := validateChallengeFile(challdir, config.ServicePath, "service_path"); err != nil {
+			if err := validateGeneratedChallengeFile(challdir, config.ServicePath, "service_path", config.SetupScripts); err != nil {
 				return err
 			}
 		}
