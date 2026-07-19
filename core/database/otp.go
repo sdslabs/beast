@@ -102,6 +102,22 @@ func DeleteOTPEntry(email string) error {
 	return Db.Delete(&OTP{}, "email = ?", email).Error
 }
 
+func ConsumeVerifiedOTP(email, purpose string, now time.Time) error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	return Db.Transaction(func(tx *gorm.DB) error {
+		var entry OTP
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("email = ?", email).First(&entry).Error; err != nil {
+			return err
+		}
+		if !entry.Verified || entry.Purpose != purpose || now.After(entry.Expiry) {
+			return ErrOTPInvalid
+		}
+		return tx.Delete(&entry).Error
+	})
+}
+
 func CreateOTPEntry(otpEntry *OTP) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
