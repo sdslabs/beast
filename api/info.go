@@ -1304,8 +1304,6 @@ func getChallengeAttempts(c *gin.Context) {
 		return
 	}
 
-	isContestant := queryingUser.Role == core.USER_ROLES["contestant"]
-
 	challengeIDStr := c.Param("challenge_id")
 	challengeID, err := strconv.ParseUint(challengeIDStr, 10, 64)
 	if err != nil {
@@ -1330,9 +1328,10 @@ func getChallengeAttempts(c *gin.Context) {
 		return
 	}
 
-	challengeTags := make([]string, len(challenge[0].Tags))
-	for index, tag := range challenge[0].Tags {
-		challengeTags[index] = tag.TagName
+	canViewSecrets, err := canViewChallengeSecrets(&queryingUser, &challenge[0])
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while checking challenge access."})
+		return
 	}
 
 	attempts, err := database.QueryChallAttempts(challengeID)
@@ -1346,7 +1345,7 @@ func getChallengeAttempts(c *gin.Context) {
 
 	resp := make([]SubmissionResp, 0, len(attempts))
 	for _, attempt := range attempts {
-		if isContestant && (!attempt.Correct || attempt.Cheating) {
+		if !canViewSecrets && (!attempt.Correct || attempt.Cheating) {
 			continue
 		}
 
@@ -1359,7 +1358,7 @@ func getChallengeAttempts(c *gin.Context) {
 			Success:   attempt.Correct,
 		}
 
-		if !isContestant {
+		if canViewSecrets {
 			submissionResp.Flag = attempt.Flag
 			submissionResp.Cheating = attempt.Cheating
 		}
@@ -1399,8 +1398,6 @@ func getUserAttempts(c *gin.Context) {
 		return
 	}
 
-	isContestant := user.Role == core.USER_ROLES["contestant"]
-
 	userIDStr := c.Param("user_id")
 	userID, err := strconv.ParseUint(userIDStr, 10, 64)
 	if err != nil {
@@ -1435,36 +1432,47 @@ func getUserAttempts(c *gin.Context) {
 	}
 
 	resp := make([]SubmissionResp, 0, len(attempts))
+	challengeCache := make(map[uint]database.Challenge)
+	accessCache := make(map[uint]bool)
 
 	for _, attempt := range attempts {
-		if isContestant && (!attempt.Correct || attempt.Cheating) {
-			continue
+		challenge, exists := challengeCache[attempt.ChallengeID]
+		if !exists {
+			challenges, err := database.QueryChallengeEntries("id", strconv.FormatUint(uint64(attempt.ChallengeID), 10))
+			if err != nil {
+				log.Errorf("DATABASE ERROR while fetching challenge details: %s", err.Error())
+				continue
+			}
+			if len(challenges) == 0 {
+				continue
+			}
+			challenge = challenges[0]
+			challengeCache[attempt.ChallengeID] = challenge
 		}
-
-		challenge, err := database.QueryChallengeEntries("id", strconv.Itoa(int(attempt.ChallengeID)))
-		if err != nil {
-			log.Errorf("DATABASE ERROR while fetching challenge details: %s", err.Error())
-			continue
+		canViewSecrets, exists := accessCache[attempt.ChallengeID]
+		if !exists {
+			var err error
+			canViewSecrets, err = canViewChallengeSecrets(&user, &challenge)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while checking challenge access."})
+				return
+			}
+			accessCache[attempt.ChallengeID] = canViewSecrets
 		}
-		if len(challenge) == 0 {
+		if !canViewSecrets && (!attempt.Correct || attempt.Cheating) {
 			continue
-		}
-
-		challengeTags := make([]string, len(challenge[0].Tags))
-		for index, tag := range challenge[0].Tags {
-			challengeTags[index] = tag.TagName
 		}
 
 		submissionResp := SubmissionResp{
 			UserId:    submissionUser.ID,
 			Username:  submissionUser.Username,
-			ChallId:   challenge[0].ID,
-			ChallName: challenge[0].Name,
+			ChallId:   challenge.ID,
+			ChallName: challenge.Name,
 			SolvedAt:  attempt.SolvedAt,
 			Success:   attempt.Correct,
 		}
 
-		if !isContestant {
+		if canViewSecrets {
 			submissionResp.Flag = attempt.Flag
 			submissionResp.Cheating = attempt.Cheating
 		}
