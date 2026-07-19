@@ -48,10 +48,14 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 
 	if live {
 		if config.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
-			cr.ShowLiveContainerLogs(chall.ContainerId)
+			if err := cr.ShowLiveContainerLogs(chall.ContainerId); err != nil {
+				return nil, err
+			}
 		} else {
 			server := config.Cfg.AvailableServers[chall.ServerDeployed]
-			remoteManager.ShowLiveContainerLogsRemote(chall.ContainerId, server)
+			if err := remoteManager.ShowLiveContainerLogsRemote(chall.ContainerId, server); err != nil {
+				return nil, err
+			}
 		}
 		return nil, nil
 	}

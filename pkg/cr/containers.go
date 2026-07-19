@@ -3,8 +3,9 @@ package cr
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,7 +43,11 @@ const (
 	UDPTraffic TrafficType = "udp"
 
 	DefaultTraffic TrafficType = TCPTraffic
+
+	maxContainerLogBytes int64 = 4 << 20
 )
+
+var errContainerLogLimit = errors.New("container logs exceed 4 MiB limit")
 
 func IsValidTrafficType(t string) bool {
 	switch TrafficType(t) {
@@ -269,7 +274,10 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 	}
 	defer stdout.Close()
 
-	stdoutlogs, _ := ioutil.ReadAll(stdout)
+	stdoutlogs, err := readContainerLogs(stdout, maxContainerLogBytes)
+	if err != nil {
+		return nil, fmt.Errorf("read container stdout: %w", err)
+	}
 
 	stderr, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
 		ShowStderr: true,
@@ -280,16 +288,29 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 	}
 	defer stderr.Close()
 
-	stderrlogs, _ := ioutil.ReadAll(stderr)
+	stderrlogs, err := readContainerLogs(stderr, maxContainerLogBytes-int64(len(stdoutlogs)))
+	if err != nil {
+		return nil, fmt.Errorf("read container stderr: %w", err)
+	}
 
 	return &Log{Stdout: string(stdoutlogs), Stderr: string(stderrlogs)}, nil
 }
 
-func ShowLiveContainerLogs(containerID string) {
+func readContainerLogs(reader io.Reader, limit int64) ([]byte, error) {
+	logs, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(logs)) > limit {
+		return nil, errContainerLogLimit
+	}
+	return logs, nil
+}
+
+func ShowLiveContainerLogs(containerID string) error {
 	cli, err := newDockerClient()
 	if err != nil {
-		log.Error(err)
-		return
+		return err
 	}
 	defer cli.Close()
 
@@ -299,13 +320,16 @@ func ShowLiveContainerLogs(containerID string) {
 		Details:    true,
 	})
 	if err != nil {
-		log.Error(err)
-		return
+		return err
 	}
 	defer stream.Close()
 
-	logs, _ := ioutil.ReadAll(stream)
+	logs, err := readContainerLogs(stream, maxContainerLogBytes)
+	if err != nil {
+		return fmt.Errorf("read container logs: %w", err)
+	}
 	fmt.Println(string(logs))
+	return nil
 }
 
 func CommitContainer(containerId string) (string, error) {
