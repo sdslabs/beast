@@ -100,3 +100,43 @@ func TestExpandHomePathOnlyExpandsHomePrefix(t *testing.T) {
 		t.Fatalf("unexpected arbitrary expansion: %q, %v", got, err)
 	}
 }
+
+func TestCopyDirectoryRejectsSymlinks(t *testing.T) {
+	source := t.TempDir()
+	target := filepath.Join(t.TempDir(), "copied")
+	secret := filepath.Join(t.TempDir(), "secret")
+	if err := os.WriteFile(secret, []byte("host secret"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secret, filepath.Join(source, "asset")); err != nil {
+		t.Fatal(err)
+	}
+	if err := CopyDirectory(source, target); err == nil {
+		t.Fatal("expected symlink rejection")
+	}
+	if _, err := os.Lstat(target); !os.IsNotExist(err) {
+		t.Fatalf("partial destination was not removed: %v", err)
+	}
+}
+
+func TestCopyFileRefusesExistingDestination(t *testing.T) {
+	directory := t.TempDir()
+	source := filepath.Join(directory, "source")
+	destination := filepath.Join(directory, "destination")
+	if err := os.WriteFile(source, []byte("new"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(destination, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := CopyFile(source, destination); err == nil {
+		t.Fatal("expected existing destination error")
+	}
+	contents, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "keep" {
+		t.Fatalf("destination was overwritten: %q", contents)
+	}
+}

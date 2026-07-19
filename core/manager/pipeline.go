@@ -119,6 +119,9 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	}
 
 	log.Debugf("Copying challenge config to staging directory")
+	if err := utils.RemoveFileIfExists(filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME)); err != nil {
+		return fmt.Errorf("remove previous staged challenge config: %w", err)
+	}
 	err = utils.CopyFile(challengeConfig, filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME))
 	if err != nil {
 		return fmt.Errorf("error while copying challenge config to staging : %s", err)

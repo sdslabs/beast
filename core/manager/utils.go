@@ -703,19 +703,21 @@ func LogTransaction(identifier string, action string, authorization string) erro
 // Copies the Static content to the staging/static/folder
 func CopyToStaticContent(challengeName, staticContentDir string) error {
 	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
-	err := utils.CreateIfNotExistDir(dirPath)
-	if err != nil {
-		return fmt.Errorf("error while copying static content : %v", err)
+	if _, err := os.Lstat(dirPath); err == nil {
+		if err := utils.RemoveDirRecursively(dirPath); err != nil {
+			return fmt.Errorf("clear static content: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect static content destination: %w", err)
 	}
 
-	err = utils.ValidateDirExists(staticContentDir)
+	err := utils.ValidateDirExists(staticContentDir)
 	if err != nil {
 		log.Warnf("%s : There is no static directory inside challenge, skipping copy.", challengeName)
 		return nil
 	}
 
-	err = utils.CopyDirectory(staticContentDir, dirPath)
-	return err
+	return utils.CopyDirectory(staticContentDir, dirPath)
 }
 
 func GetAvailableChallenges() ([]string, error) {

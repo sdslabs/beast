@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -145,14 +143,19 @@ func ResolvePathWithin(root, relativePath string) (string, error) {
 // if there was an error while creating the directory it returns the error
 // else it returns nil indicating success
 func CreateIfNotExistDir(dirPath string) error {
-	err := ValidateDirExists(dirPath)
-	if err != nil {
-		if e := os.MkdirAll(dirPath, 0755); e != nil {
-			eMsg := fmt.Errorf("could not create directory : %s", dirPath)
-			return eMsg
+	info, err := os.Lstat(dirPath)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(dirPath, 0750); err != nil {
+			return fmt.Errorf("create directory %s: %w", dirPath, err)
 		}
+		info, err = os.Lstat(dirPath)
 	}
-
+	if err != nil {
+		return fmt.Errorf("inspect directory %s: %w", dirPath, err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("path is not a real directory: %s", dirPath)
+	}
 	return nil
 }
 
@@ -199,9 +202,12 @@ func RemoveDirRecursively(dirPath string) error {
 }
 
 func CopyFile(src, dst string) error {
-	err := ValidateFileExists(src)
+	sourceInfo, err := os.Lstat(src)
 	if err != nil {
-		return err
+		return fmt.Errorf("inspect source file: %w", err)
+	}
+	if !sourceInfo.Mode().IsRegular() {
+		return fmt.Errorf("source is not a regular file: %s", src)
 	}
 
 	source, err := os.Open(src)
@@ -209,36 +215,56 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 	defer source.Close()
-
-	destination, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
+	openedInfo, err := source.Stat()
 	if err != nil {
-		return fmt.Errorf("error while creating destination file : %s", err)
+		return fmt.Errorf("inspect opened source file: %w", err)
 	}
-	defer destination.Close()
+	if !openedInfo.Mode().IsRegular() || !os.SameFile(sourceInfo, openedInfo) {
+		return fmt.Errorf("source changed while opening: %s", src)
+	}
 
-	_, err = io.Copy(destination, source)
-	return err
+	destination, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, sourceInfo.Mode().Perm())
+	if err != nil {
+		return fmt.Errorf("create destination file: %w", err)
+	}
+	if _, err := io.Copy(destination, source); err != nil {
+		_ = destination.Close()
+		_ = os.Remove(dst)
+		return fmt.Errorf("copy file contents: %w", err)
+	}
+	if err := destination.Close(); err != nil {
+		_ = os.Remove(dst)
+		return fmt.Errorf("close destination file: %w", err)
+	}
+	return nil
 }
 
 func CopyDirectory(src, dst string) error {
-	srcInfo, err := os.Stat(src)
+	srcInfo, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
-
-	err = os.MkdirAll(dst, srcInfo.Mode())
-	if err != nil {
-		return err
+	if !srcInfo.IsDir() || srcInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("source is not a real directory: %s", src)
 	}
 
-	fds, err := ioutil.ReadDir(src)
+	if err := os.Mkdir(dst, srcInfo.Mode().Perm()); err != nil {
+		return err
+	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = os.RemoveAll(dst)
+		}
+	}()
 
+	fds, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
 	for _, fd := range fds {
-		srcn := path.Join(src, fd.Name())
-		dstn := path.Join(dst, fd.Name())
+		srcn := filepath.Join(src, fd.Name())
+		dstn := filepath.Join(dst, fd.Name())
 
 		if fd.IsDir() {
 			if err = CopyDirectory(srcn, dstn); err != nil {
@@ -250,6 +276,7 @@ func CopyDirectory(src, dst string) error {
 			}
 		}
 	}
+	complete = true
 	return nil
 }
 
@@ -299,7 +326,7 @@ func GetDirsInDir(dirPath string) (error, []string) {
 		return err, dirs
 	}
 
-	files, err := ioutil.ReadDir(dirPath)
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		return fmt.Errorf("error while reading directory with path %s : %s", dirPath, err), dirs
 	}
