@@ -1,19 +1,19 @@
-## beast health-probe
+## beast new
 
-Run Health Probe
+Generate a challenge configuration and public directory
 
 ### Synopsis
 
-Run Health Probe only without API server
+Generate a challenge configuration and public directory
 
 ```
-beast health-probe [flags]
+beast new [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for health-probe
+  -h, --help   help for new
 ```
 
 ### Options inherited from parent commands

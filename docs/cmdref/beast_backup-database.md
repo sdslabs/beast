@@ -1,19 +1,19 @@
-## beast health-probe
+## beast backup-database
 
-Run Health Probe
+Backs up the configured PostgreSQL database
 
 ### Synopsis
 
-Run Health Probe only without API server
+Backs up the configured PostgreSQL database
 
 ```
-beast health-probe [flags]
+beast backup-database [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for health-probe
+  -h, --help   help for backup-database
 ```
 
 ### Options inherited from parent commands

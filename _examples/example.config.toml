@@ -1,9 +1,16 @@
 # Base OS image that beast allows the challenges to use.
-allowed_base_images = ["ubuntu:24.04", "ubuntu:18.04", "debian:bookworm"]
+allowed_base_images = ["ubuntu:24.04", "debian:bookworm"]
 
 # For authentication purposes beast uses JWT based authentication, this is the
 # key used for encrypting the claims of a user. Keep this strong.
 jwt_secret = "CHANGE_ME_GENERATED_BY_SETUP"
+
+# Public HTTPS origin of the optional static-content service. Leave empty when
+# challenge assets are not published through Beast.
+beast_static_url = ""
+
+# Minimum accepted value is 2m. Invalid/short values fall back to the default.
+remote_sync_period = "2m"
 
 #Health Prober, if active, starts a health prober on a thread which checks for
 #deployed challenges, containers and servers after every ticker_frequency period
@@ -52,7 +59,7 @@ username = ""
 # Path to private SSH key for interacting with the server. (Leave empty for localhost)
 ssh_key_path = ""
 
-# Port range for this server (format: START:END) - uses local_host_port_range if empty
+# Port range for this worker (format: START:END)
 port_range = "10000:20000"
 
 # Status of remote server to be used
@@ -108,7 +115,9 @@ password = "CHANGE_ME"
 dbname = "beast"
 host = "localhost"
 port = "5432"
-sslmode = "prefer"
+# Loopback development may use disable. Remote PostgreSQL must use verify-full
+# and a CA bundle in sslrootcert.
+sslmode = "disable"
 sslrootcert = ""
 
 [redis_config]
@@ -116,6 +125,8 @@ host = "localhost"
 port = "6379"
 password = "CHANGE_ME"
 user = "beast"
+# Remote Redis must enable TLS. ca_file may be empty only when system roots
+# trust the server certificate.
 tls = false
 ca_file = ""
 server_name = ""

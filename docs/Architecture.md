@@ -1,51 +1,40 @@
 # Architecture
 
-This section deals with how the different pieces of beast fall together to create a robust and flexible
-deployment pipeline. For internals of each section itself go to respective documentation pages.
+## Controller
 
-Important components of beast are described below:
+The Beast process owns the HTTPS API, scheduler, bounded worker queue, health/instance reconcilers, PostgreSQL pool, Redis client, and remote-worker registry. A filesystem lock prevents two controllers from using the same local state directory. Shutdown drains controller-owned goroutines and connections but intentionally leaves deployed challenges running.
 
-### API Server
+## Durable and coordination state
 
-API server is the interface provided by beast to interact with the underlying application. All the actions performed by beast
-are propogated by an external agent from this point. The API server is a HTTP REST API service built on top of go-gin framework.
-For authentication purposes it uses JWT which can be optionally turned off when running the server.
+PostgreSQL is the durable source for users, challenge metadata, ownership, submissions, scores, runtime identifiers, and deployed ports. Critical submission and dynamic-flag transitions use transactions, row locks, and unique indexes. Ports are unique per deployment server.
 
-Requests for beast API are split across five namespaces
+Redis stores namespaced coordination data, port allocation, cached metadata, and expiring instance markers. Atomic Lua/pipeline operations protect shared updates. Expiry notifications accelerate cleanup, while periodic reconciliation is the fallback.
 
-* **manage**: Challenge management related APIs. Ex. Deploy, Undeploy etc.
-* **info**: Challenge information related APIs. Ex. ChallengeInfo etc.
-* **status**: Challenge status related APIs. Ex. Challenge status
-* **remote**: Beast remote repository related APIs. Ex. SyncRemote
-* **config**: Beast global configuration related APIs. Ex. Reload Config
-* **notification**: Competition notification related APIs. Ex. Add Notifications
-* **admin**: Competition related APIs requiring admin prevalages. Ex. Competition Stastics
+## Deployment workers
 
-### Manager
+Challenges run on the local Docker daemon or active SSH workers. Worker selection is round-robin. Remote host keys are verified from `known_hosts`; unavailable active workers fail startup rather than silently reducing capacity.
 
-This part is the brains of beast and does all the action corresponding to lifecycle management of challenges along with managing configuration
-and authentication. The part lives inside `core/` directory and uses helpers/interfaces from inside of `pkg/` and `/utils`.
+Challenge builds apply CPU, memory, and PID limits. Generated service images run challenge commands as an unprivileged user unless an explicit entrypoint/custom image requires otherwise. Docker/Compose authors remain trusted because build instructions execute with Docker authority.
 
-### Container Runtime
+## Request and task flow
 
-Container runtime is a wrapper around docker client library which provides beast with helper function to deal with underlying container runtime.
+1. TLS and request-size limits are applied.
+2. Authentication establishes JWT claims and role middleware.
+3. Ownership checks authorize challenge-specific management operations.
+4. Strict configuration/path validation runs before staging.
+5. Work enters a bounded, de-duplicating queue.
+6. The selected local/remote runtime performs build or lifecycle work.
+7. Completion and failures are recorded and returned/logged; database state changes are transactional where multiple relations must move together.
 
-Currently this only supports `docker` as an underlying container runtime but we will soon be creating a generalized interface which can be fulfilled
-by most of the container runtimes. Something similar on the lines of CRI(Container Runtime Interface for kubernetes).
+Scheduled tasks never overlap with themselves. Health probes use timeouts, verify HTTPS certificates, reject redirects, and bound response bodies.
 
-### Queue and Workers
+## Static service
 
-All the tasks performed by beast are non synchronous and are handled by a queue. Whenever a new action is performed corresponding to beast API
-a new task is created using the action configuration and pushed to an internal queue. The result is returned immediately by the API server notifying about
-the start of the process.
+Static challenge content is copied to normalized public directories. A digest-pinned `nginx-unprivileged` image runs as UID 101 and receives only per-challenge read-only mounts, never the whole staging tree. The service listens on container port 8080 and is published on host port 8034; production deployments should terminate public TLS in front of it.
 
-Beast workers are the actual underlying goroutines which handles the tasks assigned by the Queue. They perform the required task and then take on
-the next. Consider them as the threadpool for beast.
+## Trust boundaries
 
-## Challenge Flow
-
-![Challenge Deployment Flow](res/challenge-flow.png)
-
-## Deployment Pipeline
-
-![Challenge Deployment Pipeline](res/deployment-pipeline.png)
+- API users are untrusted; inputs, body sizes, filenames, archive entries, and authorization are validated.
+- Challenge authors are trusted to supply build code, but paths and dangerous Compose runtime controls are constrained.
+- Docker and remote SSH credentials are highly privileged and must be protected as root-equivalent.
+- PostgreSQL, Redis, Git, SMTP, and webhook networks are external trust boundaries and require authenticated, verified transport when remote.

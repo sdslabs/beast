@@ -1,19 +1,19 @@
-## beast health-probe
+## beast config
 
-Run Health Probe
+Run interactive beast configuration setup
 
 ### Synopsis
 
-Run Health Probe only without API server
+Creates the global Beast config file while prompting the user interactively whenever needed.
 
 ```
-beast health-probe [flags]
+beast config [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for health-probe
+  -h, --help   help for config
 ```
 
 ### Options inherited from parent commands

@@ -1,19 +1,19 @@
-## beast health-probe
+## beast backup-cache
 
-Run Health Probe
+Backs up the configured Redis database
 
 ### Synopsis
 
-Run Health Probe only without API server
+Backs up the configured Redis database
 
 ```
-beast health-probe [flags]
+beast backup-cache [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for health-probe
+  -h, --help   help for backup-cache
 ```
 
 ### Options inherited from parent commands

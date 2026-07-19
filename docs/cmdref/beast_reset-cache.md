@@ -1,19 +1,20 @@
-## beast health-probe
+## beast reset-cache
 
-Run Health Probe
+Backs up and resets the configured Redis database
 
 ### Synopsis
 
-Run Health Probe only without API server
+Backs up and resets the configured Redis database
 
 ```
-beast health-probe [flags]
+beast reset-cache [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for health-probe
+  -h, --help   help for reset-cache
+      --yes    Confirm destructive cache reset
 ```
 
 ### Options inherited from parent commands

@@ -1,19 +1,20 @@
-## beast health-probe
+## beast reset-database
 
-Run Health Probe
+Backs up and resets the configured PostgreSQL database
 
 ### Synopsis
 
-Run Health Probe only without API server
+Backs up and resets the configured PostgreSQL database
 
 ```
-beast health-probe [flags]
+beast reset-database [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for health-probe
+  -h, --help   help for reset-database
+      --yes    Confirm destructive database reset
 ```
 
 ### Options inherited from parent commands

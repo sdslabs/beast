@@ -1,16 +1,5 @@
-# Beast Documentation
+# Documentation map
 
-This directory contains documentation related to beast and will guide you through flow, architecture usage and gotchas of beast.
+Use [Setup](Setup.md) for installation and operator security, [Getting started](GettingStarted.md) for the first challenge, [Usage](Usage.md) for CLI/API operation, and [Challenge configuration](ChallConfig.md) for the strict schema.
 
-Move over to any of the below pages to know more about beast.
-
-## Index
-
-* [Usage](./Usage.md)
-* [Setup](./Setup.md)
-* [Getting Started](./GettingStarted.md)
-* [Features](./Features.md)
-* [Architecture](./Architecture.md)
-* [Authentication Flow](./APIAuth.md)
-* [Challenge Configuration](./ChallConfig.md)
-* [Deployment](./Deployment.md)
+The [Architecture](Architecture.md) page documents state ownership and trust boundaries. The [command reference](cmdref/beast.md) is generated from the current binary. The running controller serves current Swagger API documentation at `/api/docs/index.html` over HTTPS.
