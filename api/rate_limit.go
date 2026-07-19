@@ -35,10 +35,7 @@ func incrementRateLimit(ctx context.Context, key string, window time.Duration) (
 }
 
 func enforceLoginRateLimit(c *gin.Context, username string) bool {
-	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
-	if err != nil {
-		host = c.Request.RemoteAddr
-	}
+	host := requestPeerHost(c)
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 	defer cancel()
 
@@ -57,4 +54,28 @@ func enforceLoginRateLimit(c *gin.Context, username string) bool {
 	c.Header("Retry-After", "300")
 	c.AbortWithStatusJSON(http.StatusTooManyRequests, HTTPErrorResp{Error: "Too many login attempts"})
 	return false
+}
+
+func enforceOTPSendRateLimit(c *gin.Context) bool {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	count, err := incrementRateLimit(ctx, rateLimitKey("otp-address", requestPeerHost(c)), 10*time.Minute)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, HTTPErrorResp{Error: "OTP service unavailable"})
+		return false
+	}
+	if count > 10 {
+		c.Header("Retry-After", "600")
+		c.AbortWithStatusJSON(http.StatusTooManyRequests, HTTPErrorResp{Error: "Too many OTP requests"})
+		return false
+	}
+	return true
+}
+
+func requestPeerHost(c *gin.Context) string {
+	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+	if err != nil {
+		return c.Request.RemoteAddr
+	}
+	return host
 }

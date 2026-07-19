@@ -213,6 +213,9 @@ func requestedOTPEmail(c *gin.Context) (string, error) {
 }
 
 func issueOTP(c *gin.Context, purpose string, existingUserRequired bool) {
+	if !enforceOTPSendRateLimit(c) {
+		return
+	}
 	email, err := requestedOTPEmail(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: "A valid email address is required"})
