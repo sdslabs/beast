@@ -81,7 +81,9 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 	info := w.Info.(TaskInfo)
 	switch info.Action {
 	case core.MANAGE_ACTION_DEPLOY:
-		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit, info.NoCache)
+		if err := StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit, info.NoCache); err != nil {
+			log.Errorf("Error while deploying challenge(%s): %s", w.ID, err)
+		}
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		err := StartUndeployChallenge(w.ID, false)

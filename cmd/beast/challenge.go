@@ -1,11 +1,10 @@
 package main
 
 import (
-	"os"
+	"fmt"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
@@ -18,114 +17,84 @@ var challengeCmd = &cobra.Command{
 	Short: "Performs action to the challs",
 	Long:  "Performs actions like : deploy, undeploy, redeploy, purge to the challs",
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := config.InitConfig(); err != nil {
-			log.Error(err)
-			return
-		}
-
-		// Since action is already verfied to exist it does not make sense to check
-		// its existence here therefore we directly parse the action from the command.
+	RunE: func(cmd *cobra.Command, args []string) error {
 		action := args[0]
-		noCache, _ := cmd.Flags().GetBool("no-cache")
-		if noCache && action == core.MANAGE_ACTION_DEPLOY {
-			config.NoCache = noCache
-		} else if noCache {
-			log.Errorf("no-cache flag is available only for \"deploy\" action")
-			os.Exit(1)
+		if NoCache && action != core.MANAGE_ACTION_DEPLOY {
+			return fmt.Errorf("no-cache flag is available only for deploy")
 		}
 
 		if action == core.MANAGE_ACTION_SHOW {
-
-			if AllChalls {
-				errors := utils.ShowAllChallenges()
-
-				if len(errors) > 0 {
-					for _, err := range errors {
-						log.Errorf("The following errors occurred: %s", err.Error())
-					}
-					os.Exit(1)
-				}
-
-			} else if Tag != "" {
-				errors := utils.ShowTagRelatedChallenges(Tag)
-
-				if len(errors) > 0 {
-					for _, err := range errors {
-						log.Errorf("The following errors occurred: %s", err.Error())
-					}
-					os.Exit(1)
-				}
-			} else {
-				if len(args) == 1 {
-					log.Errorf("Provide chall name")
-					os.Exit(1)
-				}
-
-				errors := utils.ShowChallengeByName(args[1])
-				if len(errors) > 0 {
-					for _, err := range errors {
-						log.Errorf("The following errors occurred: %s", err.Error())
-					}
-					os.Exit(1)
-				}
-
+			cleanup, err := initializeCLIRuntime(false, false)
+			if err != nil {
+				return err
 			}
-
-			return
+			defer cleanup()
+			return showChallenges(args)
 		}
 
 		challAction, ok := manager.ChallengeActionHandlers[action]
 		if !ok {
-			log.Errorf("No action %s exists", action)
-			os.Exit(1)
+			return fmt.Errorf("no challenge action %q exists", action)
 		}
+		cleanup, err := initializeCLIRuntime(true, true)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
 
-		// Handle local directory deployment separately.
 		if LocalDirectory != "" {
 			if action != core.MANAGE_ACTION_DEPLOY {
-				log.Errorf("Only deploy action is available for the challenge with local directory")
-				os.Exit(1)
+				return fmt.Errorf("local-directory is available only for deploy")
 			}
-
-			manager.StartDeployPipeline(LocalDirectory, false, false, false)
-			return
+			return manager.StartDeployPipeline(LocalDirectory, false, false, NoCache)
 		}
 
-		completionChannel := make(chan bool)
-
-		manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, completionChannel)
+		completion := make(chan bool, 1)
+		manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, completion)
 		manager.Q.StartWorkers(&manager.Worker{})
+		defer manager.Q.Stop()
 
 		if AllChalls {
-			errstrings := manager.HandleAll(action, core.BEAST_LOCAL_SERVER)
-			if len(errstrings) != 0 {
-				log.Errorf("Following errors occurred : %s", strings.Join(errstrings, " || "))
-				os.Exit(1)
-			} else {
-				log.Info("The action will be performed")
+			if failures := manager.HandleAll(action, core.BEAST_LOCAL_SERVER); len(failures) != 0 {
+				return fmt.Errorf("challenge actions failed: %s", strings.Join(failures, " || "))
 			}
 		} else if Tag != "" {
-			errstrings := manager.HandleTagRelatedChallenges(action, Tag, core.BEAST_LOCAL_SERVER)
-			if len(errstrings) != 0 {
-				log.Errorf("Following errors occurred : %s", strings.Join(errstrings, " || "))
-				os.Exit(1)
-			} else {
-				log.Info("The action will be performed")
+			if failures := manager.HandleTagRelatedChallenges(action, Tag, core.BEAST_LOCAL_SERVER); len(failures) != 0 {
+				return fmt.Errorf("challenge actions failed: %s", strings.Join(failures, " || "))
 			}
 		} else {
 			if len(args) == 1 {
-				log.Errorf("Provide chall name")
-				os.Exit(1)
+				return fmt.Errorf("challenge name is required")
 			}
-			err := challAction(args[1])
-			if err != nil {
-				log.Errorf("The action was not performed due to error : %s", err.Error())
-				os.Exit(1)
-			} else {
-				log.Info("The action will be performed")
+			if err := challAction(args[1]); err != nil {
+				return fmt.Errorf("perform %s on %s: %w", action, args[1], err)
 			}
 		}
-		_ = <-completionChannel
+
+		<-completion
+		log.Info("Challenge action completed")
+		return nil
 	},
+}
+
+func showChallenges(args []string) error {
+	var failures []error
+	switch {
+	case AllChalls:
+		failures = utils.ShowAllChallenges()
+	case Tag != "":
+		failures = utils.ShowTagRelatedChallenges(Tag)
+	case len(args) < 2:
+		return fmt.Errorf("challenge name is required")
+	default:
+		failures = utils.ShowChallengeByName(args[1])
+	}
+	if len(failures) == 0 {
+		return nil
+	}
+	messages := make([]string, 0, len(failures))
+	for _, err := range failures {
+		messages = append(messages, err.Error())
+	}
+	return fmt.Errorf("show challenges: %s", strings.Join(messages, "; "))
 }

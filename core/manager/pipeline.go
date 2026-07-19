@@ -607,13 +607,16 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 
 // This is just a decorator function over bootstrapDeployPipeline and generate
 // notifications to slack on the basis of the result of the deploy pipeline.
-func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) {
+func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) error {
 	challengeName := filepath.Base(challengeDir)
 	var sendNotificationError error
 
 	err := bootstrapDeployPipeline(challengeDir, skipStage, skipCommit, noCache)
 	if err != nil {
-		sendNotificationError = notify.SendNotification(notify.Error, err.Error())
+		if notificationErr := notify.SendNotification(notify.Error, err.Error()); notificationErr != nil {
+			log.Warnf("%s: failure notification could not be sent: %v", challengeName, notificationErr)
+		}
+		return err
 	} else {
 		msg := fmt.Sprintf("DEPLOY SUCCESS : %s : Challenge deployment pipeline successful.", challengeName)
 		sendNotificationError = notify.SendNotification(notify.Success, msg)
@@ -622,4 +625,5 @@ func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, n
 	if sendNotificationError == nil {
 		log.Debugf("%s: Notification sent", challengeName)
 	}
+	return nil
 }
