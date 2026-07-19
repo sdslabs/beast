@@ -129,20 +129,21 @@ func login(c *gin.Context) {
 		})
 		return
 	}
-
-	userEntry, err := database.QueryFirstUserEntry("username", username)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: err.Error(),
-		})
+	if !enforceLoginRateLimit(c, username) {
 		return
 	}
 
-	if userEntry.Status == 1 {
-		c.JSON(http.StatusForbidden, HTTPPlainResp{
-			Message: "The user has been banned from this competition. Please contact competition admin for more information",
-		})
+	userEntry, err := database.QueryFirstUserEntry("username", username)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			_, _ = auth.Authenticate(username, password, auth.AuthModel{
+				Salt:     make([]byte, 16),
+				Password: make([]byte, core.HASH_LENGTH),
+			})
+			c.JSON(http.StatusUnauthorized, HTTPPlainResp{Message: "The username or password is invalid"})
+			return
+		}
+		c.JSON(http.StatusServiceUnavailable, HTTPPlainResp{Message: "Authentication service unavailable"})
 		return
 	}
 
@@ -151,6 +152,12 @@ func login(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: err.Error(),
+		})
+		return
+	}
+	if userEntry.Status == 1 {
+		c.JSON(http.StatusForbidden, HTTPPlainResp{
+			Message: "The user has been banned from this competition. Please contact competition admin for more information",
 		})
 		return
 	}
