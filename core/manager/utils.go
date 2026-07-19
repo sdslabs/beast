@@ -717,7 +717,22 @@ func CopyToStaticContent(challengeName, staticContentDir string) error {
 		return nil
 	}
 
-	return utils.CopyDirectory(staticContentDir, dirPath)
+	if err := utils.CopyDirectory(staticContentDir, dirPath); err != nil {
+		return err
+	}
+	return filepath.WalkDir(dirPath, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("static asset is a symbolic link: %s", path)
+		}
+		mode := os.FileMode(0644)
+		if entry.IsDir() {
+			mode = 0755
+		}
+		return os.Chmod(path, mode)
+	})
 }
 
 func GetAvailableChallenges() ([]string, error) {

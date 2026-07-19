@@ -267,14 +267,20 @@ func beastStaticContentHandler(c *gin.Context) {
 	// Deploy and Undeploy
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		go manager.DeployStaticContentContainer()
+		if err := manager.DeployStaticContentContainer(); err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{Message: err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "Static container deploy started",
+			Message: "Static container deployed",
 		})
 		return
 
 	case core.MANAGE_ACTION_UNDEPLOY:
-		go manager.UndeployStaticContentContainer()
+		if err := manager.UndeployStaticContentContainer(); err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{Message: err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, HTTPPlainResp{
 			Message: "Static content container undeploy started",
 		})

@@ -5,7 +5,6 @@
 ### Configuration file samples:
 
 * [Beast global configuration sample](./example.config.toml)
-* [Beast static container authentication file](./.static.beast.htpasswd)
 
 ### Sample Challenges 
 
