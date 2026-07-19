@@ -103,7 +103,10 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 	if err := database.Init(); err != nil {
 		return err
 	}
-	cache.Init()
+	cache.Configure(config.Cfg.RedisConf.User, config.Cfg.RedisConf.Password, config.Cfg.RedisConf.Host, config.Cfg.RedisConf.Port, config.Cfg.RedisConf.Db)
+	if err := cache.Init(); err != nil {
+		return err
+	}
 	backgroundCtx, stopBackground := context.WithCancel(ctx)
 	dynamicScoreDone := startDynamicScoreWorker(backgroundCtx)
 	instanceCleanupDone := make(chan struct{})

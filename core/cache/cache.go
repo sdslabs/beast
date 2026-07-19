@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/redis/go-redis/v9"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/utils"
@@ -21,49 +21,54 @@ import (
 var (
 	CacheMutex *sync.Mutex
 	Cache      *redis.Client
-	cacheError error
 )
 
-var (
-	BEAST_GLOBAL_DIR string = filepath.Join(os.Getenv("HOME"), ".beast")
-	cacheConfig      Config
-)
+var cacheConfig RedisConfig
 
-type Config struct {
-	RedisConfig RedisConfig `toml:"redis_config"`
-}
 type RedisConfig struct {
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	Host     string `toml:"host"`
-	Port     string `toml:"port"`
-	DB       int    `toml:"db"`
+	User     string
+	Password string
+	Host     string
+	Port     string
+	DB       uint32
 }
 
-// Db config is loaded separately here for temp use because init() function is
-// called during initialization of package.
-// It is also loaded during db backup/reset
-func LoadCacheConfig() {
-	if _, err := toml.DecodeFile(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME), &cacheConfig); err != nil {
-		log.Fatalf("Error loading TOML file: %v", err)
+func Configure(user, password, host, port string, db uint32) {
+	cacheConfig = RedisConfig{User: user, Password: password, Host: host, Port: port, DB: db}
+}
+
+func LoadCacheConfig() error {
+	if cacheConfig.Host == "" || cacheConfig.Port == "" || cacheConfig.Password == "" {
+		return fmt.Errorf("cache is not configured")
 	}
+	return nil
+}
+
+func redisAddress(config RedisConfig) string {
+	return net.JoinHostPort(config.Host, config.Port)
 }
 
 // Connect redis
 func ConnectCache() error {
-	LoadCacheConfig()
-	Cache = redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", cacheConfig.RedisConfig.Host, cacheConfig.RedisConfig.Port),
-		Username: cacheConfig.RedisConfig.User,
-		Password: cacheConfig.RedisConfig.Password,
-		DB:       cacheConfig.RedisConfig.DB,
+	if err := LoadCacheConfig(); err != nil {
+		return err
+	}
+	client := redis.NewClient(&redis.Options{
+		Addr:     redisAddress(cacheConfig),
+		Username: cacheConfig.User,
+		Password: cacheConfig.Password,
+		DB:       int(cacheConfig.DB),
 	})
 
-	_, err := Cache.Ping(context.Background()).Result()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := client.Ping(ctx).Result()
 	if err != nil {
-		return fmt.Errorf("failed to connected to redis: %s", err.Error())
+		_ = client.Close()
+		return fmt.Errorf("connect to Redis: %w", err)
 	}
 
+	Cache = client
 	log.Debug("Cache initialized")
 	return nil
 }
@@ -72,14 +77,14 @@ func ConnectCache() error {
 // Postgresql database for beast. The Db variable is the connection variable for the
 // database, which is not closed after creating a connection here and can
 // be used further after this.
-func Init() {
+func Init() error {
 	CacheMutex = &sync.Mutex{}
 	if Cache == nil {
-		cacheError = ConnectCache()
-		if cacheError != nil {
-			log.Errorf("Error while initializing cache: %s", cacheError.Error())
+		if err := ConnectCache(); err != nil {
+			return fmt.Errorf("initialize cache: %w", err)
 		}
 	}
+	return nil
 }
 
 func EnableKeyspaceExpiryNotifications() error {
@@ -118,7 +123,7 @@ func SubscribeExpiredInstanceMarkers(ctx context.Context, handler func(instanceI
 		return fmt.Errorf("redis cache not initialized")
 	}
 
-	pattern := fmt.Sprintf("__keyevent@%d__:expired", cacheConfig.RedisConfig.DB)
+	pattern := fmt.Sprintf("__keyevent@%d__:expired", cacheConfig.DB)
 	pubsub := Cache.PSubscribe(ctx, pattern)
 	defer pubsub.Close()
 
@@ -161,7 +166,10 @@ func Close() error {
 }
 
 func BackupAndReset() {
-	LoadCacheConfig()
+	if err := LoadCacheConfig(); err != nil {
+		log.Error(err)
+		return
+	}
 
 	err := BackupCache()
 	if err != nil {
@@ -207,8 +215,10 @@ func BackupAndReset() {
 }
 
 func BackupCache() error {
-	if cacheConfig == (Config{}) {
-		LoadCacheConfig()
+	if cacheConfig == (RedisConfig{}) {
+		if err := LoadCacheConfig(); err != nil {
+			return err
+		}
 	}
 
 	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_CACHE_DIR)
@@ -218,24 +228,21 @@ func BackupCache() error {
 		return err
 	}
 
-	backupFile := fmt.Sprintf("%d_%s.bak", cacheConfig.RedisConfig.DB, time.Now().Format("20060102150405"))
+	backupFile := fmt.Sprintf("%d_%s.bak", cacheConfig.DB, time.Now().Format("20060102150405"))
 
 	args := []string{
-		"-h", cacheConfig.RedisConfig.Host,
-		"-p", cacheConfig.RedisConfig.Port,
-		"-n", strconv.Itoa(cacheConfig.RedisConfig.DB),
+		"-h", cacheConfig.Host,
+		"-p", cacheConfig.Port,
+		"-n", strconv.FormatUint(uint64(cacheConfig.DB), 10),
 		"--rdb", filepath.Join(backupPath, backupFile),
 	}
-	if cacheConfig.RedisConfig.User != "" {
-		args = append(args, "--user", cacheConfig.RedisConfig.User)
-	}
-	if cacheConfig.RedisConfig.Password != "" {
-		args = append(args, "--pass", cacheConfig.RedisConfig.Password)
+	if cacheConfig.User != "" {
+		args = append(args, "--user", cacheConfig.User)
 	}
 
 	cmd := exec.Command("redis-cli", args...)
 
-	cmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.RedisConfig.Password))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.Password))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Backup error: %s\n", string(output))
@@ -246,8 +253,10 @@ func BackupCache() error {
 }
 
 func ResetCache() error {
-	if cacheConfig == (Config{}) {
-		LoadCacheConfig()
+	if cacheConfig == (RedisConfig{}) {
+		if err := LoadCacheConfig(); err != nil {
+			return err
+		}
 	}
 	err := TerminateCacheConnections()
 	if err != nil {
@@ -257,14 +266,14 @@ func ResetCache() error {
 
 	dropCmd := exec.Command(
 		"redis-cli",
-		"-h", cacheConfig.RedisConfig.Host,
-		"-p", cacheConfig.RedisConfig.Port,
-		"--user", cacheConfig.RedisConfig.User,
-		"-n", strconv.Itoa(cacheConfig.RedisConfig.DB),
+		"-h", cacheConfig.Host,
+		"-p", cacheConfig.Port,
+		"--user", cacheConfig.User,
+		"-n", strconv.FormatUint(uint64(cacheConfig.DB), 10),
 		"FLUSHDB",
 	)
 
-	dropCmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.RedisConfig.Password))
+	dropCmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.Password))
 
 	output, err := dropCmd.CombinedOutput()
 	if err != nil {
@@ -278,12 +287,14 @@ func ResetCache() error {
 
 // Terminate all active connections before dropping
 func TerminateCacheConnections() error {
-	if cacheConfig == (Config{}) {
-		LoadCacheConfig()
+	if cacheConfig == (RedisConfig{}) {
+		if err := LoadCacheConfig(); err != nil {
+			return err
+		}
 	}
 
 	cache := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", cacheConfig.RedisConfig.Host, cacheConfig.RedisConfig.Port),
+		Addr:     redisAddress(cacheConfig),
 		Username: core.REDIS_DEFAULT_USER,
 		Password: utils.PromptSecret("Enter default redis user password"),
 	})
@@ -297,7 +308,7 @@ func TerminateCacheConnections() error {
 
 	_, err = cache.Do(context.Background(),
 		"CLIENT", "KILL",
-		"USER", cacheConfig.RedisConfig.User,
+		"USER", cacheConfig.User,
 		"SKIPME", "yes",
 	).Result()
 
