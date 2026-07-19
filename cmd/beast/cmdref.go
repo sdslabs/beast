@@ -1,7 +1,9 @@
 package main
 
 import (
-	log "github.com/sirupsen/logrus"
+	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 )
@@ -10,20 +12,15 @@ import (
 var cmdRef = &cobra.Command{
 	Use:   "cmdref [-r]",
 	Short: "Generate beast command reference",
-	Run: func(cmd *cobra.Command, args []string) {
-
-		if RefDirectory != "" {
-			err := doc.GenMarkdownTree(rootCmd, RefDirectory)
-			if err != nil {
-				log.Fatal(err)
-
-			}
-		} else {
-			err := doc.GenMarkdownTree(rootCmd, DEFAULT_CMDREF_DIRECTORY)
-			if err != nil {
-				log.Fatal(err)
-
-			}
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		directory := RefDirectory
+		if directory == "" {
+			directory = DEFAULT_CMDREF_DIRECTORY
 		}
+		if err := os.MkdirAll(directory, 0750); err != nil {
+			return fmt.Errorf("create command reference directory: %w", err)
+		}
+		return doc.GenMarkdownTree(rootCmd, directory)
 	},
 }
