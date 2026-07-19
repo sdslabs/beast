@@ -93,6 +93,7 @@ func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, er
 	if err != nil {
 		return []types.Container{}, err
 	}
+	defer cli.Close()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {
@@ -113,6 +114,7 @@ func SearchRunningContainerByFilter(filterMap map[string]string) ([]types.Contai
 	if err != nil {
 		return []types.Container{}, err
 	}
+	defer cli.Close()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {
@@ -131,6 +133,7 @@ func StopAndRemoveContainer(containerId string) error {
 	if err != nil {
 		return err
 	}
+	defer cli.Close()
 
 	// Try to stop using default timeout we are using for beast
 	err = cli.ContainerStop(context.Background(), containerId, &defaults.DefaultDockerStopTimeout)
@@ -156,6 +159,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	if err != nil {
 		return "", err
 	}
+	defer cli.Close()
 
 	portSet := make(nat.PortSet)
 	portMap := make(nat.PortMap)
@@ -254,6 +258,7 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer cli.Close()
 
 	stdout, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
 		ShowStdout: true,
@@ -284,7 +289,9 @@ func ShowLiveContainerLogs(containerID string) {
 	cli, err := newDockerClient()
 	if err != nil {
 		log.Error(err)
+		return
 	}
+	defer cli.Close()
 
 	stream, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
 		ShowStdout: true,
@@ -293,6 +300,7 @@ func ShowLiveContainerLogs(containerID string) {
 	})
 	if err != nil {
 		log.Error(err)
+		return
 	}
 	defer stream.Close()
 
@@ -306,6 +314,7 @@ func CommitContainer(containerId string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer cli.Close()
 
 	commitResp, err := cli.ContainerCommit(ctx, containerId, types.ContainerCommitOptions{})
 	if err != nil {

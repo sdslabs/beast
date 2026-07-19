@@ -68,6 +68,7 @@ func RemoveImage(imageId string) error {
 	if err != nil {
 		return err
 	}
+	defer cli.Close()
 
 	_, err = cli.ImageRemove(context.Background(), imageId, types.ImageRemoveOptions{
 		Force:         false,
@@ -83,6 +84,7 @@ func CheckIfImageExists(imageId string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer cli.Close()
 
 	inspectVal, _, err := cli.ImageInspectWithRaw(ctx, imageId)
 	if err != nil {
@@ -101,6 +103,7 @@ func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, err
 	if err != nil {
 		return []types.ImageSummary{}, err
 	}
+	defer cli.Close()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {

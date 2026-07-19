@@ -68,6 +68,7 @@ func ExecContainer(ctx context.Context, containerID string, command []string, ou
 	if err != nil {
 		return ExecResult{}, fmt.Errorf("create Docker client: %w", err)
 	}
+	defer client.Close()
 	exec, err := client.ContainerExecCreate(ctx, containerID, types.ExecConfig{
 		User:         "0",
 		AttachStdout: true,
