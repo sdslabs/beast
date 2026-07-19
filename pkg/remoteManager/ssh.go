@@ -1,6 +1,7 @@
 package remoteManager
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -8,12 +9,50 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+const (
+	defaultRemoteCommandTimeout = 2 * time.Minute
+	remoteBuildTimeout          = 30 * time.Minute
+	maxRemoteCommandOutput      = 4 << 20
+)
+
+var errRemoteOutputLimit = errors.New("remote command output exceeds limit")
+
+type boundedCommandOutput struct {
+	mu       sync.Mutex
+	buffer   bytes.Buffer
+	limit    int
+	exceeded bool
+}
+
+func (output *boundedCommandOutput) Write(data []byte) (int, error) {
+	output.mu.Lock()
+	defer output.mu.Unlock()
+	remaining := output.limit - output.buffer.Len()
+	if remaining <= 0 {
+		output.exceeded = true
+		return 0, errRemoteOutputLimit
+	}
+	if len(data) > remaining {
+		_, _ = output.buffer.Write(data[:remaining])
+		output.exceeded = true
+		return remaining, errRemoteOutputLimit
+	}
+	return output.buffer.Write(data)
+}
+
+func (output *boundedCommandOutput) String() string {
+	output.mu.Lock()
+	defer output.mu.Unlock()
+	return output.buffer.String()
+}
 
 type LoadBalancerQueue struct {
 	servers []config.AvailableServer
@@ -91,7 +130,7 @@ func PingServer(server config.AvailableServer) error {
 }
 
 // Run the command passed as argument on the remote server
-func runCommandOnServer(server config.AvailableServer, cmd string) (string, error) {
+func runCommandOnServer(server config.AvailableServer, cmd string, timeout time.Duration) (string, error) {
 	if !server.Active {
 		return "", fmt.Errorf("server is inactive in config.toml")
 	}
@@ -106,25 +145,45 @@ func runCommandOnServer(server config.AvailableServer, cmd string) (string, erro
 	defer client.Close()
 	defer session.Close()
 
-	output, err := session.CombinedOutput(cmd)
-	if err != nil {
+	output := &boundedCommandOutput{limit: maxRemoteCommandOutput}
+	session.Stdout = output
+	session.Stderr = output
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run(cmd)
+	}()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	var commandErr error
+	select {
+	case commandErr = <-done:
+	case <-timer.C:
+		_ = session.Close()
+		_ = client.Close()
+		return output.String(), fmt.Errorf("remote command timed out after %s", timeout)
+	}
+	outputText := output.String()
+	if output.exceeded {
+		return outputText, errRemoteOutputLimit
+	}
+	if commandErr != nil {
 		exitStatus := -1
 		var exitError *ssh.ExitError
-		if errors.As(err, &exitError) {
+		if errors.As(commandErr, &exitError) {
 			exitStatus = exitError.ExitStatus()
 		}
-		return string(output), &RemoteCommandError{ExitStatus: exitStatus, Output: string(output), Err: err}
+		return outputText, &RemoteCommandError{ExitStatus: exitStatus, Output: outputText, Err: commandErr}
 	}
 
-	log.Debugf("Command output for cmd %s : %s\n", cmd, output)
-	return string(output), nil
+	log.Debugf("Remote command completed on %s with %d output bytes", server.Host, len(outputText))
+	return outputText, nil
 }
 
 func RunArgsOnServer(server config.AvailableServer, arguments ...string) (string, error) {
 	if len(arguments) == 0 {
 		return "", fmt.Errorf("remote command arguments are empty")
 	}
-	return runCommandOnServer(server, "exec "+shellJoin(arguments))
+	return runCommandOnServer(server, "exec "+shellJoin(arguments), defaultRemoteCommandTimeout)
 }
 
 func RunArgsInDirOnServer(server config.AvailableServer, directory string, arguments ...string) (string, error) {
@@ -132,7 +191,7 @@ func RunArgsInDirOnServer(server config.AvailableServer, directory string, argum
 		return "", fmt.Errorf("remote directory and command arguments are required")
 	}
 	command := "cd -- " + shellQuote(directory) + " && exec " + shellJoin(arguments)
-	return runCommandOnServer(server, command)
+	return runCommandOnServer(server, command, remoteBuildTimeout)
 }
 
 func RunArgsWithEnvOnServer(server config.AvailableServer, environment map[string]string, arguments ...string) (string, error) {
@@ -156,7 +215,7 @@ func RunArgsWithEnvOnServer(server config.AvailableServer, environment map[strin
 		command += " "
 	}
 	command += "exec " + shellJoin(arguments)
-	return runCommandOnServer(server, command)
+	return runCommandOnServer(server, command, defaultRemoteCommandTimeout)
 }
 
 // Creates an SSH client to connect to the remote server.
@@ -183,6 +242,7 @@ func CreateSSHClient(remoteServer config.AvailableServer) (*ssh.Client, error) {
 			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: hostKeyCallback,
+		Timeout:         10 * time.Second,
 	}
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", remoteServer.Host), config)
