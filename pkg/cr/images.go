@@ -198,12 +198,15 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 func BuildImagesFromCompose(challengeName, challengeTag, stagedPath, ComposeFile string, noCache bool) (*bytes.Buffer, error) {
 	extractPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
 
-	if err := os.MkdirAll(extractPath, 0750); err != nil {
-		return nil, fmt.Errorf("create compose extraction directory %s: %w", extractPath, err)
+	if _, err := os.Lstat(extractPath); err == nil {
+		if err := os.RemoveAll(extractPath); err != nil {
+			return nil, fmt.Errorf("clear compose extraction directory %s: %w", extractPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("inspect compose extraction directory %s: %w", extractPath, err)
 	}
-	err := exec.Command("tar", "-xf", stagedPath, "-C", extractPath).Run()
-	if err != nil {
-		return nil, fmt.Errorf("error while extracting tar file %s to %s: %v", stagedPath, extractPath, err)
+	if err := utils.ExtractTarGzip(stagedPath, extractPath); err != nil {
+		return nil, fmt.Errorf("extract compose context: %w", err)
 	}
 
 	cmdArgs := []string{"compose", "build"}

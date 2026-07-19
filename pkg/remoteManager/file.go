@@ -78,9 +78,12 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 		return nil, "", fmt.Errorf("invalid build resource limits: %w", err)
 	}
 	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
-	_, err := RunArgsOnServer(server, "mkdir", "-p", remoteExtractPath)
+	_, err := RunArgsOnServer(server, "rm", "-rf", "--", remoteExtractPath)
 	if err == nil {
-		_, err = RunArgsOnServer(server, "tar", "-xf", stagedDir, "-C", remoteExtractPath)
+		_, err = RunArgsOnServer(server, "mkdir", "-p", "--", remoteExtractPath)
+	}
+	if err == nil {
+		_, err = RunArgsOnServer(server, "tar", "--extract", "--gzip", "--no-same-owner", "--no-same-permissions", "--file", stagedDir, "--directory", remoteExtractPath)
 	}
 	if err != nil {
 		return []byte{}, "", fmt.Errorf("failed to extract tar: %s", err)
