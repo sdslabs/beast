@@ -1,11 +1,15 @@
 package api
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +22,13 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
+
+const (
+	maxChallengeUploadBytes        int64 = 256 << 20
+	maxChallengeUploadRequestBytes       = maxChallengeUploadBytes + 1<<20
+)
+
+var challengeUploadMu sync.Mutex
 
 // Handles route related to manage all the challenges or the challenges related to a particular tag for current beast remote.
 // @Summary Handles challenge management actions for multiple challenges.
@@ -436,40 +447,46 @@ func manageScheduledAction(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/manage/challenge/upload [post]
 func manageUploadHandler(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxChallengeUploadRequestBytes)
 	file, err := c.FormFile("file")
 
-	// The file cannot be received.
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "no file received from user",
-		})
-		return
-	}
-
-	if err = utils.CreateIfNotExistDir(core.BEAST_TEMP_DIR); err != nil {
-		if err := os.MkdirAll(core.BEAST_TEMP_DIR, 0755); err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("Could not create dir %s: %s", core.BEAST_TEMP_DIR, err),
-			})
+		status := http.StatusBadRequest
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			status = http.StatusRequestEntityTooLarge
 		}
-	}
-
-	zipContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
-
-	// The file is received, save it
-	if err := c.SaveUploadedFile(file, zipContextPath); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: fmt.Sprintf("Unable to save file: %s", err),
+		c.AbortWithStatusJSON(status, HTTPPlainResp{
+			Message: "a ZIP challenge archive is required",
 		})
 		return
 	}
+	archiveName, err := challengeArchiveFilename(file.Filename)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPErrorResp{Error: err.Error()})
+		return
+	}
 
-	// Extract and show from zip and return response
-	tempStageDir, err := manager.UnzipChallengeFolder(zipContextPath, core.BEAST_TEMP_DIR)
+	tempRoot, err := os.MkdirTemp("", "beast-upload-")
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to create upload staging directory: %s", err),
+		})
+		return
+	}
+	defer os.RemoveAll(tempRoot)
 
-	// log.Debug("The dir is ",tempStageDir)
+	zipContextPath := filepath.Join(tempRoot, archiveName)
+	if err := saveChallengeArchive(file, zipContextPath); err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, errChallengeUploadTooLarge) {
+			status = http.StatusRequestEntityTooLarge
+		}
+		c.AbortWithStatusJSON(status, HTTPErrorResp{Error: err.Error()})
+		return
+	}
 
-	// The file cannot be successfully un-zipped or the resultant was a malformed directory
+	tempStageDir, err := manager.UnzipChallengeFolder(zipContextPath, tempRoot)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: fmt.Sprintf("The unzip process failed or the ZIP was unacceptable: %s", err),
@@ -477,34 +494,29 @@ func manageUploadHandler(c *gin.Context) {
 		return
 	}
 
-	err = manager.ValidateChallengeConfig(tempStageDir)
-	if err != nil {
-		c.JSON(http.StatusOK, HTTPErrorResp{
+	if err := manager.ValidateChallengeConfig(tempStageDir); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: err.Error(),
-		})
-	}
-
-	challengeUploadDirectory := filepath.Join(
-		core.BEAST_GLOBAL_DIR,
-		core.BEAST_UPLOADS_DIR,
-		strings.TrimSuffix(file.Filename, filepath.Ext(file.Filename)),
-	)
-
-	if err = manager.CopyDir(tempStageDir, challengeUploadDirectory); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: fmt.Sprintf("Unable to move challenge directory: %s", err),
 		})
 		return
 	}
 
-	challengeName := filepath.Base(challengeUploadDirectory)
-	configFile := filepath.Join(challengeUploadDirectory, core.CHALLENGE_CONFIG_FILE_NAME)
-
+	configFile := filepath.Join(tempStageDir, core.CHALLENGE_CONFIG_FILE_NAME)
 	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
-		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
+		log.Errorf("Error while loading uploaded challenge config: %s", err)
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: fmt.Sprintf("CONFIG ERROR: %s : %s", challengeName, err),
+			Error: fmt.Sprintf("CONFIG ERROR: %s", err),
+		})
+		return
+	}
+	if err := persistUploadedChallenge(tempStageDir, config.Challenge.Metadata.Name); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, os.ErrExist) {
+			status = http.StatusConflict
+		}
+		c.AbortWithStatusJSON(status, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to store challenge: %s", err),
 		})
 		return
 	}
@@ -520,6 +532,83 @@ func manageUploadHandler(c *gin.Context) {
 		Desc:            config.Challenge.Metadata.Description,
 		Points:          config.Challenge.Metadata.Points,
 	})
+}
+
+var errChallengeUploadTooLarge = errors.New("challenge archive exceeds the 256 MiB limit")
+
+func challengeArchiveFilename(name string) (string, error) {
+	if name == "" || name != filepath.Base(name) || strings.Contains(name, `\`) {
+		return "", fmt.Errorf("invalid challenge archive filename")
+	}
+	if !strings.EqualFold(filepath.Ext(name), ".zip") || strings.TrimSuffix(name, filepath.Ext(name)) == "" {
+		return "", fmt.Errorf("challenge archive must have a non-empty .zip filename")
+	}
+	return name, nil
+}
+
+func saveChallengeArchive(header *multipart.FileHeader, destination string) error {
+	if header.Size < 0 || header.Size > maxChallengeUploadBytes {
+		return errChallengeUploadTooLarge
+	}
+	source, err := header.Open()
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	target, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	written, copyErr := io.Copy(target, io.LimitReader(source, maxChallengeUploadBytes+1))
+	closeErr := target.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if written > maxChallengeUploadBytes {
+		return errChallengeUploadTooLarge
+	}
+	return nil
+}
+
+func persistUploadedChallenge(source, challengeName string) error {
+	uploadsRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR)
+	if err := os.MkdirAll(uploadsRoot, 0700); err != nil {
+		return err
+	}
+	rootInfo, err := os.Lstat(uploadsRoot)
+	if err != nil {
+		return err
+	}
+	if !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("uploads root is not a regular directory")
+	}
+	if err := os.Chmod(uploadsRoot, 0700); err != nil {
+		return err
+	}
+
+	stageRoot, err := os.MkdirTemp(uploadsRoot, ".upload-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stageRoot)
+	stagedChallenge := filepath.Join(stageRoot, challengeName)
+	if err := manager.CopyDir(source, stagedChallenge); err != nil {
+		return err
+	}
+
+	challengeUploadMu.Lock()
+	defer challengeUploadMu.Unlock()
+	destination := filepath.Join(uploadsRoot, challengeName)
+	if _, err := os.Lstat(destination); err == nil {
+		return fmt.Errorf("challenge %q is already uploaded: %w", challengeName, os.ErrExist)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return os.Rename(stagedChallenge, destination)
 }
 
 func validateFlagHandler(c *gin.Context) {
