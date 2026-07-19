@@ -78,6 +78,15 @@ func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) erro
 	if err = config.Resources.ValidateRequiredFields(); err != nil {
 		return err
 	}
+	if config.Challenge.Env.DockerCompose != "" {
+		composePath, err := utils.ResolvePathWithin(challdir, config.Challenge.Env.DockerCompose)
+		if err != nil {
+			return err
+		}
+		if err := utils.ValidateComposeResources(composePath, config.Resources.Memory, config.Resources.PidsLimit, config.Resources.CPUsLimit); err != nil {
+			return fmt.Errorf("validate Compose resources: %w", err)
+		}
+	}
 
 	for _, maintainer := range config.Maintainers {
 		err = maintainer.ValidateRequiredFields()

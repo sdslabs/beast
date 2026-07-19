@@ -2,11 +2,14 @@ package utils
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
+	"github.com/docker/go-units"
 	"gopkg.in/yaml.v2"
 )
 
@@ -37,6 +40,60 @@ type composeService struct {
 	VolumesFrom       []string      `yaml:"volumes_from"`
 	Links             []string      `yaml:"links"`
 	ExternalLinks     []string      `yaml:"external_links"`
+	MemoryLimit       interface{}   `yaml:"mem_limit"`
+	CPUsLimit         interface{}   `yaml:"cpus"`
+	PidsLimit         int64         `yaml:"pids_limit"`
+}
+
+func ValidateComposeResources(composeFile string, maxMemory, maxPids int64, maxCPUs float32) error {
+	data, err := os.ReadFile(composeFile)
+	if err != nil {
+		return err
+	}
+	var compose Compose
+	if err := yaml.Unmarshal(data, &compose); err != nil {
+		return err
+	}
+	var totalMemory, totalPids int64
+	var totalCPUs float64
+	for name, service := range compose.Services {
+		memory, err := parseComposeMemory(service.MemoryLimit)
+		if err != nil || memory <= 0 {
+			return fmt.Errorf("service %q must set a valid positive mem_limit", name)
+		}
+		cpus, err := strconv.ParseFloat(fmt.Sprint(service.CPUsLimit), 64)
+		if err != nil || cpus <= 0 || math.IsInf(cpus, 0) || math.IsNaN(cpus) {
+			return fmt.Errorf("service %q must set a valid positive cpus limit", name)
+		}
+		if service.PidsLimit <= 0 {
+			return fmt.Errorf("service %q must set a positive pids_limit", name)
+		}
+		if memory > maxMemory-totalMemory || service.PidsLimit > maxPids-totalPids || cpus > float64(maxCPUs)-totalCPUs+1e-9 {
+			return fmt.Errorf("Compose services exceed challenge resource limits")
+		}
+		totalMemory += memory
+		totalPids += service.PidsLimit
+		totalCPUs += cpus
+	}
+	return nil
+}
+
+func parseComposeMemory(value interface{}) (int64, error) {
+	switch typed := value.(type) {
+	case int:
+		return int64(typed), nil
+	case int64:
+		return typed, nil
+	case uint64:
+		if typed > math.MaxInt64 {
+			return 0, fmt.Errorf("memory limit overflows int64")
+		}
+		return int64(typed), nil
+	case string:
+		return units.RAMInBytes(typed)
+	default:
+		return 0, fmt.Errorf("unsupported memory limit %v", value)
+	}
 }
 
 type composeResource struct {

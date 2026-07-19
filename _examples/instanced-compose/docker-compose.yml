@@ -8,6 +8,9 @@ services:
     cap_drop: [ALL]
     cap_add: [CHOWN, SETGID, SETUID]
     security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.125
+    pids_limit: 50
     ports:
       - "${INSTANCE_PORT}:80"
     environment:
@@ -24,6 +27,9 @@ services:
     cap_drop: [ALL]
     cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]
     security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.125
+    pids_limit: 50
     environment:
       - MYSQL_ROOT_PASSWORD=rootpass
       - MYSQL_DATABASE=ctf

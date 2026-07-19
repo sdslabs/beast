@@ -107,3 +107,13 @@ func TestExtractPortsFromComposeRequiresRuntimeHardening(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateComposeResourcesEnforcesAggregateLimit(t *testing.T) {
+	path := writeCompose(t, "services:\n  app:\n    mem_limit: 256m\n    cpus: 0.25\n    pids_limit: 50\n  db:\n    mem_limit: 256m\n    cpus: 0.25\n    pids_limit: 50\n")
+	if err := ValidateComposeResources(path, 512<<20, 100, 0.5); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateComposeResources(path, 256<<20, 100, 0.5); err == nil {
+		t.Fatal("expected aggregate memory limit error")
+	}
+}
