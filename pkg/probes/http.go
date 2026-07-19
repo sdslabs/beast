@@ -3,7 +3,7 @@ package probes
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -11,9 +11,11 @@ import (
 
 var defaultTransport = http.DefaultTransport.(*http.Transport)
 
-// New creates Prober that will skip TLS verification while probing.
+const maxProbeBody = 1 << 20
+
+// NewHTTPProber creates a prober that verifies HTTPS endpoints using system roots.
 func NewHTTPProber() HttpProber {
-	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
 	return NewWithTLSConfig(tlsConfig)
 }
 
@@ -29,6 +31,14 @@ func setOldTransportDefaults(t *http.Transport) *http.Transport {
 }
 
 func NewWithTLSConfig(config *tls.Config) HttpProber {
+	if config == nil {
+		config = &tls.Config{MinVersion: tls.VersionTLS12}
+	} else {
+		config = config.Clone()
+		if config.MinVersion < tls.VersionTLS12 {
+			config.MinVersion = tls.VersionTLS12
+		}
+	}
 	transport := setOldTransportDefaults(
 		&http.Transport{
 			TLSClientConfig:   config,
@@ -46,8 +56,9 @@ type HttpProber struct {
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 func (pr HttpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (ProbeResult, string, error) {
 	client := &http.Client{
-		Timeout:   timeout,
-		Transport: pr.transport,
+		Timeout:       timeout,
+		Transport:     pr.transport,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 	}
 
 	req, err := http.NewRequest("GET", url.String(), nil)
@@ -65,9 +76,12 @@ func (pr HttpProber) Probe(url *url.URL, headers http.Header, timeout time.Durat
 	}
 	defer res.Body.Close()
 
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := io.ReadAll(io.LimitReader(res.Body, maxProbeBody+1))
 	if err != nil {
 		return Failure, "", err
+	}
+	if len(b) > maxProbeBody {
+		return Failure, "", fmt.Errorf("HTTP probe response exceeds %d bytes", maxProbeBody)
 	}
 	body := string(b)
 
