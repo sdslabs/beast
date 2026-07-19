@@ -27,7 +27,11 @@ type User struct {
 // Queries all the users entries where the column represented by key
 // have the value in value.
 func QueryUserEntries(key string, value string) ([]User, error) {
-	queryKey := fmt.Sprintf("%s = ?", key)
+	column, err := validatedQueryColumn(key, "id", "username", "email", "role")
+	if err != nil {
+		return nil, err
+	}
+	queryKey := fmt.Sprintf("%s = ?", column)
 	var users []User
 
 	DBMux.Lock()

@@ -87,7 +87,7 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 // else just take containerID and find the server config from db
 func StopAndRemoveContainerRemote(containerId string, server config.AvailableServer) error {
 	if server == (config.AvailableServer{}) {
-		chall, err := database.QueryChallengeEntries("id", containerId)
+		chall, err := database.QueryChallengeEntries("container_id", containerId)
 		if err != nil {
 			if err == (gorm.ErrRecordNotFound) {
 				log.Debugf("no container with container id %s present", containerId)

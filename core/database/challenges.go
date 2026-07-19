@@ -190,7 +190,11 @@ func QueryAllChallengesMetadata() ([]Challenge, error) {
 // Queries all the challenges entries where the column represented by key
 // have the value in value.
 func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
-	queryKey := fmt.Sprintf("%s = ?", key)
+	column, err := validatedQueryColumn(key, "id", "name", "status", "container_id")
+	if err != nil {
+		return nil, err
+	}
+	queryKey := fmt.Sprintf("%s = ?", column)
 
 	var challenges []Challenge
 

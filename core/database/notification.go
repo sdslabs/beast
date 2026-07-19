@@ -57,7 +57,11 @@ func DeleteNotification(notification *Notification) error {
 // Queries all the challenges entries where the column represented by key
 // have the value in value.
 func QueryNotificationEntries(key string, value string) ([]Notification, error) {
-	queryKey := fmt.Sprintf("%s = ?", key)
+	column, err := validatedQueryColumn(key, "id")
+	if err != nil {
+		return nil, err
+	}
+	queryKey := fmt.Sprintf("%s = ?", column)
 
 	var notifications []Notification
 
