@@ -206,7 +206,12 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			if err != nil {
 				return fmt.Errorf("error while checking if the challenge is staged on the remote server")
 			}
-			logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server)
+			logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server, cr.BuildLimits{
+				CPUShares: config.Resources.CPUShares,
+				CPUs:      config.Resources.CPUsLimit,
+				Memory:    config.Resources.Memory,
+				Pids:      config.Resources.PidsLimit,
+			})
 		}
 	}
 	// Create logs directory for the challenge in staging directory.

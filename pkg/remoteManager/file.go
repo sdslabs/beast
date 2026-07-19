@@ -11,6 +11,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/utils"
 )
 
@@ -68,7 +69,7 @@ func StageChallRemote(server config.AvailableServer, challenge database.Challeng
 }
 
 // BuildImageFromTarContextRemote builds a Docker image from the tar context on the remote server.
-func BuildImageFromTarContextRemote(challengeName string, imageTag string, stagedDir string, server config.AvailableServer) ([]byte, string, error) {
+func BuildImageFromTarContextRemote(challengeName string, imageTag string, stagedDir string, server config.AvailableServer, limits cr.BuildLimits) ([]byte, string, error) {
 	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
 	_, err := RunArgsOnServer(server, "mkdir", "-p", remoteExtractPath)
 	if err == nil {
@@ -80,6 +81,12 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 	projectName := utils.ProjectNameNotInstanced(challengeName)
 	output, err := RunArgsInDirOnServer(server, remoteExtractPath,
 		"docker", "build", "-t", imageTag,
+		"--cpu-shares", fmt.Sprintf("%d", limits.CPUShares),
+		"--cpu-period", "100000",
+		"--cpu-quota", fmt.Sprintf("%d", int64(limits.CPUs*100000)),
+		"--memory", fmt.Sprintf("%d", limits.Memory),
+		"--memory-swap", fmt.Sprintf("%d", limits.Memory),
+		"--ulimit", fmt.Sprintf("nproc=%d:%d", limits.Pids, limits.Pids),
 		"--label", "beast.challenge="+challengeName,
 		"--label", "com.sdslabs.beast.project="+projectName,
 		"--label", "com.docker.compose.project="+projectName, ".")
