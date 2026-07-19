@@ -40,6 +40,15 @@ func markLeaderboardCachesStale() {
 	leaderboardCacheMu.Unlock()
 }
 
+// @Summary Read or purchase a challenge hint
+// @Tags info
+// @Produce json
+// @Param hintID path int true "Hint ID"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.HintResponse
+// @Failure 400 {object} api.HTTPErrorResp
+// @Router /api/info/hint/{hintID} [get]
+// @Router /api/info/hint/{hintID} [post]
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
 
@@ -476,7 +485,8 @@ func availableImagesHandler(c *gin.Context) {
 // @Success 200 {object} api.LogsInfoResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/info/logs [get]
+// @Security ApiKeyAuth
+// @Router /api/manage/logs [get]
 func challengeLogsHandler(c *gin.Context) {
 	chall := c.Query("challenge")
 	if chall == "" {
@@ -509,14 +519,14 @@ func challengeLogsHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer"
-// @Param value formData string false "User's id"
-// @Param value query string false "username"
+// @Param user_id query int false "User ID"
+// @Param username path string true "Username"
 // @Success 200 {object} api.UserResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/user [get]
+// @Router /api/info/user/{username} [get]
 func userInfoHandler(c *gin.Context) {
-	userId := c.PostForm("user_id")
+	userId := c.Query("user_id")
 	username := c.Param("username")
 	if userId == "" && username == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
@@ -844,7 +854,7 @@ func submissionsHandler(c *gin.Context) {
 // @Success 200 {object} api.UsersStatisticsResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/competition-info [get]
+// @Router /api/admin/statistics [get]
 func getUsersStatisticsHandler(c *gin.Context) {
 	users, err := database.QueryAllUsers()
 	if err != nil {
@@ -890,7 +900,7 @@ func getUsersStatisticsHandler(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.CompetitionInfoResp
 // @Failure 400 {object} api.HTTPErrorResp
-// @Router /api/info/tags [get]
+// @Router /api/info/competition-info [get]
 func competitionInfoHandler(c *gin.Context) {
 	competitionInfo, err := config.GetCompetitionInfo()
 	if err != nil {
@@ -922,7 +932,7 @@ func competitionInfoHandler(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.TagInfoResp
 // @Failure 400 {object} api.HTTPErrorResp
-// @Router /api/admin/statistics [get]
+// @Router /api/info/tags [get]
 func tagHandler(c *gin.Context) {
 	// Optimized: Query unique tags directly from the database
 	tags, err := database.QueryAllUniqueTags()
@@ -1302,7 +1312,7 @@ func unfreezeLeaderboardHandler(c *gin.Context) {
 // @Success 200 {array} api.UserSolveResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/challenges/{challenge_id}/attempts [get]
+// @Router /api/info/submissions/challenge/{challenge_id} [get]
 func getChallengeAttempts(c *gin.Context) {
 	username, err := utils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
@@ -1501,6 +1511,12 @@ func getUserAttempts(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// @Summary Return leaderboard score history
+// @Tags info
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} database.UserLeaderboardResp
+// @Router /api/info/leaderboard-graph [get]
 func getLeaderboardGraphHandler(c *gin.Context) {
 	leaderboardCacheMu.Lock()
 	defer leaderboardCacheMu.Unlock()

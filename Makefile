@@ -27,6 +27,7 @@ dev:
 cmdref: build
 	@rm -rf docs/cmdref
 	@"$(BEAST_BIN)" cmdref --reference-directory docs/cmdref
+	@sed -i '$${/^$$/d;}' docs/cmdref/*.md
 
 # Check go formatting
 check_format:
@@ -59,7 +60,10 @@ requirements:
 	@echo ">>> Building beast extras..."
 	@./scripts/build/extras.sh
 
-docs:
+swagger:
+	@$(GO) run github.com/swaggo/swag/cmd/swag@v1.16.4 init --generalInfo main.go --dir api --output api/docs --parseDependency
+
+docs: swagger
 	@rm -rf site/
 	@echo ">>> Building Documentation"
 	@mkdocs build --strict
@@ -69,4 +73,4 @@ installenv:
 	@echo 'Setting up environment for beast.'
 	@./scripts/installenv.sh
 
-.PHONY: build cmdref format test test-race integration-test check_format docs installenv govet requirements
+.PHONY: build cmdref format test test-race integration-test check_format swagger docs installenv govet requirements

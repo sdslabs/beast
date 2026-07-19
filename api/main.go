@@ -39,18 +39,18 @@ func runBeastApiBootsteps(defaultauthorpassword string) error {
 }
 
 // @title Beast API
-// @version 1.0
-// @description Beast the automatic deployment tool for playCTF
+// @version 0.2
+// @description Authenticated API for Beast CTF challenge deployment and competition services.
 
 // @contact.name SDSLabs
 // @contact.url https://chat.sdslabs.co
-// @contact.email contact.sdslabs.co.in
+// @contact.email contact@sdslabs.co.in
 
 // @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+// @license.url https://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host playCTF.sdslabs.co
 // @BasePath /
+// @schemes https
 
 // @securityDefinitions.apikey ApiKeyAuth
 // @in header

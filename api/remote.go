@@ -18,7 +18,7 @@ import (
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/remote/sync/ [post]
+// @Router /api/remote/sync [post]
 func syncBeastGitRemote(c *gin.Context) {
 	err := manager.SyncBeastRemote("")
 	if err != nil {
@@ -43,7 +43,7 @@ func syncBeastGitRemote(c *gin.Context) {
 // @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/remote/reset/ [post]
+// @Router /api/remote/reset [post]
 func resetBeastGitRemote(c *gin.Context) {
 	err := manager.ResetBeastRemote("")
 	if err != nil {

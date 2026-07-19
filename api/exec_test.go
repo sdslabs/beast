@@ -11,7 +11,7 @@ import (
 )
 
 func TestExecChallengeRequestValidation(t *testing.T) {
-	tests := []execChallengeRequest{
+	tests := []ExecChallengeRequest{
 		{},
 		{Command: []string{""}},
 		{Command: []string{"echo", string([]byte{'a', 0, 'b'})}},
@@ -24,7 +24,7 @@ func TestExecChallengeRequestValidation(t *testing.T) {
 		}
 	}
 
-	valid := execChallengeRequest{Command: []string{"sh", "-lc", "id"}}
+	valid := ExecChallengeRequest{Command: []string{"sh", "-lc", "id"}}
 	if err := valid.validate(); err != nil {
 		t.Fatal(err)
 	}

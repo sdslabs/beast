@@ -294,10 +294,27 @@ func verifyRequestedOTP(c *gin.Context, purpose string) (string, bool) {
 	return email, true
 }
 
+// @Summary Send an email verification OTP
+// @Tags auth
+// @Accept multipart/form-data
+// @Produce json
+// @Param email formData string true "Email address"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Router /auth/send-otp [post]
 func sendOTPHandler(c *gin.Context) {
 	issueOTP(c, otpPurposeRegistration, false)
 }
 
+// @Summary Verify an email OTP
+// @Tags auth
+// @Accept multipart/form-data
+// @Produce json
+// @Param email formData string true "Email address"
+// @Param otp formData string true "One-time code"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Router /auth/verify-otp [post]
 func verifyOTPHandler(c *gin.Context) {
 	if _, ok := verifyRequestedOTP(c, otpPurposeRegistration); !ok {
 		return
@@ -305,10 +322,27 @@ func verifyOTPHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, HTTPPlainResp{Message: "OTP verified successfully"})
 }
 
+// @Summary Send a password-reset OTP
+// @Tags auth
+// @Accept multipart/form-data
+// @Produce json
+// @Param email formData string true "Registered email address"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Router /auth/send-otp-forget [post]
 func sendOTPForForgetHandler(c *gin.Context) {
 	issueOTP(c, otpPurposePasswordReset, true)
 }
 
+// @Summary Verify a password-reset OTP
+// @Tags auth
+// @Accept multipart/form-data
+// @Produce json
+// @Param email formData string true "Registered email address"
+// @Param otp formData string true "One-time code"
+// @Success 200 {object} api.HTTPAuthorizeResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Router /auth/verify-otp-forget [post]
 func verifyOTPForForgetHandler(c *gin.Context) {
 	email, ok := verifyRequestedOTP(c, otpPurposePasswordReset)
 	if !ok {

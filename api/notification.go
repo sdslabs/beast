@@ -64,7 +64,7 @@ func addNotification(c *gin.Context) {
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/delete [post]
+// @Router /api/notification/delete [delete]
 func removeNotification(c *gin.Context) {
 	id := c.PostForm("id")
 
@@ -117,7 +117,7 @@ func removeNotification(c *gin.Context) {
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/update [post]
+// @Router /api/notification/update [put]
 func updateNotifications(c *gin.Context) {
 	id := c.PostForm("id")
 	changedtitle := c.PostForm("title")
@@ -170,7 +170,7 @@ func updateNotifications(c *gin.Context) {
 // @Produce json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/available [post]
+// @Router /api/notification/available [get]
 func availableNotificationHandler(c *gin.Context) {
 	notifications, err := database.QueryAllNotification()
 	if err != nil {
@@ -204,6 +204,12 @@ func availableNotificationHandler(c *gin.Context) {
 	return
 }
 
+// @Summary Stream server-sent notifications
+// @Tags notification
+// @Produce text/event-stream
+// @Security ApiKeyAuth
+// @Success 200 {string} string "SSE stream"
+// @Router /api/notification/stream [get]
 func streamNotification(c *gin.Context) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")

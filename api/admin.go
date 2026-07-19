@@ -23,7 +23,7 @@ import (
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/admin/users/:action/:id [post]
+// @Router /api/admin/users/{action}/{id} [post]
 func userActionHandler(c *gin.Context) {
 	action := c.Param("action")
 	userId := c.Param("id")

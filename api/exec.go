@@ -27,20 +27,20 @@ const (
 	maxExecTimeout       = 300
 )
 
-type execChallengeRequest struct {
+type ExecChallengeRequest struct {
 	Command        []string `json:"command"`
 	InstanceID     string   `json:"instance_id,omitempty"`
 	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 }
 
-type execChallengeResponse struct {
+type ExecChallengeResponse struct {
 	Stdout    string `json:"stdout"`
 	Stderr    string `json:"stderr"`
 	ExitCode  int    `json:"exit_code"`
 	Truncated bool   `json:"truncated"`
 }
 
-func (request *execChallengeRequest) validate() error {
+func (request *ExecChallengeRequest) validate() error {
 	if len(request.Command) == 0 || len(request.Command) > maxExecArguments {
 		return errors.New("command must contain between 1 and 64 arguments")
 	}
@@ -79,9 +79,20 @@ func userCanExecChallenge(user database.User, challenge database.Challenge, main
 	return challenge.AuthorID == user.ID || maintainer
 }
 
+// @Summary Execute an argument-vector command in an owned challenge container
+// @Tags manage
+// @Accept json
+// @Produce json
+// @Param name path string true "Challenge name"
+// @Param request body api.ExecChallengeRequest true "Bounded exec request"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.ExecChallengeResponse
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 403 {object} api.HTTPErrorResp
+// @Router /api/manage/challenge/{name}/exec [post]
 func execChallengeHandler(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxExecRequestBytes)
-	var request execChallengeRequest
+	var request ExecChallengeRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: "invalid exec request"})
 		return
@@ -167,7 +178,7 @@ func execChallengeHandler(c *gin.Context) {
 		}
 		return
 	}
-	c.JSON(http.StatusOK, execChallengeResponse{
+	c.JSON(http.StatusOK, ExecChallengeResponse{
 		Stdout: result.Stdout, Stderr: result.Stderr, ExitCode: result.ExitCode, Truncated: result.Truncated,
 	})
 }
