@@ -29,7 +29,7 @@ func UpdateChallengeConfiguration(challengeID uint, updates map[string]interface
 				return err
 			}
 			for _, portNumber := range *ports {
-				if err := tx.Create(&Port{ChallengeID: challengeID, PortNo: portNumber}).Error; err != nil {
+				if err := tx.Create(&Port{ChallengeID: challengeID, Server: challenge.ServerDeployed, PortNo: portNumber}).Error; err != nil {
 					return fmt.Errorf("reserve port %d: %w", portNumber, err)
 				}
 			}

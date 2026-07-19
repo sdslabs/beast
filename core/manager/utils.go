@@ -627,6 +627,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 			portEntry := database.Port{
 				ChallengeID: challEntry.ID,
+				Server:      challEntry.ServerDeployed,
 				PortNo:      port,
 			}
 

@@ -402,7 +402,7 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	DBMux.RLock()
 	defer DBMux.RUnlock()
 
-	if err := Db.Model(challenge).Association("Tags").Error; err != nil {
+	if err := Db.Model(challenge).Association("Tags").Find(&tags); err != nil {
 		return tags, err
 	}
 

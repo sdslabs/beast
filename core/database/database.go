@@ -113,6 +113,9 @@ func Init() error {
 	if err := MigrateSubmissionGuards(); err != nil {
 		return fmt.Errorf("migrate submission guards: %w", err)
 	}
+	if err := MigratePortUniqueness(); err != nil {
+		return fmt.Errorf("migrate port uniqueness: %w", err)
+	}
 	if err := MigrateChallengeMaintainers(); err != nil {
 		return fmt.Errorf("migrate challenge maintainers: %w", err)
 	}
