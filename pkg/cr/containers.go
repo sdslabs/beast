@@ -191,16 +191,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		Labels:       labels,
 	}
 
-	var mountBindings []mount.Mount
-	for src, dest := range containerConfig.MountsMap {
-		mnt := mount.Mount{
-			Type:   mount.TypeBind,
-			Source: src,
-			Target: dest,
-		}
-
-		mountBindings = append(mountBindings, mnt)
-	}
+	mountBindings := readOnlyBindMounts(containerConfig.MountsMap)
 
 	resources := container.Resources{
 		NanoCPUs:  int64(containerConfig.CPUsLimit * 1e9),
@@ -215,6 +206,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		NetworkMode:  container.NetworkMode(containerConfig.ContainerNetwork),
 		Resources:    resources,
 	}
+	applyDefaultContainerSecurity(hostConfig)
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
 	if err != nil {
@@ -228,11 +220,33 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	if err := cli.ContainerStart(ctx, containerId, types.ContainerStartOptions{}); err != nil {
+		removeErr := cli.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{Force: true})
+		if removeErr != nil {
+			log.Errorf("Error while removing failed container %s: %s", containerId, removeErr)
+		}
 		log.Errorf("Error while starting the container : %s", err)
 		return "", err
 	}
 
 	return containerId, nil
+}
+
+func readOnlyBindMounts(mounts map[string]string) []mount.Mount {
+	bindings := make([]mount.Mount, 0, len(mounts))
+	for src, dest := range mounts {
+		bindings = append(bindings, mount.Mount{
+			Type:     mount.TypeBind,
+			Source:   src,
+			Target:   dest,
+			ReadOnly: true,
+		})
+	}
+	return bindings
+}
+
+func applyDefaultContainerSecurity(hostConfig *container.HostConfig) {
+	hostConfig.CapDrop = []string{"ALL"}
+	hostConfig.SecurityOpt = []string{"no-new-privileges"}
 }
 
 func GetContainerStdLogs(containerID string) (*Log, error) {

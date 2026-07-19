@@ -19,7 +19,7 @@ import (
 )
 
 func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, server config.AvailableServer) (string, error) {
-	arguments := []string{"docker", "run", "-d"}
+	arguments := []string{"docker", "run", "-d", "--cap-drop", "ALL", "--security-opt", "no-new-privileges=true"}
 	if containerConfig.ContainerName != "" {
 		arguments = append(arguments, "--name", containerConfig.ContainerName)
 	}
@@ -52,7 +52,18 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 	}
 	sort.Strings(mountSources)
 	for _, source := range mountSources {
-		arguments = append(arguments, "--mount", fmt.Sprintf("type=bind,source=%s,target=%s", source, containerConfig.MountsMap[source]))
+		resolvedSource := source
+		if !filepath.IsAbs(source) {
+			output, err := RunArgsOnServer(server, "realpath", source)
+			if err != nil {
+				return "", fmt.Errorf("resolve remote mount source %q: %w", source, err)
+			}
+			resolvedSource = strings.TrimSpace(output)
+			if !filepath.IsAbs(resolvedSource) {
+				return "", fmt.Errorf("remote mount source did not resolve to an absolute path: %q", source)
+			}
+		}
+		arguments = append(arguments, "--mount", fmt.Sprintf("type=bind,source=%s,target=%s,readonly", resolvedSource, containerConfig.MountsMap[source]))
 	}
 	arguments = append(arguments, containerConfig.ImageId)
 	output, err := RunArgsOnServer(server, arguments...)
