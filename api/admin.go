@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
+	"gorm.io/gorm"
 )
 
 // Ban/Unban/Hide/Unhide a user based on his id and the action provided.
@@ -55,6 +57,10 @@ func userActionHandler(c *gin.Context) {
 
 	user, err := database.QueryUserById(uint(parsedUserId))
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, HTTPPlainResp{Message: "User not found."})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{
 			Message: "DATABASE ERROR while processing the request.",
 		})

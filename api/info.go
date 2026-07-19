@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	fileUtils "github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 var (
@@ -532,6 +534,10 @@ func userInfoHandler(c *gin.Context) {
 
 		user, err = database.QueryUserById(uint(id))
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusNotFound, HTTPErrorResp{Error: "User not found"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
@@ -540,6 +546,10 @@ func userInfoHandler(c *gin.Context) {
 	} else {
 		user, err = database.QueryFirstUserEntry("username", username)
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusNotFound, HTTPErrorResp{Error: "User not found"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: "DATABASE ERROR while processing the request.",
 			})
@@ -1409,9 +1419,11 @@ func getUserAttempts(c *gin.Context) {
 
 	submissionUser, err := database.QueryUserById(uint(userID))
 	if err != nil {
-		c.JSON(http.StatusNotFound, HTTPErrorResp{
-			Error: "User not found",
-		})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, HTTPErrorResp{Error: "User not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while processing the request."})
+		}
 		return
 	}
 
