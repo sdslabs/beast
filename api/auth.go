@@ -4,7 +4,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
@@ -13,6 +15,18 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"gorm.io/gorm"
 )
+
+var contestantUsernamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{2,11}$`)
+
+func validatePassword(password string) error {
+	if len(password) < 12 || len(password) > 128 {
+		return errors.New("password must contain between 12 and 128 bytes")
+	}
+	if strings.TrimSpace(password) == "" {
+		return errors.New("password cannot contain only whitespace")
+	}
+	return nil
+}
 
 // Acts as a middleware to authorize user
 // @Summary Handles authorization of user
@@ -108,12 +122,12 @@ func login(c *gin.Context) {
 	password := c.PostForm("password")
 
 	username = strings.TrimSpace(strings.ToLower(username))
-	password = strings.TrimSpace(password)
 
 	if username == "" || password == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: "Username and password can not be empty",
 		})
+		return
 	}
 
 	userEntry, err := database.QueryFirstUserEntry("username", username)
@@ -170,7 +184,6 @@ func register(c *gin.Context) {
 
 	name = strings.TrimSpace(name)
 	username = strings.TrimSpace(strings.ToLower(username))
-	password = strings.TrimSpace(password)
 	email = strings.TrimSpace(strings.ToLower(email))
 
 	if username == "" || password == "" || email == "" {
@@ -181,22 +194,19 @@ func register(c *gin.Context) {
 		return
 	}
 
-	if len(username) > 12 {
+	if !contestantUsernamePattern.MatchString(username) {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: "Username cannot be greater than 12 characters",
+			Error: "Username must be 3-12 lowercase letters, digits, dots, underscores, or hyphens",
 		})
 		return
 	}
-
-	authModel, err := auth.CreateModel(username, password, core.USER_ROLES["contestant"])
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Failed to secure user credentials"})
+	if err := validatePassword(password); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: err.Error()})
 		return
 	}
-	userEntry := database.User{
-		Name:      name,
-		AuthModel: authModel,
-		Email:     email,
+	if canonical, err := canonicalMailbox(email); err != nil || canonical != email {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: "A valid email address is required"})
+		return
 	}
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
@@ -215,9 +225,19 @@ func register(c *gin.Context) {
 		}
 		return
 	}
-	if !otpEntry.Verified {
+	if !otpEntry.Verified || otpEntry.Purpose != otpPurposeRegistration || time.Now().After(otpEntry.Expiry) {
 		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{Error: "Email not verified, cannot register user"})
 		return
+	}
+	authModel, err := auth.CreateModel(username, password, core.USER_ROLES["contestant"])
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Failed to secure user credentials"})
+		return
+	}
+	userEntry := database.User{
+		Name:      name,
+		AuthModel: authModel,
+		Email:     email,
 	}
 	err = database.CreateUserEntry(&userEntry)
 
@@ -226,6 +246,9 @@ func register(c *gin.Context) {
 			Error: err.Error(),
 		})
 		return
+	}
+	if err := database.DeleteOTPEntry(email); err != nil {
+		log.Printf("Failed to consume registration OTP: %v", err)
 	}
 
 	markLeaderboardCachesStale()
@@ -247,7 +270,10 @@ func register(c *gin.Context) {
 // @Router /auth/reset-password [post]
 func resetPasswordHandler(c *gin.Context) {
 	newPass := c.PostForm("new_pass")
-	newPass = strings.TrimSpace(newPass)
+	if err := validatePassword(newPass); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{Message: err.Error()})
+		return
+	}
 
 	claimsValue, exists := c.Get("authClaims")
 	claims, ok := claimsValue.(*auth.CustomClaims)
@@ -264,12 +290,19 @@ func resetPasswordHandler(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized user",
 		})
+		return
 	}
 
 	authModel, err := auth.CreateModel(username, newPass, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, HTTPPlainResp{Message: "Failed to secure user credentials"})
 		return
+	}
+	if claims.TokenUse == auth.PasswordResetTokenUse {
+		if err := database.ConsumeVerifiedOTP(user.Email, otpPurposePasswordReset, time.Now()); err != nil {
+			c.JSON(http.StatusUnauthorized, HTTPPlainResp{Message: "Password reset grant is invalid or already used"})
+			return
+		}
 	}
 
 	err = database.UpdateUser(&user, map[string]interface{}{"Password": authModel.Password, "Salt": authModel.Salt})
