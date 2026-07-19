@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"testing"
 
 	"gorm.io/gorm"
@@ -41,6 +42,24 @@ func TestIsChallengeMaintainer(t *testing.T) {
 	}
 	if allowed {
 		t.Fatal("unrelated user was treated as maintainer")
+	}
+}
+
+func TestUserQueriesAndCreationFailClosed(t *testing.T) {
+	cleanup := setupSubmissionTestDB(t)
+	defer cleanup()
+
+	if _, err := QueryUserById(999999); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected missing user error, got %v", err)
+	}
+	if err := CreateUserEntry(nil); err == nil {
+		t.Fatal("expected nil user error")
+	}
+
+	user := createSubmissionTestUser(t, "unique-user")
+	duplicate := User{Name: "duplicate", Email: user.Email, AuthModel: user.AuthModel}
+	if err := CreateUserEntry(&duplicate); err == nil {
+		t.Fatal("expected duplicate user error")
 	}
 }
 

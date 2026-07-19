@@ -68,7 +68,7 @@ func QueryUserById(authorID uint) (User, error) {
 
 	tx := Db.First(&user, authorID)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return User{}, nil
+		return User{}, gorm.ErrRecordNotFound
 	}
 
 	return user, tx.Error
@@ -114,20 +114,12 @@ func QueryFirstUserEntry(key string, value string) (User, error) {
 // It returns an error if anything wrong happen during the
 // transaction.
 func CreateUserEntry(user *User) error {
+	if user == nil {
+		return errors.New("user is required")
+	}
 	DBMux.Lock()
 	defer DBMux.Unlock()
-	tx := Db.Begin()
-
-	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction: %v", tx.Error)
-	}
-
-	if err := tx.FirstOrCreate(user, *user).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
+	return Db.Create(user).Error
 }
 
 // Update an entry for the user in the User table
