@@ -9,6 +9,7 @@ import (
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 )
 
 func dummyHandler(c *gin.Context) {
@@ -20,14 +21,16 @@ func dummyHandler(c *gin.Context) {
 func initGinRouter() *gin.Engine {
 	router := gin.New()
 
-	corsConfig := cors.Config{
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Cookie"},
-		AllowCredentials: false,
-		AllowAllOrigins:  true,
-		MaxAge:           12 * time.Hour,
+	if len(config.Cfg.ServerConfig.AllowedOrigins) > 0 {
+		corsConfig := cors.Config{
+			AllowOrigins:     config.Cfg.ServerConfig.AllowedOrigins,
+			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+			AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+			AllowCredentials: false,
+			MaxAge:           12 * time.Hour,
+		}
+		router.Use(cors.New(corsConfig))
 	}
-	router.Use(cors.New(corsConfig))
 	router.GET("/dummy", dummyHandler)
 	// Authorization routes group
 	authGroup := router.Group("/auth")

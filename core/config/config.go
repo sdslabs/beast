@@ -139,11 +139,15 @@ type InstanceConfig struct {
 }
 
 type ServerConfig struct {
-	TLSCertFile string `toml:"tls_cert_file"`
-	TLSKeyFile  string `toml:"tls_key_file"`
+	TLSCertFile    string   `toml:"tls_cert_file"`
+	TLSKeyFile     string   `toml:"tls_key_file"`
+	AllowedOrigins []string `toml:"allowed_origins"`
 }
 
 func (config *ServerConfig) Validate() error {
+	if err := validateAllowedOrigins(config.AllowedOrigins); err != nil {
+		return err
+	}
 	if config.TLSCertFile == "" || config.TLSKeyFile == "" {
 		return errors.New("server tls_cert_file and tls_key_file are required")
 	}
@@ -164,6 +168,26 @@ func (config *ServerConfig) Validate() error {
 	}
 	if _, err := tls.LoadX509KeyPair(config.TLSCertFile, config.TLSKeyFile); err != nil {
 		return fmt.Errorf("load TLS certificate and key: %w", err)
+	}
+	return nil
+}
+
+func validateAllowedOrigins(origins []string) error {
+	seenOrigins := make(map[string]struct{}, len(origins))
+	for _, origin := range origins {
+		parsed, err := url.ParseRequestURI(origin)
+		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return fmt.Errorf("invalid CORS origin %q", origin)
+		}
+		hostname := parsed.Hostname()
+		loopback := hostname == "localhost" || net.ParseIP(hostname) != nil && net.ParseIP(hostname).IsLoopback()
+		if parsed.Scheme != "https" && !(parsed.Scheme == "http" && loopback) {
+			return fmt.Errorf("CORS origin must use HTTPS unless it is loopback: %q", origin)
+		}
+		if _, exists := seenOrigins[origin]; exists {
+			return fmt.Errorf("duplicate CORS origin %q", origin)
+		}
+		seenOrigins[origin] = struct{}{}
 	}
 	return nil
 }

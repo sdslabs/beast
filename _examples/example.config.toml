@@ -124,6 +124,7 @@ max_instances_per_user = 3
 [server]
 tls_cert_file = "$HOME/.beast/secrets/tls.crt"
 tls_key_file = "$HOME/.beast/secrets/tls.key"
+allowed_origins = []
 
 # The following fields are required only while hosting a competition on beast
 # This section contains information about the competition to be hosted

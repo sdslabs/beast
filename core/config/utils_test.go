@@ -347,3 +347,15 @@ func TestCompetitionInfoValidatesTimeWindow(t *testing.T) {
 		t.Fatal("expected malformed competition time error")
 	}
 }
+
+func TestServerRejectsUnsafeCORSOrigins(t *testing.T) {
+	if err := validateAllowedOrigins([]string{"*"}); err == nil {
+		t.Fatal("expected wildcard CORS origin error")
+	}
+	if err := validateAllowedOrigins([]string{"http://example.com"}); err == nil {
+		t.Fatal("expected insecure CORS origin error")
+	}
+	if err := validateAllowedOrigins([]string{"https://example.com", "http://localhost:3000"}); err != nil {
+		t.Fatal(err)
+	}
+}
