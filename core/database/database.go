@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -168,12 +167,10 @@ func BackupDatabase() error {
 	}
 
 	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.Dbname, time.Now().Format("20060102150405"))
-	cmd := exec.Command("pg_dump", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.Dbname)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
-	output, err := cmd.CombinedOutput()
+	environment := append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password), "PGSSLMODE="+dbConfig.SslMode)
+	output, err := utils.RunCommand(30*time.Minute, environment, "pg_dump", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.Dbname)
 	if err != nil {
-		log.Printf("Backup error: %s\n", string(output))
-		return err
+		return fmt.Errorf("pg_dump failed: %w; output: %s", err, output)
 	}
 	log.Debug("Backup successful.")
 	return nil
@@ -185,22 +182,15 @@ func ResetDatabase() error {
 			return err
 		}
 	}
-	dropCmd := exec.Command("dropdb", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "--force", dbConfig.Dbname)
-	dropCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
-
-	output, err := dropCmd.CombinedOutput()
+	environment := append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password), "PGSSLMODE="+dbConfig.SslMode)
+	output, err := utils.RunCommand(2*time.Minute, environment, "dropdb", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "--force", dbConfig.Dbname)
 	if err != nil {
-		log.Printf("Drop DB error: %s\n", string(output))
-		return err
+		return fmt.Errorf("drop database: %w; output: %s", err, output)
 	}
 
-	createCmd := exec.Command("psql", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-d", "postgres", "-c", "CREATE DATABASE "+pq.QuoteIdentifier(dbConfig.Dbname)+";")
-	createCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
-
-	output, err = createCmd.CombinedOutput()
+	output, err = utils.RunCommand(2*time.Minute, environment, "psql", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-d", "postgres", "-c", "CREATE DATABASE "+pq.QuoteIdentifier(dbConfig.Dbname)+";")
 	if err != nil {
-		log.Printf("Create DB error: %s\n", string(output))
-		return err
+		return fmt.Errorf("create database: %w; output: %s", err, output)
 	}
 	log.Debug("Reset successful.")
 	return nil
@@ -216,8 +206,8 @@ func RestoreDatabase(backupFile string) error {
 		return fmt.Errorf("backup file does not exist: %s", backupFile)
 	}
 
-	restoreCmd := exec.Command(
-		"pg_restore",
+	environment := append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password), "PGSSLMODE="+dbConfig.SslMode)
+	output, err := utils.RunCommand(30*time.Minute, environment, "pg_restore",
 		"-U", dbConfig.User,
 		"-h", dbConfig.Host,
 		"-p", dbConfig.Port,
@@ -227,12 +217,8 @@ func RestoreDatabase(backupFile string) error {
 		"--if-exists",
 		backupFile,
 	)
-	restoreCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
-
-	output, err := restoreCmd.CombinedOutput()
 	if err != nil {
-		log.Printf("Restore DB error: %s\n", string(output))
-		return fmt.Errorf("failed to restore database from %s: %v", backupFile, err)
+		return fmt.Errorf("restore database from %s: %w; output: %s", backupFile, err, output)
 	}
 
 	log.Println("Database restored successfully from:", backupFile)

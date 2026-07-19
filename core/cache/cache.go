@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -235,13 +234,10 @@ func BackupCache() error {
 	args := redisCLIConnectionArgs()
 	args = append(args, "--rdb", filepath.Join(backupPath, backupFile))
 
-	cmd := exec.Command("redis-cli", args...)
-
-	cmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.Password))
-	output, err := cmd.CombinedOutput()
+	environment := append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.Password))
+	output, err := utils.RunCommand(30*time.Minute, environment, "redis-cli", args...)
 	if err != nil {
-		log.Printf("Backup error: %s\n", string(output))
-		return err
+		return fmt.Errorf("back up Redis: %w; output: %s", err, output)
 	}
 	log.Debug("Backup successful.")
 	return nil
@@ -254,14 +250,10 @@ func ResetCache() error {
 		}
 	}
 	args := append(redisCLIConnectionArgs(), "FLUSHDB")
-	dropCmd := exec.Command("redis-cli", args...)
-
-	dropCmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.Password))
-
-	output, err := dropCmd.CombinedOutput()
+	environment := append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.Password))
+	output, err := utils.RunCommand(2*time.Minute, environment, "redis-cli", args...)
 	if err != nil {
-		log.Printf("Drop Cache error: %s\n", string(output))
-		return err
+		return fmt.Errorf("flush Redis database: %w; output: %s", err, output)
 	}
 
 	log.Debug("Reset successful.")
