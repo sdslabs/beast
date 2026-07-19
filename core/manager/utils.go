@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -873,61 +872,66 @@ func unzipFile(f *zip.File, destination, relPath string) error {
 	return nil
 }
 
-// File copies a single file from src to dst
+// CopyFile copies one regular file without following links or replacing a path.
 func CopyFile(src, dst string) error {
-	var err error
-	var srcfd *os.File
-	var dstfd *os.File
-	var srcinfo os.FileInfo
+	srcInfo, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if !srcInfo.Mode().IsRegular() {
+		return fmt.Errorf("source is not a regular file: %s", src)
+	}
 
-	if srcfd, err = os.Open(src); err != nil {
+	srcFile, err := os.Open(src)
+	if err != nil {
 		return err
 	}
-	defer srcfd.Close()
+	defer srcFile.Close()
 
-	if dstfd, err = os.Create(dst); err != nil {
+	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, srcInfo.Mode().Perm())
+	if err != nil {
 		return err
 	}
-	defer dstfd.Close()
-
-	if _, err = io.Copy(dstfd, srcfd); err != nil {
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		_ = dstFile.Close()
+		_ = os.Remove(dst)
 		return err
 	}
-	if srcinfo, err = os.Stat(src); err != nil {
+	if err := dstFile.Close(); err != nil {
+		_ = os.Remove(dst)
 		return err
 	}
-	return os.Chmod(dst, srcinfo.Mode())
+	return nil
 }
 
-// Dir copies a whole directory recursively
-func CopyDir(src string, dst string) error {
-	var err error
-	var fds []os.FileInfo
-	var srcinfo os.FileInfo
-
-	if srcinfo, err = os.Stat(src); err != nil {
+// CopyDir copies a directory tree without following links or replacing paths.
+func CopyDir(src, dst string) error {
+	srcInfo, err := os.Lstat(src)
+	if err != nil {
 		return err
 	}
-
-	if err = os.MkdirAll(dst, srcinfo.Mode()); err != nil {
-		return err
+	if !srcInfo.IsDir() || srcInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("source is not a directory: %s", src)
 	}
 
-	if fds, err = ioutil.ReadDir(src); err != nil {
+	if err := os.Mkdir(dst, srcInfo.Mode().Perm()); err != nil {
 		return err
 	}
-	for _, fd := range fds {
-		srcfp := path.Join(src, fd.Name())
-		dstfp := path.Join(dst, fd.Name())
-
-		if fd.IsDir() {
-			if err = CopyDir(srcfp, dstfp); err != nil {
-				fmt.Println(err)
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+		if entry.IsDir() {
+			if err := CopyDir(srcPath, dstPath); err != nil {
+				return err
 			}
-		} else {
-			if err = CopyFile(srcfp, dstfp); err != nil {
-				fmt.Println(err)
-			}
+			continue
+		}
+		if err := CopyFile(srcPath, dstPath); err != nil {
+			return err
 		}
 	}
 	return nil

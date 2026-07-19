@@ -88,3 +88,20 @@ func TestUnzipChallengeFolderRejectsDuplicatePaths(t *testing.T) {
 		t.Fatal("expected duplicate archive path to be rejected")
 	}
 }
+
+func TestCopyDirRejectsSymlinksAndExistingDestinations(t *testing.T) {
+	source := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "file"), []byte("content"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("file", filepath.Join(source, "link")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CopyDir(source, filepath.Join(t.TempDir(), "copy")); err == nil {
+		t.Fatal("expected symbolic link to be rejected")
+	}
+	if err := CopyDir(source, t.TempDir()); err == nil {
+		t.Fatal("expected existing destination to be rejected")
+	}
+}
