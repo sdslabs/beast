@@ -142,17 +142,9 @@ func cleanupRunningContainers() {
 
 func cleanupCacheConnections() {
 	log.Infoln("Cleaning up cache connections...")
-
-	err := cache.BackupCache()
-	if err != nil {
-		log.Errorln("Error while backing up cache:", err)
-	} else {
-		log.Infoln("Cache backup completed successfully")
-	}
-
 	log.Infoln("Terminating cache connection...")
 
-	err = cache.Close()
+	err := cache.Close()
 	if err != nil {
 		log.Errorln("Unable to terminate cache connections:", err)
 	} else {
@@ -161,15 +153,6 @@ func cleanupCacheConnections() {
 }
 
 func cleanupDatabaseConnections() {
-	log.Infoln("Backing up database...")
-
-	err := database.BackupDatabase()
-	if err != nil {
-		log.Errorln("Error while backing up database:", err)
-	} else {
-		log.Infoln("Database backup completed successfully")
-	}
-
 	log.Infoln("Terminating database connection...")
 
 	if database.Db == nil {

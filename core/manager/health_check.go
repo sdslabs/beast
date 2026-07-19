@@ -160,8 +160,6 @@ func runHealthCheckCycle(waitTime int) {
 	checks := []func(){
 		func() { ChallengesHealthProber(waitTime) },
 		func() { ServerHealthProber(waitTime) },
-		func() { _ = database.BackupDatabase() },
-		func() { _ = cache.BackupCache() },
 	}
 	group.Add(len(checks))
 	for _, check := range checks {
