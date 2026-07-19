@@ -1,14 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Check the errors in formatting using gofmt
-# Check formatting on non Godep'd code.
-GOFMT_PATHS=$(find . -not -wholename "*.git*" -not -wholename "*Godeps*" -not -wholename "*gopath*" -not -wholename "*vendor*" -not -name "." -type d)
+set -euo pipefail
 
-# Find any files with gofmt problems
-BAD_FILES=$(gofmt -s -l $GOFMT_PATHS)
+mapfile -t go_files < <(git ls-files '*.go')
+bad_files=$(gofmt -s -l "${go_files[@]}")
 
-if [ -n "$BAD_FILES" ]; then
+if [[ -n "${bad_files}" ]]; then
   echo "The following files are not properly formatted:"
-  echo $BAD_FILES
+  printf '%s\n' "${bad_files}"
   exit 1
 fi

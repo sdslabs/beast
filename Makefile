@@ -1,5 +1,5 @@
 GO := go
-AIR := ${GOPATH}/bin/air	
+AIR := $(shell $(GO) env GOPATH)/bin/air
 
 pkgs  = $(shell $(GO) list ./... | grep -v vendor)
 
@@ -33,8 +33,15 @@ check_format:
 
 # Add more tests later on for this
 test: check_format
-	@echo "[*] Running tests for example challenges"
-	@./scripts/test/test_examples.sh
+	@echo "[*] Running unit tests"
+	@$(GO) test ./...
+
+test-race:
+	@echo "[*] Running race-enabled tests"
+	@$(GO) test -race ./...
+
+integration-test: build
+	@BEAST_RUN_INTEGRATION=1 ./scripts/test/test_examples.sh
 
 # Format code using gofmt
 format:
@@ -60,4 +67,4 @@ installenv:
 	@echo 'Setting up environment for beast.'
 	@./scripts/installenv.sh
 
-.PHONY: build format test check_format docs installenv
+.PHONY: build format test test-race integration-test check_format docs installenv govet
