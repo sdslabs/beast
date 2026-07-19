@@ -265,7 +265,12 @@ func challengeInfoHandler(c *gin.Context) {
 			MaxAttemptLimit:   challenge.MaxAttemptLimit,
 			DeployedLink:      challenge.ServerDeployed,
 		}
-		if user.Role == core.USER_ROLES["contestant"] {
+		canViewSecret, err := canViewChallengeSecrets(&user, &challenge)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "DATABASE ERROR while checking challenge access."})
+			return
+		}
+		if !canViewSecret {
 			c.JSON(http.StatusOK, challengeInfo)
 			return
 		}
@@ -280,6 +285,16 @@ func challengeInfoHandler(c *gin.Context) {
 			Error: "No challenge found with name: " + name,
 		})
 	}
+}
+
+func canViewChallengeSecrets(user *database.User, challenge *database.Challenge) (bool, error) {
+	if user.Role == core.USER_ROLES["admin"] || challenge.AuthorID == user.ID {
+		return true, nil
+	}
+	if user.Role == core.USER_ROLES["contestant"] {
+		return false, nil
+	}
+	return database.IsChallengeMaintainer(user.ID, challenge.ID)
 }
 
 // Returns metadata about all challenges with and without filters
