@@ -34,8 +34,8 @@ func QueryUserEntries(key string, value string) ([]User, error) {
 	queryKey := fmt.Sprintf("%s = ?", column)
 	var users []User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(queryKey, value).Find(&users)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -53,8 +53,8 @@ func QueryUserEntries(key string, value string) ([]User, error) {
 func QueryAllUsers() ([]User, error) {
 	var users []User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Find(&users)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -67,8 +67,8 @@ func QueryAllUsers() ([]User, error) {
 func QueryUserById(authorID uint) (User, error) {
 	var user User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.First(&user, authorID)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -83,8 +83,8 @@ func GetUserRank(userID uint, userScore uint, updatedAt time.Time) (rank int64, 
 
 	rank = 1
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where("id != ? AND score >= ? AND role = ? AND status = ?", userID, userScore, core.USER_ROLES["contestant"], 0).Find(&users)
 
@@ -139,8 +139,8 @@ func UpdateUser(user *User, m map[string]interface{}) error {
 func GetRelatedChallenges(user *User) ([]Challenge, error) {
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	if err := Db.Preload("Tags").Model(user).Association("Challenges").Find(&challenges); err != nil {
 		return challenges, err
@@ -151,8 +151,8 @@ func GetRelatedChallenges(user *User) ([]Challenge, error) {
 
 func IsChallengeMaintainer(userID, challengeID uint) (bool, error) {
 	var count int64
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 	err := Db.Table("challenge_maintainers").
 		Where("user_id = ? AND challenge_id = ?", userID, challengeID).
 		Count(&count).Error
@@ -181,8 +181,8 @@ func GetUserSolvedChallenges(userID uint) ([]UserSolvedChallenge, error) {
 	}
 	var rows []solveRow
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	err := Db.Table("user_challenges").
 		Select("DISTINCT ON (user_challenges.challenge_id) user_challenges.challenge_id, challenges.name, challenges.type, challenges.points, user_challenges.created_at as solved_at").
@@ -248,8 +248,8 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 	var count int64
 	count = 0
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where("user_id = ? AND challenge_id = ? AND solved = ?", userId, challId, true).Find(&userChallenges).Count(&count)
 
@@ -263,8 +263,8 @@ func CheckPreviousSubmissions(userId uint, challId uint) (bool, error) {
 func QueryTopUsersByScore(limit int) ([]User, error) {
 	var users []User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
 		Order("score desc, updated_at asc").
@@ -281,8 +281,8 @@ func QueryTopUsersByScore(limit int) ([]User, error) {
 func QueryUsersByScoreOffsetLimit(limit, offset int) ([]User, error) {
 	var users []User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
 		Order("score desc, updated_at asc").
@@ -300,8 +300,8 @@ func QueryUsersByScoreOffsetLimit(limit, offset int) ([]User, error) {
 func QueryTopUsersByFrozenScore(limit int) ([]User, error) {
 	var users []User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
 		Order("frozen_score desc, updated_at asc").
@@ -318,8 +318,8 @@ func QueryTopUsersByFrozenScore(limit int) ([]User, error) {
 func QueryUsersByFrozenScoreOffsetLimit(limit, offset int) ([]User, error) {
 	var users []User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where("role = ? AND status = ?", core.USER_ROLES["contestant"], 0).
 		Order("frozen_score desc, updated_at asc").
@@ -348,8 +348,8 @@ func ResetFrozenScores() error {
 
 func IsFrozenScoreSet() (bool, error) {
 	var count int64
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 	err := Db.Model(&User{}).Where("frozen_score != 0").Count(&count).Error
 	if err != nil {
 		return false, err
@@ -359,8 +359,8 @@ func IsFrozenScoreSet() (bool, error) {
 
 func GetUserCount() (int64, error) {
 	var count int64
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 	tx := Db.Model(&User{}).Where("role = ?", "contestant").Count(&count)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return 0, nil
@@ -370,8 +370,8 @@ func GetUserCount() (int64, error) {
 
 func QueryAllUniqueTags() ([]string, error) {
 	var tags []string
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Model(&Challenge{}).Distinct().Pluck("tag", &tags)
 	if tx.Error != nil {

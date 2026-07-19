@@ -65,8 +65,8 @@ func QueryNotificationEntries(key string, value string) ([]Notification, error) 
 
 	var notifications []Notification
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(queryKey, value).Find(&notifications)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -99,8 +99,8 @@ func QueryFirstNotificationEntry(key string, value string) (Notification, error)
 func QueryAllNotification() ([]Notification, error) {
 	var notifications []Notification
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Find(&notifications)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {

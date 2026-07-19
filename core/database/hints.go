@@ -46,8 +46,8 @@ func CreateHintEntry(hint *Hint) error {
 }
 
 func GetHintByID(hintID uint) (*Hint, error) {
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Begin()
 	if tx.Error != nil {
@@ -73,8 +73,8 @@ func GetHintByID(hintID uint) (*Hint, error) {
 
 // checks if user has already taken the hint
 func UserHasTakenHint(userID, hintID uint) (bool, error) {
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Begin()
 	if tx.Error != nil {
@@ -156,8 +156,8 @@ func QueryHintsTaken(userID, challengeID uint) ([]Hint, error) {
 	var userHints []UserHint
 	var hints []Hint
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).Find(&userHints)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -188,8 +188,8 @@ func QueryHintsTaken(userID, challengeID uint) ([]Hint, error) {
 func QueryHintsByChallengeID(challengeID uint) ([]Hint, error) {
 	var hints []Hint
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	if err := Db.Where("challenge_id = ?", challengeID).Find(&hints).Error; err != nil {
 		return nil, err

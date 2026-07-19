@@ -32,3 +32,9 @@ func TestPostgresDSNEncodesCredentials(t *testing.T) {
 		t.Fatalf("sslrootcert did not round trip through DSN: %s", dsn)
 	}
 }
+
+func TestChallengeMetadataQueryRejectsUnknownColumn(t *testing.T) {
+	if _, err := QueryChallengeEntriesMetadata("name OR true", "challenge"); err == nil {
+		t.Fatal("expected unsafe metadata query column error")
+	}
+}

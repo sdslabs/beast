@@ -127,8 +127,8 @@ func ConsumeVerifiedOTP(email, purpose string, now time.Time) error {
 func QueryOTPEntry(email string) (OTP, error) {
 	var otpEntry OTP
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where("email = ?", email).First(&otpEntry)
 

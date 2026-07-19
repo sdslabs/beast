@@ -39,8 +39,8 @@ func PortEntryGetOrCreate(port *Port) (Port, error) {
 func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 	var ports []Port
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	if err := Db.Model(&challenge).Association("Ports").Find(&ports); err != nil {
 		return nil, fmt.Errorf("error while searching port for challenge : %s", err)

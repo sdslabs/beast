@@ -38,8 +38,8 @@ func QueryRelatedChallenges(tag *Tag) ([]Challenge, error) {
 	var challenges []Challenge
 	var tagName Tag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
 
@@ -55,8 +55,8 @@ func QueryRelatedChallengesMetadata(tag *Tag) ([]Challenge, error) {
 	var challenges []Challenge
 	var tagName Tag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
 
@@ -75,8 +75,8 @@ func QueryRelatedChallengesMetadata(tag *Tag) ([]Challenge, error) {
 func QueryTags(whereMap map[string]interface{}) ([]*Tag, error) {
 	var tags []*Tag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(whereMap).Find(&tags)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {

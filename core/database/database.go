@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	DBMux *sync.Mutex
+	DBMux *sync.RWMutex
 	Db    *gorm.DB
 )
 
@@ -83,7 +83,7 @@ func ConnectDatabase() error {
 // database, which is not closed after creating a connection here and can
 // be used further after this.
 func Init() error {
-	DBMux = &sync.Mutex{}
+	DBMux = &sync.RWMutex{}
 	if Db == nil {
 		if err := ConnectDatabase(); err != nil {
 			return fmt.Errorf("initialize database: %w", err)

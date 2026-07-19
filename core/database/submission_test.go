@@ -50,7 +50,7 @@ func setupSubmissionTestDB(t *testing.T) func() {
 	previousDB := Db
 	previousMux := DBMux
 	Db = testDB
-	DBMux = &sync.Mutex{}
+	DBMux = &sync.RWMutex{}
 
 	if err := Db.AutoMigrate(&Challenge{}, &User{}, &UserChallenges{}, &ChallengeMaintainer{}, &DynamicFlag{}, &DynamicFlagClaim{}, &DynamicScoreDirty{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)

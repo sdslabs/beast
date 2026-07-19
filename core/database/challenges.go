@@ -158,8 +158,8 @@ func CreateChallengeEntry(challenge *Challenge) error {
 func QueryAllChallenges() ([]Challenge, error) {
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Preload("Ports").Preload("Tags").Find(&challenges)
 
@@ -173,8 +173,8 @@ func QueryAllChallenges() ([]Challenge, error) {
 func QueryAllChallengesMetadata() ([]Challenge, error) {
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
 		Preload("Tags").
@@ -198,8 +198,8 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Preload("Tags").Preload("Ports").Where(queryKey, value).Find(&challenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -215,12 +215,16 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 
 // QueryChallengeEntriesMetadata returns only selected columns: Name, ID, Tags, CreatedAt, Points, Difficulty, Instanced, InstanceExpiration, Status
 func QueryChallengeEntriesMetadata(key string, value string) ([]Challenge, error) {
-	queryKey := fmt.Sprintf("%s = ?", key)
+	column, err := validatedQueryColumn(key, "id", "name", "status", "container_id")
+	if err != nil {
+		return nil, err
+	}
+	queryKey := fmt.Sprintf("%s = ?", column)
 
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	// Only select the required columns, but preload Tags for tag names
 	tx := Db.Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
@@ -244,8 +248,8 @@ func QueryChallengeEntriesMap(whereMap map[string]interface{}) ([]Challenge, err
 
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(whereMap).Find(&challenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -395,8 +399,8 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	var tags []Tag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	if err := Db.Model(challenge).Association("Tags").Error; err != nil {
 		return tags, err
@@ -409,8 +413,8 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	var users []User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	// Query users who have solved this challenge by checking the user_challenges table
 	if err := Db.Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
@@ -431,8 +435,8 @@ func GetChallengeSolveInfo(challengeID uint, userID uint) (uint16, bool, error) 
 	}
 	var res result
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	err := Db.Raw(`
 		SELECT 
@@ -477,8 +481,8 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 func QueryAllSubmissions() ([]UserChallenges, error) {
 	var userChallenges []UserChallenges
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Find(&userChallenges)
 
@@ -492,8 +496,8 @@ func QueryAllSubmissions() ([]UserChallenges, error) {
 func QuerySubmissionsWithPagination(limit, offset int) ([]UserChallenges, error) {
 	var userChallenges []UserChallenges
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Table("user_challenges").
 		Select("user_challenges.*").
@@ -515,8 +519,8 @@ func QuerySubmissionsWithPagination(limit, offset int) ([]UserChallenges, error)
 func QuerySubmissions(whereMap map[string]interface{}) ([]UserChallenges, error) {
 	var userChallenges []UserChallenges
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(whereMap).Find(&userChallenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -590,8 +594,8 @@ func CreateDynamicFlagEntry(dynamicFlag *DynamicFlag) error {
 func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, error) {
 	var dynamicFlags []DynamicFlag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	whereMap = normalizeDynamicFlagWhereMap(whereMap)
 	tx := Db.Where(whereMap).Find(&dynamicFlags)
@@ -679,8 +683,8 @@ func DeleteAllUserChallenges(challengeID uint) error {
 func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
 	var attempts []ChallengeAttempt
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	err := Db.Table("user_challenges").
 		Select("user_challenges.id as id, user_challenges.user_id as user_id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct, user_challenges.cheating as cheating").
@@ -700,8 +704,8 @@ func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
 func QueryUserAttempts(user_id uint) ([]ChallengeAttempt, error) {
 	var attempts []ChallengeAttempt
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	err := Db.Table("user_challenges").
 		Select("user_challenges.id as id, user_challenges.user_id as user_id, user_challenges.challenge_id as challenge_id, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct, user_challenges.cheating as cheating").
@@ -822,8 +826,8 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		return results
 	}
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	type userChallengeRow struct {
 		UserID    uint
