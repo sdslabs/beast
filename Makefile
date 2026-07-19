@@ -1,5 +1,6 @@
 GO := go
 AIR := $(shell $(GO) env GOPATH)/bin/air
+BEAST_BIN := $(if $(BEAST_OUTPUT),$(BEAST_OUTPUT),$(shell $(GO) env GOPATH)/bin/beast)
 
 pkgs  = $(shell $(GO) list ./... | grep -v vendor)
 
@@ -16,7 +17,7 @@ help:
 
 # Build beast
 build:
-	@./scripts/build/build.sh
+	@BEAST_OUTPUT="$(BEAST_BIN)" ./scripts/build/build.sh
 
 # Run development environment
 dev: 
@@ -24,7 +25,7 @@ dev:
 	@$(AIR)
 
 cmdref: build
-	@${GOPATH}/bin/beast cmdref
+	@"$(BEAST_BIN)" cmdref --reference-directory docs/cmdref
 
 # Check go formatting
 check_format:
@@ -60,11 +61,11 @@ requirements:
 docs:
 	@rm -rf site/
 	@echo ">>> Building Documentation"
-	@mkdocs build
-	@python scripts/tools/swagger-docs.py
+	@mkdocs build --strict
+	@python3 scripts/tools/swagger-docs.py
 
 installenv:
 	@echo 'Setting up environment for beast.'
 	@./scripts/installenv.sh
 
-.PHONY: build format test test-race integration-test check_format docs installenv govet
+.PHONY: build cmdref format test test-race integration-test check_format docs installenv govet requirements
