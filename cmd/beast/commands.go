@@ -30,6 +30,7 @@ var (
 	Tags                      string
 	NoCache                   bool
 	RestoreFile               string
+	ConfirmDestructive        bool
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -99,8 +100,12 @@ func init() {
 	challDetailsCmd.PersistentFlags().StringVarP(&Tags, "tags", "t", "", "Filter by tagname : pwn / web / image / docker")
 
 	restoreDatabaseCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Backup file to be used for restoration.")
+	resetDatabaseCmd.Flags().BoolVar(&ConfirmDestructive, "yes", false, "Confirm destructive database reset")
+	restoreDatabaseCmd.Flags().BoolVar(&ConfirmDestructive, "yes", false, "Confirm destructive database restore")
 
 	restoreCacheCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Restore file to be used for restoration.")
+	resetCacheCmd.Flags().BoolVar(&ConfirmDestructive, "yes", false, "Confirm destructive cache reset")
+	restoreCacheCmd.Flags().BoolVar(&ConfirmDestructive, "yes", false, "Confirm destructive cache restore")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)

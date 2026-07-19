@@ -140,53 +140,17 @@ func Init() error {
 	return nil
 }
 
-func BackupAndReset() {
+func BackupAndReset() error {
 	if err := LoadDbConfig(); err != nil {
-		log.Error(err)
-		return
+		return err
 	}
-
-	err := BackupDatabase()
-	if err != nil {
-		log.Errorf("Error while backing up database: %s", err)
-		return
+	if err := BackupDatabase(); err != nil {
+		return fmt.Errorf("back up database: %w", err)
 	}
-	err = ResetDatabase()
-	if err != nil {
-		log.Errorf("Error while resetting up database: %s", err)
-		return
+	if err := ResetDatabase(); err != nil {
+		return fmt.Errorf("reset database: %w", err)
 	}
-
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_REMOTES_DIR)
-	err = utils.CreateIfNotExistDir(backupPath)
-	if err != nil {
-		log.Errorf("Error while creating backup directory: %s", err)
-		return
-	}
-
-	backupPath = filepath.Join(backupPath, core.BEAST_REMOTES_DIR+time.Now().Format("20060102150405")+".bak")
-	oldPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-	err = os.Rename(oldPath, backupPath)
-	if err != nil {
-		log.Errorf("Error while backing up remote dir: %s", err)
-		return
-	}
-
-	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_STAGING_DIR)
-
-	err = utils.CreateIfNotExistDir(backupPath)
-	if err != nil {
-		log.Errorf("Error while creating backup directory: %s", err)
-		return
-	}
-
-	oldPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-	backupPath = filepath.Join(backupPath, core.BEAST_STAGING_DIR+time.Now().Format("20060102150405")+".bak")
-	err = os.Rename(oldPath, backupPath)
-	if err != nil {
-		log.Errorf("Error while backing up staging dir: %s", err)
-		return
-	}
+	return nil
 }
 
 func BackupDatabase() error {
@@ -221,12 +185,6 @@ func ResetDatabase() error {
 			return err
 		}
 	}
-	err := TerminateDatabaseConnections()
-	if err != nil {
-		log.Errorf("Unable to terminate connections %s", err)
-		return err
-	}
-
 	dropCmd := exec.Command("dropdb", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "--force", dbConfig.Dbname)
 	dropCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
 
@@ -248,46 +206,12 @@ func ResetDatabase() error {
 	return nil
 }
 
-// Terminate all active connections before dropping
-func TerminateDatabaseConnections() error {
-	if dbConfig == (beastConfig.PsqlConfig{}) {
-		if err := LoadDbConfig(); err != nil {
-			return err
-		}
-	}
-	terminateCmd := exec.Command(
-		"psql",
-		"-U", dbConfig.User,
-		"-h", dbConfig.Host,
-		"-p", dbConfig.Port,
-		"-d", "postgres",
-		"-c",
-		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid();", utils.QuoteLiteral(dbConfig.Dbname)),
-	)
-	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
-
-	output, err := terminateCmd.CombinedOutput()
-	outputStr := string(output)
-	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", outputStr)
-		return err
-	}
-	log.Debug(outputStr)
-	return nil
-}
-
 func RestoreDatabase(backupFile string) error {
 	if err := LoadDbConfig(); err != nil {
 		return err
 	}
 
-	err := TerminateDatabaseConnections()
-	if err != nil {
-		log.Errorf("Unable to terminate connections: %s ", err)
-		return err
-	}
-
-	err = utils.ValidateFileExists(backupFile)
+	err := utils.ValidateFileExists(backupFile)
 	if err != nil {
 		return fmt.Errorf("backup file does not exist: %s", backupFile)
 	}

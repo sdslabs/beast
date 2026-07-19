@@ -203,53 +203,17 @@ func Close() error {
 	return nil
 }
 
-func BackupAndReset() {
+func BackupAndReset() error {
 	if err := LoadCacheConfig(); err != nil {
-		log.Error(err)
-		return
+		return err
 	}
-
-	err := BackupCache()
-	if err != nil {
-		log.Errorf("Error while backing up cache: %s", err)
-		return
+	if err := BackupCache(); err != nil {
+		return fmt.Errorf("back up cache: %w", err)
 	}
-	err = ResetCache()
-	if err != nil {
-		log.Errorf("Error while resetting up cache: %s", err)
-		return
+	if err := ResetCache(); err != nil {
+		return fmt.Errorf("reset cache: %w", err)
 	}
-
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_REMOTES_DIR)
-	err = utils.CreateIfNotExistDir(backupPath)
-	if err != nil {
-		log.Errorf("Error while creating backup directory: %s", err)
-		return
-	}
-
-	backupPath = filepath.Join(backupPath, core.BEAST_REMOTES_DIR+time.Now().Format("20060102150405")+".bak")
-	oldPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-	err = os.Rename(oldPath, backupPath)
-	if err != nil {
-		log.Errorf("Error while backing up remote dir: %s", err)
-		return
-	}
-
-	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_STAGING_DIR)
-
-	err = utils.CreateIfNotExistDir(backupPath)
-	if err != nil {
-		log.Errorf("Error while creating backup directory: %s", err)
-		return
-	}
-
-	oldPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-	backupPath = filepath.Join(backupPath, core.BEAST_STAGING_DIR+time.Now().Format("20060102150405")+".bak")
-	err = os.Rename(oldPath, backupPath)
-	if err != nil {
-		log.Errorf("Error while backing up staging dir: %s", err)
-		return
-	}
+	return nil
 }
 
 func BackupCache() error {
@@ -289,12 +253,6 @@ func ResetCache() error {
 			return err
 		}
 	}
-	err := TerminateCacheConnections()
-	if err != nil {
-		log.Errorf("Unable to terminate connections %s", err)
-		return err
-	}
-
 	args := append(redisCLIConnectionArgs(), "FLUSHDB")
 	dropCmd := exec.Command("redis-cli", args...)
 
@@ -307,45 +265,6 @@ func ResetCache() error {
 	}
 
 	log.Debug("Reset successful.")
-	return nil
-}
-
-// Terminate all active connections before dropping
-func TerminateCacheConnections() error {
-	if cacheConfig == (RedisConfig{}) {
-		if err := LoadCacheConfig(); err != nil {
-			return err
-		}
-	}
-
-	tlsConfig, err := NewTLSConfig(cacheConfig.TLS, cacheConfig.CAFile, cacheConfig.ServerName, cacheConfig.Host)
-	if err != nil {
-		return err
-	}
-	cache := redis.NewClient(&redis.Options{
-		Addr:      redisAddress(cacheConfig),
-		Username:  core.REDIS_DEFAULT_USER,
-		Password:  utils.PromptSecret("Enter default redis user password"),
-		TLSConfig: tlsConfig,
-	})
-
-	_, err = cache.Ping(context.Background()).Result()
-	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", err.Error())
-	}
-
-	defer cache.Close()
-
-	_, err = cache.Do(context.Background(),
-		"CLIENT", "KILL",
-		"USER", cacheConfig.User,
-		"SKIPME", "yes",
-	).Result()
-
-	if err != nil {
-		log.Errorf("Terminate connections error: %s\n", err.Error())
-	}
-
 	return nil
 }
 
@@ -375,5 +294,5 @@ func RestoreCache(backupFile string) error {
 		The primary issue with restoring cache is that it needs to be written to /var/lib and redis needs to be restarted.
 		Redis will then pick up the changes and continue from there.
 	*/
-	return nil
+	return fmt.Errorf("Redis restore is not implemented; no data was changed")
 }

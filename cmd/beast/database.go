@@ -1,30 +1,45 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/sdslabs/beastv4/core/database"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var resetDatabaseCmd = &cobra.Command{
 	Use:   "reset-database",
-	Short: "Backups the existing database and cleans up old db and remote/staging directories",
-	Run: func(cmd *cobra.Command, args []string) {
-		database.BackupAndReset()
+	Short: "Backs up and resets the configured PostgreSQL database",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := requireDestructiveConfirmation(); err != nil {
+			return err
+		}
+		cleanup, err := initializeMaintenance(false)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+		return database.BackupAndReset()
 	},
 }
 
 var restoreDatabaseCmd = &cobra.Command{
 	Use:   "restore-database",
-	Short: "Restores the database, with the backed-up file",
-	Run: func(cmd *cobra.Command, args []string) {
-		if RestoreFile != "" {
-			err := database.RestoreDatabase(RestoreFile)
-			if err != nil {
-				log.Errorf("Error restoring database from file %s: %v\n", RestoreFile, err)
-			}
-		} else {
-			log.Fatalf("Restore file not specified.")
+	Short: "Restores the configured PostgreSQL database from a backup",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := requireDestructiveConfirmation(); err != nil {
+			return err
 		}
+		if RestoreFile == "" {
+			return fmt.Errorf("restore file is required")
+		}
+		cleanup, err := initializeMaintenance(false)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+		return database.RestoreDatabase(RestoreFile)
 	},
 }
