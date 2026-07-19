@@ -59,3 +59,40 @@ func TestControllerLockCanBeReacquiredAfterRelease(t *testing.T) {
 	}
 	releaseControllerLock(second)
 }
+
+func TestWriteJSONReplacesAtomicallyWithPrivatePermissions(t *testing.T) {
+	directory := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	location := filepath.Join(directory, "cache.json")
+	if err := os.Symlink(outside, location); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := writeJson(map[string]string{"state": "fresh"}, location); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(location)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != `{"state":"fresh"}` {
+		t.Fatalf("unexpected JSON cache %q", contents)
+	}
+	outsideContents, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(outsideContents) != "keep" {
+		t.Fatalf("symlink target was overwritten: %q", outsideContents)
+	}
+	info, err := os.Stat(location)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Fatalf("cache permissions = %04o, want 0600", info.Mode().Perm())
+	}
+}

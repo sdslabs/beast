@@ -149,7 +149,31 @@ func writeJson(data any, location string) error {
 		return err
 	}
 
-	return os.WriteFile(location, bytes, 0644)
+	temporary, err := os.CreateTemp(filepath.Dir(location), "."+filepath.Base(location)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temporary JSON file: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0600); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("secure temporary JSON file: %w", err)
+	}
+	if _, err := temporary.Write(bytes); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("write temporary JSON file: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("sync temporary JSON file: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("close temporary JSON file: %w", err)
+	}
+	if err := os.Rename(temporaryPath, location); err != nil {
+		return fmt.Errorf("replace JSON file: %w", err)
+	}
+	return nil
 }
 
 func saveLeaderboardCache() {
