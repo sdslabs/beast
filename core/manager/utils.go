@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/sdslabs/beastv4/core/cache"
 	"io"
 	"io/ioutil"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 
@@ -25,6 +25,11 @@ import (
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	maxChallengeArchiveFiles = 4096
+	maxChallengeArchiveBytes = 512 << 20
 )
 
 type BeastBareDockerfile struct {
@@ -752,71 +757,117 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 
 // Unzips challenge folder in a destination directory
 func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
-
 	baseFileName := filepath.Base(zipContextPath)
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
-	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
-		log.Fatal(err)
-	}
-
-	// 1. Open the zip file
 	reader, err := zip.OpenReader(zipContextPath)
 	if err != nil {
 		return "", err
 	}
 	defer reader.Close()
 
-	// 2. Get the absolute destination path
 	destination, err := filepath.Abs(targetDir)
 	if err != nil {
 		return "", err
 	}
+	if _, err := os.Lstat(destination); err == nil {
+		return "", fmt.Errorf("archive destination already exists: %s", destination)
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if err := os.MkdirAll(destination, 0700); err != nil {
+		return "", err
+	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = os.RemoveAll(destination)
+		}
+	}()
 
-	// 3. Iterate over zip files inside the archive and unzip each of them
+	if len(reader.File) > maxChallengeArchiveFiles {
+		return "", fmt.Errorf("archive contains too many entries: %d (maximum %d)", len(reader.File), maxChallengeArchiveFiles)
+	}
+
+	var totalSize uint64
+	seen := make(map[string]struct{}, len(reader.File))
 	for _, f := range reader.File {
-		err := unzipFile(f, destination)
+		if f.UncompressedSize64 > maxChallengeArchiveBytes-totalSize {
+			return "", fmt.Errorf("archive expands beyond the %d-byte limit", maxChallengeArchiveBytes)
+		}
+		totalSize += f.UncompressedSize64
+
+		relPath, err := safeArchivePath(f.Name)
 		if err != nil {
 			return "", err
 		}
+		if _, exists := seen[relPath]; exists {
+			return "", fmt.Errorf("archive contains duplicate path %q", f.Name)
+		}
+		seen[relPath] = struct{}{}
+
+		if err := unzipFile(f, destination, relPath); err != nil {
+			return "", err
+		}
 	}
+	complete = true
 	return targetDir, nil
 }
 
-func unzipFile(f *zip.File, destination string) error {
-	// 4. Check if file paths are not vulnerable to [Zip Slip](https://snyk.io/research/zip-slip-vulnerability)
-	filePath := filepath.Join(destination, f.Name)
-	if !strings.HasPrefix(filePath, filepath.Clean(destination)+string(os.PathSeparator)) {
-		return fmt.Errorf("invalid file path: %s", filePath)
+func safeArchivePath(name string) (string, error) {
+	if name == "" || strings.ContainsRune(name, '\x00') || strings.Contains(name, `\`) {
+		return "", fmt.Errorf("archive contains invalid path %q", name)
 	}
+	relPath := filepath.Clean(filepath.FromSlash(name))
+	if relPath == "." || filepath.IsAbs(relPath) || relPath == ".." || strings.HasPrefix(relPath, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("archive path escapes destination: %q", name)
+	}
+	return relPath, nil
+}
 
-	// 5. Create directory tree
+func unzipFile(f *zip.File, destination, relPath string) error {
+	filePath := filepath.Join(destination, relPath)
+
 	if f.FileInfo().IsDir() {
-		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-			return err
-		}
-		return nil
+		return os.MkdirAll(filePath, 0755)
+	}
+	if !f.Mode().IsRegular() {
+		return fmt.Errorf("archive contains unsupported entry %q with mode %s", f.Name, f.Mode())
 	}
 
-	if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return err
 	}
 
-	// 6. Create a destination file for unzipped content
-	destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	mode := f.Mode().Perm() & 0777
+	destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
 		return err
 	}
-	defer destinationFile.Close()
 
-	// 7. Unzip the content of a file and copy it to the destination file
 	zippedFile, err := f.Open()
 	if err != nil {
+		_ = destinationFile.Close()
 		return err
 	}
-	defer zippedFile.Close()
 
-	if _, err := io.Copy(destinationFile, zippedFile); err != nil {
+	written, copyErr := io.Copy(destinationFile, io.LimitReader(zippedFile, int64(f.UncompressedSize64)+1))
+	closeSourceErr := zippedFile.Close()
+	closeDestinationErr := destinationFile.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeSourceErr != nil {
+		return closeSourceErr
+	}
+	if closeDestinationErr != nil {
+		return closeDestinationErr
+	}
+	if written != int64(f.UncompressedSize64) {
+		_ = os.Remove(filePath)
+		return fmt.Errorf("archive entry %q size does not match its header", f.Name)
+	}
+	if err := os.Chmod(filePath, mode); err != nil {
 		return err
 	}
 	return nil
