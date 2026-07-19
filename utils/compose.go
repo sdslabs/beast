@@ -15,6 +15,14 @@ import (
 
 type composeService struct {
 	Build             interface{}   `yaml:"build"`
+	Image             string        `yaml:"image"`
+	Command           interface{}   `yaml:"command"`
+	Entrypoint        interface{}   `yaml:"entrypoint"`
+	Environment       interface{}   `yaml:"environment"`
+	DependsOn         interface{}   `yaml:"depends_on"`
+	Healthcheck       interface{}   `yaml:"healthcheck"`
+	ReadOnly          bool          `yaml:"read_only"`
+	Restart           string        `yaml:"restart"`
 	Ports             []string      `yaml:"ports"`
 	Privileged        bool          `yaml:"privileged"`
 	NetworkMode       string        `yaml:"network_mode"`
@@ -51,7 +59,7 @@ func ValidateComposeResources(composeFile string, maxMemory, maxPids int64, maxC
 		return err
 	}
 	var compose Compose
-	if err := yaml.Unmarshal(data, &compose); err != nil {
+	if err := yaml.UnmarshalStrict(data, &compose); err != nil {
 		return err
 	}
 	var totalMemory, totalPids int64
@@ -101,6 +109,7 @@ type composeResource struct {
 }
 
 type Compose struct {
+	Version  string                     `yaml:"version"`
 	Services map[string]composeService  `yaml:"services"`
 	Volumes  map[string]composeResource `yaml:"volumes"`
 	Networks map[string]composeResource `yaml:"networks"`
@@ -276,6 +285,18 @@ func validateComposeSecurity(composeFile string, compose Compose) error {
 		if service.Privileged {
 			return fmt.Errorf("service %q cannot be privileged", name)
 		}
+		if service.Restart != "" && service.Restart != "no" {
+			return fmt.Errorf("service %q cannot set restart policy %q", name, service.Restart)
+		}
+		withoutPorts := service
+		withoutPorts.Ports = nil
+		encodedService, err := yaml.Marshal(withoutPorts)
+		if err != nil {
+			return fmt.Errorf("inspect service %q interpolation: %w", name, err)
+		}
+		if strings.Contains(string(encodedService), "${") {
+			return fmt.Errorf("service %q can use variable interpolation only for managed ports", name)
+		}
 		if service.NetworkMode != "" && service.NetworkMode != "bridge" && service.NetworkMode != "none" {
 			return fmt.Errorf("service %q uses forbidden network_mode %q", name, service.NetworkMode)
 		}
@@ -343,7 +364,7 @@ func ExtractPortsFromCompose(composeFile string) ([]string, error) {
 		return nil, fmt.Errorf("error while reading compose file: %w", err)
 	}
 	var raw Compose
-	err = yaml.Unmarshal(data, &raw)
+	err = yaml.UnmarshalStrict(data, &raw)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing compose file: %s", err.Error())
 	}

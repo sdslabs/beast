@@ -108,6 +108,20 @@ func TestExtractPortsFromComposeRequiresRuntimeHardening(t *testing.T) {
 	}
 }
 
+func TestExtractPortsFromComposeRejectsUnknownSecurityFields(t *testing.T) {
+	path := writeCompose(t, "services:\n  app:\n    cap_drop: [ALL]\n    security_opt: [no-new-privileges:true]\n    use_api_socket: true\n    ports: [\"${APP_PORT}:8080\"]\n")
+	if _, err := ExtractPortsFromCompose(path); err == nil {
+		t.Fatal("expected unknown Compose field rejection")
+	}
+}
+
+func TestExtractPortsFromComposeRejectsHostInterpolation(t *testing.T) {
+	path := writeCompose(t, "services:\n  app:\n    cap_drop: [ALL]\n    security_opt: [no-new-privileges:true]\n    environment: [\"TOKEN=${HOST_TOKEN}\"]\n    ports: [\"${APP_PORT}:8080\"]\n")
+	if _, err := ExtractPortsFromCompose(path); err == nil || !strings.Contains(err.Error(), "interpolation") {
+		t.Fatalf("expected host interpolation rejection, got %v", err)
+	}
+}
+
 func TestValidateComposeResourcesEnforcesAggregateLimit(t *testing.T) {
 	path := writeCompose(t, "services:\n  app:\n    mem_limit: 256m\n    cpus: 0.25\n    pids_limit: 50\n  db:\n    mem_limit: 256m\n    cpus: 0.25\n    pids_limit: 50\n")
 	if err := ValidateComposeResources(path, 512<<20, 100, 0.5); err != nil {
@@ -115,5 +129,16 @@ func TestValidateComposeResourcesEnforcesAggregateLimit(t *testing.T) {
 	}
 	if err := ValidateComposeResources(path, 256<<20, 100, 0.5); err == nil {
 		t.Fatal("expected aggregate memory limit error")
+	}
+}
+
+func TestExampleComposeFilesPassSecurityValidation(t *testing.T) {
+	for _, path := range []string{
+		filepath.Join("..", "_examples", "compose-type", "docker-compose.yml"),
+		filepath.Join("..", "_examples", "instanced-compose", "docker-compose.yml"),
+	} {
+		if _, err := ExtractPortsFromCompose(path); err != nil {
+			t.Fatalf("example %s failed security validation: %v", path, err)
+		}
 	}
 }

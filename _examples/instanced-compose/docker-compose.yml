@@ -20,7 +20,6 @@ services:
       - DB_NAME=ctf
     depends_on:
       - db
-    restart: unless-stopped
     
   db:
     image: mysql:5.7
@@ -37,4 +36,3 @@ services:
       - MYSQL_PASSWORD=challengepass
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    restart: unless-stopped
