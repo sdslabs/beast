@@ -15,7 +15,6 @@ import (
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
-	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	fileUtils "github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
@@ -58,7 +57,7 @@ func hintHandler(c *gin.Context) {
 		return
 	}
 
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	username, err := utils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 			Error: "Unauthorized user",
@@ -189,7 +188,7 @@ func challengeInfoHandler(c *gin.Context) {
 	}
 
 	authHeader := c.GetHeader("Authorization")
-	username, err := coreUtils.GetUser(authHeader)
+	username, err := utils.GetUser(authHeader)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 			Error: "No Token Provided",
@@ -378,7 +377,7 @@ func challengesMetadataHandler(c *gin.Context) {
 		availableChallenges := make([]ChallengeMetadata, 0, len(challenges))
 
 		authHeader := c.GetHeader("Authorization")
-		username, err := coreUtils.GetUser(authHeader)
+		username, err := utils.GetUser(authHeader)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 				Error: "No Token Provided",
@@ -919,22 +918,38 @@ func tagHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPPlainResp
 // @Router /api/info/download [get]
 func serveAssets(c *gin.Context) {
-	challenge := c.Query("challenge")
+	challengeName := c.Query("challenge")
 	assetName := c.Query("asset")
-	challenge = filepath.Base(challenge)
-	assetName = filepath.Base(assetName)
-	if challenge == "" || assetName == "" {
+	if challengeName == "" || challengeName != filepath.Base(challengeName) || strings.Contains(challengeName, `\`) || assetName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "challenge and asset parameters are required"})
 		return
 	}
-	filepath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, core.BEAST_STATIC_FOLDER, assetName)
-	err := fileUtils.ValidateFileExists(filepath)
-	if err != nil {
+	if err, state := utils.CheckTime(); err != nil || state == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Incorrect file requested"})
+		return
+	}
+	challenge, err := database.QueryFirstChallengeEntry("name", challengeName)
+	if err != nil || !declaresAsset(challenge.Assets, assetName) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Incorrect file requested"})
 		return
 	}
-	c.FileAttachment(filepath, assetName)
+	staticRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
+	assetPath, err := fileUtils.ResolvePathWithin(staticRoot, assetName)
+	if err != nil || fileUtils.ValidateFileExists(assetPath) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Incorrect file requested"})
+		return
+	}
+	c.FileAttachment(assetPath, filepath.Base(assetName))
 
+}
+
+func declaresAsset(encodedAssets, requested string) bool {
+	for _, asset := range strings.Split(encodedAssets, core.DELIMITER) {
+		if asset == requested {
+			return true
+		}
+	}
+	return false
 }
 
 // This route returns the number of users in the databse with role=contestant
@@ -1258,7 +1273,7 @@ func unfreezeLeaderboardHandler(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/challenges/{challenge_id}/attempts [get]
 func getChallengeAttempts(c *gin.Context) {
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	username, err := utils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 			Error: "Unauthorized user",
@@ -1353,7 +1368,7 @@ func getChallengeAttempts(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/info/submissions/user/{user_id} [get]
 func getUserAttempts(c *gin.Context) {
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	username, err := utils.GetUser(c.GetHeader("Authorization"))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 			Error: "Unauthorized user",
