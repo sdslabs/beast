@@ -93,6 +93,7 @@ func init() {
 	challengeCmd.PersistentFlags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Deploys challenge from local directory")
 	challengeCmd.PersistentFlags().BoolVarP(&DeleteEntry, "delete-entry", "d", false, "Deletes db entry related to this challenge")
 	challengeCmd.PersistentFlags().BoolVarP(&NoCache, "no-cache", "c", false, "Build image of challenge without using cache")
+	verifyCmd.Flags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Validate a challenge from a local directory")
 
 	cmdRef.PersistentFlags().StringVarP(&RefDirectory, "reference-directory", "r", "", "Generate beast command reference files in reference directory")
 

@@ -11,13 +11,25 @@ import (
 
 // Verifies the challenge config
 var verifyCmd = &cobra.Command{
-	Use:   "verify challenge-name",
+	Use:   "verify [challenge-name]",
 	Short: "Verifies challenge config",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := config.InitConfig(); err != nil {
 			return err
+		}
+		if LocalDirectory != "" {
+			if len(args) != 0 {
+				return fmt.Errorf("challenge name and local-directory are mutually exclusive")
+			}
+			if err := manager.ValidateChallengeConfig(LocalDirectory); err != nil {
+				return fmt.Errorf("validate local challenge: %w", err)
+			}
+			return nil
+		}
+		if len(args) == 0 {
+			return fmt.Errorf("challenge name or local-directory is required")
 		}
 		challengeName := args[0]
 
