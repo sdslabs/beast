@@ -136,3 +136,23 @@ func TestChallengeIdentifiersAllowEmptyAndProtectActiveValues(t *testing.T) {
 		t.Fatalf("deleted challenge identifiers should be reusable: %v", err)
 	}
 }
+
+func TestSaveTransactionPreservesRepeatedActions(t *testing.T) {
+	cleanup := setupSubmissionTestDB(t)
+	defer cleanup()
+
+	user := createSubmissionTestUser(t, "audit-user")
+	challenge := createSubmissionTestChallenge(t, "audit-challenge", -1, false)
+	for range 2 {
+		if err := SaveTransaction(&Transaction{Action: "deploy", UserID: user.ID, ChallengeID: challenge.ID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var count int64
+	if err := Db.Model(&Transaction{}).Where("user_id = ? AND challenge_id = ? AND action = ?", user.ID, challenge.ID, "deploy").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("transaction count = %d, want 2", count)
+	}
+}

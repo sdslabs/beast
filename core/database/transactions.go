@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -16,18 +17,14 @@ type Transaction struct {
 }
 
 func SaveTransaction(transaction *Transaction) error {
+	if transaction == nil || transaction.UserID == 0 || transaction.ChallengeID == 0 || transaction.Action == "" {
+		return errors.New("complete transaction audit record is required")
+	}
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Begin()
-
-	if tx.Error != nil {
-		return fmt.Errorf("Error while saving transaction: %v", tx.Error)
+	if err := Db.Create(transaction).Error; err != nil {
+		return fmt.Errorf("save transaction audit record: %w", err)
 	}
-
-	if err := tx.FirstOrCreate(transaction, *transaction).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	return tx.Commit().Error
+	return nil
 }

@@ -676,13 +676,9 @@ func LogTransaction(identifier string, action string, authorization string) erro
 		return fmt.Errorf("error while querying challenge: %s", identifier)
 	}
 
-	// We are trying to get the username for the request from JWT claims here
-	// Since upto this point the request is already authorized, we use a default
-	// username if any error occurs while getting the username.
 	userName, err := coreUtils.GetUser(authorization)
 	if err != nil {
-		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
-		userName = core.DEFAULT_USER_NAME
+		return fmt.Errorf("resolve transaction user: %w", err)
 	}
 
 	user, err := database.QueryFirstUserEntry("username", userName)
