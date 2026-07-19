@@ -2,12 +2,13 @@ package api
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"html/template"
 	"log"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -24,9 +25,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func generateOTP() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return fmt.Sprintf("%06d", r.Intn(1000000)) // 6-digit OTP
+func generateOTP() (string, error) {
+	value, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", value.Int64()), nil
 }
 
 // sendEmail sends an OTP email using an SMTP client with TLS. Falls back to plain text if template is missing.
@@ -169,7 +173,11 @@ func sendOTPHandler(c *gin.Context) {
 		return
 	}
 
-	otp := generateOTP()
+	otp, err := generateOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Failed to generate OTP"})
+		return
+	}
 	expiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
 
 	otpEntry, err := database.QueryOTPEntry(email)
@@ -306,7 +314,11 @@ func sendOTPForForgetHandler(c *gin.Context) {
 		return
 	}
 
-	otp := generateOTP()
+	otp, err := generateOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Failed to generate OTP"})
+		return
+	}
 	expiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
 
 	otpEntry, err := database.QueryOTPEntry(email)
