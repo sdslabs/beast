@@ -1,57 +1,35 @@
 package main
 
 import (
-	"errors"
+	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
 	"github.com/BurntSushi/toml"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"io"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strconv"
-	"time"
 )
 
 var (
 	MINIMUM_MEMORY_LIMIT int64 = (1 << 23) /* a little over 6MB */
 
 	BEAST_GLOBAL_CONFIG string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
-
-	BEAST_EXAMPLE_DIRECTORY string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_EXAMPLE_DIR)
-	BEAST_EXAMPLE_CONFIG    string = filepath.Join(BEAST_EXAMPLE_DIRECTORY, core.BEAST_EX_CONFIG_FILE_NAME)
 )
 
-func downloadExampleBeastConfig() error {
-	log.Println("Downloading example config file from GitHub...")
-
-	response, err := http.Get("https://raw.githubusercontent.com/sdslabs/beast/master/_examples/example.config.toml")
-	if err != nil {
-		return err
+func generateConfigSecret(size int) (string, error) {
+	secret := make([]byte, size)
+	if _, err := rand.Read(secret); err != nil {
+		return "", err
 	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return errors.New("error while downloading: " + response.Status)
-	}
-
-	err = os.MkdirAll(BEAST_EXAMPLE_DIRECTORY, 0755)
-	if err != nil {
-		return err
-	}
-
-	exampleConfig, err := os.Create(BEAST_EXAMPLE_CONFIG)
-	if err != nil {
-		return err
-	}
-	defer exampleConfig.Close()
-
-	_, err = io.Copy(exampleConfig, response.Body)
-	return err
+	return base64.RawURLEncoding.EncodeToString(secret), nil
 }
 
 func promptServerDetails(configuration *config.BeastConfig) {
@@ -71,7 +49,7 @@ func promptServerDetails(configuration *config.BeastConfig) {
 }
 
 func promptResourceLimits(configuration *config.BeastConfig) {
-	configuration.CPUShares = utils.PromptInt64("Default CPU Share (must be over 6MB):", core.DEFAULT_CPU_SHARE)
+	configuration.CPUShares = utils.PromptInt64("Default CPU shares", core.DEFAULT_CPU_SHARE)
 	configuration.CPUsLimit = utils.PromptFloat32("Default CPU Limit", core.DEFAULT_CPU_LIMIT)
 	configuration.PidsLimit = utils.PromptInt64("Default PIDs Limit:", core.DEFAULT_PIDS_LIMIT)
 	configuration.Memory = utils.PromptInt64("Default Memory Limit:", core.DEFAULT_MEMORY_LIMIT)
@@ -90,7 +68,7 @@ func promptRemoteRepository(configuration *config.BeastConfig) {
 		remote.Active = utils.PromptBinary("Enable this repository?")
 		remote.RemoteName = utils.PromptString("Remote Repository Name")
 		remote.Branch = utils.PromptString("Remote Repository Branch")
-		remote.Secret = utils.PromptSecret("Remote Repository SSH Key")
+		remote.Secret = utils.PromptString("Path to remote repository SSH private key")
 
 		err := remote.ValidateGitConfig()
 		if err != nil {
@@ -104,6 +82,9 @@ func promptRemoteRepository(configuration *config.BeastConfig) {
 }
 
 func promptCompetitionDetails(configuration *config.BeastConfig) {
+	if !utils.PromptBinary("Configure competition metadata?") {
+		return
+	}
 	configuration.CompetitionInfo.Name = utils.PromptString("Enter Competition Name")
 	configuration.CompetitionInfo.About = utils.PromptString("Enter Competition About Text")
 	configuration.CompetitionInfo.Prizes = utils.PromptString("Enter Competition Prizes Text")
@@ -140,15 +121,20 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 	}
 }
 
-func promptCacheConnectionDetails(configuration *config.BeastConfig) {
+func promptCacheConnectionDetails(configuration *config.BeastConfig) error {
 	configuration.RedisConf.User = utils.PromptString("Enter Redis User Name (this user will be created if does not exist)... leaving it empty will default it to beast")
 	if configuration.RedisConf.User == "" {
 		configuration.RedisConf.User = "beast"
 	}
 
-	configuration.RedisConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Redis User %s Password... leaving it empty will default it to beast", configuration.RedisConf.User))
+	configuration.RedisConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Redis user %s password (leave empty to generate one)", configuration.RedisConf.User))
 	if configuration.RedisConf.Password == "" {
-		configuration.RedisConf.Password = "beast"
+		password, err := generateConfigSecret(32)
+		if err != nil {
+			return err
+		}
+		configuration.RedisConf.Password = password
+		log.Info("Generated a Redis password in the private Beast configuration")
 	}
 
 	configuration.RedisConf.Host = utils.PromptString("Enter Redis Host Name, leave empty for localhost")
@@ -157,12 +143,18 @@ func promptCacheConnectionDetails(configuration *config.BeastConfig) {
 	}
 
 	configuration.RedisConf.Port = strconv.FormatInt(utils.PromptInt64("Enter Redis Port", 6379), 10)
+	configuration.RedisConf.TLS = utils.PromptBinary("Use TLS for Redis?")
+	if configuration.RedisConf.TLS {
+		configuration.RedisConf.CAFile = utils.PromptString("Redis CA certificate path (empty uses system roots)")
+		configuration.RedisConf.ServerName = utils.PromptString("Redis TLS server name (empty uses host)")
+	}
 
 	log.Infoln("Setting Redis DB to 0...")
 	configuration.RedisConf.Db = 0
+	return nil
 }
 
-func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {
+func promptDatabaseConnectionDetails(configuration *config.BeastConfig) error {
 	configuration.PsqlConf.User = utils.PromptString("Enter Postgres User Name (this user will be created if does not exist)... leaving it empty will default it to beast")
 	if configuration.PsqlConf.User == "" {
 		configuration.PsqlConf.User = "beast"
@@ -173,9 +165,14 @@ func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {
 		configuration.PsqlConf.Dbname = "beast"
 	}
 
-	configuration.PsqlConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Postgres User %s Password... leaving it empty will default it to beast", configuration.PsqlConf.User))
+	configuration.PsqlConf.Password = utils.PromptSecret(fmt.Sprintf("Enter Postgres user %s password (leave empty to generate one)", configuration.PsqlConf.User))
 	if configuration.PsqlConf.Password == "" {
-		configuration.PsqlConf.Password = "beast"
+		password, err := generateConfigSecret(32)
+		if err != nil {
+			return err
+		}
+		configuration.PsqlConf.Password = password
+		log.Info("Generated a PostgreSQL password in the private Beast configuration")
 	}
 
 	configuration.PsqlConf.Host = utils.PromptString("Enter Postgres Host Name, leave empty for localhost")
@@ -188,44 +185,63 @@ func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {
 		"allow",
 		"prefer",
 		"require",
+		"verify-ca",
+		"verify-full",
 	})
+	return nil
 }
 
-func promptBeastConfiguration(configuration *config.BeastConfig) {
+func promptBeastConfiguration(configuration *config.BeastConfig) error {
 	promptServerDetails(configuration)
 	promptResourceLimits(configuration)
 	promptRemoteRepository(configuration)
 	promptCompetitionDetails(configuration)
 	promptNotificationWebhooks(configuration)
-	promptCacheConnectionDetails(configuration)
-	promptDatabaseConnectionDetails(configuration)
+	if err := promptCacheConnectionDetails(configuration); err != nil {
+		return err
+	}
+	return promptDatabaseConnectionDetails(configuration)
 }
 
 func tryCopyExampleConfig() error {
-	var configuration config.BeastConfig
-
-	if _, err := os.Stat(BEAST_EXAMPLE_CONFIG); os.IsNotExist(err) {
-		log.Println("No example config file found...")
-
-		if err = downloadExampleBeastConfig(); err != nil {
-			return err
-		}
-	}
-
-	log.Println("Reading example config file at", BEAST_EXAMPLE_CONFIG)
-
-	data, err := os.ReadFile(BEAST_EXAMPLE_CONFIG)
+	jwtSecret, err := generateConfigSecret(48)
 	if err != nil {
 		return err
 	}
-
-	if _, err = toml.Decode(string(data), &configuration); err != nil {
+	configuration := config.BeastConfig{
+		AllowedBaseImages: []string{"ubuntu:24.04", "debian:bookworm"},
+		AvailableServers: map[string]config.AvailableServer{
+			core.LOCALHOST: {Host: core.LOCALHOST, Active: true, PortRange: "10000:20000"},
+		},
+		JWTSecret:       jwtSecret,
+		TickerFrequency: core.DEFAULT_TICKER_FREQUENCY,
+		CPUShares:       core.DEFAULT_CPU_SHARE,
+		CPUsLimit:       core.DEFAULT_CPU_LIMIT,
+		Memory:          core.DEFAULT_MEMORY_LIMIT,
+		PidsLimit:       core.DEFAULT_PIDS_LIMIT,
+		PsqlConf:        config.PsqlConfig{User: "beast", Dbname: "beast", Host: core.LOCALHOST, Port: "5432", SslMode: "disable"},
+		RedisConf:       config.RedisConfig{User: "beast", Host: core.LOCALHOST, Port: "6379"},
+		InstanceConfig:  config.InstanceConfig{DefaultExpiration: 300, MaxExtension: 600, MaxInstancesPerUser: 3},
+		ServerConfig: config.ServerConfig{
+			TLSCertFile: filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SECRETS_DIR, "tls.crt"),
+			TLSKeyFile:  filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SECRETS_DIR, "tls.key"),
+		},
+	}
+	if err := promptBeastConfiguration(&configuration); err != nil {
 		return err
 	}
+	if err := ensureLocalTLSCertificate(); err != nil {
+		return err
+	}
+	if err := configuration.ValidateConfig(); err != nil {
+		return fmt.Errorf("validate generated configuration: %w", err)
+	}
 
-	promptBeastConfiguration(&configuration)
-
-	file, err := os.OpenFile(BEAST_GLOBAL_CONFIG, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	var encoded bytes.Buffer
+	if err := toml.NewEncoder(&encoded).Encode(configuration); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(BEAST_GLOBAL_CONFIG, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
 	}
@@ -233,19 +249,22 @@ func tryCopyExampleConfig() error {
 		file.Close()
 		return err
 	}
-	defer file.Close()
-
-	encoder := toml.NewEncoder(file)
-	if err = encoder.Encode(configuration); err != nil {
+	if _, err := file.Write(encoded.Bytes()); err != nil {
+		file.Close()
+		_ = os.Remove(BEAST_GLOBAL_CONFIG)
 		return err
 	}
-
-	return nil
+	return file.Close()
 }
 
 func initBeastConfig() error {
-	if _, err := os.Stat(BEAST_GLOBAL_CONFIG); os.IsNotExist(err) {
+	if _, err := os.Lstat(BEAST_GLOBAL_CONFIG); os.IsNotExist(err) {
+		if err := initDirectories(); err != nil {
+			return err
+		}
 		return tryCopyExampleConfig()
+	} else if err != nil {
+		return err
 	}
 
 	log.Infoln("Found global config file:", BEAST_GLOBAL_CONFIG)
@@ -257,15 +276,13 @@ var configCmd = &cobra.Command{
 	Short: "Run interactive beast configuration setup",
 	Long:  "Creates the global Beast config file while prompting the user interactively whenever needed.",
 
-	Run: func(cmd *cobra.Command, args []string) {
-		err := initBeastConfig()
-
-		if err != nil {
-			log.Errorln(err.Error())
-			log.Errorln("Failed to create global beast config file... fix the above errors and try again")
-			return
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := initBeastConfig(); err != nil {
+			return fmt.Errorf("initialize Beast configuration: %w", err)
 		}
 
 		log.Infoln(fmt.Sprintf("Beast global config file initiliazed at %s", BEAST_GLOBAL_CONFIG))
+		return nil
 	},
 }
