@@ -5,14 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strings"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -21,7 +17,6 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	coreCache "github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
@@ -39,6 +34,7 @@ func initDirectories() error {
 	log.Infoln("Creating beast directories...")
 
 	directories := []string{
+		core.BEAST_GLOBAL_DIR,
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CACHE_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR),
@@ -49,8 +45,11 @@ func initDirectories() error {
 	}
 
 	for _, dir := range directories {
-		err := os.MkdirAll(dir, 0755)
+		err := os.MkdirAll(dir, 0700)
 		if err != nil {
+			return err
+		}
+		if err := os.Chmod(dir, 0700); err != nil {
 			return err
 		}
 	}
@@ -60,43 +59,11 @@ func initDirectories() error {
 
 func checkDockerDaemon() error {
 	log.Infoln("Checking docker daemon...")
-	_, err := os.Stat(core.DOCKER_PID)
-	return err
-}
-
-func installAir() error {
-	log.Infoln("Installing air for live reloading...")
-
-	resp, err := http.Get("https://raw.githubusercontent.com/cosmtrek/air/master/install.sh")
+	output, err := utils.RunCommand(30*time.Second, nil, "docker", "info", "--format", "{{.ServerVersion}}")
 	if err != nil {
-		return err
+		return fmt.Errorf("Docker daemon is unavailable: %w; output: %s", err, output)
 	}
-	defer resp.Body.Close()
-
-	install := "install.sh"
-	out, err := os.Create(install)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	defer os.Remove(install)
-
-	if _, err = io.Copy(out, resp.Body); err != nil {
-		return err
-	}
-
-	gopath, err := exec.Command("go", "env", "GOPATH").Output()
-	if err != nil {
-		return err
-	}
-	binDir := filepath.Join(strings.TrimSpace(string(gopath)), "bin")
-
-	cmd := exec.Command("sh", install, "-b", binDir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+	return nil
 }
 
 func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig) error {
@@ -298,12 +265,9 @@ func initAdmin() error {
 		}
 
 		password := utils.PromptSecret("Enter admin password")
-		if password == "" {
-			return errors.New("admin password is required")
-		}
-
-		if err := database.Init(); err != nil {
-			return err
+		confirmation := utils.PromptSecret("Confirm admin password")
+		if password != confirmation || len(password) < 12 || len(password) > 128 {
+			return errors.New("admin password confirmation must match and contain 12 to 128 bytes")
 		}
 
 		if err := createAuthorAdminPrereq(); err != nil {
@@ -331,18 +295,15 @@ func runBeastBootsteps() error {
 	}
 
 	log.Infoln(fmt.Sprintf("Beast global config file initiliazed at %s", BEAST_GLOBAL_CONFIG))
+	if err := ensureLocalTLSCertificate(); err != nil {
+		return err
+	}
 
 	if err := checkDockerDaemon(); err != nil {
 		return err
 	}
 
 	log.Infoln("Verified Docker Daemon running")
-
-	if err := installAir(); err != nil {
-		return err
-	}
-
-	log.Infoln("Successfully installed air for live reloading...")
 
 	if err := config.InitConfig(); err != nil {
 		return err
@@ -374,18 +335,16 @@ var initCmd = &cobra.Command{
 	Short: "Run Beast initial setup bootsetps.",
 	Long:  "Initializes beast by setting up beast directory, checking for permission. It also configures the logger and local SQLite database to be used by beast",
 
-	Run: func(cmd *cobra.Command, args []string) {
-		err := runBeastBootsteps()
-
-		if err != nil {
-			log.Errorln(err.Error())
-			log.Errorln("Failed to complete beast bootsteps... fix above errors and try again")
-			return
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := runBeastBootsteps(); err != nil {
+			return fmt.Errorf("complete Beast bootsteps: %w", err)
 		}
 
 		log.Infoln(COLOR_GREEN + "Please run beast server by following command:-" + RESET)
 		log.Infoln(COLOR_GREEN + "******************" + RESET)
 		log.Infoln(COLOR_GREEN + "*  " + BLINK_ON + "beast run -v" + BLINK_OFF + "  *" + RESET)
 		log.Infoln(COLOR_GREEN + "******************" + RESET)
+		return nil
 	},
 }
