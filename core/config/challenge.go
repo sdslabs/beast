@@ -24,6 +24,10 @@ var challengeNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 var environmentKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 var generatedPathPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$`)
 
+func IsValidChallengeName(name string) bool {
+	return challengeNamePattern.MatchString(name)
+}
+
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
 // will be ignored.
@@ -193,7 +197,7 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if config.Name == "" || (config.Flag == "" && !config.DynamicFlag) {
 		return fmt.Errorf("name and flag required for the challenge"), false
 	}
-	if !challengeNamePattern.MatchString(config.Name) {
+	if !IsValidChallengeName(config.Name) {
 		return fmt.Errorf("challenge name must match %s", challengeNamePattern.String()), false
 	}
 	if config.MaxPoints > 0 && config.MinPoints > config.MaxPoints {
