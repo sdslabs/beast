@@ -11,8 +11,8 @@ import (
 type Notification struct {
 	gorm.Model
 
-	Title       string `gorm:not null;unique`
-	Description string `gorm:not null`
+	Title       string `gorm:"not null;unique"`
+	Description string `gorm:"not null"`
 }
 
 // Create an entry for the notification in the Notification table
