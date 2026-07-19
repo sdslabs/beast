@@ -115,7 +115,6 @@ func initGinRouter() *gin.Engine {
 
 		configGroup := apiGroup.Group("/config", adminAuthorize)
 		{
-			configGroup.POST("/competition-info", updateCompetitionInfoHandler)
 			configGroup.POST("/challenge-info", updateChallengeInfoHandler)
 		}
 

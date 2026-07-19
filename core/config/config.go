@@ -15,7 +15,6 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/utils"
 
-	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -493,53 +492,11 @@ type MailConfig struct {
 	SMTPPort string `toml:"smtpPort"`
 }
 
-func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {
-	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
-	var config BeastConfig
-
-	err := utils.ValidateFileExists(configPath)
-	if err != nil {
-		return err
-	}
-
-	_, err = toml.DecodeFile(configPath, &config)
-	if err != nil {
-		return err
-	}
-
-	config.CompetitionInfo = *competitionInfo
-
-	configFile, err := os.Create(configPath)
-	if err != nil {
-		return err
-	}
-
-	if err := toml.NewEncoder(configFile).Encode(config); err != nil {
-		return err
-	}
-
-	if err := configFile.Close(); err != nil {
-		return err
-	}
-	return err
-}
-
 func GetCompetitionInfo() (CompetitionInfo, error) {
-	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
-	var config BeastConfig
-	var competitionInfo CompetitionInfo
-
-	err := utils.ValidateFileExists(configPath)
-	if err != nil {
-		return competitionInfo, err
+	if Cfg == nil {
+		return CompetitionInfo{}, errors.New("beast config is not initialized")
 	}
-
-	_, err = toml.DecodeFile(configPath, &config)
-	if err != nil {
-		return competitionInfo, err
-	}
-
-	return config.CompetitionInfo, nil
+	return Cfg.CompetitionInfo, nil
 }
 
 // From the path of the config file provided as an arguement this function
