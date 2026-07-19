@@ -3,6 +3,7 @@ package remoteManager
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -176,7 +177,7 @@ func GetContainerStdLogsRemote(containerID string, server config.AvailableServer
 
 // Get live logs of container
 func ShowLiveContainerLogsRemote(containerID string, server config.AvailableServer) error {
-	output, err := RunArgsOnServer(server, "docker", "logs", "--details", "--follow", containerID)
+	output, err := RunArgsOnServer(server, "docker", "logs", "--details", containerID)
 	if err != nil {
 		return fmt.Errorf("error streaming live logs: %w", err)
 	}
@@ -207,17 +208,16 @@ func DeployContainerFromComposeRemote(challengeName string, projectName string, 
 	upOutput, err := RunArgsWithEnvOnServer(server, environment, "docker", "compose", "-f", composeFile, "-p", projectName, "up", "-d")
 	if err != nil {
 		log.Errorf("docker compose up failed for challenge %s. Output:\n%s", challengeName, upOutput)
-		return "", fmt.Errorf("error while running docker compose up on remote: %v", err)
+		return "", cleanupFailedComposeDeploymentRemote(projectName, server, fmt.Errorf("run docker compose up on remote: %w", err))
 	}
 
 	if err := validateAllComposeServicesRunningRemote(projectName, challengeName, server); err != nil {
-		return "", err
+		return "", cleanupFailedComposeDeploymentRemote(projectName, server, err)
 	}
 
 	primaryContainerId, err := getPrimaryComposeContainerIdRemote(projectName, server)
 	if err != nil {
-		log.Warnf("Could not get primary container ID for challenge %s on remote: %v", challengeName, err)
-		return "", nil // Return empty string but success
+		return "", cleanupFailedComposeDeploymentRemote(projectName, server, fmt.Errorf("get primary container for challenge %s on remote: %w", challengeName, err))
 	}
 
 	log.Debugf("Verified challenge %s services are running on remote. Primary container: %s", challengeName, primaryContainerId)
@@ -321,4 +321,11 @@ func ComposePurgeProjectRemote(projectName string, server config.AvailableServer
 	}
 	log.Debugf("Successfully purged compose project %s on remote. Output: %s", projectName, purgeOutput)
 	return nil
+}
+
+func cleanupFailedComposeDeploymentRemote(projectName string, server config.AvailableServer, deploymentErr error) error {
+	if cleanupErr := ComposeDownProjectRemote(projectName, server); cleanupErr != nil {
+		return errors.Join(deploymentErr, fmt.Errorf("clean up failed remote compose deployment: %w", cleanupErr))
+	}
+	return deploymentErr
 }

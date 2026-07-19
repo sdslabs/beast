@@ -1,12 +1,11 @@
 package remoteManager
 
 import (
-	"bytes"
+	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"os/exec"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
@@ -33,20 +32,25 @@ func RsyncFileToServer(server config.AvailableServer, localFilePath, remoteFileP
 	remoteShell := "ssh -i " + shellQuote(server.SSHKeyPath) +
 		" -o " + shellQuote("UserKnownHostsFile="+server.KnownHostsFile) +
 		" -o StrictHostKeyChecking=yes"
-	cmd := exec.Command("rsync", "-az", "--protect-args",
+	ctx, cancel := context.WithTimeout(context.Background(), remoteBuildTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "rsync", "-az", "--protect-args",
 		"-e", remoteShell, "--",
 		localFilePath,
 		fmt.Sprintf("%s@%s:%s", server.Username, server.Host, remoteFilePath))
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-		return err
+	output := &boundedCommandOutput{limit: maxRemoteCommandOutput}
+	cmd.Stdout = output
+	cmd.Stderr = output
+	commandErr := cmd.Run()
+	if ctx.Err() != nil {
+		return fmt.Errorf("rsync timed out after %s: %w", remoteBuildTimeout, ctx.Err())
 	}
-	fmt.Println("Result: " + out.String())
+	if output.exceeded {
+		return errRemoteOutputLimit
+	}
+	if commandErr != nil {
+		return fmt.Errorf("rsync failed: %w; output: %s", commandErr, output.String())
+	}
 	return nil
 }
 
