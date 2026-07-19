@@ -34,7 +34,7 @@ func setupRedisIntegrationTest(t *testing.T) func() {
 	previousMutex := CacheMutex
 	previousConfig := cacheConfig
 
-	CacheMutex = &sync.Mutex{}
+	CacheMutex = &sync.RWMutex{}
 	Cache = redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Username: os.Getenv("BEAST_TEST_REDIS_USER"),

@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	CacheMutex *sync.Mutex
+	CacheMutex *sync.RWMutex
 	Cache      *redis.Client
 )
 
@@ -116,7 +116,7 @@ func ConnectCache() error {
 // database, which is not closed after creating a connection here and can
 // be used further after this.
 func Init() error {
-	CacheMutex = &sync.Mutex{}
+	CacheMutex = &sync.RWMutex{}
 	if Cache == nil {
 		if err := ConnectCache(); err != nil {
 			return fmt.Errorf("initialize cache: %w", err)

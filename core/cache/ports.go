@@ -36,6 +36,15 @@ end
 return selected
 `
 
+const freeContainerPortsScript = `
+local ports = redis.call("SMEMBERS", KEYS[2])
+for _, port in ipairs(ports) do
+	redis.call("SREM", KEYS[1], port)
+end
+redis.call("DEL", KEYS[2])
+return ports
+`
+
 // GetFreePortOnHost gets the first available port in the specific range by checking its existance in the cache.
 // algorithm can be imprived later on if it bottlenecks performance.
 func GetFreePortOnHost(host string, firstPort uint32, portRange uint32) (uint32, error) {
@@ -52,15 +61,12 @@ func GetFreePortOnHost(host string, firstPort uint32, portRange uint32) (uint32,
 
 func GetFreePortsOnHost(host string, firstPort uint32, portRange uint32, count int) ([]uint32, error) {
 	if Cache == nil {
-		Init()
+		return nil, fmt.Errorf("redis cache not initialized")
 	}
 
 	if count <= 0 {
 		return []uint32{}, nil
 	}
-
-	CacheMutex.Lock()
-	defer CacheMutex.Unlock()
 
 	ctx := context.Background()
 	hostKey := utils.HostToKey(host)
@@ -93,6 +99,9 @@ func AssignFreePortOnHostToContainer(host string, containerId string, port uint3
 }
 
 func AssignPortsOnHostToContainer(host string, containerId string, ports []uint32) error {
+	if Cache == nil {
+		return fmt.Errorf("redis cache not initialized")
+	}
 	CacheMutex.Lock()
 	defer CacheMutex.Unlock()
 
@@ -129,11 +138,11 @@ func AssignPortsOnHostToContainer(host string, containerId string, ports []uint3
 // GetContainerPortsOnHost gets all the assigned ports for a given container on a given host
 func GetContainerPortsOnHost(host string, containerId string) ([]uint32, error) {
 	if Cache == nil {
-		Init()
+		return nil, fmt.Errorf("redis cache not initialized")
 	}
 
-	CacheMutex.Lock()
-	defer CacheMutex.Unlock()
+	CacheMutex.RLock()
+	defer CacheMutex.RUnlock()
 
 	ctx := context.Background()
 	instanceKey := utils.ContainerToKey(host, containerId)
@@ -173,7 +182,7 @@ func redisValueToUint32(value interface{}) (uint32, error) {
 
 func FreePortOnHost(host string, port uint32) error {
 	if Cache == nil {
-		Init()
+		return fmt.Errorf("redis cache not initialized")
 	}
 
 	CacheMutex.Lock()
@@ -193,7 +202,7 @@ func FreePortOnHost(host string, port uint32) error {
 // FreeContainerPortsOnHost frees all allocated host ports on a machine, at present occupied by a container
 func FreeContainerPortsOnHost(host string, containerId string) error {
 	if Cache == nil {
-		Init()
+		return fmt.Errorf("redis cache not initialized")
 	}
 
 	CacheMutex.Lock()
@@ -203,28 +212,12 @@ func FreeContainerPortsOnHost(host string, containerId string) error {
 	hostKey := utils.HostToKey(host)
 	instanceKey := utils.ContainerToKey(host, containerId)
 
-	result, err := Cache.SMembers(ctx, instanceKey).Result()
+	result, err := Cache.Eval(ctx, freeContainerPortsScript, []string{hostKey, instanceKey}).Result()
 	if err != nil {
 		return err
 	}
-
-	ports := make([]uint32, len(result))
-	for i, portString := range result {
-		port, err := strconv.ParseUint(portString, 10, 32)
-		if err != nil {
-			return err
-		}
-
-		ports[i] = uint32(port)
-		Cache.SRem(ctx, instanceKey, port)
+	if _, ok := result.([]interface{}); !ok {
+		return fmt.Errorf("unexpected Redis free-port result %T", result)
 	}
-
-	for _, port := range ports {
-		_, err = Cache.SRem(ctx, hostKey, port).Result()
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
