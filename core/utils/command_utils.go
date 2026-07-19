@@ -26,11 +26,11 @@ func CreateAdminOrAuthor(name string, username string, email string, password st
 }
 
 func DeleteChallengeEntryWithPorts(challname string) error {
-	chall, err := database.QueryFirstChallengeEntry("name", challname)
+	chall, found, err := database.FindFirstChallengeEntry("name", challname)
 	if err != nil {
 		return fmt.Errorf("Error while querying database : %v", err)
 	}
-	if chall.Name == "" {
+	if !found {
 		return nil
 	}
 	ports, err := database.GetAllocatedPorts(chall)

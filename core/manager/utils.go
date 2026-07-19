@@ -981,7 +981,7 @@ func UpdateChallenges(defaultauthorpassword string) {
 				continue
 			}
 
-			challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
+			challenge, _, err := database.FindFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 			if err != nil {
 				log.Errorf("Error while querying challenge %s : %s", config.Challenge.Metadata.Name, err)
 				continue

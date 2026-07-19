@@ -476,7 +476,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		return fmt.Errorf("CONFIG ERROR: %s : Inconsistent configuration name and challengeName", challengeName)
 	}
 
-	challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
+	challenge, _, err := database.FindFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 	if err != nil {
 		log.Errorf("Error while querying challenge %s : %s", config.Challenge.Metadata.Name, err)
 		return fmt.Errorf("DB ERROR: %s : %s", challengeName, err)

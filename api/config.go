@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // This updates challenge info in the respective challenge configuration
@@ -70,6 +72,10 @@ func updateChallengeInfoHandler(c *gin.Context) {
 	log.Debug(fmt.Sprintf("Starting to update the challenge : %s", name))
 	chall, err := database.QueryFirstChallengeEntry("name", name)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, HTTPErrorResp{Error: "Challenge not found"})
+			return
+		}
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: fmt.Sprintf("DB_ACCESS_ERROR : %s", err.Error()),

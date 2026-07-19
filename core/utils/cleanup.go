@@ -124,13 +124,13 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 }
 
 func CleanupChallengeIfExist(config cfg.BeastChallengeConfig) error {
-	chall, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
+	chall, found, err := database.FindFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 	if err != nil {
 		log.Errorf("Error while database query for challenge %s", config.Challenge.Metadata.Name)
 		return err
 	}
 
-	if chall.Name == "" {
+	if !found {
 		log.Info("No such challenge exist in the database")
 		return nil
 	}

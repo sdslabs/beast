@@ -16,6 +16,7 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
+	"gorm.io/gorm"
 )
 
 const (
@@ -103,11 +104,11 @@ func execChallengeHandler(c *gin.Context) {
 	}
 	challenge, err := database.QueryFirstChallengeEntry("name", c.Param("name"))
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, HTTPErrorResp{Error: "challenge not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "failed to query challenge"})
-		return
-	}
-	if challenge.ID == 0 {
-		c.JSON(http.StatusNotFound, HTTPErrorResp{Error: "challenge not found"})
 		return
 	}
 	maintainer, err := database.IsChallengeMaintainer(user.ID, challenge.ID)

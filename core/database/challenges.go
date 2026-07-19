@@ -258,16 +258,27 @@ func QueryChallengeEntriesMap(whereMap map[string]interface{}) ([]Challenge, err
 // Using the column value in key and value in value get the first
 // result of the query.
 func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
-	challenges, err := QueryChallengeEntries(key, value)
+	challenge, found, err := FindFirstChallengeEntry(key, value)
 	if err != nil {
 		return Challenge{}, err
 	}
+	if !found {
+		return Challenge{}, gorm.ErrRecordNotFound
+	}
+	return challenge, nil
+}
 
-	if len(challenges) == 0 {
-		return Challenge{}, nil
+func FindFirstChallengeEntry(key string, value string) (Challenge, bool, error) {
+	challenges, err := QueryChallengeEntries(key, value)
+	if err != nil {
+		return Challenge{}, false, err
 	}
 
-	return challenges[0], nil
+	if len(challenges) == 0 {
+		return Challenge{}, false, nil
+	}
+
+	return challenges[0], true, nil
 }
 
 // Check Pre Reqs Status
