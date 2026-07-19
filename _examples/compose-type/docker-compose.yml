@@ -1,6 +1,9 @@
 services:
   app:
     build: .
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+    security_opt: [no-new-privileges:true]
     ports:
       - "${APP_PORT}:80"
     environment:
@@ -13,6 +16,9 @@ services:
 
   mysql:
     image: mysql:8
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]
+    security_opt: [no-new-privileges:true]
     environment:
       MYSQL_DATABASE: my_db
       MYSQL_USER: my_user

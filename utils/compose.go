@@ -25,6 +25,7 @@ type composeService struct {
 	Volumes           []interface{} `yaml:"volumes"`
 	Devices           []string      `yaml:"devices"`
 	CapAdd            []string      `yaml:"cap_add"`
+	CapDrop           []string      `yaml:"cap_drop"`
 	SecurityOpt       []string      `yaml:"security_opt"`
 	DeviceCgroupRules []string      `yaml:"device_cgroup_rules"`
 	Sysctls           interface{}   `yaml:"sysctls"`
@@ -80,6 +81,15 @@ func validateComposeVolume(composeDir string, value interface{}) error {
 		if filepath.IsAbs(source) || strings.HasPrefix(source, "~") {
 			return fmt.Errorf("host volume source is not allowed: %s", source)
 		}
+		readOnly := false
+		for _, option := range parts[2:] {
+			if option == "ro" || option == "readonly" {
+				readOnly = true
+			}
+		}
+		if !readOnly {
+			return fmt.Errorf("project bind mount %q must be read-only", source)
+		}
 		if _, err := ResolvePathWithin(composeDir, source); err != nil {
 			return fmt.Errorf("invalid project volume source %q: %w", source, err)
 		}
@@ -91,8 +101,9 @@ func validateComposeVolume(composeDir string, value interface{}) error {
 		return fmt.Errorf("parse volume definition: %w", err)
 	}
 	var volume struct {
-		Type   string `yaml:"type"`
-		Source string `yaml:"source"`
+		Type     string `yaml:"type"`
+		Source   string `yaml:"source"`
+		ReadOnly bool   `yaml:"read_only"`
 	}
 	if err := yaml.Unmarshal(encoded, &volume); err != nil {
 		return fmt.Errorf("parse volume definition: %w", err)
@@ -102,6 +113,9 @@ func validateComposeVolume(composeDir string, value interface{}) error {
 	}
 	if volume.Type != "bind" {
 		return fmt.Errorf("unsupported volume type %q", volume.Type)
+	}
+	if !volume.ReadOnly {
+		return fmt.Errorf("project bind mount %q must be read-only", volume.Source)
 	}
 	if filepath.IsAbs(volume.Source) || strings.HasPrefix(volume.Source, "~") {
 		return fmt.Errorf("host volume source is not allowed: %s", volume.Source)
@@ -214,8 +228,25 @@ func validateComposeSecurity(composeFile string, compose Compose) error {
 		if service.Runtime != "" || service.CgroupParent != "" || service.ContainerName != "" {
 			return fmt.Errorf("service %q overrides host-managed container settings", name)
 		}
-		if len(service.Devices) > 0 || len(service.CapAdd) > 0 || len(service.DeviceCgroupRules) > 0 || service.Sysctls != nil {
+		if len(service.Devices) > 0 || len(service.DeviceCgroupRules) > 0 || service.Sysctls != nil {
 			return fmt.Errorf("service %q requests additional host privileges", name)
+		}
+		allowedCapabilities := map[string]struct{}{
+			"CHOWN": {}, "DAC_OVERRIDE": {}, "FOWNER": {}, "SETGID": {}, "SETUID": {},
+		}
+		for _, capability := range service.CapAdd {
+			if _, allowed := allowedCapabilities[strings.ToUpper(capability)]; !allowed {
+				return fmt.Errorf("service %q requests forbidden capability %q", name, capability)
+			}
+		}
+		dropsAllCapabilities := false
+		for _, capability := range service.CapDrop {
+			if strings.EqualFold(capability, "ALL") {
+				dropsAllCapabilities = true
+			}
+		}
+		if !dropsAllCapabilities {
+			return fmt.Errorf("service %q must set cap_drop to ALL", name)
 		}
 		if service.Secrets != nil || service.Configs != nil {
 			return fmt.Errorf("service %q uses unsupported secrets or configs", name)
@@ -229,10 +260,16 @@ func validateComposeSecurity(composeFile string, compose Compose) error {
 		if err := validateComposeEnvFiles(composeDir, service.EnvFile); err != nil {
 			return fmt.Errorf("service %q: %w", name, err)
 		}
+		noNewPrivileges := false
 		for _, option := range service.SecurityOpt {
-			if option != "no-new-privileges:true" {
+			if option == "no-new-privileges:true" {
+				noNewPrivileges = true
+			} else {
 				return fmt.Errorf("service %q uses forbidden security_opt %q", name, option)
 			}
+		}
+		if !noNewPrivileges {
+			return fmt.Errorf("service %q must enable no-new-privileges", name)
 		}
 		for _, volume := range service.Volumes {
 			if err := validateComposeVolume(composeDir, volume); err != nil {
