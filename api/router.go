@@ -20,6 +20,21 @@ func dummyHandler(c *gin.Context) {
 	})
 }
 
+const maxAPIRequestBytes int64 = 2 << 20
+
+func limitRequestBody(c *gin.Context) {
+	limit := maxAPIRequestBytes
+	if c.Request.URL.Path == "/api/manage/challenge/upload" {
+		limit = maxChallengeUploadRequestBytes
+	}
+	if c.Request.ContentLength > limit {
+		c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, HTTPErrorResp{Error: "Request body is too large"})
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+	c.Next()
+}
+
 func initGinRouter() *gin.Engine {
 	router := gin.New()
 	router.Use(gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ interface{}) {
@@ -37,6 +52,7 @@ func initGinRouter() *gin.Engine {
 		}
 		router.Use(cors.New(corsConfig))
 	}
+	router.Use(limitRequestBody)
 	router.GET("/dummy", dummyHandler)
 	// Authorization routes group
 	authGroup := router.Group("/auth")
