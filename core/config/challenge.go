@@ -41,24 +41,24 @@ func (config *BeastChallengeConfig) PopulateDefaultValues() {
 }
 
 func (Author *Author) PopulateAuthor() {
-	Author.Name = "AuthorName"
-	Author.Email = "AuthorMail"
+	Author.Name = "Author Name"
+	Author.Email = "author@example.com"
 }
 
 func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
-	Metadata.Name = "ChallengeName"
-	Metadata.Type = "ChallengeType"
+	Metadata.Name = "challenge-name"
+	Metadata.Type = core.STATIC_CHALLENGE_TYPE_NAME
 	Metadata.DynamicFlag = false
-	Metadata.Flag = "ChallengeFlag"
+	Metadata.Flag = "flag{replace-me}"
+	Metadata.Difficulty = "medium"
+	Metadata.Points = 100
 }
 
 func (Env *ChallengeEnv) PopulateChallengeEnv() {
 	Env.AptDeps = []string{}
 	Env.Ports = []uint32{}
 	Env.SetupScripts = []string{}
-	Env.StaticContentDir = "StaticContentDir"
-	Env.BaseImage = "ChallengeBase"
-	Env.RunCmd = "RunCmd"
+	Env.StaticContentDir = core.PUBLIC
 }
 
 func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) error {
