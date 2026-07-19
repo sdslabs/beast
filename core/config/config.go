@@ -107,6 +107,7 @@ var gitBranchPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$`)
 // host = "localhost"
 // port = "5432"
 // sslmode = "prefer"
+// sslrootcert = ""
 // ```
 type BeastConfig struct {
 	AllowedBaseImages    []string                   `toml:"allowed_base_images"`
@@ -469,12 +470,13 @@ func (config *GitRemote) ValidateGitConfig() error {
 }
 
 type PsqlConfig struct {
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	Dbname   string `toml:"dbname"`
-	Host     string `toml:"host"`
-	Port     string `toml:"port"`
-	SslMode  string `toml:"sslmode"`
+	User        string `toml:"user"`
+	Password    string `toml:"password"`
+	Dbname      string `toml:"dbname"`
+	Host        string `toml:"host"`
+	Port        string `toml:"port"`
+	SslMode     string `toml:"sslmode"`
+	SSLRootCert string `toml:"sslrootcert"`
 }
 
 type RedisConfig struct {
@@ -506,6 +508,28 @@ func (config *PsqlConfig) ValidatePsqlConfig() error {
 	}
 	if _, ok := validSSLModes[config.SslMode]; !ok {
 		return fmt.Errorf("unsupported psql sslmode %q", config.SslMode)
+	}
+	isLoopback := config.Host == "localhost"
+	if ip := net.ParseIP(config.Host); ip != nil {
+		isLoopback = ip.IsLoopback()
+	}
+	if !isLoopback && config.SslMode != "verify-full" {
+		return errors.New("psql sslmode verify-full is required for non-loopback connections")
+	}
+	if config.SslMode == "verify-ca" || config.SslMode == "verify-full" {
+		if config.SSLRootCert == "" {
+			return errors.New("psql sslrootcert is required when verifying TLS")
+		}
+		rootCert, err := utils.ExpandHomePath(config.SSLRootCert)
+		if err != nil {
+			return fmt.Errorf("expand psql root certificate: %w", err)
+		}
+		config.SSLRootCert = rootCert
+		if err := utils.ValidateFileExists(config.SSLRootCert); err != nil {
+			return fmt.Errorf("validate psql root certificate: %w", err)
+		}
+	} else if config.SSLRootCert != "" {
+		return errors.New("psql sslrootcert requires sslmode verify-ca or verify-full")
 	}
 	return nil
 }

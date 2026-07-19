@@ -9,12 +9,13 @@ import (
 
 func TestPostgresDSNEncodesCredentials(t *testing.T) {
 	dsn := postgresDSN(config.PsqlConfig{
-		User:     "beast user",
-		Password: "secret with =' delimiters",
-		Dbname:   "beast-db",
-		Host:     "127.0.0.1",
-		Port:     "5432",
-		SslMode:  "require",
+		User:        "beast user",
+		Password:    "secret with =' delimiters",
+		Dbname:      "beast-db",
+		Host:        "127.0.0.1",
+		Port:        "5432",
+		SslMode:     "require",
+		SSLRootCert: "/etc/ssl/certs/root.pem",
 	})
 	parsed, err := url.Parse(dsn)
 	if err != nil {
@@ -26,5 +27,8 @@ func TestPostgresDSNEncodesCredentials(t *testing.T) {
 	}
 	if parsed.Query().Get("sslmode") != "require" {
 		t.Fatalf("sslmode did not round trip through DSN: %s", dsn)
+	}
+	if parsed.Query().Get("sslrootcert") != "/etc/ssl/certs/root.pem" {
+		t.Fatalf("sslrootcert did not round trip through DSN: %s", dsn)
 	}
 }

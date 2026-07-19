@@ -49,8 +49,19 @@ func postgresDSN(config beastConfig.PsqlConfig) string {
 	}
 	query := dsn.Query()
 	query.Set("sslmode", config.SslMode)
+	if config.SSLRootCert != "" {
+		query.Set("sslrootcert", config.SSLRootCert)
+	}
 	dsn.RawQuery = query.Encode()
 	return dsn.String()
+}
+
+func postgresEnvironment(config beastConfig.PsqlConfig) []string {
+	environment := append(os.Environ(), "PGPASSWORD="+config.Password, "PGSSLMODE="+config.SslMode)
+	if config.SSLRootCert != "" {
+		environment = append(environment, "PGSSLROOTCERT="+config.SSLRootCert)
+	}
+	return environment
 }
 
 // Connect psql database
@@ -167,7 +178,7 @@ func BackupDatabase() error {
 	}
 
 	backupFile := fmt.Sprintf("%s_%s.bak", dbConfig.Dbname, time.Now().Format("20060102150405"))
-	environment := append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password), "PGSSLMODE="+dbConfig.SslMode)
+	environment := postgresEnvironment(dbConfig)
 	output, err := utils.RunCommand(30*time.Minute, environment, "pg_dump", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-F", "c", "-f", filepath.Join(backupPath, backupFile), dbConfig.Dbname)
 	if err != nil {
 		return fmt.Errorf("pg_dump failed: %w; output: %s", err, output)
@@ -182,7 +193,7 @@ func ResetDatabase() error {
 			return err
 		}
 	}
-	environment := append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password), "PGSSLMODE="+dbConfig.SslMode)
+	environment := postgresEnvironment(dbConfig)
 	output, err := utils.RunCommand(2*time.Minute, environment, "dropdb", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "--force", dbConfig.Dbname)
 	if err != nil {
 		return fmt.Errorf("drop database: %w; output: %s", err, output)
@@ -206,7 +217,7 @@ func RestoreDatabase(backupFile string) error {
 		return fmt.Errorf("backup file does not exist: %s", backupFile)
 	}
 
-	environment := append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password), "PGSSLMODE="+dbConfig.SslMode)
+	environment := postgresEnvironment(dbConfig)
 	output, err := utils.RunCommand(30*time.Minute, environment, "pg_restore",
 		"-U", dbConfig.User,
 		"-h", dbConfig.Host,

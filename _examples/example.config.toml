@@ -109,6 +109,7 @@ dbname = "beast"
 host = "localhost"
 port = "5432"
 sslmode = "prefer"
+sslrootcert = ""
 
 [redis_config]
 host = "localhost"

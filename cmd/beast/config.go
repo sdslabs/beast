@@ -188,6 +188,9 @@ func promptDatabaseConnectionDetails(configuration *config.BeastConfig) error {
 		"verify-ca",
 		"verify-full",
 	})
+	if configuration.PsqlConf.SslMode == "verify-ca" || configuration.PsqlConf.SslMode == "verify-full" {
+		configuration.PsqlConf.SSLRootCert = utils.PromptString("Postgres root CA certificate path")
+	}
 	return nil
 }
 

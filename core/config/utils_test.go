@@ -363,6 +363,25 @@ func TestRemoteRedisRequiresTLS(t *testing.T) {
 	}
 }
 
+func TestRemotePostgresRequiresVerifiedTLS(t *testing.T) {
+	psql := PsqlConfig{User: "beast", Password: "secret", Dbname: "beast", Host: "db.example.com", Port: "5432", SslMode: "require"}
+	if err := psql.ValidatePsqlConfig(); err == nil || !strings.Contains(err.Error(), "verify-full") {
+		t.Fatalf("expected remote TLS verification rejection, got %v", err)
+	}
+	psql.SslMode = "verify-full"
+	if err := psql.ValidatePsqlConfig(); err == nil || !strings.Contains(err.Error(), "sslrootcert") {
+		t.Fatalf("expected missing root certificate rejection, got %v", err)
+	}
+	rootCert := filepath.Join(t.TempDir(), "root.pem")
+	if err := os.WriteFile(rootCert, []byte("test"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	psql.SSLRootCert = rootCert
+	if err := psql.ValidatePsqlConfig(); err != nil {
+		t.Fatalf("expected verified remote PostgreSQL config to pass: %v", err)
+	}
+}
+
 func TestCompetitionInfoValidatesTimeWindow(t *testing.T) {
 	info := CompetitionInfo{
 		StartingTime: "00:00:00 UTC: +05:30, 1 January 2030, Tuesday",

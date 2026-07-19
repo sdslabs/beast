@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -164,8 +165,33 @@ func dbUserCheck() (bool, error) {
 	return current.Username == core.POSTGRES_SUPER_USER, nil
 }
 
+func postgresAdminDSN(configuration config.PsqlConfig, password string) string {
+	dsn := &url.URL{
+		Scheme: "postgresql",
+		User:   url.UserPassword(core.POSTGRES_SUPER_USER, password),
+		Host:   net.JoinHostPort(configuration.Host, configuration.Port),
+		Path:   "postgres",
+	}
+	query := dsn.Query()
+	query.Set("sslmode", configuration.SslMode)
+	if configuration.SSLRootCert != "" {
+		query.Set("sslrootcert", configuration.SSLRootCert)
+	}
+	dsn.RawQuery = query.Encode()
+	return dsn.String()
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 func initDb() error {
 	log.Infoln("Initializing database...")
+	configuration := config.Cfg.PsqlConf
 
 	isPostgres, err := dbUserCheck()
 	if err != nil {
@@ -173,36 +199,28 @@ func initDb() error {
 	}
 
 	var db *sql.DB
-	if isPostgres {
+	if isPostgres && isLoopbackHost(configuration.Host) {
 		log.Infoln("Attempting to connect to postgres as postgres super user...")
 
-		dsn := fmt.Sprintf("user=%s dbname=%s sslmode=%s", "postgres", "postgres", "disable")
-		db, err = sql.Open("pgx", dsn)
+		db, err = sql.Open("pgx", "user=postgres dbname=postgres sslmode=disable")
 
 		if err != nil {
 			return err
 		}
 	} else {
-		log.Warnln("Current user is not postgres super user...")
-
-		if utils.PromptBinary("Do you use password authentication for the postgres super user?") {
-			password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
-
-			dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
-			db, err = sql.Open("pgx", dsn)
-
-			if err != nil {
-				return err
-			}
-		} else {
+		log.Warnln("A PostgreSQL superuser password is required for this connection...")
+		if !utils.PromptBinary("Connect using password authentication for the postgres superuser?") {
 			log.Errorln("Cannot continue with postgres setup... Please run this command as the postgres super user (preferred) or use password authentication.")
 			return errors.New("failed to initialize database")
+		}
+		password := utils.PromptSecret("Enter postgres superuser password:")
+		db, err = sql.Open("pgx", postgresAdminDSN(configuration, password))
+		if err != nil {
+			return err
 		}
 	}
 
 	defer db.Close()
-
-	configuration := config.Cfg.PsqlConf
 
 	var exists int
 	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.User).Scan(&exists)
