@@ -187,7 +187,12 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	} else {
 		if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 			var buff *bytes.Buffer
-			buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
+			buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache, cr.BuildLimits{
+				CPUShares: config.Resources.CPUShares,
+				CPUs:      config.Resources.CPUsLimit,
+				Memory:    config.Resources.Memory,
+				Pids:      config.Resources.PidsLimit,
+			})
 			if buff != nil {
 				logBytes = buff.Bytes()
 			} else {
