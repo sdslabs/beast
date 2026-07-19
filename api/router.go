@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	log "github.com/sirupsen/logrus"
 )
 
 func dummyHandler(c *gin.Context) {
@@ -20,6 +22,10 @@ func dummyHandler(c *gin.Context) {
 
 func initGinRouter() *gin.Engine {
 	router := gin.New()
+	router.Use(gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ interface{}) {
+		log.Error("request handler panic recovered")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Internal server error"})
+	}))
 
 	if len(config.Cfg.ServerConfig.AllowedOrigins) > 0 {
 		corsConfig := cors.Config{
