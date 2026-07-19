@@ -83,23 +83,27 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 	case core.MANAGE_ACTION_DEPLOY:
 		if err := StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit, info.NoCache); err != nil {
 			log.Errorf("Error while deploying challenge(%s): %s", w.ID, err)
+			Q.RecordError(fmt.Errorf("deploy %s: %w", w.ID, err))
 		}
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		err := StartUndeployChallenge(w.ID, false)
 		if err != nil {
 			log.Errorf("Error while undeplying challenge(%s): %s", w.ID, err.Error())
+			Q.RecordError(fmt.Errorf("undeploy %s: %w", w.ID, err))
 		}
 
 	case core.MANAGE_ACTION_REDEPLOY:
 		err := StartUndeployChallenge(w.ID, true)
 		if err != nil {
 			log.Errorf("Error while redeplying challenge(%s): %s", w.ID, err.Error())
+			Q.RecordError(fmt.Errorf("redeploy %s: %w", w.ID, err))
 			return nil
 		}
 		work, err := GetDeployWork(w.ID)
 		if err != nil {
 			log.Error(err)
+			Q.RecordError(fmt.Errorf("prepare redeploy %s: %w", w.ID, err))
 			return nil
 		}
 		return work
@@ -108,17 +112,20 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 		err := StartUndeployChallenge(w.ID, true)
 		if err != nil {
 			log.Errorf("Error while purging challenge(%s): %s", w.ID, err.Error())
+			Q.RecordError(fmt.Errorf("purge %s: %w", w.ID, err))
 		}
 
 	default:
 		chall, err := database.QueryFirstChallengeEntry("name", w.ID)
 		if err != nil {
 			log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+			Q.RecordError(fmt.Errorf("query challenge %s: %w", w.ID, err))
 		}
 
 		if chall.Name != "" {
 			database.UpdateChallenge(&chall, map[string]interface{}{"status": core.DEPLOY_STATUS["undeployed"]})
 			log.Errorf("The action(%s) specified for challenge : %s does not exist", info.Action, w.ID)
+			Q.RecordError(fmt.Errorf("action %s does not exist", info.Action))
 		}
 	}
 

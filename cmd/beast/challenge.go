@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -72,6 +73,9 @@ var challengeCmd = &cobra.Command{
 		}
 
 		<-completion
+		if failures := manager.Q.Errors(); len(failures) != 0 {
+			return errors.Join(failures...)
+		}
 		log.Info("Challenge action completed")
 		return nil
 	},

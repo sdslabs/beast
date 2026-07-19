@@ -18,6 +18,22 @@ type Queue struct {
 	stopOnce          sync.Once
 	workers           sync.WaitGroup
 	stopped           bool
+	errors            []error
+}
+
+func (q *Queue) RecordError(err error) {
+	if err == nil {
+		return
+	}
+	q.Mux.Lock()
+	defer q.Mux.Unlock()
+	q.errors = append(q.errors, err)
+}
+
+func (q *Queue) Errors() []error {
+	q.Mux.RLock()
+	defer q.Mux.RUnlock()
+	return append([]error(nil), q.errors...)
 }
 
 type Task struct {

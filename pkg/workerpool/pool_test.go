@@ -1,6 +1,7 @@
 package Taskerpool
 
 import (
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -47,5 +48,19 @@ func TestStopTerminatesWorkersAndRejectsTasks(t *testing.T) {
 	queue.Stop()
 	if err := queue.Push(Task{ID: "after-stop"}); err == nil {
 		t.Fatal("expected stopped queue error")
+	}
+}
+
+func TestQueueRecordsErrorsSafely(t *testing.T) {
+	queue := InitQueue(1, nil)
+	want := fmt.Errorf("task failed")
+	queue.RecordError(want)
+	errors := queue.Errors()
+	if len(errors) != 1 || errors[0] != want {
+		t.Fatalf("Errors() = %v, want [%v]", errors, want)
+	}
+	errors[0] = nil
+	if queue.Errors()[0] != want {
+		t.Fatal("Errors returned internal queue storage")
 	}
 }
