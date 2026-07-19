@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -216,19 +215,24 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 	// Create logs directory for the challenge in staging directory.
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
-	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
+	err = os.MkdirAll(challengeStagingLogsDir, 0700)
 	if err != nil {
 		log.Errorf("Could not create challenge logs directory : %s : %s", challengeStagingLogsDir, err)
 	} else if logBytes != nil {
-		logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
-		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
-		if err != nil {
-			log.Errorf("Error while writing logs to file : %s", logFilePath)
-			return fmt.Errorf("error logs generated on image build failure could not be written to the logfile")
+		if err := os.Chmod(challengeStagingLogsDir, 0700); err != nil {
+			return fmt.Errorf("secure build log directory: %w", err)
 		}
-		defer logFile.Close()
-
-		logFile.Write(logBytes)
+		logFile, err := os.CreateTemp(challengeStagingLogsDir, challengeName+".*.log")
+		if err != nil {
+			return fmt.Errorf("create build log: %w", err)
+		}
+		if _, err := logFile.Write(logBytes); err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("write build log: %w", err)
+		}
+		if err := logFile.Close(); err != nil {
+			return fmt.Errorf("close build log: %w", err)
+		}
 		log.Debug("Logs written to log file for the challenge")
 	}
 
