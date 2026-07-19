@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -450,20 +451,46 @@ type RedisConfig struct {
 
 func (config *PsqlConfig) ValidatePsqlConfig() error {
 	if config.User == "" || config.Password == "" || config.Dbname == "" || config.Host == "" || config.Port == "" {
-		log.Error("One of username, password, dbname, hostname, port is missing in the config")
 		return errors.New("psql config not valid, config parameters missing")
 	}
+	if !configIdentifierPattern.MatchString(config.User) || !configIdentifierPattern.MatchString(config.Dbname) {
+		return errors.New("psql user and database names must be safe identifiers")
+	}
+	if err := validateServiceAddress(config.Host, config.Port); err != nil {
+		return fmt.Errorf("invalid psql address: %w", err)
+	}
 	if config.SslMode == "" {
-		log.Warn("Ssl Mode not set. Disabling it.")
 		config.SslMode = "prefer"
+	}
+	validSSLModes := map[string]struct{}{
+		"disable": {}, "allow": {}, "prefer": {}, "require": {}, "verify-ca": {}, "verify-full": {},
+	}
+	if _, ok := validSSLModes[config.SslMode]; !ok {
+		return fmt.Errorf("unsupported psql sslmode %q", config.SslMode)
 	}
 	return nil
 }
 
 func (config *RedisConfig) ValidateRedisConfig() error {
-	if config.Host == "" || config.Port == "" {
-		log.Error("One of hostname or port is missing in the config")
+	if config.Password == "" || config.Host == "" || config.Port == "" {
 		return errors.New("redis config not valid, config parameters missing")
+	}
+	if config.User != "" && !configIdentifierPattern.MatchString(config.User) {
+		return errors.New("redis user must be a safe identifier")
+	}
+	if err := validateServiceAddress(config.Host, config.Port); err != nil {
+		return fmt.Errorf("invalid redis address: %w", err)
+	}
+	return nil
+}
+
+func validateServiceAddress(host, port string) error {
+	if net.ParseIP(host) == nil && !hostnamePattern.MatchString(host) {
+		return fmt.Errorf("invalid host %q", host)
+	}
+	portNumber, err := strconv.ParseUint(port, 10, 16)
+	if err != nil || portNumber == 0 {
+		return fmt.Errorf("invalid port %q", port)
 	}
 	return nil
 }

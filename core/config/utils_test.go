@@ -308,3 +308,22 @@ func TestServerRejectsInvalidHostname(t *testing.T) {
 		t.Fatal("expected invalid hostname error")
 	}
 }
+
+func TestDataStoreConfigRejectsUnsafeValues(t *testing.T) {
+	psql := PsqlConfig{User: "beast", Password: "secret", Dbname: "../../escape", Host: "localhost", Port: "5432", SslMode: "prefer"}
+	if err := psql.ValidatePsqlConfig(); err == nil {
+		t.Fatal("expected unsafe database name error")
+	}
+	psql = PsqlConfig{User: "beast", Password: "secret", Dbname: "beast", Host: "localhost", Port: "5432", SslMode: "invalid"}
+	if err := psql.ValidatePsqlConfig(); err == nil {
+		t.Fatal("expected invalid sslmode error")
+	}
+	redis := RedisConfig{User: "beast", Host: "host;id", Port: "6379", Password: "secret"}
+	if err := redis.ValidateRedisConfig(); err == nil {
+		t.Fatal("expected invalid Redis host error")
+	}
+	redis = RedisConfig{User: "beast", Host: "localhost", Port: "0", Password: "secret"}
+	if err := redis.ValidateRedisConfig(); err == nil {
+		t.Fatal("expected invalid Redis port error")
+	}
+}

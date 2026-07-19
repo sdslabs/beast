@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/sdslabs/beastv4/core"
 	beastConfig "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/pkg/auth"
@@ -232,7 +233,7 @@ func ResetDatabase() error {
 		return err
 	}
 
-	createCmd := exec.Command("psql", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-d", "postgres", "-c", "CREATE DATABASE "+dbConfig.Dbname+";")
+	createCmd := exec.Command("psql", "-U", dbConfig.User, "-h", dbConfig.Host, "-p", dbConfig.Port, "-d", "postgres", "-c", "CREATE DATABASE "+pq.QuoteIdentifier(dbConfig.Dbname)+";")
 	createCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
 
 	output, err = createCmd.CombinedOutput()
@@ -258,7 +259,7 @@ func TerminateDatabaseConnections() error {
 		"-p", dbConfig.Port,
 		"-d", "postgres",
 		"-c",
-		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid();", dbConfig.Dbname),
+		fmt.Sprintf("SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid();", utils.QuoteLiteral(dbConfig.Dbname)),
 	)
 	terminateCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbConfig.Password))
 
