@@ -23,13 +23,19 @@ const (
 
 type OTP struct {
 	Email    string `gorm:"primaryKey"`
-	Code     string
 	Expiry   time.Time
 	Verified bool
 	Purpose  string
 	CodeHash []byte
 	Attempts uint
 	SentAt   time.Time
+}
+
+func ClearLegacyOTPSecrets() error {
+	if !Db.Migrator().HasColumn(&OTP{}, "code") {
+		return nil
+	}
+	return Db.Exec("UPDATE otps SET code = ''").Error
 }
 
 func IssueOTP(email, purpose string, codeHash []byte, now, expiry time.Time) error {
@@ -118,21 +124,6 @@ func ConsumeVerifiedOTP(email, purpose string, now time.Time) error {
 	})
 }
 
-func CreateOTPEntry(otpEntry *OTP) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	var existingOTP OTP
-	tx := Db.First(&existingOTP, "email = ?", otpEntry.Email)
-	if tx.Error == nil {
-		existingOTP.Code = otpEntry.Code
-		existingOTP.Expiry = otpEntry.Expiry
-		return Db.Save(&existingOTP).Error
-	}
-
-	return Db.Create(otpEntry).Error
-}
-
 func QueryOTPEntry(email string) (OTP, error) {
 	var otpEntry OTP
 
@@ -142,11 +133,4 @@ func QueryOTPEntry(email string) (OTP, error) {
 	tx := Db.Where("email = ?", email).First(&otpEntry)
 
 	return otpEntry, tx.Error
-}
-
-func VerifyOTPEntry(email string) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	return Db.Model(&OTP{}).Where("email = ?", email).Update("verified", true).Error
 }

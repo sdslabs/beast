@@ -106,6 +106,9 @@ func Init() error {
 	if err := MigrateChallengeMaintainers(); err != nil {
 		return fmt.Errorf("migrate challenge maintainers: %w", err)
 	}
+	if err := ClearLegacyOTPSecrets(); err != nil {
+		return fmt.Errorf("clear legacy OTP secrets: %w", err)
+	}
 
 	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
 	if err != nil {
