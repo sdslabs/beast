@@ -34,14 +34,14 @@ func setupRedisIntegrationTest(t *testing.T) func() {
 	previousMutex := CacheMutex
 	previousConfig := cacheConfig
 
-	CacheMutex = &sync.Mutex{}
+	CacheMutex = &sync.RWMutex{}
 	Cache = redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Username: os.Getenv("BEAST_TEST_REDIS_USER"),
 		Password: os.Getenv("BEAST_TEST_REDIS_PASSWORD"),
 		DB:       db,
 	})
-	cacheConfig.RedisConfig.DB = db
+	cacheConfig.DB = uint32(db)
 
 	ctx := context.Background()
 	if err := Cache.Ping(ctx).Err(); err != nil {

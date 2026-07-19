@@ -24,13 +24,13 @@ type HTTPAuthorizeResp struct {
 
 type AvailableImagesResp struct {
 	Message string   `json:"message" example:"Available Base images."`
-	Images  []string `json:"images" example:"['ubuntu16.04', 'ubuntu18.04']"`
+	Images  []string `json:"images" example:"ubuntu:24.04,debian:bookworm"`
 }
 
 type PortsInUseResp struct {
 	MinPortValue uint32   `json:"port_min_value" example:"10000"`
 	MaxPortValue uint32   `json:"port_max_value" example:"20000"`
-	PortsInUse   []uint32 `json:"ports_in_use" example:"[100001, 100003, 10010]"`
+	PortsInUse   []uint32 `json:"ports_in_use" example:"10001,10003,10010"`
 }
 
 type ChallengeStatusResp struct {
@@ -82,7 +82,7 @@ type ChallengeSolveResp struct {
 	Id       uint      `json:"id" example:"4"`
 	Name     string    `json:"name" example:"Web Challenge"`
 	Category string    `json:"category" example:"bare"`
-	Tags     []string  `json:"tags" example:"['pwn','misc']"`
+	Tags     []string  `json:"tags" example:"pwn,misc"`
 	SolvedAt time.Time `json:"solvedAt"`
 	Points   uint      `json:"points" example:"50"`
 }
@@ -108,14 +108,14 @@ type HintResponse struct {
 type ChallengeMetadata struct {
 	ChallId            uint      `json:"id" example:"0"`
 	Name               string    `json:"name" example:"Web Challenge"`
-	Tags               []string  `json:"tags" example:"['pwn','misc']"`
+	Tags               []string  `json:"tags" example:"pwn,misc"`
 	Points             uint      `json:"points" example:"50"`
 	Difficulty         string    `json:"difficulty" example:"easy"`
 	SolvesNumber       uint16    `json:"solvesNumber" example:"100"`
 	SolveStatus        bool      `json:"solveStatus" example:"True"`
 	CreatedAt          time.Time `json:"createdAt"`
 	DeployedStatus     string    `json:"deployedStatus" example:"deployed"`
-	PreRequisite       []string  `json:"preRequisite" example:"['chall1', chall2]"`
+	PreRequisite       []string  `json:"preRequisite" example:"chall1,chall2"`
 	Instanced          bool      `json:"instanced" example:"false"`
 	InstanceExpiration int64     `json:"instanceExpiration" example:"300"`
 }
@@ -126,8 +126,8 @@ type Challenge struct {
 	Description     string     `json:"description" example:"A simple web challenge"`
 	Hints           []HintInfo `json:"hints"`
 	Category        string     `json:"category" example:"web"`
-	Assets          []string   `json:"assets" example:"['image1.png', 'zippy.zip']"`
-	AdditionalLinks []string   `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
+	Assets          []string   `json:"assets" example:"image1.png,zippy.zip"`
+	AdditionalLinks []string   `json:"additionalLinks" example:"https://link1.example,https://link2.example"`
 	PreviousTries   int        `json:"previousTries" example:"3"`
 	MaxAttemptLimit int        `json:"maxAttemptLimit" example:"5"`
 	DeployedLink    string     `json:"deployedLink" example:"beast.sdslabs.co or ip:port"`
@@ -143,12 +143,12 @@ type AdminChallenge struct {
 type ChallengePreviewResp struct {
 	Name            string   `json:"name" example:"Web Challenge"`
 	Category        string   `json:"category" example:"web"`
-	Tags            []string `json:"tags" example:"['pwn','misc']"`
-	Assets          []string `json:"assets" example:"['image1.png', 'zippy.zip']"`
-	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
+	Tags            []string `json:"tags" example:"pwn,misc"`
+	Assets          []string `json:"assets" example:"image1.png,zippy.zip"`
+	AdditionalLinks []string `json:"additionalLinks" example:"https://link1.example,https://link2.example"`
 	MaxAttemptLimit int      `json:"maxAttemptLimit" example:"5"`
-	PreReqs         []string `json:"preRequisite" example:"['web-php','simple']"`
-	Ports           []uint32 `json:"ports" example:"[3001, 3002]"`
+	PreReqs         []string `json:"preRequisite" example:"web-php,simple"`
+	Ports           []uint32 `json:"ports" example:"3001,3002"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
 	DeployedLink    string   `json:"deployedLink" example:"beast.sdslabs.co"`

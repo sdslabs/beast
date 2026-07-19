@@ -27,6 +27,10 @@ func TestCreateSearchAndRemoveContainerIntegration(t *testing.T) {
 		ContainerName: containerName,
 		ChallengeName: challengeName,
 		MountsMap:     map[string]string{},
+		CPUShares:     512,
+		CPUsLimit:     0.25,
+		Memory:        512 << 20,
+		PidsLimit:     100,
 		Labels: map[string]string{
 			"beast.integration_test": "true",
 		},

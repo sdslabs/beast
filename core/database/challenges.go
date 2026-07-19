@@ -1,22 +1,14 @@
 package database
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"html/template"
-	"io/ioutil"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/araddon/dateparse"
-
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
-	tools "github.com/sdslabs/beastv4/templates"
 	log "github.com/sirupsen/logrus"
 
 	"gorm.io/gorm"
@@ -58,8 +50,8 @@ type Challenge struct {
 	AdditionalLinks    string `gorm:"type:text"`
 	Description        string `gorm:"type:text"`
 	Format             string `gorm:"not null"`
-	ContainerId        string `gorm:"size:64;unique"`
-	ImageId            string `gorm:"size:64;unique"`
+	ContainerId        string `gorm:"size:64"`
+	ImageId            string `gorm:"size:64"`
 	Status             string `gorm:"not null;default:'Undeployed'"`
 	DeploymentType     string `gorm:"not null;default:'standard_docker'"`
 	AuthorID           uint   `gorm:"not null"`
@@ -69,7 +61,7 @@ type Challenge struct {
 	MinPoints          uint   `gorm:"default:0"`
 	Ports              []Port
 	Tags               []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Users              []*User `gorm:"many2many:user_challenges;"`
+	Users              []*User `gorm:"many2many:challenge_maintainers;"`
 	ServerDeployed     string  `gorm:"type:varchar(64)"`
 	Instanced          bool    `gorm:"not null;default:false"`
 	InstanceExpiration int64   `gorm:"default:0"`
@@ -87,6 +79,11 @@ type UserChallenges struct {
 	Solved      bool   `gorm:"not null;default:false;index"`
 	Flag        string `gorm:"type:text"`
 	Cheating    bool   `gorm:"not null;default:false"`
+}
+
+type ChallengeMaintainer struct {
+	UserID      uint `gorm:"primaryKey"`
+	ChallengeID uint `gorm:"primaryKey"`
 }
 
 type ChallengeAttempt struct {
@@ -161,8 +158,8 @@ func CreateChallengeEntry(challenge *Challenge) error {
 func QueryAllChallenges() ([]Challenge, error) {
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Preload("Ports").Preload("Tags").Find(&challenges)
 
@@ -176,8 +173,8 @@ func QueryAllChallenges() ([]Challenge, error) {
 func QueryAllChallengesMetadata() ([]Challenge, error) {
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
 		Preload("Tags").
@@ -193,12 +190,16 @@ func QueryAllChallengesMetadata() ([]Challenge, error) {
 // Queries all the challenges entries where the column represented by key
 // have the value in value.
 func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
-	queryKey := fmt.Sprintf("%s = ?", key)
+	column, err := validatedQueryColumn(key, "id", "name", "status", "container_id")
+	if err != nil {
+		return nil, err
+	}
+	queryKey := fmt.Sprintf("%s = ?", column)
 
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Preload("Tags").Preload("Ports").Where(queryKey, value).Find(&challenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -214,12 +215,16 @@ func QueryChallengeEntries(key string, value string) ([]Challenge, error) {
 
 // QueryChallengeEntriesMetadata returns only selected columns: Name, ID, Tags, CreatedAt, Points, Difficulty, Instanced, InstanceExpiration, Status
 func QueryChallengeEntriesMetadata(key string, value string) ([]Challenge, error) {
-	queryKey := fmt.Sprintf("%s = ?", key)
+	column, err := validatedQueryColumn(key, "id", "name", "status", "container_id")
+	if err != nil {
+		return nil, err
+	}
+	queryKey := fmt.Sprintf("%s = ?", column)
 
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	// Only select the required columns, but preload Tags for tag names
 	tx := Db.Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
@@ -243,8 +248,8 @@ func QueryChallengeEntriesMap(whereMap map[string]interface{}) ([]Challenge, err
 
 	var challenges []Challenge
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(whereMap).Find(&challenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -261,16 +266,27 @@ func QueryChallengeEntriesMap(whereMap map[string]interface{}) ([]Challenge, err
 // Using the column value in key and value in value get the first
 // result of the query.
 func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
-	challenges, err := QueryChallengeEntries(key, value)
+	challenge, found, err := FindFirstChallengeEntry(key, value)
 	if err != nil {
 		return Challenge{}, err
 	}
+	if !found {
+		return Challenge{}, gorm.ErrRecordNotFound
+	}
+	return challenge, nil
+}
 
-	if len(challenges) == 0 {
-		return Challenge{}, nil
+func FindFirstChallengeEntry(key string, value string) (Challenge, bool, error) {
+	challenges, err := QueryChallengeEntries(key, value)
+	if err != nil {
+		return Challenge{}, false, err
 	}
 
-	return challenges[0], nil
+	if len(challenges) == 0 {
+		return Challenge{}, false, nil
+	}
+
+	return challenges[0], true, nil
 }
 
 // Check Pre Reqs Status
@@ -383,10 +399,10 @@ func BatchUpdateChallenge(whereMap map[string]interface{}, chall Challenge) erro
 func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	var tags []Tag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
-	if err := Db.Model(challenge).Association("Tags").Error; err != nil {
+	if err := Db.Model(challenge).Association("Tags").Find(&tags); err != nil {
 		return tags, err
 	}
 
@@ -397,8 +413,8 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 func GetRelatedUsers(challenge *Challenge) ([]User, error) {
 	var users []User
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	// Query users who have solved this challenge by checking the user_challenges table
 	if err := Db.Joins("JOIN user_challenges ON users.id = user_challenges.user_id").
@@ -419,8 +435,8 @@ func GetChallengeSolveInfo(challengeID uint, userID uint) (uint16, bool, error) 
 	}
 	var res result
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	err := Db.Raw(`
 		SELECT 
@@ -465,8 +481,8 @@ func DeleteChallengeEntry(challenge *Challenge) error {
 func QueryAllSubmissions() ([]UserChallenges, error) {
 	var userChallenges []UserChallenges
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Find(&userChallenges)
 
@@ -480,8 +496,8 @@ func QueryAllSubmissions() ([]UserChallenges, error) {
 func QuerySubmissionsWithPagination(limit, offset int) ([]UserChallenges, error) {
 	var userChallenges []UserChallenges
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Table("user_challenges").
 		Select("user_challenges.*").
@@ -503,8 +519,8 @@ func QuerySubmissionsWithPagination(limit, offset int) ([]UserChallenges, error)
 func QuerySubmissions(whereMap map[string]interface{}) ([]UserChallenges, error) {
 	var userChallenges []UserChallenges
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(whereMap).Find(&userChallenges)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -554,88 +570,6 @@ func SaveFlagSubmission(user_challenges *UserChallenges) error {
 	return tx.Commit().Error
 }
 
-// hook after update of challenge
-func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
-	iFace, _ := tx.InstanceGet("gorm:update_attrs")
-	if iFace == nil {
-		return nil
-	}
-	updatedAttr := iFace.(map[string]interface{})
-	if _, ok := updatedAttr["container_id"]; ok {
-		var users []*User
-		Db.Model(challenge).Association("Users")
-		go updateScripts(users)
-	}
-	return nil
-}
-
-// hook after create of challenge
-func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
-	var users []*User
-	Db.Model(challenge).Association("Users")
-	go updateScripts(users)
-
-	return nil
-}
-
-// hook after deleting the challenge
-func (challenge *Challenge) AfterDelete(tx *gorm.DB) error {
-	var users []*User
-	Db.Model(challenge).Association("Users")
-	go updateScripts(users)
-	return nil
-}
-
-type ScriptFile struct {
-	User       string
-	Challenges map[string]string
-}
-
-// updates users' script
-func updateScripts(users []*User) {
-	for _, user := range users {
-		go updateScript(user)
-	}
-}
-
-// updates user script
-func updateScript(user *User) error {
-
-	time.Sleep(3 * time.Second)
-
-	SHA256 := sha256.New()
-	SHA256.Write([]byte(user.Email))
-	scriptPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR, fmt.Sprintf("%x", SHA256.Sum(nil)))
-	challs, err := GetRelatedChallenges(user)
-	if err != nil {
-		return fmt.Errorf("error while getting related challenges : %v", err)
-	}
-
-	mapOfChall := make(map[string]string)
-
-	for _, chall := range challs {
-		mapOfChall[chall.Name] = chall.ContainerId
-	}
-
-	data := ScriptFile{
-		User:       user.Name,
-		Challenges: mapOfChall,
-	}
-
-	var script bytes.Buffer
-	scriptTemplate, err := template.New("script").Parse(tools.SSH_LOGIN_SCRIPT_TEMPLATE)
-	if err != nil {
-		return fmt.Errorf("error while parsing script template :: %s", err)
-	}
-
-	err = scriptTemplate.Execute(&script, data)
-	if err != nil {
-		return fmt.Errorf("error while executing script template :: %s", err)
-	}
-
-	return ioutil.WriteFile(scriptPath, script.Bytes(), 0755)
-}
-
 // Create a new entry in the DynamicFlag table
 func CreateDynamicFlagEntry(dynamicFlag *DynamicFlag) error {
 
@@ -660,8 +594,8 @@ func CreateDynamicFlagEntry(dynamicFlag *DynamicFlag) error {
 func QueryDynamicFlagEntries(whereMap map[string]interface{}) ([]DynamicFlag, error) {
 	var dynamicFlags []DynamicFlag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	whereMap = normalizeDynamicFlagWhereMap(whereMap)
 	tx := Db.Where(whereMap).Find(&dynamicFlags)
@@ -749,8 +683,8 @@ func DeleteAllUserChallenges(challengeID uint) error {
 func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
 	var attempts []ChallengeAttempt
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	err := Db.Table("user_challenges").
 		Select("user_challenges.id as id, user_challenges.user_id as user_id, users.username as username, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct, user_challenges.cheating as cheating").
@@ -770,8 +704,8 @@ func QueryChallAttempts(chall_id uint64) ([]ChallengeAttempt, error) {
 func QueryUserAttempts(user_id uint) ([]ChallengeAttempt, error) {
 	var attempts []ChallengeAttempt
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	err := Db.Table("user_challenges").
 		Select("user_challenges.id as id, user_challenges.user_id as user_id, user_challenges.challenge_id as challenge_id, user_challenges.created_at as solved_at, user_challenges.flag as flag, user_challenges.solved as correct, user_challenges.cheating as cheating").
@@ -788,24 +722,16 @@ func QueryUserAttempts(user_id uint) ([]ChallengeAttempt, error) {
 
 // timeElapsed returns the aggregation bucket for the given duration
 func timeElapsed() TimeAggBucket {
-	startStr := config.Cfg.CompetitionInfo.StartingTime
-	// The format is "16:31:23 UTC: +05:30, 03 February 2025, Monday"
-	// We'll parse only the part up to the date, ignoring the weekday
-	// e.g. "16:31:23 UTC: +05:30, 03 February 2025"
-	parts := strings.Split(startStr, ",")
-	if len(parts) < 2 {
-		log.Errorf("invalid StartingTime format: %s", startStr)
+	if config.Cfg == nil {
+		log.Error("cannot aggregate scores before config initialization")
 		return Between1MonthAnd1Year
 	}
-	startTimePart := strings.TrimSpace(parts[0])
-	startDatePart := strings.TrimSpace(parts[1])
-	startParseStr := startTimePart + ", " + startDatePart
-	start, err := dateparse.ParseLocal(startParseStr)
+	start, _, err := config.Cfg.CompetitionInfo.ParseWindow()
 	if err != nil {
-		log.Errorf("failed to parse StartingTime: %v", err)
+		log.Errorf("parse competition window for score aggregation: %v", err)
 		return Between1MonthAnd1Year
 	}
-	end := time.Now()
+	end := time.Now().In(start.Location())
 	diff := end.Sub(start)
 	minutes := diff.Minutes()
 	hours := diff.Hours()
@@ -900,8 +826,8 @@ func QueryTimeSeriesForTopUsers(topUserId []uint) []UserLeaderboardResp {
 		return results
 	}
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	type userChallengeRow struct {
 		UserID    uint

@@ -16,7 +16,9 @@ import (
 type Compression int
 
 const (
-	Gzip Compression = 1
+	Gzip                     Compression = 1
+	maxExtractedArchiveFiles             = 10000
+	maxExtractedArchiveBytes             = int64(1 << 30)
 )
 
 // Tar the provided context directory into the destination directory, additionalCtx is the context
@@ -51,6 +53,12 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 	if err != nil {
 		return fmt.Errorf("error while creating tar :: %s", target)
 	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = os.Remove(target)
+		}
+	}()
 	defer targetFile.Close()
 
 	// Create a Gzipped tar file writer from the file we just opened
@@ -69,7 +77,6 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 		return false
 	}
 
-	baseDir := filepath.Base(contextDir)
 	err = filepath.Walk(contextDir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -80,15 +87,20 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 				log.Debugf("skipping a dir without errors: %s", info.Name())
 				return filepath.SkipDir
 			}
+			if !info.IsDir() && !info.Mode().IsRegular() {
+				return fmt.Errorf("unsupported file type in archive context: %s", path)
+			}
 
 			header, err := tar.FileInfoHeader(info, info.Name())
 			if err != nil {
 				return err
 			}
 
-			if baseDir != "" {
-				header.Name = filepath.Join(strings.TrimPrefix(path, contextDir))
+			relativePath, err := filepath.Rel(contextDir, path)
+			if err != nil {
+				return fmt.Errorf("resolve archive path: %w", err)
 			}
+			header.Name = filepath.ToSlash(relativePath)
 
 			if err := tarFileWriter.WriteHeader(header); err != nil {
 				return err
@@ -112,31 +124,37 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 	for fileName, filePath := range additionalCtx {
 		fileInfo, err := CheckPathValid(filePath)
 		if err != nil || !fileInfo.Mode().IsRegular() {
-			log.Errorf("Cannot find a valid file for %s while creating tar... Continuing", filePath)
-			continue
+			return fmt.Errorf("invalid additional archive file %s", filePath)
 		}
 
 		header, err := tar.FileInfoHeader(fileInfo, fileInfo.Name())
 		if err != nil {
-			log.Errorf("Cannot create a valid tar header for %s while creating tar... Continuing", filePath)
-			continue
+			return fmt.Errorf("create archive header for %s: %w", filePath, err)
 		}
 
-		header.Name = filepath.Join(fileName)
+		cleanName := filepath.Clean(fileName)
+		if cleanName == "." || filepath.IsAbs(cleanName) || cleanName == ".." || strings.HasPrefix(cleanName, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("invalid additional archive name %q", fileName)
+		}
+		header.Name = filepath.ToSlash(cleanName)
 
 		if err := tarFileWriter.WriteHeader(header); err != nil {
-			log.Errorf("Cannot write tar header for %s while creating tar... Continuing", filePath)
-			continue
+			return fmt.Errorf("write archive header for %s: %w", filePath, err)
 		}
 
-		curFile, _ := os.Open(filePath)
+		curFile, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("open additional archive file %s: %w", filePath, err)
+		}
 
 		_, err = io.Copy(tarFileWriter, curFile)
+		closeErr := curFile.Close()
 		if err != nil {
-			log.Errorf("Cannot write file to tar %s... Continuing", filePath)
-			continue
+			return fmt.Errorf("write additional archive file %s: %w", filePath, err)
 		}
-		curFile.Close()
+		if closeErr != nil {
+			return fmt.Errorf("close additional archive file %s: %w", filePath, closeErr)
+		}
 	}
 
 	if err != nil {
@@ -150,6 +168,112 @@ func Tar(contextDir string, compression Compression, destinationDir string, addi
 
 		return fmt.Errorf("error while creating Tar :: %s", err)
 	}
+	if err := tarFileWriter.Close(); err != nil {
+		return fmt.Errorf("finalize tar archive: %w", err)
+	}
+	if err := fileWriter.Close(); err != nil {
+		return fmt.Errorf("finalize gzip archive: %w", err)
+	}
+	if err := targetFile.Close(); err != nil {
+		return fmt.Errorf("close archive: %w", err)
+	}
+	complete = true
 
+	return nil
+}
+
+// ExtractTarGzip extracts a bounded archive into a new directory without
+// following links or accepting paths outside that directory.
+func ExtractTarGzip(archivePath, destination string) error {
+	if _, err := os.Lstat(destination); err == nil {
+		return fmt.Errorf("archive destination already exists: %s", destination)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect archive destination: %w", err)
+	}
+	if err := os.Mkdir(destination, 0700); err != nil {
+		return fmt.Errorf("create archive destination: %w", err)
+	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = os.RemoveAll(destination)
+		}
+	}()
+
+	archiveFile, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("open archive: %w", err)
+	}
+	defer archiveFile.Close()
+	gzipReader, err := gzip.NewReader(archiveFile)
+	if err != nil {
+		return fmt.Errorf("open gzip stream: %w", err)
+	}
+	defer gzipReader.Close()
+
+	reader := tar.NewReader(gzipReader)
+	seen := make(map[string]struct{})
+	var totalSize int64
+	for count := 0; ; count++ {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("read archive: %w", err)
+		}
+		if count >= maxExtractedArchiveFiles {
+			return fmt.Errorf("archive contains more than %d entries", maxExtractedArchiveFiles)
+		}
+		name := filepath.Clean(filepath.FromSlash(header.Name))
+		if filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("archive path escapes destination: %q", header.Name)
+		}
+		if _, exists := seen[name]; exists {
+			return fmt.Errorf("archive contains duplicate path %q", header.Name)
+		}
+		seen[name] = struct{}{}
+		if header.Size < 0 || header.Size > maxExtractedArchiveBytes-totalSize {
+			return fmt.Errorf("archive expands beyond %d bytes", maxExtractedArchiveBytes)
+		}
+		totalSize += header.Size
+
+		target := filepath.Join(destination, name)
+		relative, err := filepath.Rel(destination, target)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("archive path escapes destination: %q", header.Name)
+		}
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if name == "." {
+				continue
+			}
+			if err := os.Mkdir(target, header.FileInfo().Mode().Perm()); err != nil {
+				return fmt.Errorf("create archive directory %q: %w", header.Name, err)
+			}
+		case tar.TypeReg, tar.TypeRegA:
+			if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+				return fmt.Errorf("create archive parent: %w", err)
+			}
+			file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, header.FileInfo().Mode().Perm())
+			if err != nil {
+				return fmt.Errorf("create archive file %q: %w", header.Name, err)
+			}
+			written, copyErr := io.Copy(file, io.LimitReader(reader, header.Size+1))
+			closeErr := file.Close()
+			if copyErr != nil {
+				return fmt.Errorf("extract archive file %q: %w", header.Name, copyErr)
+			}
+			if closeErr != nil {
+				return fmt.Errorf("close archive file %q: %w", header.Name, closeErr)
+			}
+			if written != header.Size {
+				return fmt.Errorf("archive file %q size mismatch", header.Name)
+			}
+		default:
+			return fmt.Errorf("archive contains unsupported entry %q", header.Name)
+		}
+	}
+	complete = true
 	return nil
 }

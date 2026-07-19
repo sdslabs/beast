@@ -38,10 +38,12 @@ func QueryRelatedChallenges(tag *Tag) ([]Challenge, error) {
 	var challenges []Challenge
 	var tagName Tag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
-	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
+	if err := Db.Where(&Tag{TagName: tag.TagName}).First(&tagName).Error; err != nil {
+		return nil, err
+	}
 
 	if err := Db.Preload("Tags").Preload("Ports").Model(&tagName).Association("Challenges").Find(&challenges); err != nil {
 		return challenges, err
@@ -55,10 +57,12 @@ func QueryRelatedChallengesMetadata(tag *Tag) ([]Challenge, error) {
 	var challenges []Challenge
 	var tagName Tag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
-	Db.Where(&Tag{TagName: tag.TagName}).First(&tagName)
+	if err := Db.Where(&Tag{TagName: tag.TagName}).First(&tagName).Error; err != nil {
+		return nil, err
+	}
 
 	if err := Db.Model(&tagName).
 		Select("id", "name", "created_at", "points", "difficulty", "instanced", "instance_expiration", "status").
@@ -75,8 +79,8 @@ func QueryRelatedChallengesMetadata(tag *Tag) ([]Challenge, error) {
 func QueryTags(whereMap map[string]interface{}) ([]*Tag, error) {
 	var tags []*Tag
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(whereMap).Find(&tags)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -91,29 +95,19 @@ func QueryTags(whereMap map[string]interface{}) ([]*Tag, error) {
 }
 
 // Update tags
-func UpdateTags(tag []*Tag, chall *Challenge) error {
-	var tags []Tag
-
+func UpdateTags(tagEntries []*Tag, chall *Challenge) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	// Delete existing tags
-	Db.Model(&chall).Association("Tags").Find(&tags)
-	tx := Db.Begin()
-	if err := tx.Model(&chall).Association("Tags").Delete(tags); err != nil {
-		return err
-	}
-
-	// Create tags
-	for _, tagEntry := range tag {
-		if err := tx.FirstOrCreate(tagEntry, *tagEntry).Error; err != nil {
-			tx.Rollback()
-			return err
+	return Db.Transaction(func(tx *gorm.DB) error {
+		for _, tagEntry := range tagEntries {
+			if tagEntry == nil || tagEntry.TagName == "" {
+				return errors.New("tag name is required")
+			}
+			if err := tx.FirstOrCreate(tagEntry, Tag{TagName: tagEntry.TagName}).Error; err != nil {
+				return err
+			}
 		}
-		if err := tx.Model(&chall).Association("Tags").Append(tagEntry); err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit().Error
+		return tx.Model(chall).Association("Tags").Replace(tagEntries)
+	})
 }

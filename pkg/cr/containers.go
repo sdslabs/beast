@@ -1,12 +1,12 @@
 package cr
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -20,7 +20,6 @@ import (
 	utils "github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 type PortMapping struct {
@@ -42,7 +41,11 @@ const (
 	UDPTraffic TrafficType = "udp"
 
 	DefaultTraffic TrafficType = TCPTraffic
+
+	maxContainerLogBytes int64 = 4 << 20
 )
+
+var errContainerLogLimit = errors.New("container logs exceed 4 MiB limit")
 
 func IsValidTrafficType(t string) bool {
 	switch TrafficType(t) {
@@ -93,13 +96,16 @@ func SearchContainerByFilter(filterMap map[string]string) ([]types.Container, er
 	if err != nil {
 		return []types.Container{}, err
 	}
+	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {
 		filterArgs.Add(key, val)
 	}
 
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{
 		All:     true,
 		Filters: filterArgs,
 	})
@@ -113,13 +119,16 @@ func SearchRunningContainerByFilter(filterMap map[string]string) ([]types.Contai
 	if err != nil {
 		return []types.Container{}, err
 	}
+	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {
 		filterArgs.Add(key, val)
 	}
 
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{
 		Filters: filterArgs,
 	})
 
@@ -131,16 +140,19 @@ func StopAndRemoveContainer(containerId string) error {
 	if err != nil {
 		return err
 	}
+	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
 	// Try to stop using default timeout we are using for beast
-	err = cli.ContainerStop(context.Background(), containerId, &defaults.DefaultDockerStopTimeout)
+	err = cli.ContainerStop(ctx, containerId, &defaults.DefaultDockerStopTimeout)
 	if err != nil {
 		return err
 	}
 	log.Debug("Stopped container with ID ", containerId)
 
 	log.Debug("Removing container with ID ", containerId)
-	err = cli.ContainerRemove(context.Background(), containerId, types.ContainerRemoveOptions{
+	err = cli.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{
 		RemoveVolumes: false,
 		RemoveLinks:   false,
 		Force:         true,
@@ -150,12 +162,23 @@ func StopAndRemoveContainer(containerId string) error {
 }
 
 func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
+	if containerConfig == nil {
+		return "", errors.New("container configuration is required")
+	}
+	if containerConfig.ImageId == "" {
+		return "", errors.New("container image ID is required")
+	}
+	if err := ValidateResourceLimits(containerConfig.CPUShares, containerConfig.CPUsLimit, containerConfig.Memory, containerConfig.PidsLimit); err != nil {
+		return "", fmt.Errorf("invalid container resource limits: %w", err)
+	}
 	containerName := containerConfig.ContainerName
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPILongTimeout)
+	defer cancel()
 	cli, err := newDockerClient()
 	if err != nil {
 		return "", err
 	}
+	defer cli.Close()
 
 	portSet := make(nat.PortSet)
 	portMap := make(nat.PortMap)
@@ -191,16 +214,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		Labels:       labels,
 	}
 
-	var mountBindings []mount.Mount
-	for src, dest := range containerConfig.MountsMap {
-		mnt := mount.Mount{
-			Type:   mount.TypeBind,
-			Source: src,
-			Target: dest,
-		}
-
-		mountBindings = append(mountBindings, mnt)
-	}
+	mountBindings := readOnlyBindMounts(containerConfig.MountsMap)
 
 	resources := container.Resources{
 		NanoCPUs:  int64(containerConfig.CPUsLimit * 1e9),
@@ -215,6 +229,7 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 		NetworkMode:  container.NetworkMode(containerConfig.ContainerNetwork),
 		Resources:    resources,
 	}
+	applyDefaultContainerSecurity(hostConfig)
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
 	if err != nil {
@@ -228,6 +243,10 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	if err := cli.ContainerStart(ctx, containerId, types.ContainerStartOptions{}); err != nil {
+		removeErr := cli.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{Force: true})
+		if removeErr != nil {
+			log.Errorf("Error while removing failed container %s: %s", containerId, removeErr)
+		}
 		log.Errorf("Error while starting the container : %s", err)
 		return "", err
 	}
@@ -235,13 +254,34 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	return containerId, nil
 }
 
+func readOnlyBindMounts(mounts map[string]string) []mount.Mount {
+	bindings := make([]mount.Mount, 0, len(mounts))
+	for src, dest := range mounts {
+		bindings = append(bindings, mount.Mount{
+			Type:     mount.TypeBind,
+			Source:   src,
+			Target:   dest,
+			ReadOnly: true,
+		})
+	}
+	return bindings
+}
+
+func applyDefaultContainerSecurity(hostConfig *container.HostConfig) {
+	hostConfig.CapDrop = []string{"ALL"}
+	hostConfig.SecurityOpt = []string{"no-new-privileges"}
+}
+
 func GetContainerStdLogs(containerID string) (*Log, error) {
 	cli, err := newDockerClient()
 	if err != nil {
 		return nil, err
 	}
+	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
-	stdout, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	stdout, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{
 		ShowStdout: true,
 		Details:    true,
 	})
@@ -250,9 +290,12 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 	}
 	defer stdout.Close()
 
-	stdoutlogs, _ := ioutil.ReadAll(stdout)
+	stdoutlogs, err := readContainerLogs(stdout, maxContainerLogBytes)
+	if err != nil {
+		return nil, fmt.Errorf("read container stdout: %w", err)
+	}
 
-	stderr, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	stderr, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{
 		ShowStderr: true,
 		Details:    true,
 	})
@@ -261,37 +304,60 @@ func GetContainerStdLogs(containerID string) (*Log, error) {
 	}
 	defer stderr.Close()
 
-	stderrlogs, _ := ioutil.ReadAll(stderr)
+	stderrlogs, err := readContainerLogs(stderr, maxContainerLogBytes-int64(len(stdoutlogs)))
+	if err != nil {
+		return nil, fmt.Errorf("read container stderr: %w", err)
+	}
 
 	return &Log{Stdout: string(stdoutlogs), Stderr: string(stderrlogs)}, nil
 }
 
-func ShowLiveContainerLogs(containerID string) {
+func readContainerLogs(reader io.Reader, limit int64) ([]byte, error) {
+	logs, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(logs)) > limit {
+		return nil, errContainerLogLimit
+	}
+	return logs, nil
+}
+
+func ShowLiveContainerLogs(containerID string) error {
 	cli, err := newDockerClient()
 	if err != nil {
-		log.Error(err)
+		return err
 	}
+	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
-	stream, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	stream, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Details:    true,
 	})
 	if err != nil {
-		log.Error(err)
+		return err
 	}
 	defer stream.Close()
 
-	logs, _ := ioutil.ReadAll(stream)
+	logs, err := readContainerLogs(stream, maxContainerLogBytes)
+	if err != nil {
+		return fmt.Errorf("read container logs: %w", err)
+	}
 	fmt.Println(string(logs))
+	return nil
 }
 
 func CommitContainer(containerId string) (string, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPILongTimeout)
+	defer cancel()
 	cli, err := newDockerClient()
 	if err != nil {
 		return "", err
 	}
+	defer cli.Close()
 
 	commitResp, err := cli.ContainerCommit(ctx, containerId, types.ContainerCommitOptions{})
 	if err != nil {
@@ -309,35 +375,29 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 
 	// Deploy with project name - Docker Compose automatically labels containers with
 	// com.docker.compose.project=<projectName>
-	upCmd := exec.Command("docker", "compose",
+	arguments := []string{"compose",
 		"-f", composeFile,
 		"-p", projectName,
-		"up", "-d")
+		"up", "-d"}
 
 	environment := os.Environ()
 	for variable, port := range ports {
 		environment = append(environment, fmt.Sprintf("%s=%s", variable, strconv.FormatUint(uint64(port), 10)))
 	}
 
-	upCmd.Env = environment
-
-	var upOutput bytes.Buffer
-	upCmd.Stdout = &upOutput
-	upCmd.Stderr = &upOutput
-
-	if err := upCmd.Run(); err != nil {
-		log.Errorf("docker compose up failed for challenge %s. Output:\n%s", challengeName, upOutput.String())
-		return "", fmt.Errorf("error while running docker compose up: %v", err)
+	upOutput, err := runRuntimeCommand("docker", arguments, runtimeCommandOptions{environment: environment})
+	if err != nil {
+		log.Errorf("docker compose up failed for challenge %s. Output:\n%s", challengeName, upOutput)
+		return "", cleanupFailedComposeDeployment(projectName, fmt.Errorf("run docker compose up: %w", err))
 	}
 
 	if err := validateAllComposeServicesRunning(projectName, challengeName); err != nil {
-		return "", err
+		return "", cleanupFailedComposeDeployment(projectName, err)
 	}
 
 	primaryContainerId, err := getPrimaryComposeContainerId(projectName)
 	if err != nil {
-		log.Warnf("Could not get primary container ID for challenge %s: %v", challengeName, err)
-		return "", nil // Return empty string but success
+		return "", cleanupFailedComposeDeployment(projectName, fmt.Errorf("get primary container for challenge %s: %w", challengeName, err))
 	}
 
 	log.Debugf("Verified challenge %s services are running. Primary container: %s", challengeName, primaryContainerId)
@@ -345,16 +405,12 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 }
 
 func validateAllComposeServicesRunning(projectName, challengeName string) error {
-	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "--format", "json")
-	var psOutput bytes.Buffer
-	psCmd.Stdout = &psOutput
-	psCmd.Stderr = &psOutput
-
-	if err := psCmd.Run(); err != nil {
-		return fmt.Errorf("error checking container status after compose up for challenge %s. Output:\n%s", challengeName, psOutput.String())
+	psOutput, err := runRuntimeCommand("docker", []string{"compose", "-p", projectName, "ps", "--format", "json"}, runtimeCommandOptions{})
+	if err != nil {
+		return fmt.Errorf("error checking container status after compose up for challenge %s: %w. Output:\n%s", challengeName, err, psOutput)
 	}
 
-	output := strings.TrimSpace(psOutput.String())
+	output := strings.TrimSpace(psOutput)
 	if output == "" {
 		return fmt.Errorf("no services found after compose up for challenge %s", challengeName)
 	}
@@ -405,15 +461,12 @@ func validateAllComposeServicesRunning(projectName, challengeName string) error 
 
 // gets the first container ID from a compose project
 func getPrimaryComposeContainerId(projectName string) (string, error) {
-	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q")
-	var output bytes.Buffer
-	psCmd.Stdout = &output
-
-	if err := psCmd.Run(); err != nil {
+	output, err := runRuntimeCommand("docker", []string{"compose", "-p", projectName, "ps", "-q"}, runtimeCommandOptions{})
+	if err != nil {
 		return "", fmt.Errorf("failed to get container IDs: %v", err)
 	}
 
-	containerIds := strings.Fields(strings.TrimSpace(output.String()))
+	containerIds := strings.Fields(strings.TrimSpace(output))
 	if len(containerIds) == 0 {
 		return "", fmt.Errorf("no containers found for project %s", projectName)
 	}
@@ -429,13 +482,9 @@ func getPrimaryComposeContainerId(projectName string) (string, error) {
 func ComposeDownProject(projectName string) error {
 	log.Debugf("Stopping docker compose project %s", projectName)
 
-	downCmd := exec.Command("docker", "compose", "-p", projectName, "down")
-	var downOutput bytes.Buffer
-	downCmd.Stdout = &downOutput
-	downCmd.Stderr = &downOutput
-
-	if err := downCmd.Run(); err != nil {
-		return fmt.Errorf("docker compose down failed for project %s: %v. Output: %s", projectName, err, downOutput.String())
+	downOutput, err := runRuntimeCommand("docker", []string{"compose", "-p", projectName, "down"}, runtimeCommandOptions{})
+	if err != nil {
+		return fmt.Errorf("docker compose down failed for project %s: %v. Output: %s", projectName, err, downOutput)
 	}
 
 	log.Debugf("Successfully stopped compose project %s", projectName)
@@ -446,17 +495,19 @@ func ComposeDownProject(projectName string) error {
 func ComposePurgeProject(projectName string) error {
 	log.Debugf("Purging docker compose project %s", projectName)
 
-	purgeCmd := exec.Command("docker", "compose", "-p", projectName,
-		"down", "--remove-orphans", "--volumes", "--rmi", "all")
-
-	var purgeOutput bytes.Buffer
-	purgeCmd.Stdout = &purgeOutput
-	purgeCmd.Stderr = &purgeOutput
-
-	if err := purgeCmd.Run(); err != nil {
-		return fmt.Errorf("docker compose purge failed for project %s: %v. Output: %s", projectName, err, purgeOutput.String())
+	purgeOutput, err := runRuntimeCommand("docker", []string{"compose", "-p", projectName,
+		"down", "--remove-orphans", "--volumes", "--rmi", "all"}, runtimeCommandOptions{})
+	if err != nil {
+		return fmt.Errorf("docker compose purge failed for project %s: %v. Output: %s", projectName, err, purgeOutput)
 	}
 
 	log.Debugf("Successfully purged compose project %s", projectName)
 	return nil
+}
+
+func cleanupFailedComposeDeployment(projectName string, deploymentErr error) error {
+	if cleanupErr := ComposeDownProject(projectName); cleanupErr != nil {
+		return errors.Join(deploymentErr, fmt.Errorf("clean up failed compose deployment: %w", cleanupErr))
+	}
+	return deploymentErr
 }

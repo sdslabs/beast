@@ -1,62 +1,49 @@
 # Authentication
 
-Authentication is done to provide restricted access only to the organizers. Authentication is done using asymmetric encryption. After authentication, JWT tokens are used to provide access for further usage of API's.
+Beast uses password authentication and HMAC-signed JWT bearer tokens. There is no SSH-key challenge-response login and authorization cannot be disabled from the command line.
 
-## Usage
+## Credentials
 
-### Configuration
+- Passwords must contain 12–128 bytes and cannot be whitespace-only.
+- Contestant usernames are 3–12 lowercase letters, digits, dots, underscores, or hyphens.
+- `jwt_secret` must contain at least 32 bytes and must be unique per deployment.
+- Tokens expire after six hours. Password-reset tokens have a separate, restricted claim type.
 
-For signing JWT tokens using **HMAC** algorithm `jwt_secret` is required which can be configured in the beast global config (config.toml) as:
+Create the first administrator during `beast init`. Additional authors/admins can be created with the CLI on the controller host.
 
-```toml
-jwt_secret = "beast_jwt_secret_SUPER_STRONG_0x100010000100"
+## Login
+
+```bash
+curl --cacert "$HOME/.beast/secrets/tls.crt" \
+  --request POST https://localhost:5005/auth/login \
+  --data-urlencode 'username=admin' \
+  --data-urlencode 'password=<password>'
 ```
 
-The SSH keys are used for assymetric authentication which can be registered directly from the terminal using:
+The response contains `token`, `role`, and `message`. Supply the token exactly as:
 
-`beast create-author --name <username> --email <email> --publickey <pub-key-location>`
-
-Or it can be given in the challenge description(beast.toml) : 
-
-```toml
-[author]
-ssh_key = "<public key>"
+```text
+Authorization: Bearer <token>
 ```
 
-This key gets added in the database when beast.toml is validated.
+The CLI performs the same flow and verifies TLS:
 
-## Flow
-
-Once the public key is registered in the database, the user can get a JWT token through the following steps :
-* First make a GET request on URL : `/auth/<username>`
-* The response will be of the format :
-
-``` JSON
-{
-    "challenge"	:	"Challenge String",
-    "message"	:	"<solve message>"
-}
+```bash
+beast getauth --host https://localhost:5005 \
+  --ca-file "$HOME/.beast/secrets/tls.crt" \
+  --username admin
 ```
 
-* The challenge must be decrypted using *ssh private key* and then a POST request has to be made on URL: `/auth/<username>`along with POST form data: `decrmess=<decrypted message>`
-* You will get a response like this : 
-``` JSON
-{
-    "token"    :	"YOUR_AUTHENTICATION_TOKEN",
-    "role"     :	"<User Role>",
-    "message"  :	"<Usage message>"
-}
-```
+Login attempts are rate-limited, unknown users receive the same public failure as bad passwords, and banned users cannot obtain tokens. Keep the API behind network access controls as rate limiting is not a substitute for perimeter protection.
 
-* Now to access any restricted route you need to add this JWT token in the HTTP header as :
-``` HTTP
-Authorization: Bearer YOUR_AUTHENTICATION_TOKEN
-```
+## Roles
 
-### Alternative
+- `contestant`: competition and instance APIs.
+- `author` / `maintainer`: challenge-management routes only for challenges they own or maintain; uploaded configuration email ownership is checked.
+- `admin`: bulk/scheduled operations, controller-local path deployment, remote synchronization, configuration mutation, static-service management, user control, and administrative instance operations.
 
-If you have the `beast` binary with you, you can also use command :
+Authorization is checked both at route level and against challenge ownership for sensitive operations such as logs and container execution.
 
-`beast getauth --identity <path to ssh-private-key> --username <username> --host <host-string>`
+## Browser access
 
-This command will give you the JWT token for usage in other APIs by adding in the HTTP header.
+CORS is disabled unless `server.allowed_origins` is populated. Origins are exact and credentialed cross-origin requests are disabled. Never use a wildcard origin for an administrative frontend.

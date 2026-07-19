@@ -1,25 +1,20 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Build Beast
 
-# Exit if any steps fail
-set -e
-
-CWD=${PWD}
+set -euo pipefail
 
 GO_FLAGS=${GO_FLAGS:-"-tags netgo"}
 GO_CMD=${GO_CMD:-"build"}
-BUILD_USER=${BUILD_USER:-"${USER}@${HOSTNAME}"}
-BUILD_DATE=${BUILD_DATE:-$( date +%Y%m%d-%H:%M:%S )}
+BUILD_USER=${BUILD_USER:-"${USER:-unknown}@${HOSTNAME:-unknown}"}
+BUILD_DATE=${BUILD_DATE:-$(date -u +%Y%m%d-%H:%M:%S)}
 VERBOSE=${VERBOSE:-}
+OUTPUT=${BEAST_OUTPUT:-"$(go env GOPATH)/bin/beast"}
 
 repo_path="github.com/sdslabs/beastv4"
 main_package="github.com/sdslabs/beastv4/cmd/beast"
-mysql_agent="github.com/sdslabs/beastv4/cmd/agents/mysql"
-mongo_agent="github.com/sdslabs/beastv4/cmd/agents/mongo"
-
 # Get branch revision and  version
-version="0.1"
+version="0.2"
 revision=$(git rev-parse --short HEAD 2> /dev/null || echo 'unknown')
 branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null || echo 'unknown')
 
@@ -27,21 +22,13 @@ branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null || echo 'unknown')
 go_version=$(go version | sed -e 's/^[^0-9.]*\([0-9.]*\).*/\1/')
 
 
-# go 1.4 requires ldflags format to be "-X key value", not "-X key=value"
-# ldseparator here is for cross compatibility between go versions
-
-ldseparator="="
-if [ "${go_version:0:3}" = "1.4" ]; then
-	ldseparator=" "
-fi
-
 ldflags="
-  -X ${repo_path}/version.Version${ldseparator}${version}
-  -X ${repo_path}/version.Revision${ldseparator}${revision}
-  -X ${repo_path}/version.Branch${ldseparator}${branch}
-  -X ${repo_path}/version.BuildUser${ldseparator}${BUILD_USER}
-  -X ${repo_path}/version.BuildDate${ldseparator}${BUILD_DATE}
-  -X ${repo_path}/version.GoVersion${ldseparator}${go_version}"
+  -X ${repo_path}/version.Version=${version}
+  -X ${repo_path}/version.Revision=${revision}
+  -X ${repo_path}/version.Branch=${branch}
+  -X ${repo_path}/version.BuildUser=${BUILD_USER}
+  -X ${repo_path}/version.BuildDate=${BUILD_DATE}
+  -X ${repo_path}/version.GoVersion=${go_version}"
 
 echo ">>> Building Beast..."
 
@@ -49,7 +36,9 @@ if [ -n "$VERBOSE" ]; then
   echo "Building with -ldflags $ldflags"
 fi
 
-GOBIN=$PWD go "${GO_CMD}" -o "${GOPATH}/bin/beast" ${GO_FLAGS} -ldflags "${ldflags}" "${main_package}"
+mkdir -p "$(dirname "${OUTPUT}")"
+# GO_FLAGS is intentionally word-split to preserve the existing override interface.
+# shellcheck disable=SC2086
+go "${GO_CMD}" -o "${OUTPUT}" ${GO_FLAGS} -ldflags "${ldflags}" "${main_package}"
 
-echo "[*] Build Complete."
-exit 0
+echo "[*] Build complete: ${OUTPUT}"

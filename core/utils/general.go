@@ -1,8 +1,6 @@
 package utils
 
 import (
-	b64 "encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -15,24 +13,13 @@ func GetUser(authHeader string) (string, error) {
 	}
 	values := strings.Split(authHeader, " ")
 
-	if len(values) < 2 {
+	if len(values) != 2 || values[0] != "Bearer" {
 		return "", fmt.Errorf("Not a valid authorization header")
 	}
 
-	jwtToken := values[1]
-	userInfoEncr := strings.Split(jwtToken, ".")
-	if len(userInfoEncr) != 3 {
-		return "", fmt.Errorf("Not a valid JWT token in authorization header: %s", jwtToken)
-	}
-
-	sDec, err := b64.StdEncoding.WithPadding(b64.NoPadding).DecodeString(userInfoEncr[1])
+	claims, err := auth.AuthorizeClaims(values[1], auth.MANAGER|auth.ADMIN|auth.USER)
 	if err != nil {
-		return "", fmt.Errorf("Error in decrypting JWT token: %s", err)
+		return "", fmt.Errorf("invalid authorization token: %w", err)
 	}
-
-	in := []byte(sDec)
-	var raw auth.CustomClaims
-	json.Unmarshal(in, &raw)
-
-	return raw.User, nil
+	return claims.User, nil
 }

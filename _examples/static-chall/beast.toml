@@ -1,13 +1,15 @@
 [author]
 name = "fristonio"
 email = "contact+fristonio@sdslabs.co.in"
-ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
 name = "static-chall"
 flag = "BACKDOOR{SAMPLE_FLAG}"
 type = "static"
 points=150
+maxPoints = 150
+minPoints = 50
+tags = ["easy", "web"]
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
@@ -17,15 +19,11 @@ points = 10
 text = "simple_hint_2"
 points = 20
 
-maxPoints = 100
-minPoints = 50
-tags = ["easy", "web"]
-
 [challenge.env]
 static_dir = "static"
 
 [resource]
-cpu_shares = 1024
+cpu_shares = 512
 memory_limit = 536870912
 pids_limit = 100
 cpuslimit = 0.25

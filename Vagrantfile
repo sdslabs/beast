@@ -33,8 +33,7 @@ Vagrant.configure(VAGRANTFILE_VERSION) do |config|
 
   config.vm.hostname = "beast"
 
-  # The default box for the machine is ubuntu/bionic64
-  config.vm.box = "ubuntu/bionic64"
+  config.vm.box = "ubuntu/noble64"
 
   # The Beast environment runs on 9991 on the guest.
   host_port = 5005
@@ -54,25 +53,25 @@ Vagrant.configure(VAGRANTFILE_VERSION) do |config|
   # Provider-specific configuration so you can fine-tune various
   # backing providers for Vagrant. These expose provider-specific options.
   config.vm.provider "virtualbox" do |vb, override|
-    override.vm.box = "ubuntu/bionic64"
+    override.vm.box = "ubuntu/noble64"
     # Customize the amount of memory on the VM:
     vb.memory = vm_memory
   end
 
   config.vm.provider "hyperv" do |h, override|
-    override.vm.box = "bento/ubuntu-18.04"
+    override.vm.box = "bento/ubuntu-24.04"
     h.memory = vm_memory
     h.maxmemory = vm_memory
     h.cpus = vm_num_cpus
   end
 
   config.vm.provider "parallels" do |prl, override|
-    override.vm.box = "bento/ubuntu-18.04"
-    override.vm.box_version = "202005.21.0"
+    override.vm.box = "bento/ubuntu-24.04"
     prl.memory = vm_memory
     prl.cpus = vm_num_cpus
   end
 
+  config.vm.provision "dependencies", type: "shell", path: "scripts/provision/dependencies.sh", privileged: true
   config.vm.provision "docker"
   config.vm.provision "env", type: "shell", path: "scripts/installenv.sh", privileged: false
   config.vm.provision "setup", type: "shell", after: "env", path: "scripts/provision/setup.sh", privileged: false

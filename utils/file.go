@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -69,18 +67,95 @@ func ValidateFileExists(filePath string) error {
 	return nil
 }
 
+func ValidateSecretFile(filePath string) error {
+	info, err := os.Lstat(filePath)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("secret file must not be a symbolic link: %s", filePath)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("secret path is not a regular file: %s", filePath)
+	}
+	if info.Mode().Perm() != 0600 {
+		return fmt.Errorf("secret file permissions must be 0600, got %04o", info.Mode().Perm())
+	}
+	return nil
+}
+
+func ExpandHomePath(filePath string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home directory: %w", err)
+	}
+	switch {
+	case filePath == "~" || filePath == "$HOME" || filePath == "${HOME}":
+		return home, nil
+	case strings.HasPrefix(filePath, "~/"):
+		return filepath.Join(home, strings.TrimPrefix(filePath, "~/")), nil
+	case strings.HasPrefix(filePath, "$HOME/"):
+		return filepath.Join(home, strings.TrimPrefix(filePath, "$HOME/")), nil
+	case strings.HasPrefix(filePath, "${HOME}/"):
+		return filepath.Join(home, strings.TrimPrefix(filePath, "${HOME}/")), nil
+	default:
+		return filePath, nil
+	}
+}
+
+// ResolvePathWithin resolves an existing relative path and verifies that it
+// remains inside root, including after following symbolic links.
+func ResolvePathWithin(root, relativePath string) (string, error) {
+	if relativePath == "" || filepath.IsAbs(relativePath) {
+		return "", fmt.Errorf("path must be relative: %q", relativePath)
+	}
+
+	rootPath, err := filepath.Abs(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve root path: %w", err)
+	}
+	rootPath, err = filepath.EvalSymlinks(rootPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve root symlinks: %w", err)
+	}
+
+	targetPath, err := filepath.Abs(filepath.Join(rootPath, relativePath))
+	if err != nil {
+		return "", fmt.Errorf("resolve path: %w", err)
+	}
+	resolvedPath, err := filepath.EvalSymlinks(targetPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve path symlinks: %w", err)
+	}
+
+	rel, err := filepath.Rel(rootPath, resolvedPath)
+	if err != nil {
+		return "", fmt.Errorf("compare path to root: %w", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path escapes root: %q", relativePath)
+	}
+
+	return resolvedPath, nil
+}
+
 // Create the directory sequence in dirPath if it does not exist
 // if there was an error while creating the directory it returns the error
 // else it returns nil indicating success
 func CreateIfNotExistDir(dirPath string) error {
-	err := ValidateDirExists(dirPath)
-	if err != nil {
-		if e := os.MkdirAll(dirPath, 0755); e != nil {
-			eMsg := fmt.Errorf("could not create directory : %s", dirPath)
-			return eMsg
+	info, err := os.Lstat(dirPath)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(dirPath, 0750); err != nil {
+			return fmt.Errorf("create directory %s: %w", dirPath, err)
 		}
+		info, err = os.Lstat(dirPath)
 	}
-
+	if err != nil {
+		return fmt.Errorf("inspect directory %s: %w", dirPath, err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("path is not a real directory: %s", dirPath)
+	}
 	return nil
 }
 
@@ -127,9 +202,12 @@ func RemoveDirRecursively(dirPath string) error {
 }
 
 func CopyFile(src, dst string) error {
-	err := ValidateFileExists(src)
+	sourceInfo, err := os.Lstat(src)
 	if err != nil {
-		return err
+		return fmt.Errorf("inspect source file: %w", err)
+	}
+	if !sourceInfo.Mode().IsRegular() {
+		return fmt.Errorf("source is not a regular file: %s", src)
 	}
 
 	source, err := os.Open(src)
@@ -137,36 +215,56 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 	defer source.Close()
-
-	destination, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
+	openedInfo, err := source.Stat()
 	if err != nil {
-		return fmt.Errorf("error while creating destination file : %s", err)
+		return fmt.Errorf("inspect opened source file: %w", err)
 	}
-	defer destination.Close()
+	if !openedInfo.Mode().IsRegular() || !os.SameFile(sourceInfo, openedInfo) {
+		return fmt.Errorf("source changed while opening: %s", src)
+	}
 
-	_, err = io.Copy(destination, source)
-	return err
+	destination, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, sourceInfo.Mode().Perm())
+	if err != nil {
+		return fmt.Errorf("create destination file: %w", err)
+	}
+	if _, err := io.Copy(destination, source); err != nil {
+		_ = destination.Close()
+		_ = os.Remove(dst)
+		return fmt.Errorf("copy file contents: %w", err)
+	}
+	if err := destination.Close(); err != nil {
+		_ = os.Remove(dst)
+		return fmt.Errorf("close destination file: %w", err)
+	}
+	return nil
 }
 
 func CopyDirectory(src, dst string) error {
-	srcInfo, err := os.Stat(src)
+	srcInfo, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
-
-	err = os.MkdirAll(dst, srcInfo.Mode())
-	if err != nil {
-		return err
+	if !srcInfo.IsDir() || srcInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("source is not a real directory: %s", src)
 	}
 
-	fds, err := ioutil.ReadDir(src)
+	if err := os.Mkdir(dst, srcInfo.Mode().Perm()); err != nil {
+		return err
+	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = os.RemoveAll(dst)
+		}
+	}()
 
+	fds, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
 	for _, fd := range fds {
-		srcn := path.Join(src, fd.Name())
-		dstn := path.Join(dst, fd.Name())
+		srcn := filepath.Join(src, fd.Name())
+		dstn := filepath.Join(dst, fd.Name())
 
 		if fd.IsDir() {
 			if err = CopyDirectory(srcn, dstn); err != nil {
@@ -178,6 +276,7 @@ func CopyDirectory(src, dst string) error {
 			}
 		}
 	}
+	complete = true
 	return nil
 }
 
@@ -227,7 +326,7 @@ func GetDirsInDir(dirPath string) (error, []string) {
 		return err, dirs
 	}
 
-	files, err := ioutil.ReadDir(dirPath)
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		return fmt.Errorf("error while reading directory with path %s : %s", dirPath, err), dirs
 	}

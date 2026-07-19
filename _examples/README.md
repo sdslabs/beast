@@ -1,26 +1,25 @@
 # Examples
 
-> This directory contains a few challenges example for beast, which are properly tested and should work out of the box.
+These directories demonstrate Beast challenge formats. They contain public test flags and intentionally weak sample services; run them only on disposable development workers.
 
-### Configuration file samples:
+- `static-chall`: static-only content.
+- `service`, `xinetd-service`: service challenges.
+- `web-php`, `web-php-mysql`: generated web challenges.
+- `bare-docker`: custom Dockerfile.
+- `compose-type`: constrained Compose deployment.
+- `instanced-service`, `instanced-compose`: per-user instances.
+- `simple`: generated bare environment.
 
-* [Beast global configuration sample](./example.config.toml)
-* [Beast static container authentication file](./.static.beast.htpasswd)
-
-### Sample Challenges 
-
-* [Simple Challenge - Bare](./simple)
-* [PHP Web challenge](./web-php)
-* [PHP Web challenge with MySQL](./web-php-mysql)
-* [Challenge with Static files only](./static-chall)
-* [Xinted Service challenge with custom xinetd config](./xinetd-service)
-* [Service challenge with auto-generated xinetd config](./service)
-* [A bare challenge using docker](./docker-type)
-* [Docker compose challenge](./compose-type)
-
-To test any of the above challenges, cd to \_example directory and use the below command:
+Validate before deployment:
 
 ```bash
-$ curl -X POST localhost:5005/api/manage/deploy/local/ \
-	--data "challenge_dir=$PWD/<challenge_name>"
+beast verify --local-directory "$PWD/_examples/service"
 ```
+
+Then deploy with the local CLI path:
+
+```bash
+beast challenge deploy --local-directory "$PWD/_examples/service"
+```
+
+Both commands load the operator's validated `$HOME/.beast/config.toml`. Local deployment is an administrator/controller-host workflow and still uses the configured Docker worker, resource ceilings, PostgreSQL, and Redis.

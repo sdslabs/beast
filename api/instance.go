@@ -59,6 +59,14 @@ func instanceToAdminResponse(instance *cache.Instance) AdminInstanceResponse {
 	}
 }
 
+// @Summary Spawn a per-user challenge instance
+// @Tags instances
+// @Produce json
+// @Param challenge_name path string true "Challenge name"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.InstanceResponse
+// @Failure 400 {object} api.HTTPErrorResp
+// @Router /api/instances/{challenge_name}/spawn [post]
 func spawnInstanceHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {
@@ -103,6 +111,14 @@ func spawnInstanceHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, instanceToResponse(instance))
 }
 
+// @Summary Get the current user's challenge instance
+// @Tags instances
+// @Produce json
+// @Param challenge_name path string true "Challenge name"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.InstanceResponse
+// @Failure 404 {object} api.HTTPErrorResp
+// @Router /api/instances/{challenge_name} [get]
 func getUserInstanceHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {
@@ -141,6 +157,12 @@ func getUserInstanceHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, instanceToResponse(instance))
 }
 
+// @Summary List the current user's instances
+// @Tags instances
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} api.InstanceResponse
+// @Router /api/instances [get]
 func getUserInstancesHandler(ctx *gin.Context) {
 	username, err := coreUtils.GetUser(ctx.GetHeader("Authorization"))
 	if err != nil {
@@ -180,6 +202,15 @@ func getUserInstancesHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
+// @Summary Extend the current user's challenge instance
+// @Tags instances
+// @Produce json
+// @Param challenge_name path string true "Challenge name"
+// @Param seconds formData int false "Requested extension in seconds"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.InstanceResponse
+// @Failure 400 {object} api.HTTPErrorResp
+// @Router /api/instances/{challenge_name}/extend [post]
 func extendInstanceHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {
@@ -248,6 +279,13 @@ func extendInstanceHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, instanceToResponse(instance))
 }
 
+// @Summary Delete the current user's challenge instance
+// @Tags instances
+// @Produce json
+// @Param challenge_name path string true "Challenge name"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.HTTPPlainResp
+// @Router /api/instances/{challenge_name} [delete]
 func killUserInstanceHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {
@@ -288,6 +326,12 @@ func killUserInstanceHandler(ctx *gin.Context) {
 	})
 }
 
+// @Summary List all active instances
+// @Tags admin
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} api.AdminInstanceResponse
+// @Router /api/admin/instances [get]
 func adminGetAllInstancesHandler(ctx *gin.Context) {
 	instances, err := manager.GetAllInstances()
 	if err != nil {
@@ -309,6 +353,13 @@ func adminGetAllInstancesHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
+// @Summary Get an instance by ID
+// @Tags admin
+// @Produce json
+// @Param instance_id path string true "Instance ID"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.AdminInstanceResponse
+// @Router /api/admin/instances/{instance_id} [get]
 func adminGetInstanceHandler(ctx *gin.Context) {
 	instanceID := ctx.Param("instance_id")
 	if instanceID == "" {
@@ -329,6 +380,13 @@ func adminGetInstanceHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, instanceToAdminResponse(instance))
 }
 
+// @Summary Delete an instance by ID
+// @Tags admin
+// @Produce json
+// @Param instance_id path string true "Instance ID"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.HTTPPlainResp
+// @Router /api/admin/instances/{instance_id} [delete]
 func adminKillInstanceHandler(ctx *gin.Context) {
 	instanceID := ctx.Param("instance_id")
 	if instanceID == "" {
@@ -351,6 +409,13 @@ func adminKillInstanceHandler(ctx *gin.Context) {
 	})
 }
 
+// @Summary Delete all instances owned by a user
+// @Tags admin
+// @Produce json
+// @Param user_id path string true "User ID"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.HTTPPlainResp
+// @Router /api/admin/instances/user/{user_id} [delete]
 func adminKillUserInstancesHandler(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
 	if userID == "" {
@@ -381,6 +446,13 @@ func adminKillUserInstancesHandler(ctx *gin.Context) {
 	})
 }
 
+// @Summary Delete all instances for a challenge
+// @Tags admin
+// @Produce json
+// @Param challenge_name path string true "Challenge name"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.HTTPPlainResp
+// @Router /api/admin/instances/challenge/{challenge_name} [delete]
 func adminKillChallengeInstancesHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {

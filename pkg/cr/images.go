@@ -2,28 +2,77 @@ package cr
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
+	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/go-units"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
+
+const (
+	maxBuildOutput = 4 << 20
+	buildTimeout   = 30 * time.Minute
+)
+
+var errBuildOutputLimit = errors.New("build output exceeds 4 MiB limit")
+
+type BuildLimits struct {
+	CPUShares int64
+	CPUs      float32
+	Memory    int64
+	Pids      int64
+}
+
+type boundedBuildOutput struct {
+	mu       sync.Mutex
+	buffer   bytes.Buffer
+	exceeded bool
+}
+
+func (output *boundedBuildOutput) Write(data []byte) (int, error) {
+	output.mu.Lock()
+	defer output.mu.Unlock()
+	remaining := maxBuildOutput - output.buffer.Len()
+	if remaining <= 0 {
+		output.exceeded = true
+		return 0, errBuildOutputLimit
+	}
+	if len(data) > remaining {
+		_, _ = output.buffer.Write(data[:remaining])
+		output.exceeded = true
+		return remaining, errBuildOutputLimit
+	}
+	return output.buffer.Write(data)
+}
+
+func (output *boundedBuildOutput) Buffer() *bytes.Buffer {
+	output.mu.Lock()
+	defer output.mu.Unlock()
+	return bytes.NewBuffer(append([]byte(nil), output.buffer.Bytes()...))
+}
 
 func RemoveImage(imageId string) error {
 	cli, err := newDockerClient()
 	if err != nil {
 		return err
 	}
+	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
-	_, err = cli.ImageRemove(context.Background(), imageId, types.ImageRemoveOptions{
+	_, err = cli.ImageRemove(ctx, imageId, types.ImageRemoveOptions{
 		Force:         false,
 		PruneChildren: true,
 	})
@@ -32,11 +81,13 @@ func RemoveImage(imageId string) error {
 }
 
 func CheckIfImageExists(imageId string) (bool, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 	cli, err := newDockerClient()
 	if err != nil {
 		return false, err
 	}
+	defer cli.Close()
 
 	inspectVal, _, err := cli.ImageInspectWithRaw(ctx, imageId)
 	if err != nil {
@@ -55,13 +106,16 @@ func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, err
 	if err != nil {
 		return []types.ImageSummary{}, err
 	}
+	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), dockerAPIRequestTimeout)
+	defer cancel()
 
 	filterArgs := filters.NewArgs()
 	for key, val := range filterMap {
 		filterArgs.Add(key, val)
 	}
 
-	images, err := cli.ImageList(context.Background(), types.ImageListOptions{
+	images, err := cli.ImageList(ctx, types.ImageListOptions{
 		All:     false,
 		Filters: filterArgs,
 	})
@@ -69,8 +123,12 @@ func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, err
 	return images, err
 }
 
-func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, dockerCtxFile string, noCache bool) (*bytes.Buffer, string, error) {
-	ctx := context.Background()
+func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, dockerCtxFile string, noCache bool, limits BuildLimits) (*bytes.Buffer, string, error) {
+	if err := limits.Validate(); err != nil {
+		return nil, "", fmt.Errorf("invalid build resource limits: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), buildTimeout)
+	defer cancel()
 	builderContext, err := os.Open(tarContextPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("error while opening staged file :: %s", tarContextPath)
@@ -82,6 +140,16 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 		Remove:     true,
 		Dockerfile: dockerCtxFile,
 		NoCache:    noCache,
+		CPUShares:  limits.CPUShares,
+		CPUPeriod:  100000,
+		CPUQuota:   CPUQuota(limits.CPUs),
+		Memory:     limits.Memory,
+		MemorySwap: limits.Memory,
+		Ulimits: []*units.Ulimit{{
+			Name: "nproc",
+			Soft: limits.Pids,
+			Hard: limits.Pids,
+		}},
 		Labels: map[string]string{
 			"beast.challenge":            challengeName,
 			"com.sdslabs.beast.project":  utils.ProjectNameNotInstanced(challengeName),
@@ -93,6 +161,7 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 	if err != nil {
 		return nil, "", fmt.Errorf("error while creating a docker client for beast: %s", err)
 	}
+	defer dockerClient.Close()
 
 	log.Debug("Image build in process")
 	imageBuildResp, err := dockerClient.ImageBuild(ctx, builderContext, buildOptions)
@@ -102,25 +171,42 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 	defer imageBuildResp.Body.Close()
 
 	buf := new(bytes.Buffer)
-	buf.ReadFrom(imageBuildResp.Body)
+	written, err := io.Copy(buf, io.LimitReader(imageBuildResp.Body, maxBuildOutput+1))
+	if err != nil {
+		return buf, "", fmt.Errorf("read image build output: %w", err)
+	}
+	if written > maxBuildOutput {
+		return buf, "", errBuildOutputLimit
+	}
+	if err := ctx.Err(); err != nil {
+		return buf, "", fmt.Errorf("image build deadline: %w", err)
+	}
 
 	images, err := SearchImageByFilter(map[string]string{"reference": fmt.Sprintf("%s:latest", challengeTag)})
+	if err != nil {
+		return buf, "", fmt.Errorf("find built image: %w", err)
+	}
 	if len(images) > 0 {
 		log.Infof("Image ID for the image built is : %s", images[0].ID[7:])
 		return buf, images[0].ID[7:], nil
 	}
 
-	return buf, "", err
+	return buf, "", fmt.Errorf("Docker build completed without producing image %s:latest", challengeTag)
 }
 
 // TODO: find a better way to build images from docker-compose instead of cmd running
 func BuildImagesFromCompose(challengeName, challengeTag, stagedPath, ComposeFile string, noCache bool) (*bytes.Buffer, error) {
 	extractPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
 
-	extractCmd := fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", extractPath, stagedPath, extractPath)
-	err := exec.Command("bash", "-c", extractCmd).Run()
-	if err != nil {
-		return nil, fmt.Errorf("error while extracting tar file %s to %s: %v", stagedPath, extractPath, err)
+	if _, err := os.Lstat(extractPath); err == nil {
+		if err := os.RemoveAll(extractPath); err != nil {
+			return nil, fmt.Errorf("clear compose extraction directory %s: %w", extractPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("inspect compose extraction directory %s: %w", extractPath, err)
+	}
+	if err := utils.ExtractTarGzip(stagedPath, extractPath); err != nil {
+		return nil, fmt.Errorf("extract compose context: %w", err)
 	}
 
 	cmdArgs := []string{"compose", "build"}
@@ -129,18 +215,25 @@ func BuildImagesFromCompose(challengeName, challengeTag, stagedPath, ComposeFile
 	}
 	// Note: docker compose build does not support --label flag
 	// Labels are automatically added to containers during 'docker compose up -p <project>'
-	composeCmd := fmt.Sprintf("docker %s", strings.Join(cmdArgs, " "))
 	log.Debugf("Building image for challenge %s with tag %s", challengeName, challengeTag)
 	log.Debugf("Running the command: docker %v", cmdArgs)
 
-	cmd := exec.Command("bash", "-c", composeCmd)
+	ctx, cancel := context.WithTimeout(context.Background(), buildTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
 	cmd.Dir = extractPath
-	var outBuffer bytes.Buffer
-	cmd.Stdout = &outBuffer
-	cmd.Stderr = &outBuffer
+	output := &boundedBuildOutput{}
+	cmd.Stdout = output
+	cmd.Stderr = output
 
 	if err := cmd.Run(); err != nil {
-		return &outBuffer, fmt.Errorf("error while building image for challenge %s with tag %s: %v", challengeName, challengeTag, err)
+		return output.Buffer(), fmt.Errorf("error while building image for challenge %s with tag %s: %v", challengeName, challengeTag, err)
 	}
-	return &outBuffer, nil
+	if output.exceeded {
+		return output.Buffer(), errBuildOutputLimit
+	}
+	if err := ctx.Err(); err != nil {
+		return output.Buffer(), fmt.Errorf("Compose build deadline: %w", err)
+	}
+	return output.Buffer(), nil
 }

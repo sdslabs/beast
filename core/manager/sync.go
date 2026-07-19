@@ -68,7 +68,10 @@ func SyncBeastRemote(defaultauthorpassword string) error {
 	}
 	log.Info("Beast git base synced with remote")
 	UpdateChallenges(defaultauthorpassword)
-	return fmt.Errorf("%s", strings.Join(errStrings, "\n"))
+	if len(errStrings) != 0 {
+		return fmt.Errorf("%s", strings.Join(errStrings, "\n"))
+	}
+	return nil
 }
 
 func ResetBeastRemote(defaultauthorpassword string) error {
@@ -85,12 +88,14 @@ func ResetBeastRemote(defaultauthorpassword string) error {
 			}
 		}
 	}
-	err := SyncBeastRemote(defaultauthorpassword)
-	if err != nil {
+	if err := SyncBeastRemote(defaultauthorpassword); err != nil {
 		log.Errorf("Error while syncing remote after clean : %s", err)
+		errStrings = append(errStrings, err.Error())
 	}
-	errors := strings.Join(errStrings, "\n") + err.Error()
-	return fmt.Errorf("%s", errors)
+	if len(errStrings) != 0 {
+		return fmt.Errorf("%s", strings.Join(errStrings, "\n"))
+	}
+	return nil
 }
 
 // IsAlreadySynced checks if the local repository is already synced
@@ -194,6 +199,8 @@ func SyncAndGetChangesFromRemote(defaultauthorpassword string) []string {
 func RunBeastBootsteps(defaultauthorpassword string) error {
 	log.Info("Syncing beast git challenge dir with remote....")
 
-	_ = SyncBeastRemote(defaultauthorpassword)
+	if err := SyncBeastRemote(defaultauthorpassword); err != nil {
+		return fmt.Errorf("sync Beast remote: %w", err)
+	}
 	return nil
 }

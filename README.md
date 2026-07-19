@@ -1,204 +1,121 @@
-<p align="center">
-  <img src="./docs/res/beast-logo.png" alt="Beast Logo">
-</p>
+# Beast
 
-<h3 align="center">Jeopardy-style CTF challenge deployment and management tool.</h3>
+Beast is a Linux service for building, deploying, and operating jeopardy-style CTF challenges. It exposes an HTTPS API and CLI, stores durable state in PostgreSQL, uses Redis for coordination and instance expiry, and deploys challenges through local or remote Docker daemons.
 
-<p align="center">
- <a href="https://app.netlify.com/sites/beast-docs-sdslabs/deploys">
-    <img src="https://api.netlify.com/api/v1/badges/bea0e0b4-30e1-4830-ba98-e484b51e4036/deploy-status" alt="Netlify Status" />
-  </a>
- <a href="https://dev.azure.com/deepshpathak/deepshpathak/_build/latest?definitionId=1&branchName=master">
-    <img src="https://dev.azure.com/deepshpathak/deepshpathak/_apis/build/status/sdslabs.beastv4?branchName=master" alt="Build Status" />
-  </a>
- <a href="https://github.com/sdslabs/beastv4/blob/master/LICENSE.md">
-    <img src="https://img.shields.io/badge/license-Apache-blue.svg" alt="Apache License" />
-  </a>
-</p>
+## Security model
 
-## Contents
+Beast executes organizer-supplied challenge build contexts and controls Docker. Docker socket access and membership in the Docker group are effectively root-equivalent. Run Beast on a dedicated host or VM, use a dedicated unprivileged account, restrict management API access, and treat challenge authors as trusted build-code contributors. Containers reduce risk but are not a security boundary against a hostile kernel exploit.
 
-- [Overview](#overview)
-- [Features](#features)
-- [Supported Challenge](#supported-challenges)
-- [Download](#download)
-- [Tech Stack](#tech-stack)
-- [Development](#development)
-- [Contributing](#contributing)
-- [Contact](#contact)
+The controller requires TLS. Non-loopback PostgreSQL connections require `sslmode = "verify-full"` and a CA file; non-loopback Redis connections require TLS. SSH workers verify `known_hosts`, and private keys/configuration files must be regular files with mode `0600`.
 
-## Overview
+## Requirements
 
-Beast is a service that runs on your host(maybe a bare metal server or a cloud instance) and helps manage deployment, lifecycle, and health check of CTF challenges. It can also be used to host Jeopardy-style CTF competition.
+- Linux
+- Go 1.23 or newer
+- Docker Engine with a reachable daemon
+- Git and Make
+- PostgreSQL
+- Redis with ACL support
 
-Visit [beast.sdslabs.co](https://beast.sdslabs.co/) for the more details and documentation
+Use trusted operating-system packages. The setup scripts do not install system packages or pipe remote scripts into a shell.
 
-If you're looking for the source code of playCTF, the frontend powered by Beast, visit https://github.com/sdslabs/playCTF. 
-
-## Features
-
-- Git based source of truth.
-- Container based isolation
-- Easy configuration
-- SSH support for challenge instances
-- Command line interface to perform actions and host competitions
-- REST API interface for the entire ecosystem
-- An optional automated health check service to periodically check the status of challenges and report if there is some sort of problem with one.
-- Single source of truth for all the static content related to all the challenges making it easy to debug, monitor and manage
-  static content through a single interface.
-- Support for various notification channels like slack, discord.
-- Everything embedded to a single go binary which can be easily used anywhere.
-
-For more details on the features, refer to [Features](./docs/Features.md)
-
-## Supported Challenges
-
-As of now beast support the following type of challenges:
-
-- Service - A service hosted on beast container instance
-- Web - Web based challenges for various languages including PHP, Python, Node.js etc.
-- Static - Challenges with static files, this may include forensics challenges.
-- Bare - Highly customisable challenges.
-- Docker - Challenges which are provided with their own docker file.
-
-## Download
-
-Assuming you have the [docker](https://www.docker.com/) installed, head over to Beast's [releases](https://github.com/sdslabs/beast/releases) page and grab the latest binary and `setup.sh` script.
-
-Run the `setup.sh` script once. It will setup the required folders and configuration files for you.
-
-Run the downloaded binary with
+## Install and initialize
 
 ```bash
-$ ./beast run -v
+git clone https://github.com/sdslabs/beastv4.git
+cd beastv4
+./scripts/installenv.sh
+make build
+beast init
 ```
 
-## Tech Stack
+`beast init` creates private state under `$HOME/.beast`, generates or validates the TLS certificate and configuration, provisions the configured PostgreSQL database and Redis ACL user, and can create the first administrator. It prompts before privileged datastore operations.
 
-Beast is written completely in Golang and comes with a clean REST API interface to trigger actions or interact with underlying functionalities.
-The REST API server is implemented using `gin` go library and uses JWT as an authentication mechanism. Being written in go, Beast is compiled into
-a single binary which can run on any linux distribution.
+For a non-interactive filesystem/bootstrap starting point, run `./setup.sh`, review the generated `$HOME/.beast/config.toml`, then run `beast init`. The setup script generates unique JWT, PostgreSQL, and Redis secrets but does not install or start those services.
 
-Beast uses Docker as a container runtimes to run challenges in a sandboxed environment. Note that container does not provide a very strong isolation, but our host is safe as long as there is no 0-day in linux kernel itself. Even though container provide a security layer for the challenges, we follow some practices to harden those security measures.
+Start the controller:
 
-We use Swagger for automatic generation of API documentation and you can find the docs at `/api/docs/index.html` from beast server root.
+```bash
+beast run --health-probe
+```
 
-To save the state of the deployments and challenges beast uses SQLite as a database, all the information ranging from challenge deployment state to allocated ports and author information is stored in this database. This database is created automatically in the root of your beast configuration directory.
+The default endpoint is `https://localhost:5005`. For a locally generated certificate, pass its CA/certificate explicitly to clients. Do not disable TLS verification.
+
+```bash
+beast getauth --host https://localhost:5005 \
+  --ca-file "$HOME/.beast/secrets/tls.crt" \
+  --username <admin-username>
+```
+
+## Configuration
+
+The complete annotated example is [`_examples/example.config.toml`](_examples/example.config.toml). Important rules:
+
+- `$HOME/.beast/config.toml` must be a non-symlink regular file with mode `0600`.
+- `jwt_secret` must contain at least 32 bytes.
+- TLS certificate/key paths are mandatory; the private key must be mode `0600`.
+- Active remote workers need a mode-`0600` SSH key and a populated `known_hosts` file.
+- Resource defaults are hard ceilings for per-challenge overrides.
+- CORS origins must be explicit HTTPS origins (loopback HTTP is accepted for development only).
+
+## Challenge workflow
+
+Create a strict, parseable static-challenge scaffold in an empty directory:
+
+```bash
+mkdir my-challenge && cd my-challenge
+beast new
+```
+
+Edit `beast.toml`, place downloadable files in `public/`, and validate before deployment:
+
+```bash
+beast verify --local-directory "$PWD"
+```
+
+Controller-local path deployment (`beast challenge deploy --local-directory …` and its API equivalent) is administrator-only. Authors can upload a bounded ZIP whose `author`/`maintainer` email matches their account, or manage synchronized challenges they own.
+
+Challenge names, referenced files, Compose build contexts, setup scripts, assets, and environment-value files are validated and must remain inside the challenge directory. Compose files accept a constrained schema and only port-variable interpolation; privileged, host-network, host-PID/IPC, device, socket, and unsafe mount controls are rejected.
+
+See the [challenge configuration guide](docs/ChallConfig.md) and [examples](_examples/README.md).
 
 ## Development
 
-Beast go version is under development; follow the below instructions to get started.
-
-- Make sure you have docker up and running.
-- Install go [1.18.X](https://golang.org/dl/) or above
-- Make sure that `GO111MODULES` environment variable should be set to `on`, or do `export GO111MODULES=on`
-- Clone the repository.
-- Jump to `$GOPATH/src/github.com/sdslabs/beast/` and start hacking.
-
 ```bash
-$ go version
-go version go1.18 linux/amd64
-
-$ export GO111MODULES=on
-
-$ git clone git@github.com:sdslabs/beast.git
-
-$ cd beast && make help
-BEAST: An automated challenge deployment tool for backdoor
-
-* build: Build Beast and copy binary to PATH set for go build binaries.
-* dev: Run development environment with hot-reloading enabled
-* check_format: Check for formatting errors using gofmt
-* format: format the go files using go_fmt in the project directory.
-* requirements: Build beast extra artifacts requirements
-* test: Run tests for beast
-* tools: Set up required tools for Beast which includes - docker-enter, importenv
+make check_format
+go vet ./...
+go test ./...
+go test -race ./...
+make build
 ```
 
-**All the dependencies are already vendored with the project, so no need to install any dependencies**. The project uses go modules from go 1.18.X of dependency management. Make sure you vendor any library used using `go mod vendor`
-
-### Building
-
-To build Beast from Source use the Makefile provided.
-
-- `make build`
-
-This will build Beast and place the binary in `$GOPATH/bin/` and copy the necessery tools to the desired place. To build this in production make sure you also have built the static-content docker image in `/extras/static-content`
-
-To run the API server for Beast, use the command `beast run -v`
-
-### Hot reloading support
-
-- run the following command to install `air` (hot reload support)
+PostgreSQL concurrency tests run when `BEAST_TEST_PG_DSN` is set. Redis integration tests run when `BEAST_TEST_REDIS_ADDR` and related credentials are set. The example deployment harness is destructive and opt-in:
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+BEAST_RUN_INTEGRATION=1 make integration-test
 ```
-- modify `full_bin` in `.air.toml` for changing the arguments to run beast, default being `beast run -nv`
 
-- run `make dev` to start `beast` in development mode
-
-### Testing
-
-To test use the sample challenges in the `_examples` directory. Use the challenge simple and try to deploy it using
-Beast. Follow the below instructions.
-
-You can find swagger API documentation here: http://localhost:5005/api/docs/index.html
+Build documentation with pinned Python dependencies from `requirements.txt`:
 
 ```bash
-# Build beast
-$ make build
-
-# Run beast server
-# Beast server will start running on port 5005 port by default
-$ beast run -v
-
-# In another terminal Start the local deployment of the challenge, using the directory
-$ curl -X POST localhost:5005/api/manage/deploy/local/ --data "challenge_dir=<absolute_path_to_challenge_simple>"
-
-# Or you can directly deploy the challenge using name in the remote
-$ curl -X POST --data "action=deploy&name=<challenge_name>" localhost:5005/api/manage/challenge/
-
-# Wait for Beast to finish the image build and deployment of the challenge
-# This might take some time. Have some snacks ready!
-# Try connecting to the deployed service
-$ nc localhost 10001
-
---- Menu ---
-1.New note
-2.Delete note
-3.Help
-4.Exit
-choice > 4
+python3 -m venv .venv
+. .venv/bin/activate
+pip install --requirement requirements.txt
+make cmdref
+make docs
 ```
 
-### Building documentation
+## Teardown
 
-The documentation for the project lies in [/docs](/docs). We use `mkdocs` to automatically generate documentation from markdown. The configuration file for the same can be found at [mkdocs.yml](/mkdocs.yml). To view the documentation locally, create a virtual environment locally and install [requirements](/requirements-dev.txt).
+`scripts/teardown.sh` verifies the controller lock and process ownership before sending `SIGTERM`. It does not undeploy challenges or delete external PostgreSQL/Redis data.
 
 ```bash
-$ virtualenv venv && source venv/bin/activate
-
-$ pip install -r requirements.txt
-
-$ mkdocs serve
-
-Serving on http://127.0.0.1:8000
+./scripts/teardown.sh              # stop only
+./scripts/teardown.sh --purge-data # also remove $BEAST_HOME or $HOME/.beast
 ```
 
-## Contributing
+The purge option is intentionally destructive for local Beast state and refuses unsafe target paths.
 
-We are always open for contributions. If you find any feature missing, or just want to report a bug, feel free to open an issue and/or submit a pull request regarding the same.
+## License
 
-For more information on contribution, check out our
-[docs](./docs/Contribution.md).
-
-## Contact
-
-If you have a query regarding the product or just want to say hello then feel
-free to visit [chat.sdslabs.co](https://chat.sdslabs.co) or drop a mail at
-[contact@sdslabs.co.in](mailto:contact@sdslabs.co.in)
-
----
-
-Made with :heart: by [SDSLabs](https://sdslabs.co)
+[Apache License 2.0](LICENSE.md)

@@ -1,69 +1,47 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-echo -e "Setting up sample environment for beast..."
+set -euo pipefail
+umask 077
 
-# Creating required directories
-mkdir -p "/home/$USER/.beast" "/home/$USER/.beast/assets/logo" "/home/$USER/.beast/assets/mailTemplates" "/home/$USER/.beast/remote" "/home/$USER/.beast/uploads" "/home/$USER/.beast/secrets" "/home/$USER/.beast/scripts" "/home/$USER/.beast/staging"
+repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+beast_dir=${BEAST_HOME:-"${HOME}/.beast"}
+config_file="${beast_dir}/config.toml"
 
-# Creating random authorized_keys and secret.key files
-echo -e "auth_keys" >/home/$USER/.beast/authorized_keys
-echo -e "auth_keys" >/home/$USER/.beast/secret.key
+"${repo_dir}/scripts/installenv.sh"
 
-BEAST_GLOBAL_CONFIG=~/.beast/config.toml
-EXAMPLE_CONFIG_FILE=./_examples/example.config.toml
+mkdir -p \
+  "${beast_dir}/assets/logo" \
+  "${beast_dir}/assets/mailTemplates" \
+  "${beast_dir}/backup/cache" \
+  "${beast_dir}/backup/db" \
+  "${beast_dir}/cache" \
+  "${beast_dir}/remote" \
+  "${beast_dir}/secrets" \
+  "${beast_dir}/staging" \
+  "${beast_dir}/uploads"
 
-if [ -f "$BEAST_GLOBAL_CONFIG" ]; then
-    echo -e "Found $BEAST_GLOBAL_CONFIG"
+created_config=false
+if [[ ! -e "${config_file}" ]]; then
+  cp "${repo_dir}/_examples/example.config.toml" "${config_file}"
+  chmod 0600 "${config_file}"
+  jwt_secret=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+  postgres_password=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
+  redis_password=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
+  sed -i "s/CHANGE_ME_GENERATED_BY_SETUP/${jwt_secret}/" "${config_file}"
+  sed -i "0,/password = \"CHANGE_ME\"/s//password = \"${postgres_password}\"/" "${config_file}"
+  sed -i "0,/password = \"CHANGE_ME\"/s//password = \"${redis_password}\"/" "${config_file}"
+  created_config=true
+elif [[ -L "${config_file}" || $(stat -c '%a' "${config_file}") != 600 ]]; then
+  echo "existing config must be a regular file with mode 0600: ${config_file}" >&2
+  exit 1
+fi
+
+BEAST_OUTPUT=${BEAST_OUTPUT:-"$(go env GOPATH)/bin/beast"} make -C "${repo_dir}" build
+
+if [[ "${created_config}" == true ]]; then
+  echo "Created ${config_file} with unique JWT and datastore credentials."
+  echo "Before starting Beast, configure PostgreSQL, Redis, SMTP, and TLS certificate paths."
 else
-    if [ -f "$EXAMPLE_CONFIG_FILE" ]; then
-        echo -e "Copying example config file"
-        cp ./_examples/example.config.toml $BEAST_GLOBAL_CONFIG
-    else
-        echo -e '\e[93mCould not find example.config.toml'
-        echo -e 'Downloading example.config.toml'
-        wget https://raw.githubusercontent.com/sdslabs/beast/master/_examples/example.config.toml
-        cp ./example.config.toml $BEAST_GLOBAL_CONFIG
-        exit
-    fi
-    sed -i "s/vsts/$USER/g" $BEAST_GLOBAL_CONFIG
+  echo "Using existing ${config_file}."
 fi
-
-echo -e "Created .beast folder..."
-
-echo -e "Building beast..."
-
-export GO111MODULES=on
-
-echo -e 'validating $GOPATH...'
-if [ -z "$GOPATH" ]; then
-    echo -e '\e[31m$GOPATH is not set...'
-    echo -e '\e[31mAborting...'
-    exit
-fi
-
-echo -e 'checking if docker is running...'
-# Checking if docker deamon is running or not by checking its PID
-DOCKER_PID_FILE=/var/run/docker.pid
-if [ -f "$DOCKER_PID_FILE" ]; then
-    echo -e "Docker is running."
-else
-    echo -e '\e[31mDocker daemon is not running'
-    echo -e '\e[31mAborting...'
-    echo -e "\e[31mPlease start docker daemon and restart again"
-    exit
-fi
-
-echo -e "Installing air for live reloading"
-curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
-
-echo -e "Building beast..."
-make build
-if [ $? -eq 0 ]; then
-    echo -e "\e[92mPlease run beast server by following command:-"
-    echo -e "******************"
-    echo -e "*  \e[5mbeast run -v  \e[25m*"
-    echo -e "******************"
-else
-    echo -e "\e[31mBeast build failed. Please check above errors"
-    exit 1
-fi
+echo "Beast binary: ${BEAST_OUTPUT:-$(go env GOPATH)/bin/beast}"

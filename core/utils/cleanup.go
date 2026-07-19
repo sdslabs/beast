@@ -70,9 +70,7 @@ func CleanupChallengeContainers(chall *database.Challenge, config cfg.BeastChall
 
 		if !cfg.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
 			server := cfg.Cfg.AvailableServers[chall.ServerDeployed]
-			downCommand := fmt.Sprintf("docker compose -p %s down", projectName)
-			_, err := remoteManager.RunCommandOnServer(server, downCommand)
-			if err != nil {
+			if err := remoteManager.ComposeDownProjectRemote(projectName, server); err != nil {
 				log.Errorf("Error running docker compose down on remote: %v", err)
 				return err
 			}
@@ -126,13 +124,13 @@ func CleanupChallengeImage(chall *database.Challenge) error {
 }
 
 func CleanupChallengeIfExist(config cfg.BeastChallengeConfig) error {
-	chall, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
+	chall, found, err := database.FindFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 	if err != nil {
 		log.Errorf("Error while database query for challenge %s", config.Challenge.Metadata.Name)
 		return err
 	}
 
-	if chall.Name == "" {
+	if !found {
 		log.Info("No such challenge exist in the database")
 		return nil
 	}

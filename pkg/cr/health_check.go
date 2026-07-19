@@ -1,15 +1,14 @@
 package cr
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/cache"
 	log "github.com/sirupsen/logrus"
-	"os/exec"
-	"strings"
 )
 
 func CleanupOrphans() {
@@ -92,7 +91,7 @@ func CleanupOrphanedComposeInstances() {
 		if err != nil {
 			log.Infof("Removing orphaned compose instance project: %s (instance %s) on %s", projectName, instanceID, core.LOCALHOST)
 
-			err = composeDownProject(projectName)
+			err = composeDownOrphanProject(projectName)
 			if err != nil {
 				log.Warnf("Failed to remove orphaned compose project %s: %v", projectName, err)
 			}
@@ -106,13 +105,9 @@ func CleanupOrphanedComposeInstances() {
 // getOrphanedComposeInstanceProjects returns a list of docker compose project names
 // that match the instance naming pattern (beast-instance-*)
 func getOrphanedComposeInstanceProjects() ([]string, error) {
-	cmd := exec.Command("docker", "compose", "ls", "--format", "json")
-	var output bytes.Buffer
-	cmd.Stdout = &output
-	cmd.Stderr = &output
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("docker compose ls failed: %v, output: %s", err, output.String())
+	output, err := runRuntimeCommand("docker", []string{"compose", "ls", "--format", "json"}, runtimeCommandOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("docker compose ls failed: %v, output: %s", err, output)
 	}
 
 	type ComposeProject struct {
@@ -121,7 +116,7 @@ func getOrphanedComposeInstanceProjects() ([]string, error) {
 	}
 
 	var projects []ComposeProject
-	outputStr := strings.TrimSpace(output.String())
+	outputStr := strings.TrimSpace(output)
 	if outputStr == "" {
 		return nil, nil
 	}
@@ -150,17 +145,11 @@ func getOrphanedComposeInstanceProjects() ([]string, error) {
 	return instanceProjects, nil
 }
 
-// composeDownProject removes a docker compose project by name
-func composeDownProject(projectName string) error {
-	cmd := exec.Command("docker", "compose", "-p", projectName, "down", "--remove-orphans", "-v")
-	var output bytes.Buffer
-	cmd.Stdout = &output
-	cmd.Stderr = &output
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker compose down failed: %v, output: %s", err, output.String())
+func composeDownOrphanProject(projectName string) error {
+	output, err := runRuntimeCommand("docker", []string{"compose", "-p", projectName, "down", "--remove-orphans", "-v"}, runtimeCommandOptions{})
+	if err != nil {
+		return fmt.Errorf("docker compose down failed: %v, output: %s", err, output)
 	}
-
 	log.Debugf("Successfully removed compose project %s", projectName)
 	return nil
 }

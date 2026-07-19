@@ -103,7 +103,7 @@ func CleanupOrphanedComposeInstancesOnServer(serverDeployed string) {
 
 // getOrphanedComposeInstanceProjectsRemote returns compose instance projects on a remote server
 func getOrphanedComposeInstanceProjectsRemote(server config.AvailableServer) ([]string, error) {
-	output, err := RunCommandOnServer(server, "docker compose ls --format json")
+	output, err := RunArgsOnServer(server, "docker", "compose", "ls", "--format", "json")
 	if err != nil {
 		return nil, fmt.Errorf("docker compose ls failed on remote: %v", err)
 	}
@@ -145,8 +145,7 @@ func getOrphanedComposeInstanceProjectsRemote(server config.AvailableServer) ([]
 
 // composeDownProjectRemote removes a docker compose project on a remote server
 func composeDownProjectRemote(projectName string, server config.AvailableServer) error {
-	cmd := fmt.Sprintf("docker compose -p %s down --remove-orphans -v", projectName)
-	output, err := RunCommandOnServer(server, cmd)
+	output, err := RunArgsOnServer(server, "docker", "compose", "-p", projectName, "down", "--remove-orphans", "--volumes")
 	if err != nil {
 		return fmt.Errorf("docker compose down failed on remote: %v, output: %s", err, output)
 	}

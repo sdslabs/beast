@@ -47,26 +47,15 @@ func SaveInstance(instance *Instance, ttl time.Duration) error {
 	}
 
 	key := utils.InstanceToKey(instance.InstanceID)
-	err = Cache.Set(ctx, key, data, 0).Err()
-	if err != nil {
-		return fmt.Errorf("failed to save instance: %w", err)
-	}
-
 	expiryKey := utils.InstanceExpiryToKey(instance.InstanceID)
-	err = Cache.Set(ctx, expiryKey, instance.InstanceID, ttl).Err()
-	if err != nil {
-		return fmt.Errorf("failed to save instance expiry marker: %w", err)
-	}
-
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
-	err = Cache.Set(ctx, userKey, instance.InstanceID, ttl).Err()
-	if err != nil {
-		return fmt.Errorf("failed to save user instance mapping: %w", err)
-	}
-
-	err = Cache.SAdd(ctx, utils.InstancesSetKey, instance.InstanceID).Err()
-	if err != nil {
-		log.Warnf("failed to add instance to set: %v", err)
+	pipe := Cache.TxPipeline()
+	pipe.Set(ctx, key, data, 0)
+	pipe.Set(ctx, expiryKey, instance.InstanceID, ttl)
+	pipe.Set(ctx, userKey, instance.InstanceID, ttl)
+	pipe.SAdd(ctx, utils.InstancesSetKey, instance.InstanceID)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("save instance metadata: %w", err)
 	}
 
 	log.Debugf("Saved instance %s for user %s, challenge %s, port %d, expires in %v",
@@ -81,8 +70,8 @@ func GetInstance(instanceID string) (*Instance, error) {
 	}
 
 	ctx := context.Background()
-	CacheMutex.Lock()
-	defer CacheMutex.Unlock()
+	CacheMutex.RLock()
+	defer CacheMutex.RUnlock()
 
 	key := utils.InstanceToKey(instanceID)
 	data, err := Cache.Get(ctx, key).Bytes()
@@ -105,8 +94,8 @@ func GetUserInstance(userID, challengeName string) (*Instance, error) {
 	}
 
 	ctx := context.Background()
-	CacheMutex.Lock()
-	defer CacheMutex.Unlock()
+	CacheMutex.RLock()
+	defer CacheMutex.RUnlock()
 
 	userKey := utils.UserChallengeToKey(userID, challengeName)
 	instanceID, err := Cache.Get(ctx, userKey).Result()
@@ -135,8 +124,8 @@ func GetUserInstances(userID string) ([]*Instance, error) {
 	}
 
 	ctx := context.Background()
-	CacheMutex.Lock()
-	defer CacheMutex.Unlock()
+	CacheMutex.RLock()
+	defer CacheMutex.RUnlock()
 
 	pattern := utils.UserChallengesAllKey(userID)
 	var instances []*Instance
@@ -260,16 +249,16 @@ func DeleteInstance(instanceID string) error {
 		return fmt.Errorf("failed to unmarshal instance: %w", err)
 	}
 
-	err = Cache.Del(ctx, key).Err()
-	if err != nil {
-		return fmt.Errorf("failed to delete instance: %w", err)
-	}
-
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	expiryKey := utils.InstanceExpiryToKey(instanceID)
-	Cache.Del(ctx, userKey)
-	Cache.Del(ctx, expiryKey)
-	Cache.SRem(ctx, utils.InstancesSetKey, instanceID)
+	pipe := Cache.TxPipeline()
+	pipe.Del(ctx, key)
+	pipe.Del(ctx, userKey)
+	pipe.Del(ctx, expiryKey)
+	pipe.SRem(ctx, utils.InstancesSetKey, instanceID)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("delete instance metadata: %w", err)
+	}
 
 	log.Debugf("Deleted instance %s for user %s, challenge %s",
 		instanceID, instance.UserID, instance.ChallengeName)
@@ -312,15 +301,15 @@ func ExtendInstance(instanceID string, additionalTime time.Duration) error {
 		return fmt.Errorf("failed to marshal instance: %w", err)
 	}
 
-	err = Cache.Set(ctx, key, updatedData, 0).Err()
-	if err != nil {
-		return fmt.Errorf("failed to extend instance: %w", err)
-	}
-
 	userKey := utils.UserChallengeToKey(instance.UserID, instance.ChallengeName)
 	expiryKey := utils.InstanceExpiryToKey(instanceID)
-	Cache.Set(ctx, expiryKey, instanceID, newTTL)
-	Cache.Expire(ctx, userKey, newTTL)
+	pipe := Cache.TxPipeline()
+	pipe.Set(ctx, key, updatedData, 0)
+	pipe.Set(ctx, expiryKey, instanceID, newTTL)
+	pipe.Expire(ctx, userKey, newTTL)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("extend instance metadata: %w", err)
+	}
 
 	log.Debugf("Extended instance %s by %v, new expiration: %v", instanceID, additionalTime, newExpiresAt)
 
@@ -333,8 +322,8 @@ func CountUserInstances(userID string) (int, error) {
 	}
 
 	ctx := context.Background()
-	CacheMutex.Lock()
-	defer CacheMutex.Unlock()
+	CacheMutex.RLock()
+	defer CacheMutex.RUnlock()
 
 	pattern := utils.UserChallengesAllKey(userID)
 	count := 0
@@ -353,8 +342,8 @@ func GetInstanceTTL(instanceID string) (time.Duration, error) {
 	}
 
 	ctx := context.Background()
-	CacheMutex.Lock()
-	defer CacheMutex.Unlock()
+	CacheMutex.RLock()
+	defer CacheMutex.RUnlock()
 
 	expiryKey := utils.InstanceExpiryToKey(instanceID)
 	ttl, err := Cache.TTL(ctx, expiryKey).Result()
@@ -495,8 +484,8 @@ func GetDeletionQueueLength() (int64, error) {
 	}
 
 	ctx := context.Background()
-	CacheMutex.Lock()
-	defer CacheMutex.Unlock()
+	CacheMutex.RLock()
+	defer CacheMutex.RUnlock()
 
 	return Cache.LLen(ctx, utils.InstanceDeletionQueue).Result()
 }

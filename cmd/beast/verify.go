@@ -1,34 +1,46 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/manager"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // Verifies the challenge config
 var verifyCmd = &cobra.Command{
-	Use:   "verify challenge-name",
+	Use:   "verify [challenge-name]",
 	Short: "Verifies challenge config",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 
-	Run: func(cmd *cobra.Command, args []string) {
-		config.InitConfig()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := config.InitConfig(); err != nil {
+			return err
+		}
+		if LocalDirectory != "" {
+			if len(args) != 0 {
+				return fmt.Errorf("challenge name and local-directory are mutually exclusive")
+			}
+			if err := manager.ValidateChallengeConfig(LocalDirectory); err != nil {
+				return fmt.Errorf("validate local challenge: %w", err)
+			}
+			return nil
+		}
+		if len(args) == 0 {
+			return fmt.Errorf("challenge name or local-directory is required")
+		}
 		challengeName := args[0]
 
 		challengeDir := coreUtils.GetChallengeDir(challengeName)
 		if challengeDir == "" {
-			log.Errorf("Challenge does not exist")
-			return
+			return fmt.Errorf("challenge %q does not exist", challengeName)
 		}
 
-		err := manager.ValidateChallengeConfig(challengeDir)
-		if err != nil {
-			log.Warnf("Error while validating challenge %s : %s", challengeName, err.Error())
-		} else {
-			log.Infof("The challenge config is verified.")
+		if err := manager.ValidateChallengeConfig(challengeDir); err != nil {
+			return fmt.Errorf("validate challenge %s: %w", challengeName, err)
 		}
+		return nil
 	},
 }

@@ -1,35 +1,32 @@
 package remoteManager
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
-	log "github.com/sirupsen/logrus"
 )
 
-func Init() {
+func Init() error {
 	ServerQueue = NewLoadBalancerQueue()
+	var failures []error
 	for serverDeployed, server := range config.Cfg.AvailableServers {
 		if server.Active {
 			// Skip SSH bootstrap for loopback workers; they use the local Docker socket from Beast.
 			if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 				continue
 			}
-			client, err := CreateSSHClient(server)
+			_, err := RunArgsOnServer(server, "mkdir", "-p", "--", filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR))
 			if err != nil {
-				log.Errorf("SSH connection to %s failed: %s\n", server.Host, err)
+				failures = append(failures, fmt.Errorf("prepare remote %s: %w", serverDeployed, err))
 				continue
 			}
-			defer client.Close()
 			ServerQueue.Push(server)
-			_, err = RunCommandOnServer(server, fmt.Sprintf("mkdir -p %s", filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR)))
-			if err != nil {
-				log.Errorf("failed to run command on server %s: %s", server.Host, err.Error())
-			}
 		}
 	}
+	return errors.Join(failures...)
 }
 
 func Stop() {

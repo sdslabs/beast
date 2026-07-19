@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 TEMPLATE = """
 <!DOCTYPE html>
@@ -86,7 +86,7 @@ window.onload = function() {
 </html>
 """
 
-INPUT_PATH = "api/docs/swagger/swagger.json"
+INPUT_PATH = "api/docs/swagger.json"
 OUTPUT_PATH = "site/apidocs.html"
 
 with open(INPUT_PATH, "r") as file:

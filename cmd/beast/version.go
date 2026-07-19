@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/sdslabs/beastv4/version"
 	"github.com/spf13/cobra"
@@ -16,6 +15,7 @@ var versionCmd = &cobra.Command{
 	Short: "Displays the version of the current build of beast",
 	Long: `Displays the version of the current build of beast, this information
 include Version, Revision, Git-Branch, BuildUser, BuildDate, go-version`,
+	Args: cobra.NoArgs,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf(version.VersionStr,
@@ -25,6 +25,5 @@ include Version, Revision, Git-Branch, BuildUser, BuildDate, go-version`,
 			version.Info["buildUser"],
 			version.Info["buildDate"],
 			version.Info["goVersion"])
-		os.Exit(0)
 	},
 }

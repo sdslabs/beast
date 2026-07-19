@@ -2,52 +2,35 @@ package utils
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/auth"
-	"github.com/sdslabs/beastv4/utils"
-	log "github.com/sirupsen/logrus"
 )
 
-func CreateAdminOrAuthor(name string, username string, email string, publicKeyPath string, password string, role string) {
-	var sshKey []byte
-	if publicKeyPath != "" {
-		err := utils.ValidateFileExists(publicKeyPath)
-		if err != nil {
-			log.Errorf("Error while checking validity of file(%v): %v : ", publicKeyPath, err)
-			return
-		}
-
-		sshKey, err = os.ReadFile(publicKeyPath)
-		if err != nil {
-			log.Errorf("Error while reading file: %v", err)
-			return
-		}
-
-	} else {
-		log.Warn("SSH Key for author is not provided")
+func CreateAdminOrAuthor(name string, username string, email string, password string, role string) error {
+	authModel, err := auth.CreateModel(username, password, core.USER_ROLES[role])
+	if err != nil {
+		return err
 	}
-
 	userEntry := database.User{
 		Name:      name,
-		AuthModel: auth.CreateModel(username, password, core.USER_ROLES[role]),
+		AuthModel: authModel,
 		Email:     email,
-		SshKey:    string(sshKey),
 	}
-	err := database.CreateUserEntry(&userEntry)
+	err = database.CreateUserEntry(&userEntry)
 	if err != nil {
-		log.Errorf("Error while creating author entry : %v", err)
+		return fmt.Errorf("create author entry: %w", err)
 	}
+	return nil
 }
 
 func DeleteChallengeEntryWithPorts(challname string) error {
-	chall, err := database.QueryFirstChallengeEntry("name", challname)
+	chall, found, err := database.FindFirstChallengeEntry("name", challname)
 	if err != nil {
 		return fmt.Errorf("Error while querying database : %v", err)
 	}
-	if chall.Name == "" {
+	if !found {
 		return nil
 	}
 	ports, err := database.GetAllocatedPorts(chall)

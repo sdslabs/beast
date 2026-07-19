@@ -3,7 +3,9 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -21,9 +23,8 @@ import (
 // The image name for the static content docker image shoule be specified in the
 // BEAST_STATIC_CONTAINER_NAME:latest variable
 // This function does not build the image for static containers.
-// The port for the deployment of the static container is specified in the variable
-// BEAST_CHALLENGES_STATIC_PORT, this port should be free and will be the port on which
-// nginx container for static files will be running.
+// The static container receives a separate read-only mount for each challenge's public
+// assets. Other staging data is never visible to the web server.
 //
 // Each challenges have its own static file folder inside the challenges directory.
 // The whole staging area of beast configuration is mounted on the docker container
@@ -48,28 +49,26 @@ func DeployStaticContentContainer() error {
 		return errors.New("IMAGE_NOT_FOUND_ERROR")
 	}
 
-	// Remove the prefix sha256:
-	imageId := images[0].ID[7:]
-	stagingDirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-	err = utils.CreateIfNotExistDir(stagingDirPath)
-	if err != nil {
-		log.Errorf("Error in validating staging mount point : %s", err)
-		return errors.New("INVALID_STAGING_AREA")
-	}
-
-	beastStaticAuthFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STATIC_AUTH_FILE)
-	err = utils.ValidateFileExists(beastStaticAuthFile)
-	if err != nil {
-		p := fmt.Errorf("BEAST STATIC: Authentication file does not exist for beast static container, cannot proceed deployment")
-		log.Error(p.Error())
-		return p
-	}
+	imageId := strings.TrimPrefix(images[0].ID, "sha256:")
 
 	staticMount := make(map[string]string)
-	staticMount[stagingDirPath] = core.BEAST_STAGING_AREA_MOUNT_POINT
-	staticMount[beastStaticAuthFile] = filepath.Join("/", core.BEAST_STATIC_AUTH_FILE)
+	challenges, err := database.QueryAllChallenges()
+	if err != nil {
+		return fmt.Errorf("query static challenge assets: %w", err)
+	}
+	for _, challenge := range challenges {
+		source := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge.Name, core.BEAST_STATIC_FOLDER)
+		info, statErr := os.Lstat(source)
+		if os.IsNotExist(statErr) {
+			continue
+		}
+		if statErr != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("invalid static asset directory for %s", challenge.Name)
+		}
+		staticMount[source] = filepath.Join(core.BEAST_STAGING_AREA_MOUNT_POINT, challenge.Name, core.BEAST_STATIC_FOLDER)
+	}
 	portMap := cr.PortMapping{
-		ContainerPort: core.BEAST_CHALLENGES_STATIC_PORT,
+		ContainerPort: core.BEAST_STATIC_CONTAINER_PORT,
 		HostPort:      core.BEAST_CHALLENGES_STATIC_PORT,
 	}
 
@@ -78,6 +77,10 @@ func DeployStaticContentContainer() error {
 		MountsMap:     staticMount,
 		ImageId:       imageId,
 		ContainerName: core.BEAST_STATIC_CONTAINER_NAME,
+		CPUShares:     cfg.Cfg.CPUShares,
+		CPUsLimit:     cfg.Cfg.CPUsLimit,
+		Memory:        cfg.Cfg.Memory,
+		PidsLimit:     cfg.Cfg.PidsLimit,
 	}
 	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {
@@ -97,13 +100,14 @@ func DeployStaticContentContainer() error {
 
 // This cleans up the container deployed by DeployStaticContentContainer function
 // The image is preserved after calling the function and thus need not be build again.
-func UndeployStaticContentContainer() {
+func UndeployStaticContentContainer() error {
 	err := coreutils.CleanupContainerByFilter("name", core.BEAST_STATIC_CONTAINER_NAME)
 	if err != nil {
 		log.Errorf("Error while cleaning old static content container : %s", err)
-	} else {
-		log.Infof("Static content container undeployed")
+		return err
 	}
+	log.Infof("Static content container undeployed")
+	return nil
 }
 
 // Deploy a static challenge

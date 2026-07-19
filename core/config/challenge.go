@@ -3,7 +3,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/mail"
+	"net/url"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
@@ -15,6 +19,14 @@ import (
 
 const SERVICE_CONTAINER_DEPS string = "xinetd"
 const SERVICE_CHALL_RUN_CMD string = "xinetd -dontfork"
+
+var challengeNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
+var environmentKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+var generatedPathPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$`)
+
+func IsValidChallengeName(name string) bool {
+	return challengeNamePattern.MatchString(name)
+}
 
 // This is the beast challenge config file structure
 // any other field specified in the file other than this structure
@@ -36,25 +48,24 @@ func (config *BeastChallengeConfig) PopulateDefaultValues() {
 }
 
 func (Author *Author) PopulateAuthor() {
-	Author.Name = "AuthorName"
-	Author.Email = "AuthorMail"
-	Author.SSHKey = "AuthorPubKey"
+	Author.Name = "Author Name"
+	Author.Email = "author@example.com"
 }
 
 func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
-	Metadata.Name = "ChallengeName"
-	Metadata.Type = "ChallengeType"
+	Metadata.Name = "challenge-name"
+	Metadata.Type = core.STATIC_CHALLENGE_TYPE_NAME
 	Metadata.DynamicFlag = false
-	Metadata.Flag = "ChallengeFlag"
+	Metadata.Flag = "flag{replace-me}"
+	Metadata.Difficulty = "medium"
+	Metadata.Points = 100
 }
 
 func (Env *ChallengeEnv) PopulateChallengeEnv() {
 	Env.AptDeps = []string{}
 	Env.Ports = []uint32{}
 	Env.SetupScripts = []string{}
-	Env.StaticContentDir = "StaticContentDir"
-	Env.BaseImage = "ChallengeBase"
-	Env.RunCmd = "RunCmd"
+	Env.StaticContentDir = core.PUBLIC
 }
 
 func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) error {
@@ -71,7 +82,18 @@ func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) erro
 		return err
 	}
 
-	config.Resources.ValidateRequiredFields()
+	if err = config.Resources.ValidateRequiredFields(); err != nil {
+		return err
+	}
+	if config.Challenge.Env.DockerCompose != "" {
+		composePath, err := utils.ResolvePathWithin(challdir, config.Challenge.Env.DockerCompose)
+		if err != nil {
+			return err
+		}
+		if err := utils.ValidateComposeResources(composePath, config.Resources.Memory, config.Resources.PidsLimit, config.Resources.CPUsLimit); err != nil {
+			return fmt.Errorf("validate Compose resources: %w", err)
+		}
+	}
 
 	for _, maintainer := range config.Maintainers {
 		err = maintainer.ValidateRequiredFields()
@@ -102,7 +124,13 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 		return err
 	} else if staticChall {
 		log.Debugf("Challenge provided is a static challenge.")
-		return nil
+		if config.Env.StaticContentDir == "" {
+			config.Env.StaticContentDir = core.PUBLIC
+		}
+		if err := validateChallengeDir(challdir, config.Env.StaticContentDir, "static_dir"); err != nil {
+			return err
+		}
+		return config.Metadata.ValidateAssets(challdir, config.Env.StaticContentDir)
 	}
 
 	err = config.Env.ValidateRequiredFields(config.Metadata.Type, challdir)
@@ -110,8 +138,7 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
 		return err
 	}
-
-	return nil
+	return config.Metadata.ValidateAssets(challdir, config.Env.StaticContentDir)
 }
 
 // This contains challenge meta data
@@ -170,6 +197,29 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	if config.Name == "" || (config.Flag == "" && !config.DynamicFlag) {
 		return fmt.Errorf("name and flag required for the challenge"), false
 	}
+	if !IsValidChallengeName(config.Name) {
+		return fmt.Errorf("challenge name must match %s", challengeNamePattern.String()), false
+	}
+	if config.MaxPoints > 0 && config.MinPoints > config.MaxPoints {
+		return fmt.Errorf("minPoints cannot exceed maxPoints"), false
+	}
+	if config.MaxPoints == 0 && config.Points > 0 && config.MinPoints > config.Points {
+		return fmt.Errorf("minPoints cannot exceed points when maxPoints is omitted"), false
+	}
+	if config.MaxPoints > 0 && config.Points > config.MaxPoints {
+		return fmt.Errorf("points cannot exceed maxPoints"), false
+	}
+	for _, prerequisite := range config.PreReqs {
+		if !challengeNamePattern.MatchString(prerequisite) {
+			return fmt.Errorf("invalid prerequisite challenge name %q", prerequisite), false
+		}
+	}
+	for _, link := range config.AdditionalLinks {
+		parsed, err := url.ParseRequestURI(link)
+		if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
+			return fmt.Errorf("invalid additional link %q", link), false
+		}
+	}
 
 	// Checks if fail solve limit is provided and is greater than 0
 	if config.MaxAttemptLimit < 0 {
@@ -197,6 +247,29 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 	}
 
 	return fmt.Errorf("not a valid challenge type : %s", config.Type), false
+}
+
+func (config *ChallengeMetadata) ValidateAssets(challengeDir, staticContentDir string) error {
+	if len(config.Assets) == 0 {
+		return nil
+	}
+	if staticContentDir == "" {
+		staticContentDir = core.PUBLIC
+	}
+	staticRoot, err := utils.ResolvePathWithin(challengeDir, staticContentDir)
+	if err != nil {
+		return fmt.Errorf("invalid static asset root: %w", err)
+	}
+	for _, asset := range config.Assets {
+		assetPath, err := utils.ResolvePathWithin(staticRoot, asset)
+		if err != nil {
+			return fmt.Errorf("invalid challenge asset %q: %w", asset, err)
+		}
+		if err := utils.ValidateFileExists(assetPath); err != nil {
+			return fmt.Errorf("invalid challenge asset %q: %w", asset, err)
+		}
+	}
+	return nil
 }
 
 // This contains challenge specific properties which includes the following toml fields
@@ -294,12 +367,53 @@ func (config *ChallengeEnv) TrafficType() cr.TrafficType {
 // GetDefaultPort returns the default port used by the challenge from the challenge environment
 // configuration.
 func (config *ChallengeEnv) GetDefaultPort() uint32 {
+	if config.DefaultPort != 0 {
+		return config.DefaultPort
+	}
 	ports := config.Ports
 	if len(ports) == 0 {
 		return 0
 	}
 
 	return ports[0]
+}
+
+func validateChallengeFile(challengeDir, relativePath, field string) error {
+	resolvedPath, err := utils.ResolvePathWithin(challengeDir, relativePath)
+	if err != nil {
+		return fmt.Errorf("invalid %s %q: %w", field, relativePath, err)
+	}
+	if err := utils.ValidateFileExists(resolvedPath); err != nil {
+		return fmt.Errorf("invalid %s %q: %w", field, relativePath, err)
+	}
+	return nil
+}
+
+func validateChallengeDir(challengeDir, relativePath, field string) error {
+	resolvedPath, err := utils.ResolvePathWithin(challengeDir, relativePath)
+	if err != nil {
+		return fmt.Errorf("invalid %s %q: %w", field, relativePath, err)
+	}
+	if err := utils.ValidateDirExists(resolvedPath); err != nil {
+		return fmt.Errorf("invalid %s %q: %w", field, relativePath, err)
+	}
+	return nil
+}
+
+func validateGeneratedChallengeFile(challengeDir, relativePath, field string, setupScripts []string) error {
+	cleaned := filepath.ToSlash(filepath.Clean(relativePath))
+	if !generatedPathPattern.MatchString(cleaned) || cleaned == "." || strings.Contains(cleaned, "../") {
+		return fmt.Errorf("invalid %s path %q", field, relativePath)
+	}
+	if err := validateChallengeFile(challengeDir, cleaned, field); err == nil {
+		return nil
+	} else if _, statErr := os.Lstat(filepath.Join(challengeDir, filepath.FromSlash(cleaned))); !os.IsNotExist(statErr) {
+		return err
+	}
+	if len(setupScripts) == 0 {
+		return fmt.Errorf("%s %q does not exist and no setup script generates it", field, relativePath)
+	}
+	return nil
 }
 
 // ValidateRequiredFields validates required fields for the Challenge environment configuration.
@@ -309,10 +423,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	// Validate port related stuff for the challenge environment configuration.
 
 	if config.StaticContentDir != "" {
-		if filepath.IsAbs(config.StaticContentDir) {
-			return fmt.Errorf("static content directory path should be relative to challenge directory root")
-		}
-		if err := utils.ValidateDirExists(filepath.Join(challdir, config.StaticContentDir)); err != nil {
+		if err := validateChallengeDir(challdir, config.StaticContentDir, "static_dir"); err != nil {
 			return err
 		}
 	}
@@ -322,11 +433,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	if config.DockerCompose != "" {
-		if filepath.IsAbs(config.DockerCompose) {
-			return fmt.Errorf("docker_compose path should be relative to challenge directory root")
-		}
-		if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCompose)); err != nil {
-			return fmt.Errorf("docker_compose file does not exist: %s", config.DockerCompose)
+		if err := validateChallengeFile(challdir, config.DockerCompose, "docker_compose"); err != nil {
+			return err
 		}
 
 		// Warn if other configuration fields are specified when docker_compose is provided
@@ -377,16 +485,23 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	if !utils.StringInSlice(config.BaseImage, Cfg.AllowedBaseImages) {
 		return fmt.Errorf("the base image: %s is not supported", config.BaseImage)
 	}
+	if config.DockerCtx != "" {
+		if err := validateChallengeFile(challdir, config.DockerCtx, "docker_context"); err != nil {
+			return err
+		}
+	}
+	if config.XinetdConf != "" {
+		if err := validateChallengeFile(challdir, config.XinetdConf, "xinetd_conf"); err != nil {
+			return err
+		}
+	}
 
 	if challType == core.SERVICE_CHALLENGE_TYPE_NAME {
 		// Challenge type is service.
 		// ServicePath must be relative.
 		if config.ServicePath != "" {
-			if filepath.IsAbs(config.ServicePath) {
-				return fmt.Errorf("for challenge type `services` service_path is a required variable, which should be relative path to executable")
-			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
-				// Skip this, we might create service later too.
-				log.Warnf("Service path file %s does not exist", config.ServicePath)
+			if err := validateGeneratedChallengeFile(challdir, config.ServicePath, "service_path", config.SetupScripts); err != nil {
+				return err
 			}
 		}
 	} else if strings.HasPrefix(challType, core.WEB_CHALLENGE_TYPE_NAME) {
@@ -394,35 +509,30 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if config.WebRoot == "" && config.DockerCtx == "" && config.DockerCompose == "" {
 			return errors.New("web root can not be empty for web challenges without custom dockerfile or docker-compose")
 		} else if config.WebRoot != "" {
-			if filepath.IsAbs(config.WebRoot) {
-				return fmt.Errorf("web Root directory path should be relative to challenge directory root")
-			} else if err := utils.ValidateDirExists(filepath.Join(challdir, config.WebRoot)); err != nil {
-				return fmt.Errorf("web Root directory does not exist")
+			if err := validateChallengeDir(challdir, config.WebRoot, "web_root"); err != nil {
+				return err
 			}
 		}
 	}
 
 	for _, script := range config.SetupScripts {
-		if filepath.IsAbs(script) {
-			return fmt.Errorf("script path is absolute : %s", script)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, script)); err != nil {
-			return fmt.Errorf("file %s does not exist", script)
+		if err := validateChallengeFile(challdir, script, "setup_scripts"); err != nil {
+			return err
 		}
 	}
 
 	for _, env := range config.EnvironmentVars {
-		if filepath.IsAbs(env.Value) {
-			return fmt.Errorf("environment Variable contains absolute path : %s", env.Value)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
-			return fmt.Errorf("file %s does not exist", env.Value)
+		if !environmentKeyPattern.MatchString(env.Key) {
+			return fmt.Errorf("invalid environment variable key %q", env.Key)
+		}
+		if err := validateChallengeFile(challdir, env.Value, "environment variable value"); err != nil {
+			return err
 		}
 	}
 
 	if config.Entrypoint != "" {
-		if filepath.IsAbs(config.Entrypoint) {
-			return fmt.Errorf("entrypoint contains absolute path : %s", config.Entrypoint)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.Entrypoint)); err != nil {
-			return fmt.Errorf("file %s does not exist", config.Entrypoint)
+		if err := validateChallengeFile(challdir, config.Entrypoint, "entrypoint"); err != nil {
+			return err
 		}
 	}
 
@@ -441,6 +551,16 @@ func (config *ChallengeEnv) ExtractPorts() error {
 		if len(config.Ports) > int(core.MAX_PORT_PER_CHALL) {
 			return fmt.Errorf("max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
 		}
+		seen := make(map[uint32]bool, len(config.Ports))
+		for _, port := range config.Ports {
+			if port == 0 || port > 65535 {
+				return fmt.Errorf("container port %d is outside 1-65535", port)
+			}
+			if seen[port] {
+				return fmt.Errorf("container port %d is duplicated", port)
+			}
+			seen[port] = true
+		}
 
 		if config.DefaultPort == 0 {
 			config.DefaultPort = config.Ports[0]
@@ -455,12 +575,19 @@ func (config *ChallengeEnv) ExtractPorts() error {
 
 func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 	if config.DockerCompose != "" {
-		portVariables, err := utils.ExtractPortsFromCompose(filepath.Join(challdir, config.DockerCompose))
+		composePath, err := utils.ResolvePathWithin(challdir, config.DockerCompose)
 		if err != nil {
-			log.Warnf("failed to extract port variables from compose file with the following error : %s", err.Error())
+			return err
+		}
+		portVariables, err := utils.ExtractPortsFromCompose(composePath)
+		if err != nil {
+			return fmt.Errorf("extract compose ports: %w", err)
 		}
 		if len(portVariables) == 0 {
 			return errors.New("some port is required to be specified by the challenge")
+		}
+		if len(portVariables) > int(core.MAX_PORT_PER_CHALL) {
+			return fmt.Errorf("max ports allowed for challenge: %d given: %d", core.MAX_PORT_PER_CHALL, len(portVariables))
 		}
 
 		config.PortVariables = portVariables
@@ -480,8 +607,6 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 //
 //   - Name - Name of the author of the challenge
 //   - Email - Email of the author
-//   - SSHKey - Public SSH key for the challenge author, to give the access
-//     to the challenge container.
 //
 // ```toml
 // # Optional fields
@@ -489,17 +614,19 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 //
 // # Required Fields
 // email = ""
-// ssh_key = "" # Public ssh Key of the author.
 // ```
 type Author struct {
-	Name   string `toml:"name"`
-	Email  string `toml:"email"`
-	SSHKey string `toml:"ssh_key"`
+	Name  string `toml:"name"`
+	Email string `toml:"email"`
 }
 
 func (config *Author) ValidateRequiredFields() error {
-	if config.Email == "" || config.SSHKey == "" {
-		return errors.New("Challenge `email` and `ssh_key` are required")
+	if config.Email == "" {
+		return errors.New("challenge author email is required")
+	}
+	address, err := mail.ParseAddress(config.Email)
+	if err != nil || address.Address != config.Email {
+		return fmt.Errorf("invalid challenge author email %q", config.Email)
 	}
 
 	if config.Name == "" {
@@ -521,7 +648,10 @@ type Resources struct {
 	CPUsLimit float32 `toml:"cpuslimit"`
 }
 
-func (config *Resources) ValidateRequiredFields() {
+func (config *Resources) ValidateRequiredFields() error {
+	if Cfg == nil {
+		return errors.New("global configuration is not initialized")
+	}
 	if config.CPUShares <= 0 {
 		log.Debug("CPU shares not provided in configuration, using default.")
 		config.CPUShares = Cfg.CPUShares
@@ -541,4 +671,20 @@ func (config *Resources) ValidateRequiredFields() {
 		log.Debug("CPUsLimit not provided in configuration, using default.")
 		config.CPUsLimit = Cfg.CPUsLimit
 	}
+	if err := cr.ValidateResourceLimits(config.CPUShares, config.CPUsLimit, config.Memory, config.PidsLimit); err != nil {
+		return fmt.Errorf("invalid challenge resource limits: %w", err)
+	}
+	if config.CPUShares > Cfg.CPUShares {
+		return fmt.Errorf("cpu_shares %d exceeds global limit %d", config.CPUShares, Cfg.CPUShares)
+	}
+	if config.Memory > Cfg.Memory {
+		return fmt.Errorf("memory_limit %d exceeds global limit %d", config.Memory, Cfg.Memory)
+	}
+	if config.PidsLimit > Cfg.PidsLimit {
+		return fmt.Errorf("pids_limit %d exceeds global limit %d", config.PidsLimit, Cfg.PidsLimit)
+	}
+	if config.CPUsLimit > Cfg.CPUsLimit {
+		return fmt.Errorf("cpuslimit %.2f exceeds global limit %.2f", config.CPUsLimit, Cfg.CPUsLimit)
+	}
+	return nil
 }

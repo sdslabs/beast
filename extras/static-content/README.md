@@ -10,20 +10,11 @@ Build the docker image using
 $ docker build . --tag beast-static:latest
 ```
 
-To run the nginx powered static content serving container on port 8034 (by standard) for beast, run
+Beast deploys the image on host port 8034 through the authenticated management API. It mounts only each challenge's public static directory read-only; do not mount the complete Beast staging directory.
 
 ```bash
-$ export BEAST_STATIC_PORT=8034 
-$ docker run -d -p $BEAST_STATIC_PORT:80 -v <beast-staging-directory>:/beast -v <beast-htpasswd-file>:/.static.beast.htpasswd beast-static
-```
-
-For authentication purposes you should create a htpasswd file using apache2-utils. First install apache2-utils and then create a htpasswd file
-
-```bash
-$ sudo apt-get install -y apache2-utils
-
-$ htpasswd -c .static.beast.htpasswd <username>
-<password>
-
-$ mv .static.beast.htpasswd ~/.beast/
+$ make requirements
+$ beast run
+$ curl --cacert <ca-file> -H 'Authorization: Bearer <admin-token>' \
+    -X POST https://localhost:5005/api/manage/static/deploy
 ```

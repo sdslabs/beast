@@ -1,66 +1,29 @@
-# Challenge Types
+# Challenge types
 
-## Service Challenge
+## Static
 
-Any service whether it is a binary file, or a shell script, which needs to be instantiated on every connection can be easily hosted using `service` type challenge. **Xinetd** is for hosting these type of challenges inside a docker container.
+`type = "static"` publishes files from `static_dir` (default `public`) through the shared unprivileged static service. Static challenges do not receive a runtime container or port.
 
-###Primary Requirements
+## Service
 
-```toml
-# Relative path to binary or script which needs to be executed when the specified
-# Type for the challenge is service.
-# This can be anything which can be exeucted, a python file, a binary etc.
-service_path = ""
-```
+`type = "service"` hosts a program through xinetd. Set `service_path` to a regular executable/script inside the challenge and provide one or more `ports`. An optional `xinetd_conf` replaces the generated service configuration.
 
-## Web Challenge
+## Web
 
-Web challenges are hosted using the corresponding images from Dockerhub. Currently only these types are supported:
+Web types begin with `web`, such as the supported PHP/Python/Node variants returned by configuration helpers. Set `web_root` and ports, or provide a validated `docker_context`/`docker_compose` for a custom web stack.
 
-* Node
-* Python : Django and Flask
-* Php
+## Bare/custom
 
-###Primary Requirements
+`type = "bare"` uses a generated base image and requires `run_cmd` or `entrypoint`. Generated `run_cmd` execution uses the unprivileged challenge user. An explicit entrypoint controls the whole container and may execute with its image user/root privileges, so it should be treated like a custom Dockerfile.
 
-```toml
-# Relative directory corresponding to root of the challenge where the root
-# of the web application lies.
-web_root = ""
-```
+## Custom Dockerfile
 
-## Static Challenge
+Set `docker_context` to the Dockerfile path inside the challenge. Beast validates containment and applies build/run resource controls, but Dockerfile instructions are trusted build code with Docker-daemon impact.
 
-All the challenges which requires the hackers to only have static files comes under `static` challenges. All the files are mounted on a single container which serves all the static files to the hackers.
+## Docker Compose
 
-## Bare Challenge
+Set `docker_compose` to a Compose file inside the challenge. Beast accepts a constrained service schema, validates resource ceilings and build contexts, allocates port variables, and rejects host-level privilege controls. See [Challenge configuration](ChallConfig.md#compose-environments).
 
-A challenge which requires high level of customization can be hosted using `bare` challenge. In these case, a bare base image is provided with exposed ports. 
+## Instanced challenges
 
-###Primary Requirements
-
-```toml
-# Command to execute inside the container, if a predefined type is being used try to
-# use an existing field to let beast automatically calculate what command to run.
-run_cmd = ""
-
-# OR
-
-# Provide a script to run on startup of container
-# Similar to run_cmd but in this case you have the entire container to yourself
-# and everything you are doing is done using root permissions inside the container
-# When using this keep in mind you are root inside the container.
-entrypoint = ""
-```
-
-## Docker Challenge
-
-Authors might have tested the challenges in a isolated docker environment and might not want to port the challenge to one of these types. So they can use `docker` type challenge in which you can provide your own docker context file and ports.
-
-###Primary Requirements
-
-```toml
-# Docker file name for specific type challenge - `docker`.
-# Helps to build flexible images for specific user-custom challenges
-docket_context = ""
-```
+Any supported runtime type may set `instanced = true`. Beast then creates isolated per-user instances with Redis-backed expiry, bounded extension, and administrator cleanup endpoints. Static-only challenges are not meaningful as instanced runtimes.

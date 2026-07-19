@@ -1,10 +1,12 @@
 package auth
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"errors"
+	"fmt"
+	"io"
 
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"golang.org/x/crypto/pbkdf2"
@@ -25,10 +27,11 @@ type AuthModel struct {
 	Salt     []byte
 }
 
-func CreateModel(username, password, role string) AuthModel {
-
+func CreateModel(username, password, role string) (AuthModel, error) {
 	salt := make([]byte, 16)
-	rand.Read(salt)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return AuthModel{}, fmt.Errorf("generate password salt: %w", err)
+	}
 
 	auth1 := AuthModel{
 		Username: username,
@@ -36,12 +39,12 @@ func CreateModel(username, password, role string) AuthModel {
 		Salt:     salt,
 		Role:     role,
 	}
-	return auth1
+	return auth1, nil
 }
 
 func Authenticate(username, password string, authEntry AuthModel) (string, error) {
 	hashedPassword := pbkdf2.Key([]byte(password), authEntry.Salt, ITERATIONS, HASH_LENGTH, sha256.New)
-	if !bytes.Equal(hashedPassword, authEntry.Password) {
+	if subtle.ConstantTimeCompare(hashedPassword, authEntry.Password) != 1 {
 		return "", errors.New("The username or password is invalid")
 	}
 

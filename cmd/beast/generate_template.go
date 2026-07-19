@@ -2,118 +2,75 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"text/template"
 
 	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/core/config"
+	challengeConfig "github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var generateTemplateCmd = &cobra.Command{
 	Use:   "new",
-	Short: "generate config file",
-	Long:  "generate basic challenge config and public directory ",
-
-	Run: func(cmd *cobra.Command, args []string) {
-		log.Debug("Generating Config Template")
-
-		path, err := os.Getwd()
+	Short: "Generate a challenge configuration and public directory",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		directory, err := os.Getwd()
 		if err != nil {
-			log.Errorf("Error while finding directory's path :: %s : using empty string instead", err)
+			return fmt.Errorf("resolve working directory: %w", err)
 		}
-
-		challName := filepath.Base(path)
-		if challName == "." {
-			challName = ""
-		}
-
-		var config config.BeastChallengeConfig
-		config.PopulateDefaultValues()
-
-		var configfile bytes.Buffer
-		log.Debugf("Preparing Config template")
-		configfileTemplate, err := template.New("configfile").Parse(tools.CHALLENGE_CONFIG_FILE_TEMPLATE)
-		if err != nil {
-			log.Errorf("Error while parsing configfile template :: %s", err)
-			return
-		}
-
-		log.Debugf("Executing dockerfile template with challenge config")
-		err = configfileTemplate.Execute(&configfile, config)
-		if err != nil {
-			log.Errorf("Error while executing configfile template :: %s", err)
-			return
-		}
-
-		err = createFile()
-		if err != nil {
-			log.Errorf("Error while creating beast.toml :: %s", err)
-			return
-		}
-
-		var file, erro = os.OpenFile(core.CHALLENGE_CONFIG_FILE_NAME, os.O_RDWR, 0644)
-		if erro != nil {
-			log.Fatal(erro)
-		}
-
-		_, err = file.WriteString(configfile.String())
-		if err != nil {
-			log.Errorf("Error while writing beast.toml :: %s", err)
-		}
-
-		defer file.Close()
-		log.Debugf("beast.toml generated for the challenge")
-
-		err = createPublicDir()
-		if err != nil {
-			log.Errorf("Error while creating public directory")
-		}
-
+		return generateChallengeTemplate(directory)
 	},
 }
 
-func createFile() error {
-	// check if file exists
-	_, err := os.Stat(core.CHALLENGE_CONFIG_FILE_NAME)
-
-	// create file if not exists
-	if os.IsNotExist(err) {
-
-		file, err := os.Create(core.CHALLENGE_CONFIG_FILE_NAME)
-		if err != nil {
-			return err
+func generateChallengeTemplate(directory string) error {
+	configPath := filepath.Join(directory, core.CHALLENGE_CONFIG_FILE_NAME)
+	publicPath := filepath.Join(directory, core.PUBLIC)
+	for _, path := range []string{configPath, publicPath} {
+		if _, err := os.Lstat(path); err == nil {
+			return fmt.Errorf("refusing to overwrite existing path: %s", path)
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("inspect output path %s: %w", path, err)
 		}
-		defer file.Close()
-		return nil
-
-	} else if err != nil {
-		return err
 	}
 
-	log.Errorf("%s already exists", core.CHALLENGE_CONFIG_FILE_NAME)
-
-	return nil
-}
-
-func createPublicDir() error {
-	// check if public directory exists
-	_, err := os.Stat(core.PUBLIC)
-
-	// create public directory if not exists
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(core.PUBLIC, 0755)
-		if err != nil {
-			return err
-		}
-		return nil
-	} else if err != nil {
-		return err
+	var configuration challengeConfig.BeastChallengeConfig
+	configuration.PopulateDefaultValues()
+	parsed, err := template.New("configfile").Parse(tools.CHALLENGE_CONFIG_FILE_TEMPLATE)
+	if err != nil {
+		return fmt.Errorf("parse challenge template: %w", err)
+	}
+	var contents bytes.Buffer
+	if err := parsed.Execute(&contents, configuration); err != nil {
+		return fmt.Errorf("render challenge template: %w", err)
 	}
 
-	log.Errorf("%s directory already exists", core.PUBLIC)
+	file, err := os.OpenFile(configPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", configPath, err)
+	}
+	keepConfig := false
+	defer func() {
+		_ = file.Close()
+		if !keepConfig {
+			_ = os.Remove(configPath)
+		}
+	}()
+	if _, err := file.Write(contents.Bytes()); err != nil {
+		return fmt.Errorf("write %s: %w", configPath, err)
+	}
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("sync %s: %w", configPath, err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close %s: %w", configPath, err)
+	}
+	if err := os.Mkdir(publicPath, 0750); err != nil {
+		return fmt.Errorf("create public directory: %w", err)
+	}
+	keepConfig = true
 	return nil
 }

@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -58,8 +59,6 @@ const (
 // In the Discord notification provider it was using the same payload which was used for slack.
 // By writing "/slack" in the discord WebHookURL, it execute Slack-Compatible Webhook
 func NewNotifier(url *url.URL, ProviderType ProviderTypeEnum) Notifier {
-	log.Debug("Inside notifier: Webhook URL: " + url.String())
-
 	switch ProviderType {
 	case SlackProvider:
 		return &SlackNotificationProvider{
@@ -68,9 +67,11 @@ func NewNotifier(url *url.URL, ProviderType ProviderTypeEnum) Notifier {
 			},
 		}
 	case DiscordProvider:
+		discordURL := *url
+		discordURL.Path = strings.TrimSuffix(discordURL.Path, "/") + "/slack"
 		return &DiscordNotificationProvider{
 			Request{
-				WebHookURL: url.String() + "/slack",
+				WebHookURL: discordURL.String(),
 			},
 		}
 	}
@@ -88,9 +89,16 @@ func (req *Request) FillReqParams() error {
 
 func SendNotification(nType NotificationType, message string) error {
 	var errs []string
+	if len(message) > 16<<10 {
+		message = message[:16<<10]
+	}
 
 	for _, webhook := range config.Cfg.NotificationWebhooks {
 		if webhook.ServiceName != "" && webhook.URL != "" && webhook.Active {
+			if err := webhook.Validate(); err != nil {
+				errs = append(errs, fmt.Sprintf("invalid %s webhook configuration: %s", webhook.ServiceName, err))
+				continue
+			}
 			var provider ProviderTypeEnum
 
 			url, err := url.ParseRequestURI(webhook.URL)
@@ -132,5 +140,5 @@ func SendNotification(nType NotificationType, message string) error {
 		return nil
 	}
 
-	return fmt.Errorf(strings.Join(errs, "\n"))
+	return errors.New(strings.Join(errs, "\n"))
 }

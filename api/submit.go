@@ -1,10 +1,11 @@
 package api
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,8 +18,7 @@ import (
 )
 
 var (
-	dynamicScoreWorkerOnce sync.Once
-	dynamicScoreNotify     = make(chan struct{}, 1)
+	dynamicScoreNotify = make(chan struct{}, 1)
 )
 
 // Verifies and creates an entry in the database for successful submission of flag for a challenge.
@@ -198,8 +198,13 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 		if claim.Status == database.DynamicFlagClaimedByOtherUser {
-			subuser, _ := database.QueryUserById(claim.ClaimedByID)
-			msg := "User " + user.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been claimed by user " + subuser.Username
+			claimedBy := fmt.Sprintf("ID %d", claim.ClaimedByID)
+			if subuser, lookupErr := database.QueryUserById(claim.ClaimedByID); lookupErr != nil {
+				log.Warnf("failed to resolve dynamic flag claimant %d: %v", claim.ClaimedByID, lookupErr)
+			} else {
+				claimedBy = subuser.Username
+			}
+			msg := fmt.Sprintf("User %s submitted a duplicate dynamic flag for challenge %s already claimed by user %s", user.Username, challenge.Name, claimedBy)
 			go notify.SendNotification(notify.Warning, msg)
 			if err := database.MarkSubmissionCheating(user.ID, challenge.ID, flag); err != nil {
 				log.Warnf("failed to mark duplicate dynamic flag submission as cheating: %v", err)
@@ -250,9 +255,7 @@ func submitFlagHandler(c *gin.Context) {
 		}
 	}
 
-	leaderboardStale = true
-	graphCacheStale = true
-	adminLeaderboardStale = true
+	markLeaderboardCachesStale()
 
 	c.JSON(http.StatusOK, FlagSubmitResp{
 		Message: "Your flag is correct",
@@ -269,22 +272,33 @@ func dynamicScore(maxPoints, minPoints, solvers uint) uint {
 	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
 }
 
-func startDynamicScoreWorker() {
-	dynamicScoreWorkerOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(30 * time.Second)
-			defer ticker.Stop()
+func scoreAfterPointChange(currentScore, newPoints, oldPoints uint) uint {
+	score := int64(currentScore) + int64(newPoints) - int64(oldPoints)
+	if score < 0 {
+		return 0
+	}
+	return uint(score)
+}
 
-			for {
-				select {
-				case <-dynamicScoreNotify:
-					processDirtyDynamicScores()
-				case <-ticker.C:
-					processDirtyDynamicScores()
-				}
+func startDynamicScoreWorker(ctx context.Context) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-dynamicScoreNotify:
+				processDirtyDynamicScores()
+			case <-ticker.C:
+				processDirtyDynamicScores()
 			}
-		}()
-	})
+		}
+	}()
+	return done
 }
 
 func notifyDynamicScoreWorker() {
@@ -339,9 +353,7 @@ func recomputeDynamicScore(dirty database.DynamicScoreDirty) error {
 
 	if delta != 0 {
 		log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challenge.Points)
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		markLeaderboardCachesStale()
 	}
 
 	return nil
@@ -356,28 +368,17 @@ func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePo
 			return err
 		}
 		if user.Role == "contestant" {
-			oldScore := user.Score
-			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
-			if newScore <= 0 {
-				newScore = 0
-			}
+			newScore := scoreAfterPointChange(user.Score, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve)
 			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
 			if err != nil {
 				return err
 			}
-			// Check if this user's score change could affect top 25 leaderboard
-			if !scoreChanged && (len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
-				(len(adminLeaderboardCache) > 0 && (oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
-					newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score))) {
-				scoreChanged = true
-			}
+			scoreChanged = true
 		}
 	}
 	// Mark cache stale if any user's score change could affect top 25
 	if scoreChanged {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		markLeaderboardCachesStale()
 	}
 	return nil
 }

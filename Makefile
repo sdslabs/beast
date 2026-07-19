@@ -1,5 +1,6 @@
 GO := go
-AIR := ${GOPATH}/bin/air	
+AIR := $(shell $(GO) env GOPATH)/bin/air
+BEAST_BIN := $(if $(BEAST_OUTPUT),$(BEAST_OUTPUT),$(shell $(GO) env GOPATH)/bin/beast)
 
 pkgs  = $(shell $(GO) list ./... | grep -v vendor)
 
@@ -12,12 +13,11 @@ help:
 	@echo "* check_format: Check for formatting errors using gofmt"
 	@echo "* format: format the go files using go_fmt in the project directory."
 	@echo "* test: Run tests for beast"
-	@echo "* tools: Set up required tools for beast which includes - docker-enter, importenv"
 	@echo ""
 
 # Build beast
-build: tools
-	@./scripts/build/build.sh
+build:
+	@BEAST_OUTPUT="$(BEAST_BIN)" ./scripts/build/build.sh
 
 # Run development environment
 dev: 
@@ -25,7 +25,9 @@ dev:
 	@$(AIR)
 
 cmdref: build
-	@${GOPATH}/bin/beast cmdref
+	@rm -rf docs/cmdref
+	@"$(BEAST_BIN)" cmdref --reference-directory docs/cmdref
+	@sed -i '$${/^$$/d;}' docs/cmdref/*.md
 
 # Check go formatting
 check_format:
@@ -34,8 +36,15 @@ check_format:
 
 # Add more tests later on for this
 test: check_format
-	@echo "[*] Running tests for example challenges"
-	@./scripts/test/test_examples.sh
+	@echo "[*] Running unit tests"
+	@$(GO) test ./...
+
+test-race:
+	@echo "[*] Running race-enabled tests"
+	@$(GO) test -race ./...
+
+integration-test: build
+	@BEAST_RUN_INTEGRATION=1 ./scripts/test/test_examples.sh
 
 # Format code using gofmt
 format:
@@ -47,37 +56,21 @@ govet:
 	@echo "[*] Vetting code, checking for mistakes"
 	@$(GO) vet $(pkgs)
 
-# Ensure that the required tools are installed for beast to work
-tools:
-	@if ! test -x "`which nsenter 2>&1;true`"; then \
-	  echo 'Error: nsenter is not installed, Install it first' >&2 ; \
-	fi
-
-	@if ! test -x "`which docker-enter 2>&1;true`"; then \
-	  echo 'Warn: docker-enter is not installed, building....' >&2 ; \
-	  sudo cp ./scripts/docker-enter "/usr/bin/" ; \
-	  sudo cp ./scripts/docker_enter "/usr/bin/"; \
-	  sudo chown root "/usr/bin/docker_enter"; \
-	  sudo chmod u+s "/usr/bin/docker_enter"; \
-	fi
-
-	@if ! test -x "`which importenv 2>&1;true`"; then \
-	  echo 'Warn: importenv is not installed, building....' >&2 ; \
-	  sudo gcc -o "/usr/bin/importenv" ./scripts/importenv.c ; \
-	fi
-
 requirements:
 	@echo ">>> Building beast extras..."
 	@./scripts/build/extras.sh
 
-docs:
+swagger:
+	@$(GO) run github.com/swaggo/swag/cmd/swag@v1.16.4 init --generalInfo main.go --dir api --output api/docs --parseDependency
+
+docs: swagger
 	@rm -rf site/
 	@echo ">>> Building Documentation"
-	@mkdocs build
-	@python scripts/tools/swagger-docs.py
+	@mkdocs build --strict
+	@python3 scripts/tools/swagger-docs.py
 
 installenv:
 	@echo 'Setting up environment for beast.'
 	@./scripts/installenv.sh
 
-.PHONY: build format test check_format tools docs installenv
+.PHONY: build cmdref format test test-race integration-test check_format swagger docs installenv govet requirements

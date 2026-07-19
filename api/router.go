@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
+	log "github.com/sirupsen/logrus"
 )
 
 func dummyHandler(c *gin.Context) {
@@ -17,24 +20,46 @@ func dummyHandler(c *gin.Context) {
 	})
 }
 
+const maxAPIRequestBytes int64 = 2 << 20
+
+func limitRequestBody(c *gin.Context) {
+	limit := maxAPIRequestBytes
+	if c.Request.URL.Path == "/api/manage/challenge/upload" {
+		limit = maxChallengeUploadRequestBytes
+	}
+	if c.Request.ContentLength > limit {
+		c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, HTTPErrorResp{Error: "Request body is too large"})
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+	c.Next()
+}
+
 func initGinRouter() *gin.Engine {
 	router := gin.New()
+	router.Use(gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ interface{}) {
+		log.Error("request handler panic recovered")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Internal server error"})
+	}))
 
-	corsConfig := cors.Config{
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Cookie"},
-		AllowCredentials: false,
-		AllowAllOrigins:  true,
-		MaxAge:           12 * time.Hour,
+	if len(config.Cfg.ServerConfig.AllowedOrigins) > 0 {
+		corsConfig := cors.Config{
+			AllowOrigins:     config.Cfg.ServerConfig.AllowedOrigins,
+			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+			AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+			AllowCredentials: false,
+			MaxAge:           12 * time.Hour,
+		}
+		router.Use(cors.New(corsConfig))
 	}
-	router.Use(cors.New(corsConfig))
+	router.Use(limitRequestBody)
 	router.GET("/dummy", dummyHandler)
 	// Authorization routes group
 	authGroup := router.Group("/auth")
 	{
 		authGroup.POST("/register", register)
 		authGroup.POST("/login", login)
-		authGroup.POST("/reset-password", authorize, resetPasswordHandler)
+		authGroup.POST("/reset-password", resetPasswordAuthorize, resetPasswordHandler)
 		authGroup.POST("/send-otp", sendOTPHandler)
 		authGroup.POST("/verify-otp", verifyOTPHandler)
 		authGroup.POST("/send-otp-forget", sendOTPForForgetHandler)
@@ -55,17 +80,18 @@ func initGinRouter() *gin.Engine {
 		// Deploy route group
 		manageGroup := apiGroup.Group("/manage", managerAuthorize)
 		{
-			manageGroup.POST("/deploy/local/", deployLocalChallengeHandler)
+			manageGroup.POST("/deploy/local/", adminAuthorize, deployLocalChallengeHandler)
 			manageGroup.POST("/challenge/", manageChallengeHandler)
-			manageGroup.POST("/challenge/multiple/", manageMultipleChallengeHandlerNameBased)
-			manageGroup.POST("/multiple/:action", manageMultipleChallengeHandlerTagBased)
-			manageGroup.POST("/static/:action", beastStaticContentHandler)
+			manageGroup.POST("/challenge/multiple/", adminAuthorize, manageMultipleChallengeHandlerNameBased)
+			manageGroup.POST("/multiple/:action", adminAuthorize, manageMultipleChallengeHandlerTagBased)
+			manageGroup.POST("/static/:action", adminAuthorize, beastStaticContentHandler)
 			manageGroup.POST("/commit/", commitChallenge)
 			manageGroup.POST("/challenge/verify", verifyHandler)
-			manageGroup.POST("/schedule/:action", manageScheduledAction)
+			manageGroup.POST("/schedule/:action", adminAuthorize, manageScheduledAction)
 			manageGroup.POST("/challenge/upload", manageUploadHandler)
 			manageGroup.POST("/challenge/validateflag", validateFlagHandler)
 			manageGroup.GET("/logs", challengeLogsHandler)
+			manageGroup.POST("/challenge/:name/exec", execChallengeHandler)
 		}
 
 		// Status route group
@@ -81,12 +107,12 @@ func initGinRouter() *gin.Engine {
 		{
 			infoGroup.GET("/challenge/:name", challengeInfoHandler)
 			infoGroup.GET("/challenges", challengesMetadataHandler)
-			// infoGroup.GET("/images/available", availableImagesHandler)
+			infoGroup.GET("/images/available", availableImagesHandler)
 			// infoGroup.GET("/ports/used", usedPortsInfoHandler)
 			infoGroup.GET("/user/:username", userInfoHandler)
 			infoGroup.GET("/users", getAllUsersInfoHandler)
 			infoGroup.GET("/leaderboard", getLeaderboardHandler)
-			infoGroup.GET("leaderboard-graph", getLeaderboardGraphHandler)
+			infoGroup.GET("/leaderboard-graph", getLeaderboardGraphHandler)
 			infoGroup.GET("/usercount", getUserCountHandler)
 			infoGroup.GET("/submissions/challenge/:challenge_id", getChallengeAttempts)
 			infoGroup.GET("/submissions/user/:user_id", getUserAttempts)
@@ -114,8 +140,6 @@ func initGinRouter() *gin.Engine {
 
 		configGroup := apiGroup.Group("/config", adminAuthorize)
 		{
-			configGroup.PATCH("/reload", reloadBeastConfig)
-			configGroup.POST("/competition-info", updateCompetitionInfoHandler)
 			configGroup.POST("/challenge-info", updateChallengeInfoHandler)
 		}
 

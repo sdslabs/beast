@@ -1,26 +1,18 @@
 # Deployment
 
-Deploying challenge is completely handled by beast, once the author is done with creating the required
-challenge he can invoke deploy endpoints from beast to trigger the deployment pipeline for the challenge.
+Beast can deploy a validated local challenge directory or synchronize the `challenges/` tree from configured SSH Git remotes. Active remotes are treated as sources of trusted build code.
 
-The deployment model for beast is based on `git`, you can think of a git repository as a single source of 
-truth for all the challenge configuraiton. Using this `gitops` based approach provides a lot of benifits
-in terms of flexibility and robustness of the applications.
+The deployment pipeline validates configuration and paths, copies regular files into private staging, builds a generated/custom image or constrained Compose project under resource limits, selects a worker, starts the runtime, records identifiers/ports transactionally, and publishes normalized static assets when configured.
 
-Every challenge that we create/add to the repository we can first verify is working and then can also do an
-automatic deployment for the same. This is quite helpful for wargames like website where earlier for each challenge you
-would have to manually deploy the challenge.
+Remote synchronization and startup fail when an active remote/worker is unavailable; Beast does not silently operate with incomplete capacity. Periodic synchronization is opt-in with `beast run --periodic-sync`, and the scheduler prevents overlapping runs of the same task.
 
-Using this gitops based approach provides us with all the benifits that modern days deployment pipelines have. Also,
-it helps to easily extend the use cases around how beast can be used in different types of scenarios like for Jeopardy style
-challenges, Wargames websites, CTF competitions etc.
+Before production deployment:
 
-## Flow
+- review every setup script, Dockerfile, entrypoint, and Compose image as executable trusted code;
+- pin base images by digest where reproducibility is required;
+- keep flags/secrets out of Git and image layers, using validated file-backed environment values or runtime mechanisms;
+- enforce worker firewall rules around allocated port ranges;
+- terminate public challenge HTTP/TCP services appropriately and keep the Beast management API private over HTTPS;
+- verify backup and restore procedures independently of controller shutdown.
 
-![Challenge Deployment Flow](res/deployment-pipeline.png)
-
-## Note
-
-There are a lot of features which we can have when using a git repository as the source of truth for the application.
-Beast still does not make use of all of them. There are a few features which are still in pipeline, in the same context
-you can hope to see them in future releases of beast.
+Normal controller shutdown preserves deployed workloads. Use explicit challenge undeploy/purge operations when runtime removal is intended.

@@ -1,7 +1,6 @@
 [author]
 name = "contact"
 email = "contact@sdslabs.co.in"
-ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
 name = "xinetd-service"
@@ -9,6 +8,7 @@ flag = "CTF{not_the_flag}"
 type = "service"
 points = 500
 maxAttemptLimit = 10
+preReqs = ["simple", "web-php"]
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
@@ -18,19 +18,17 @@ points = 10
 text = "simple_hint_2"
 points = 20
 
-preReqs = ["simple", "web-php"]
-
 
 [challenge.env]
 apt_deps = ["gcc", "socat"]
 setup_scripts = ["setup.sh"]
-xinetd_config = "ctf.xinetd"
+xinetd_conf = "ctf.xinetd"
 service_path = "pwn"
 ports = [10003]
 default_port = 10003
 
 [resource]
-cpu_shares = 1024
+cpu_shares = 512
 memory_limit = 536870912
 pids_limit = 100
 cpuslimit = 0.25

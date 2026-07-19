@@ -50,13 +50,19 @@ func setupSubmissionTestDB(t *testing.T) func() {
 	previousDB := Db
 	previousMux := DBMux
 	Db = testDB
-	DBMux = &sync.Mutex{}
+	DBMux = &sync.RWMutex{}
 
-	if err := Db.AutoMigrate(&Challenge{}, &User{}, &UserChallenges{}, &DynamicFlag{}, &DynamicFlagClaim{}, &DynamicScoreDirty{}); err != nil {
+	if err := Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &Tag{}, &User{}, &UserChallenges{}, &ChallengeMaintainer{}, &DynamicFlag{}, &DynamicFlagClaim{}, &DynamicScoreDirty{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	if err := MigrateSubmissionGuards(); err != nil {
 		t.Fatalf("migrate submission guards: %v", err)
+	}
+	if err := MigratePortUniqueness(); err != nil {
+		t.Fatalf("migrate port uniqueness: %v", err)
+	}
+	if err := MigrateChallengeIdentifiers(); err != nil {
+		t.Fatalf("migrate challenge identifiers: %v", err)
 	}
 
 	return func() {
@@ -115,6 +121,8 @@ func createSubmissionTestChallenge(t *testing.T, name string, maxAttempts int, d
 		MinPoints:       100,
 		MaxAttemptLimit: maxAttempts,
 		Status:          core.DEPLOY_STATUS["deployed"],
+		ContainerId:     "container-" + name,
+		ImageId:         "image-" + name,
 	}
 	if err := Db.Create(&challenge).Error; err != nil {
 		t.Fatalf("create challenge %s: %v", name, err)

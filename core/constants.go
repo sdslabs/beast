@@ -8,9 +8,8 @@ import (
 
 var (
 	// BEAST_GLOBAL_DIR should always be used only on local deployment
-	BEAST_GLOBAL_DIR     = filepath.Join(os.Getenv("HOME"), ".beast")
-	AUTHORIZED_KEYS_FILE = filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
-	BEAST_TEMP_DIR       = filepath.Join(os.TempDir(), "beast")
+	BEAST_GLOBAL_DIR = filepath.Join(os.Getenv("HOME"), ".beast")
+	BEAST_TEMP_DIR   = filepath.Join(os.TempDir(), "beast")
 )
 
 const ( //names
@@ -36,7 +35,7 @@ const ( //names
 	DELIMITER                   string = "::::"
 	LOCALHOST                   string = "localhost"
 	LOCALHOST_IP                string = "127.0.0.1"
-	BEAST_REMOTE_GLOBAL_DIR     string = "~/.beast" // This should always be used for remote only.
+	BEAST_REMOTE_GLOBAL_DIR     string = ".beast" // Relative to the remote SSH user's home directory.
 	DOCKER_PID                  string = "/var/run/docker.pid"
 	BEAST_GRAPH_CACHE           string = "graph_cache.json"
 	BEAST_LEADERBOARD_CACHE     string = "leaderboard.json"
@@ -47,9 +46,7 @@ const ( //names
 const ( //paths
 	BEAST_DOCKER_CHALLENGE_DIR     string = "/challenge"
 	BEAST_CHALLENGE_LOGS_DIR       string = "logs"
-	DEFAULT_AUTH_KEYS_FILE         string = "beast_authorized_keys"
 	BEAST_STAGING_DIR              string = "staging"
-	BEAST_SCRIPTS_DIR              string = "scripts"
 	BEAST_REMOTES_DIR              string = "remote"
 	BEAST_STAGING_AREA_MOUNT_POINT string = "/beast"
 	BEAST_UPLOADS_DIR              string = "uploads"
@@ -81,10 +78,10 @@ const ( // chall actions
 
 const ( // chall env
 	MAX_PORT_PER_CHALL           uint32 = 3
-	BEAST_CHALLENGES_STATIC_PORT uint32 = 80
-	DEFAULT_BASE_IMAGE           string = "ubuntu:24.03"
+	BEAST_CHALLENGES_STATIC_PORT uint32 = 8034
+	BEAST_STATIC_CONTAINER_PORT  uint32 = 8080
+	DEFAULT_BASE_IMAGE           string = "ubuntu:24.04"
 	DEFAULT_XINETD_CONF_FILE     string = "xinetd.conf"
-	BEAST_STATIC_AUTH_FILE       string = ".static.beast.htpasswd"
 	ALLOWED_MIN_PORT_VALUE       uint32 = 10000
 	ALLOWED_MAX_PORT_VALUE       uint32 = 20000
 )

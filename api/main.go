@@ -1,7 +1,13 @@
 package api
 
 import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/cache"
@@ -23,67 +29,131 @@ import (
 
 const (
 	DEFAULT_BEAST_PORT = ":5005"
+	shutdownTimeout    = 30 * time.Second
 )
 
 var BeastScheduler scheduler.Scheduler = scheduler.NewScheduler()
 
 func runBeastApiBootsteps(defaultauthorpassword string) error {
-	manager.RunBeastBootsteps(defaultauthorpassword)
-
-	return nil
+	return manager.RunBeastBootsteps(defaultauthorpassword)
 }
 
 // @title Beast API
-// @version 1.0
-// @description Beast the automatic deployment tool for playCTF
+// @version 0.2
+// @description Authenticated API for Beast CTF challenge deployment and competition services.
 
 // @contact.name SDSLabs
 // @contact.url https://chat.sdslabs.co
-// @contact.email contact.sdslabs.co.in
+// @contact.email contact@sdslabs.co.in
 
 // @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+// @license.url https://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host playCTF.sdslabs.co
 // @BasePath /
+// @schemes https
 
 // @securityDefinitions.apikey ApiKeyAuth
 // @in header
 // @name Authorization
 
-func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) {
+func listenAddress(port string) (string, error) {
+	if port == "" {
+		return DEFAULT_BEAST_PORT, nil
+	}
+	value, err := strconv.Atoi(port)
+	if err != nil || value < 1 || value > 65535 {
+		return "", fmt.Errorf("invalid API port %q", port)
+	}
+	return ":" + strconv.Itoa(value), nil
+}
+
+func newHTTPServer(address string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              address,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    64 << 10,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+	}
+}
+
+func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) error {
 	log.Info("Bootstrapping Beast API server")
 
-	config.InitConfig()
-
-	if port != "" {
-		port = ":" + port
-	} else {
-		port = DEFAULT_BEAST_PORT
+	if err := config.InitConfig(); err != nil {
+		return err
 	}
 
+	address, err := listenAddress(port)
+	if err != nil {
+		return err
+	}
+
+	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"], core.USER_ROLES["maintainer"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
+	if err := database.Init(); err != nil {
+		if database.Db != nil {
+			if sqlDB, dbErr := database.Db.DB(); dbErr == nil {
+				_ = sqlDB.Close()
+			}
+		}
+		return err
+	}
+	cache.Configure(config.Cfg.RedisConf.User, config.Cfg.RedisConf.Password, config.Cfg.RedisConf.Host, config.Cfg.RedisConf.Port, config.Cfg.RedisConf.Db, config.Cfg.RedisConf.TLS, config.Cfg.RedisConf.CAFile, config.Cfg.RedisConf.ServerName)
+	if err := cache.Init(); err != nil {
+		if sqlDB, dbErr := database.Db.DB(); dbErr == nil {
+			_ = sqlDB.Close()
+		}
+		return err
+	}
+	if err := remoteManager.Init(); err != nil {
+		_ = cache.Close()
+		if sqlDB, dbErr := database.Db.DB(); dbErr == nil {
+			_ = sqlDB.Close()
+		}
+		return err
+	}
 	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
 	manager.Q.StartWorkers(&manager.Worker{})
-
-	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
-	remoteManager.Init()
-	database.Init()
-	cache.Init()
-	startDynamicScoreWorker()
-	go manager.InstanceCleanupProber()
+	backgroundCtx, stopBackground := context.WithCancel(ctx)
+	dynamicScoreDone := startDynamicScoreWorker(backgroundCtx)
+	instanceCleanupDone := make(chan struct{})
+	go func() {
+		defer close(instanceCleanupDone)
+		manager.InstanceCleanupProber(backgroundCtx)
+	}()
+	healthCheckDone := make(chan struct{})
+	if healthProbe || config.Cfg.HealthProber {
+		go func() {
+			defer close(healthCheckDone)
+			manager.BeastHealthCheckProber(backgroundCtx, config.Cfg.TickerFrequency)
+		}()
+	} else {
+		close(healthCheckDone)
+	}
+	defer func() {
+		stopBackground()
+		<-dynamicScoreDone
+		<-instanceCleanupDone
+		<-healthCheckDone
+	}()
 
 	// Initialise and start the Hub
 	// Must be started before the Notification Router, since SSE handler has access to SSE Hub
 	sse.Init()
 
-	runBeastApiBootsteps(defaultauthorpassword)
+	if err := runBeastApiBootsteps(defaultauthorpassword); err != nil {
+		return err
+	}
 
 	// Initialize Gin router.
 	router := initGinRouter()
 
 	// Setup gin middlewares
 	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
 
 	router.GET("/api/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/", func(c *gin.Context) {
@@ -103,11 +173,9 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 
 	if periodicSync {
 		log.Infof("Scheduling periodic remote sync and auto update for beast with period: %v", config.Cfg.RemoteSyncPeriod)
-		BeastScheduler.ScheduleEvery(config.Cfg.RemoteSyncPeriod, manager.AutoUpdate)
-	}
-
-	if healthProbe || config.Cfg.HealthProber {
-		go manager.BeastHeathCheckProber(config.Cfg.TickerFrequency)
+		if err := BeastScheduler.ScheduleEvery(config.Cfg.RemoteSyncPeriod, manager.AutoUpdate); err != nil {
+			return fmt.Errorf("schedule periodic remote sync: %w", err)
+		}
 	}
 
 	if autoDeploy {
@@ -117,5 +185,28 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	if noCache {
 		log.Infof("Starting Beast server in no cache mode")
 	}
-	router.Run(port)
+	server := newHTTPServer(address, router)
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- server.ListenAndServeTLS(config.Cfg.ServerConfig.TLSCertFile, config.Cfg.ServerConfig.TLSKeyFile)
+	}()
+
+	select {
+	case err := <-serverErr:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return fmt.Errorf("serve Beast API: %w", err)
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shut down Beast API: %w", err)
+		}
+		err := <-serverErr
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("serve Beast API: %w", err)
+		}
+		return nil
+	}
 }

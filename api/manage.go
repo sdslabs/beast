@@ -1,14 +1,17 @@
 package api
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -20,6 +23,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	maxChallengeUploadBytes        int64 = 256 << 20
+	maxChallengeUploadRequestBytes       = maxChallengeUploadBytes + 1<<20
+)
+
+var challengeUploadMu sync.Mutex
+
 // Handles route related to manage all the challenges or the challenges related to a particular tag for current beast remote.
 // @Summary Handles challenge management actions for multiple challenges.
 // @Description Handles challenge management routes for multiple the challenges with actions which includes - DEPLOY, UNDEPLOY.
@@ -30,7 +40,7 @@ import (
 // @Param tag query string false "Tag for a group of challenges"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/multiple/:action [post]
+// @Router /api/manage/multiple/{action} [post]
 func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// If no tags are provided we by default we apply the action to all
 	// the challenges.
@@ -41,7 +51,7 @@ func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// Since upto this point the request is already authorized, we use a default
 	// username if any error occurs while getting the username.
 	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
-	if err == nil {
+	if err != nil {
 		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
 		username = core.DEFAULT_USER_NAME
 	}
@@ -95,6 +105,9 @@ func manageChallengeHandler(c *gin.Context) {
 	identifier := c.PostForm("name")
 	action := c.PostForm("action")
 	authorization := c.GetHeader("Authorization")
+	if !authorizeChallengeManagement(c, identifier, action == core.MANAGE_ACTION_DEPLOY) {
+		return
+	}
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 	if msgs := manager.LogTransaction(identifier, action, authorization); msgs != nil {
@@ -121,9 +134,7 @@ func manageChallengeHandler(c *gin.Context) {
 	}
 
 	if action == core.MANAGE_ACTION_PURGE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		markLeaderboardCachesStale()
 	}
 
 	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
@@ -184,9 +195,7 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	}
 
 	if action == core.MANAGE_ACTION_PURGE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		markLeaderboardCachesStale()
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainMapResp{
@@ -204,7 +213,7 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
-// @Router /api/manage/deploy/local [post]
+// @Router /api/manage/deploy/local/ [post]
 func deployLocalChallengeHandler(c *gin.Context) {
 	action := core.MANAGE_ACTION_DEPLOY
 	challDir := c.PostForm("challenge_dir")
@@ -216,9 +225,26 @@ func deployLocalChallengeHandler(c *gin.Context) {
 		})
 		return
 	}
+	if err := manager.ValidateChallengeConfig(challDir); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: err.Error()})
+		return
+	}
+	configuration, err := cfg.LoadChallengeConfig(filepath.Join(challDir, core.CHALLENGE_CONFIG_FILE_NAME))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{Error: "challenge configuration is invalid"})
+		return
+	}
+	user, ok := authenticatedManager(c)
+	if !ok {
+		return
+	}
+	if !userOwnsChallengeConfig(user, configuration) {
+		c.JSON(http.StatusForbidden, HTTPErrorResp{Error: "challenge management access denied"})
+		return
+	}
 
 	log.Info("In local deploy challenge Handler")
-	err := manager.DeployChallengePipeline(challDir)
+	err = manager.DeployChallengePipeline(challDir)
 	if msgs := manager.LogTransaction(strings.Split(challDir, "/")[len(strings.Split(challDir, "/"))-1], action, authorization); msgs != nil {
 		log.Warn("Error while saving transaction")
 	}
@@ -247,7 +273,7 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // @Param action query string true "Action to apply on the beast static content provider"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/static/:action [post]
+// @Router /api/manage/static/{action} [post]
 func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
 	identifier := core.BEAST_STATIC_CONTAINER_NAME
@@ -261,14 +287,20 @@ func beastStaticContentHandler(c *gin.Context) {
 	// Deploy and Undeploy
 	switch action {
 	case core.MANAGE_ACTION_DEPLOY:
-		go manager.DeployStaticContentContainer()
+		if err := manager.DeployStaticContentContainer(); err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{Message: err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, HTTPPlainResp{
-			Message: "Static container deploy started",
+			Message: "Static container deployed",
 		})
 		return
 
 	case core.MANAGE_ACTION_UNDEPLOY:
-		go manager.UndeployStaticContentContainer()
+		if err := manager.UndeployStaticContentContainer(); err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{Message: err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, HTTPPlainResp{
 			Message: "Static content container undeploy started",
 		})
@@ -290,9 +322,12 @@ func beastStaticContentHandler(c *gin.Context) {
 // @Param challenge query string true "Name of the challenge to commit"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/manage/commit/ [post]
+// @Router /api/manage/challenge/verify [post]
 func commitChallenge(c *gin.Context) {
 	challenge := c.PostForm("challenge")
+	if !authorizeChallengeManagement(c, challenge, false) {
+		return
+	}
 
 	err := manager.CommitChallengeContainer(challenge)
 
@@ -319,6 +354,9 @@ func commitChallenge(c *gin.Context) {
 // @Router /api/manage/commit/ [post]
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
+	if !authorizeChallengeManagement(c, challengeName, true) {
+		return
+	}
 	challengeRemoteDir := coreUtils.GetChallengeDir(challengeName)
 	if challengeRemoteDir == "" {
 		log.Errorf("Challenge does not exist")
@@ -353,7 +391,7 @@ func verifyHandler(c *gin.Context) {
 // @Param after query string false "Time after which the action on the selector should be executed should be of duration format as in '1m20s' etc."
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/schedule/:action [post]
+// @Router /api/manage/schedule/{action} [post]
 func manageScheduledAction(c *gin.Context) {
 	action := c.Param("action")
 	challenge := c.PostForm("challenge")
@@ -361,7 +399,7 @@ func manageScheduledAction(c *gin.Context) {
 
 	authorization := c.GetHeader("Authorization")
 	username, err := coreUtils.GetUser(authorization)
-	if err == nil {
+	if err != nil {
 		log.Warn("Error while getting user from authorization header, using default user(since already authorized)")
 		username = core.DEFAULT_USER_NAME
 	}
@@ -414,12 +452,18 @@ func manageScheduledAction(c *gin.Context) {
 	if tag != "" {
 		manager.LogTransaction(fmt.Sprintf("TAG:%s", tag), "SCHEDULE::"+action, authorization)
 
-		BeastScheduler.ScheduleAfter(duration, manager.HandleTagRelatedChallenges, action, tag, username)
+		if err := BeastScheduler.ScheduleAfter(duration, manager.HandleTagRelatedChallenges, action, tag, username); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "failed to schedule challenge action"})
+			return
+		}
 		log.Infof("Scheduled %s for challenges with tag %s", action, tag)
 	} else {
 		manager.LogTransaction(challenge, "SCHEDULE::"+action, authorization)
 
-		BeastScheduler.ScheduleAfter(duration, actionHandler, challenge)
+		if err := BeastScheduler.ScheduleAfter(duration, actionHandler, challenge); err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "failed to schedule challenge action"})
+			return
+		}
 		log.Infof("Scheduled %s for challenge %s", action, challenge)
 	}
 
@@ -441,40 +485,46 @@ func manageScheduledAction(c *gin.Context) {
 // @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/manage/challenge/upload [post]
 func manageUploadHandler(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxChallengeUploadRequestBytes)
 	file, err := c.FormFile("file")
 
-	// The file cannot be received.
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "no file received from user",
-		})
-		return
-	}
-
-	if err = utils.CreateIfNotExistDir(core.BEAST_TEMP_DIR); err != nil {
-		if err := os.MkdirAll(core.BEAST_TEMP_DIR, 0755); err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("Could not create dir %s: %s", core.BEAST_TEMP_DIR, err),
-			})
+		status := http.StatusBadRequest
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			status = http.StatusRequestEntityTooLarge
 		}
-	}
-
-	zipContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
-
-	// The file is received, save it
-	if err := c.SaveUploadedFile(file, zipContextPath); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: fmt.Sprintf("Unable to save file: %s", err),
+		c.AbortWithStatusJSON(status, HTTPPlainResp{
+			Message: "a ZIP challenge archive is required",
 		})
 		return
 	}
+	archiveName, err := challengeArchiveFilename(file.Filename)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, HTTPErrorResp{Error: err.Error()})
+		return
+	}
 
-	// Extract and show from zip and return response
-	tempStageDir, err := manager.UnzipChallengeFolder(zipContextPath, core.BEAST_TEMP_DIR)
+	tempRoot, err := os.MkdirTemp("", "beast-upload-")
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to create upload staging directory: %s", err),
+		})
+		return
+	}
+	defer os.RemoveAll(tempRoot)
 
-	// log.Debug("The dir is ",tempStageDir)
+	zipContextPath := filepath.Join(tempRoot, archiveName)
+	if err := saveChallengeArchive(file, zipContextPath); err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, errChallengeUploadTooLarge) {
+			status = http.StatusRequestEntityTooLarge
+		}
+		c.AbortWithStatusJSON(status, HTTPErrorResp{Error: err.Error()})
+		return
+	}
 
-	// The file cannot be successfully un-zipped or the resultant was a malformed directory
+	tempStageDir, err := manager.UnzipChallengeFolder(zipContextPath, tempRoot)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: fmt.Sprintf("The unzip process failed or the ZIP was unacceptable: %s", err),
@@ -482,35 +532,37 @@ func manageUploadHandler(c *gin.Context) {
 		return
 	}
 
-	err = manager.ValidateChallengeConfig(tempStageDir)
-	if err != nil {
-		c.JSON(http.StatusOK, HTTPErrorResp{
+	if err := manager.ValidateChallengeConfig(tempStageDir); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: err.Error(),
-		})
-	}
-
-	challengeUploadDirectory := filepath.Join(
-		core.BEAST_GLOBAL_DIR,
-		core.BEAST_UPLOADS_DIR,
-		strings.TrimSuffix(file.Filename, filepath.Ext(file.Filename)),
-	)
-
-	if err = manager.CopyDir(tempStageDir, challengeUploadDirectory); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, HTTPErrorResp{
-			Error: fmt.Sprintf("Unable to move challenge directory: %s", err),
 		})
 		return
 	}
 
-	challengeName := filepath.Base(challengeUploadDirectory)
-	configFile := filepath.Join(challengeUploadDirectory, core.CHALLENGE_CONFIG_FILE_NAME)
-
-	var config cfg.BeastChallengeConfig
-	_, err = toml.DecodeFile(configFile, &config)
+	configFile := filepath.Join(tempStageDir, core.CHALLENGE_CONFIG_FILE_NAME)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
-		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
+		log.Errorf("Error while loading uploaded challenge config: %s", err)
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
-			Error: fmt.Sprintf("CONFIG ERROR: %s : %s", challengeName, err),
+			Error: fmt.Sprintf("CONFIG ERROR: %s", err),
+		})
+		return
+	}
+	user, ok := authenticatedManager(c)
+	if !ok {
+		return
+	}
+	if !userOwnsChallengeConfig(user, config) {
+		c.AbortWithStatusJSON(http.StatusForbidden, HTTPErrorResp{Error: "challenge management access denied"})
+		return
+	}
+	if err := persistUploadedChallenge(tempStageDir, config.Challenge.Metadata.Name); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, os.ErrExist) {
+			status = http.StatusConflict
+		}
+		c.AbortWithStatusJSON(status, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to store challenge: %s", err),
 		})
 		return
 	}
@@ -528,10 +580,98 @@ func manageUploadHandler(c *gin.Context) {
 	})
 }
 
+var errChallengeUploadTooLarge = errors.New("challenge archive exceeds the 256 MiB limit")
+
+func challengeArchiveFilename(name string) (string, error) {
+	if name == "" || name != filepath.Base(name) || strings.Contains(name, `\`) {
+		return "", fmt.Errorf("invalid challenge archive filename")
+	}
+	if !strings.EqualFold(filepath.Ext(name), ".zip") || strings.TrimSuffix(name, filepath.Ext(name)) == "" {
+		return "", fmt.Errorf("challenge archive must have a non-empty .zip filename")
+	}
+	return name, nil
+}
+
+func saveChallengeArchive(header *multipart.FileHeader, destination string) error {
+	if header.Size < 0 || header.Size > maxChallengeUploadBytes {
+		return errChallengeUploadTooLarge
+	}
+	source, err := header.Open()
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	target, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	written, copyErr := io.Copy(target, io.LimitReader(source, maxChallengeUploadBytes+1))
+	closeErr := target.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if written > maxChallengeUploadBytes {
+		return errChallengeUploadTooLarge
+	}
+	return nil
+}
+
+func persistUploadedChallenge(source, challengeName string) error {
+	uploadsRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR)
+	if err := os.MkdirAll(uploadsRoot, 0700); err != nil {
+		return err
+	}
+	rootInfo, err := os.Lstat(uploadsRoot)
+	if err != nil {
+		return err
+	}
+	if !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("uploads root is not a regular directory")
+	}
+	if err := os.Chmod(uploadsRoot, 0700); err != nil {
+		return err
+	}
+
+	stageRoot, err := os.MkdirTemp(uploadsRoot, ".upload-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stageRoot)
+	stagedChallenge := filepath.Join(stageRoot, challengeName)
+	if err := manager.CopyDir(source, stagedChallenge); err != nil {
+		return err
+	}
+
+	challengeUploadMu.Lock()
+	defer challengeUploadMu.Unlock()
+	destination := filepath.Join(uploadsRoot, challengeName)
+	if _, err := os.Lstat(destination); err == nil {
+		return fmt.Errorf("challenge %q is already uploaded: %w", challengeName, os.ErrExist)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return os.Rename(stagedChallenge, destination)
+}
+
+// @Summary Validate a configured challenge flag as its manager
+// @Tags manage
+// @Produce json
+// @Param challenge_name formData string true "Challenge name"
+// @Param flag formData string true "Flag to validate"
+// @Security ApiKeyAuth
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 403 {object} api.HTTPErrorResp
+// @Router /api/manage/challenge/validateflag [post]
 func validateFlagHandler(c *gin.Context) {
 	flag := c.PostForm("flag")
 	challenge_name := c.PostForm("challenge_name")
-	authorization := c.GetHeader("Authorization")
+	if !authorizeChallengeManagement(c, challenge_name, false) {
+		return
+	}
 
 	challenges, err := database.QueryChallengeEntries("name", challenge_name)
 	if err != nil {
@@ -548,7 +688,7 @@ func validateFlagHandler(c *gin.Context) {
 		return
 	}
 
-	if msgs := manager.LogTransaction(challenge_name, "VALIDATE_FLAG: "+flag, authorization); msgs != nil {
+	if msgs := manager.LogTransaction(challenge_name, "VALIDATE_FLAG", c.GetHeader("Authorization")); msgs != nil {
 		log.Warn("Error while saving transaction")
 	}
 

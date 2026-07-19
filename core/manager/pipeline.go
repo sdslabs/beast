@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/sdslabs/beastv4/core"
 	cfg "github.com/sdslabs/beastv4/core/config"
@@ -16,7 +15,6 @@ import (
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/utils"
 
-	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -121,6 +119,9 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 	}
 
 	log.Debugf("Copying challenge config to staging directory")
+	if err := utils.RemoveFileIfExists(filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME)); err != nil {
+		return fmt.Errorf("remove previous staged challenge config: %w", err)
+	}
 	err = utils.CopyFile(challengeConfig, filepath.Join(stagingDir, core.CHALLENGE_CONFIG_FILE_NAME))
 	if err != nil {
 		return fmt.Errorf("error while copying challenge config to staging : %s", err)
@@ -188,7 +189,12 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	} else {
 		if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 			var buff *bytes.Buffer
-			buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache)
+			buff, imageId, buildErr = cr.BuildImageFromTarContext(challengeName, challengeTag, stagedPath, config.Challenge.Env.DockerCtx, noCache, cr.BuildLimits{
+				CPUShares: config.Resources.CPUShares,
+				CPUs:      config.Resources.CPUsLimit,
+				Memory:    config.Resources.Memory,
+				Pids:      config.Resources.PidsLimit,
+			})
 			if buff != nil {
 				logBytes = buff.Bytes()
 			} else {
@@ -202,24 +208,34 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			if err != nil {
 				return fmt.Errorf("error while checking if the challenge is staged on the remote server")
 			}
-			logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server)
+			logBytes, imageId, buildErr = remoteManager.BuildImageFromTarContextRemote(challengeName, challengeTag, remoteStagedPath, server, cr.BuildLimits{
+				CPUShares: config.Resources.CPUShares,
+				CPUs:      config.Resources.CPUsLimit,
+				Memory:    config.Resources.Memory,
+				Pids:      config.Resources.PidsLimit,
+			})
 		}
 	}
 	// Create logs directory for the challenge in staging directory.
 	challengeStagingLogsDir := filepath.Join(challengeStagingDir, core.BEAST_CHALLENGE_LOGS_DIR)
-	err = utils.CreateIfNotExistDir(challengeStagingLogsDir)
+	err = os.MkdirAll(challengeStagingLogsDir, 0700)
 	if err != nil {
 		log.Errorf("Could not create challenge logs directory : %s : %s", challengeStagingLogsDir, err)
 	} else if logBytes != nil {
-		logFilePath := filepath.Join(challengeStagingLogsDir, fmt.Sprintf("%s.%s.log", challengeName, time.Now().Format("20060102150405")))
-		logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
-		if err != nil {
-			log.Errorf("Error while writing logs to file : %s", logFilePath)
-			return fmt.Errorf("error logs generated on image build failure could not be written to the logfile")
+		if err := os.Chmod(challengeStagingLogsDir, 0700); err != nil {
+			return fmt.Errorf("secure build log directory: %w", err)
 		}
-		defer logFile.Close()
-
-		logFile.Write(logBytes)
+		logFile, err := os.CreateTemp(challengeStagingLogsDir, challengeName+".*.log")
+		if err != nil {
+			return fmt.Errorf("create build log: %w", err)
+		}
+		if _, err := logFile.Write(logBytes); err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("write build log: %w", err)
+		}
+		if err := logFile.Close(); err != nil {
+			return fmt.Errorf("close build log: %w", err)
+		}
 		log.Debug("Logs written to log file for the challenge")
 	}
 
@@ -440,8 +456,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 	challengeName := filepath.Base(challengeDir)
 	configFile := filepath.Join(challengeDir, core.CHALLENGE_CONFIG_FILE_NAME)
 
-	var config cfg.BeastChallengeConfig
-	_, err := toml.DecodeFile(configFile, &config)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
 		log.Errorf("Error while loading beast config for challenge %s : %s", challengeName, err)
 		return fmt.Errorf("CONFIG ERROR: %s : %s", challengeName, err)
@@ -464,7 +479,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		return fmt.Errorf("CONFIG ERROR: %s : Inconsistent configuration name and challengeName", challengeName)
 	}
 
-	challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
+	challenge, _, err := database.FindFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 	if err != nil {
 		log.Errorf("Error while querying challenge %s : %s", config.Challenge.Metadata.Name, err)
 		return fmt.Errorf("DB ERROR: %s : %s", challengeName, err)
@@ -595,13 +610,16 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 
 // This is just a decorator function over bootstrapDeployPipeline and generate
 // notifications to slack on the basis of the result of the deploy pipeline.
-func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) {
+func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) error {
 	challengeName := filepath.Base(challengeDir)
 	var sendNotificationError error
 
 	err := bootstrapDeployPipeline(challengeDir, skipStage, skipCommit, noCache)
 	if err != nil {
-		sendNotificationError = notify.SendNotification(notify.Error, err.Error())
+		if notificationErr := notify.SendNotification(notify.Error, err.Error()); notificationErr != nil {
+			log.Warnf("%s: failure notification could not be sent: %v", challengeName, notificationErr)
+		}
+		return err
 	} else {
 		msg := fmt.Sprintf("DEPLOY SUCCESS : %s : Challenge deployment pipeline successful.", challengeName)
 		sendNotificationError = notify.SendNotification(notify.Success, msg)
@@ -610,4 +628,5 @@ func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, n
 	if sendNotificationError == nil {
 		log.Debugf("%s: Notification sent", challengeName)
 	}
+	return nil
 }

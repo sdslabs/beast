@@ -5,20 +5,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
+	"net"
+	"net/url"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strings"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"github.com/sdslabs/beastv4/core"
+	coreCache "github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
-	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
@@ -36,10 +35,10 @@ func initDirectories() error {
 	log.Infoln("Creating beast directories...")
 
 	directories := []string{
+		core.BEAST_GLOBAL_DIR,
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CACHE_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_UPLOADS_DIR),
-		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SCRIPTS_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_SECRETS_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR),
 		filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_ASSETS_DIR, core.BEAST_LOGO_DIR),
@@ -47,8 +46,11 @@ func initDirectories() error {
 	}
 
 	for _, dir := range directories {
-		err := os.MkdirAll(dir, 0755)
+		err := os.MkdirAll(dir, 0700)
 		if err != nil {
+			return err
+		}
+		if err := os.Chmod(dir, 0700); err != nil {
 			return err
 		}
 	}
@@ -58,43 +60,26 @@ func initDirectories() error {
 
 func checkDockerDaemon() error {
 	log.Infoln("Checking docker daemon...")
-	_, err := os.Stat(core.DOCKER_PID)
-	return err
+	output, err := utils.RunCommand(30*time.Second, nil, "docker", "info", "--format", "{{.ServerVersion}}")
+	if err != nil {
+		return fmt.Errorf("Docker daemon is unavailable: %w; output: %s", err, output)
+	}
+	return nil
 }
 
-func installAir() error {
-	log.Infoln("Installing air for live reloading...")
-
-	resp, err := http.Get("https://raw.githubusercontent.com/cosmtrek/air/master/install.sh")
-	if err != nil {
-		return err
+func beastRedisACLRules(password string) []string {
+	return []string{
+		"reset", "on", ">" + password,
+		"~beast:*", "&__keyevent@*__:expired",
+		"+ping", "+select", "+client|setinfo",
+		"+get", "+set", "+del", "+expire", "+ttl", "+scan",
+		"+sadd", "+srem", "+smembers", "+sismember",
+		"+lpush", "+rpop", "+llen",
+		"+eval", "+multi", "+exec", "+discard", "+watch", "+unwatch",
+		"+psubscribe", "+punsubscribe",
+		"+config|get", "+config|set",
+		"+flushdb", "+psync", "+replconf",
 	}
-	defer resp.Body.Close()
-
-	install := "install.sh"
-	out, err := os.Create(install)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	defer os.Remove(install)
-
-	if _, err = io.Copy(out, resp.Body); err != nil {
-		return err
-	}
-
-	gopath, err := exec.Command("go", "env", "GOPATH").Output()
-	if err != nil {
-		return err
-	}
-	binDir := filepath.Join(strings.TrimSpace(string(gopath)), "bin")
-
-	cmd := exec.Command("sh", install, "-b", binDir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
 }
 
 func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig) error {
@@ -113,7 +98,8 @@ func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig
 		}
 	}
 
-	_, err = cache.ACLSetUser(ctx, configuration.User, "on", ">"+configuration.Password, "~beast:*", "+@all").Result()
+	rules := beastRedisACLRules(configuration.Password)
+	_, err = cache.ACLSetUser(ctx, configuration.User, rules...).Result()
 	if err != nil {
 		return err
 	}
@@ -131,21 +117,35 @@ func initCache() error {
 	log.Infoln("Initializing cache...")
 
 	redisConfig := config.Cfg.RedisConf
+	tlsConfig, err := coreCache.NewTLSConfig(redisConfig.TLS, redisConfig.CAFile, redisConfig.ServerName, redisConfig.Host)
+	if err != nil {
+		return err
+	}
 	var cache *redis.Client
 	if utils.PromptBinary("Do you use password authentication for the redis default user?") {
 		cache = redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
-			Username: core.REDIS_DEFAULT_USER,
-			Password: utils.PromptSecret("Enter default redis user password"),
+			Addr:         net.JoinHostPort(redisConfig.Host, redisConfig.Port),
+			Username:     core.REDIS_DEFAULT_USER,
+			Password:     utils.PromptSecret("Enter default redis user password"),
+			TLSConfig:    tlsConfig,
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 5 * time.Second,
 		})
 	} else {
 		cache = redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
-			Username: core.REDIS_DEFAULT_USER,
+			Addr:         net.JoinHostPort(redisConfig.Host, redisConfig.Port),
+			Username:     core.REDIS_DEFAULT_USER,
+			TLSConfig:    tlsConfig,
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 5 * time.Second,
 		})
 	}
 
-	_, err := cache.Ping(context.Background()).Result()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = cache.Ping(ctx).Result()
 	if err != nil {
 		return fmt.Errorf("failed to connected to redis: %s", err.Error())
 	}
@@ -181,8 +181,33 @@ func dbUserCheck() (bool, error) {
 	return current.Username == core.POSTGRES_SUPER_USER, nil
 }
 
+func postgresAdminDSN(configuration config.PsqlConfig, password string) string {
+	dsn := &url.URL{
+		Scheme: "postgresql",
+		User:   url.UserPassword(core.POSTGRES_SUPER_USER, password),
+		Host:   net.JoinHostPort(configuration.Host, configuration.Port),
+		Path:   "postgres",
+	}
+	query := dsn.Query()
+	query.Set("sslmode", configuration.SslMode)
+	if configuration.SSLRootCert != "" {
+		query.Set("sslrootcert", configuration.SSLRootCert)
+	}
+	dsn.RawQuery = query.Encode()
+	return dsn.String()
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 func initDb() error {
 	log.Infoln("Initializing database...")
+	configuration := config.Cfg.PsqlConf
 
 	isPostgres, err := dbUserCheck()
 	if err != nil {
@@ -190,36 +215,28 @@ func initDb() error {
 	}
 
 	var db *sql.DB
-	if isPostgres {
+	if isPostgres && isLoopbackHost(configuration.Host) {
 		log.Infoln("Attempting to connect to postgres as postgres super user...")
 
-		dsn := fmt.Sprintf("user=%s dbname=%s sslmode=%s", "postgres", "postgres", "disable")
-		db, err = sql.Open("pgx", dsn)
+		db, err = sql.Open("pgx", "user=postgres dbname=postgres sslmode=disable")
 
 		if err != nil {
 			return err
 		}
 	} else {
-		log.Warnln("Current user is not postgres super user...")
-
-		if utils.PromptBinary("Do you use password authentication for the postgres super user?") {
-			password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
-
-			dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
-			db, err = sql.Open("pgx", dsn)
-
-			if err != nil {
-				return err
-			}
-		} else {
+		log.Warnln("A PostgreSQL superuser password is required for this connection...")
+		if !utils.PromptBinary("Connect using password authentication for the postgres superuser?") {
 			log.Errorln("Cannot continue with postgres setup... Please run this command as the postgres super user (preferred) or use password authentication.")
 			return errors.New("failed to initialize database")
+		}
+		password := utils.PromptSecret("Enter postgres superuser password:")
+		db, err = sql.Open("pgx", postgresAdminDSN(configuration, password))
+		if err != nil {
+			return err
 		}
 	}
 
 	defer db.Close()
-
-	configuration := config.Cfg.PsqlConf
 
 	var exists int
 	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.User).Scan(&exists)
@@ -262,7 +279,9 @@ func initDb() error {
 
 func initAdmin() error {
 	if result := utils.PromptBinary("Create an administrative user for beast?"); result {
-		config.InitConfig()
+		if err := config.InitConfig(); err != nil {
+			return err
+		}
 
 		name := utils.PromptString("Enter admin name")
 		if name == "" {
@@ -280,22 +299,17 @@ func initAdmin() error {
 		}
 
 		password := utils.PromptSecret("Enter admin password")
-		if password == "" {
-			return errors.New("admin password is required")
+		confirmation := utils.PromptSecret("Confirm admin password")
+		if password != confirmation || len(password) < 12 || len(password) > 128 {
+			return errors.New("admin password confirmation must match and contain 12 to 128 bytes")
 		}
 
-		publicKeyPath, err := utils.PromptPublicKeyFile()
-		if err != nil {
+		if err := createAuthorAdminPrereq(); err != nil {
 			return err
 		}
-		if publicKeyPath == "" {
-			log.Warnln("No public key provided... proceeding without it")
+		if err := coreUtils.CreateAdminOrAuthor(name, username, email, password, "admin"); err != nil {
+			return err
 		}
-
-		database.Init()
-
-		createAuthorAdminPrereq()
-		coreUtils.CreateAdminOrAuthor(name, username, email, publicKeyPath, password, "admin")
 	}
 
 	return nil
@@ -315,6 +329,9 @@ func runBeastBootsteps() error {
 	}
 
 	log.Infoln(fmt.Sprintf("Beast global config file initiliazed at %s", BEAST_GLOBAL_CONFIG))
+	if err := ensureLocalTLSCertificate(); err != nil {
+		return err
+	}
 
 	if err := checkDockerDaemon(); err != nil {
 		return err
@@ -322,13 +339,9 @@ func runBeastBootsteps() error {
 
 	log.Infoln("Verified Docker Daemon running")
 
-	if err := installAir(); err != nil {
+	if err := config.InitConfig(); err != nil {
 		return err
 	}
-
-	log.Infoln("Successfully installed air for live reloading...")
-
-	config.InitConfig()
 
 	if err := initCache(); err != nil {
 		return err
@@ -354,20 +367,18 @@ func runBeastBootsteps() error {
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Run Beast initial setup bootsetps.",
-	Long:  "Initializes beast by setting up beast directory, checking for permission. It also configures the logger and local SQLite database to be used by beast",
+	Long:  "Initializes Beast directories, configuration, TLS, Redis ACLs, PostgreSQL schema, and an optional administrator account.",
 
-	Run: func(cmd *cobra.Command, args []string) {
-		err := runBeastBootsteps()
-
-		if err != nil {
-			log.Errorln(err.Error())
-			log.Errorln("Failed to complete beast bootsteps... fix above errors and try again")
-			return
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := runBeastBootsteps(); err != nil {
+			return fmt.Errorf("complete Beast bootsteps: %w", err)
 		}
 
 		log.Infoln(COLOR_GREEN + "Please run beast server by following command:-" + RESET)
 		log.Infoln(COLOR_GREEN + "******************" + RESET)
 		log.Infoln(COLOR_GREEN + "*  " + BLINK_ON + "beast run -v" + BLINK_OFF + "  *" + RESET)
 		log.Infoln(COLOR_GREEN + "******************" + RESET)
+		return nil
 	},
 }

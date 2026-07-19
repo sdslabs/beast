@@ -8,16 +8,28 @@ import (
 
 var backupDatabase = &cobra.Command{
 	Use:   "backup-database",
-	Short: "Backups the existing database and remote/staging directories",
-	Run: func(cmd *cobra.Command, args []string) {
-		database.BackupDatabase()
+	Short: "Backs up the configured PostgreSQL database",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cleanup, err := initializeMaintenance(false)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+		return database.BackupDatabase()
 	},
 }
 
 var backupCache = &cobra.Command{
 	Use:   "backup-cache",
-	Short: "Backups the existing cache and remote/staging directories",
-	Run: func(cmd *cobra.Command, args []string) {
-		cache.BackupCache()
+	Short: "Backs up the configured Redis database",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cleanup, err := initializeMaintenance(true)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+		return cache.BackupCache()
 	},
 }

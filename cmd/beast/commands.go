@@ -10,28 +10,27 @@ import (
 )
 
 var (
-	Verbose               bool
-	HealthProbe           bool
-	Port                  string
-	DefaultAuthorPassword string
-	Name                  string
-	Host                  string
-	Username              string
-	Email                 string
-	Password              string
-	PublicKeyPath         string
-	SkipAuthorization     bool
-	AllChalls             bool
-	AutoDeploy            bool
-	PeriodicSync          bool
-	Tag                   string
-	LocalDirectory        string
-	DeleteEntry           bool
-	RefDirectory          string
-	Status                string
-	Tags                  string
-	NoCache               bool
-	RestoreFile           string
+	Verbose                   bool
+	HealthProbe               bool
+	Port                      string
+	DefaultAuthorPasswordFile string
+	Name                      string
+	Host                      string
+	Username                  string
+	Email                     string
+	AuthCAFile                string
+	AllChalls                 bool
+	AutoDeploy                bool
+	PeriodicSync              bool
+	Tag                       string
+	LocalDirectory            string
+	DeleteEntry               bool
+	RefDirectory              string
+	Status                    string
+	Tags                      string
+	NoCache                   bool
+	RestoreFile               string
+	ConfirmDestructive        bool
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -45,12 +44,6 @@ var rootCmd = &cobra.Command{
 			debug.Enable()
 		} else {
 			debug.Disable()
-		}
-
-		if SkipAuthorization {
-			config.SkipAuthorization = true
-		} else {
-			config.SkipAuthorization = false
 		}
 
 		config.NoCache = NoCache
@@ -77,34 +70,30 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
 
 	runCmd.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to run the beast server on.")
-	runCmd.PersistentFlags().StringVarP(&DefaultAuthorPassword, "defaultauthorpassword", "q", "", "Default password for creating author, users are not created if value is empty string")
+	runCmd.PersistentFlags().StringVar(&DefaultAuthorPasswordFile, "default-author-password-file", "", "0600 file containing the password used to create missing authors")
 	runCmd.PersistentFlags().BoolVarP(&AutoDeploy, "auto-deploy", "a", false, "Auto deploy all challenges from remote on server start.")
 	runCmd.PersistentFlags().BoolVarP(&HealthProbe, "health-probe", "k", false, "Run health check service for beast deployed challenges")
 	runCmd.PersistentFlags().BoolVarP(&PeriodicSync, "periodic-sync", "s", false, "Periodically sync remote with beast and auto update challenges.")
-	runCmd.PersistentFlags().BoolVarP(&SkipAuthorization, "noauth", "n", false, "Skip Authorization")
 	runCmd.PersistentFlags().BoolVarP(&NoCache, "no-cache", "c", false, "Build image of challenge without using cache")
 
 	getAuthCmd.PersistentFlags().StringVarP(&Username, "username", "u", "", "Username")
-	getAuthCmd.PersistentFlags().StringVarP(&Password, "password", "p", "", "Password")
-	getAuthCmd.PersistentFlags().StringVarP(&Host, "host", "H", "http://localhost:5005/", "Hostname or IP along with port where beast is hosted")
+	getAuthCmd.PersistentFlags().StringVarP(&Host, "host", "H", "https://localhost:5005/", "HTTPS URL where Beast is hosted")
+	getAuthCmd.PersistentFlags().StringVar(&AuthCAFile, "ca-file", "", "CA certificate used to verify the Beast server")
 
 	createAuthorCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new author")
 	createAuthorCmd.PersistentFlags().StringVarP(&Username, "username", "", "", "Username of the new author")
-	createAuthorCmd.PersistentFlags().StringVarP(&Password, "password", "", "", "Password of the author")
 	createAuthorCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new author")
-	createAuthorCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new author")
 
 	createAdminCmd.PersistentFlags().StringVarP(&Name, "name", "", "", "Name of the new admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Username, "username", "", "", "Username of the new admin")
-	createAdminCmd.PersistentFlags().StringVarP(&Password, "password", "", "", "Password of the admin")
 	createAdminCmd.PersistentFlags().StringVarP(&Email, "email", "", "", "Email of the new admin")
-	createAdminCmd.PersistentFlags().StringVarP(&PublicKeyPath, "publickey", "", "", "Public key file representing new admin")
 
 	challengeCmd.PersistentFlags().BoolVarP(&AllChalls, "all", "a", false, "Performs action to all challs")
 	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")
 	challengeCmd.PersistentFlags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Deploys challenge from local directory")
 	challengeCmd.PersistentFlags().BoolVarP(&DeleteEntry, "delete-entry", "d", false, "Deletes db entry related to this challenge")
 	challengeCmd.PersistentFlags().BoolVarP(&NoCache, "no-cache", "c", false, "Build image of challenge without using cache")
+	verifyCmd.Flags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Validate a challenge from a local directory")
 
 	cmdRef.PersistentFlags().StringVarP(&RefDirectory, "reference-directory", "r", "", "Generate beast command reference files in reference directory")
 
@@ -112,9 +101,12 @@ func init() {
 	challDetailsCmd.PersistentFlags().StringVarP(&Tags, "tags", "t", "", "Filter by tagname : pwn / web / image / docker")
 
 	restoreDatabaseCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Backup file to be used for restoration.")
-
+	resetDatabaseCmd.Flags().BoolVar(&ConfirmDestructive, "yes", false, "Confirm destructive database reset")
+	restoreDatabaseCmd.Flags().BoolVar(&ConfirmDestructive, "yes", false, "Confirm destructive database restore")
 
 	restoreCacheCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Restore file to be used for restoration.")
+	resetCacheCmd.Flags().BoolVar(&ConfirmDestructive, "yes", false, "Confirm destructive cache reset")
+	restoreCacheCmd.Flags().BoolVar(&ConfirmDestructive, "yes", false, "Confirm destructive cache restore")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
@@ -127,7 +119,6 @@ func init() {
 	rootCmd.AddCommand(healthProbeCmd)
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(challengeCmd)
-	rootCmd.AddCommand(disableUserSSH)
 	rootCmd.AddCommand(cmdRef)
 	rootCmd.AddCommand(generateTemplateCmd)
 	rootCmd.AddCommand(challDetailsCmd)

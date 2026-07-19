@@ -1,16 +1,18 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 type Port struct {
 	gorm.Model
 
 	ChallengeID uint   `gorm:"not null"`
-	PortNo      uint32 `gorm:"not null;unique"`
+	Server      string `gorm:"not null;default:'';uniqueIndex:idx_ports_server_port"`
+	PortNo      uint32 `gorm:"not null;uniqueIndex:idx_ports_server_port"`
 }
 
 // Create an entry for the port in the Port table
@@ -18,29 +20,30 @@ type Port struct {
 // transaction. If the entry already exists then it does not
 // do anything and returns.
 func PortEntryGetOrCreate(port *Port) (Port, error) {
+	if port == nil || port.ChallengeID == 0 {
+		return Port{}, errors.New("persisted challenge port is required")
+	}
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Begin()
-
-	if tx.Error != nil {
-		return Port{}, fmt.Errorf("Error while starting transaction : %s", tx.Error)
-	}
-
-	err := tx.FirstOrCreate(port, *port).Error
-	if err != nil {
-		tx.Rollback()
-		return Port{}, err
-	}
-
-	return *port, tx.Commit().Error
+	err := Db.Transaction(func(tx *gorm.DB) error {
+		if port.Server == "" {
+			var challenge Challenge
+			if err := tx.Select("server_deployed").First(&challenge, port.ChallengeID).Error; err != nil {
+				return fmt.Errorf("resolve challenge server: %w", err)
+			}
+			port.Server = challenge.ServerDeployed
+		}
+		return tx.FirstOrCreate(port, Port{Server: port.Server, PortNo: port.PortNo}).Error
+	})
+	return *port, err
 }
 
 func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 	var ports []Port
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	if err := Db.Model(&challenge).Association("Ports").Find(&ports); err != nil {
 		return nil, fmt.Errorf("error while searching port for challenge : %s", err)
@@ -50,40 +53,58 @@ func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 }
 
 func UpdatePorts(challenge *Challenge) error {
-	var ports []Port
+	if challenge == nil || challenge.ID == 0 {
+		return errors.New("persisted challenge is required")
+	}
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Begin()
-
-	if err := tx.Model(&challenge).Association("Ports").Find(&ports); err != nil {
-		return fmt.Errorf("error while searching port for challenge : %s", err)
-	}
-	tx.Commit()
-
-	if err := Db.Unscoped().Where("challenge_id = ?", challenge.ID).Delete(ports); err != nil {
-		return err.Error
-	}
-
-	return nil
+	return Db.Unscoped().Where("challenge_id = ?", challenge.ID).Delete(&Port{}).Error
 }
 
 func DeleteRelatedPorts(portList []Port) error {
+	if len(portList) == 0 {
+		return nil
+	}
+	ids := make([]uint, 0, len(portList))
+	for _, port := range portList {
+		if port.ID == 0 {
+			return errors.New("persisted port is required")
+		}
+		ids = append(ids, port.ID)
+	}
 
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Begin()
+	return Db.Unscoped().Where("id IN ?", ids).Delete(&Port{}).Error
+}
 
-	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
+func MigratePortUniqueness() error {
+	if Db == nil {
+		return errors.New("database is not initialized")
 	}
-
-	if err := tx.Where("1 = 1").Unscoped().Delete(portList).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
+	return Db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`
+UPDATE ports
+SET server = challenges.server_deployed
+FROM challenges
+WHERE ports.challenge_id = challenges.id AND ports.server = ''`).Error; err != nil {
+			return fmt.Errorf("backfill port servers: %w", err)
+		}
+		statements := []string{
+			`ALTER TABLE ports DROP CONSTRAINT IF EXISTS uni_ports_port_no`,
+			`ALTER TABLE ports DROP CONSTRAINT IF EXISTS ports_port_no_key`,
+			`DROP INDEX IF EXISTS idx_ports_port_no`,
+			`DROP INDEX IF EXISTS uix_ports_port_no`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_ports_server_port ON ports (server, port_no)`,
+		}
+		for _, statement := range statements {
+			if err := tx.Exec(statement).Error; err != nil {
+				return fmt.Errorf("migrate port uniqueness: %w", err)
+			}
+		}
+		return nil
+	})
 }

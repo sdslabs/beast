@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	containerType "github.com/docker/docker/api/types"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
@@ -82,23 +81,29 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 	info := w.Info.(TaskInfo)
 	switch info.Action {
 	case core.MANAGE_ACTION_DEPLOY:
-		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit, info.NoCache)
+		if err := StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit, info.NoCache); err != nil {
+			log.Errorf("Error while deploying challenge(%s): %s", w.ID, err)
+			Q.RecordError(fmt.Errorf("deploy %s: %w", w.ID, err))
+		}
 
 	case core.MANAGE_ACTION_UNDEPLOY:
 		err := StartUndeployChallenge(w.ID, false)
 		if err != nil {
 			log.Errorf("Error while undeplying challenge(%s): %s", w.ID, err.Error())
+			Q.RecordError(fmt.Errorf("undeploy %s: %w", w.ID, err))
 		}
 
 	case core.MANAGE_ACTION_REDEPLOY:
 		err := StartUndeployChallenge(w.ID, true)
 		if err != nil {
 			log.Errorf("Error while redeplying challenge(%s): %s", w.ID, err.Error())
+			Q.RecordError(fmt.Errorf("redeploy %s: %w", w.ID, err))
 			return nil
 		}
 		work, err := GetDeployWork(w.ID)
 		if err != nil {
 			log.Error(err)
+			Q.RecordError(fmt.Errorf("prepare redeploy %s: %w", w.ID, err))
 			return nil
 		}
 		return work
@@ -107,17 +112,20 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 		err := StartUndeployChallenge(w.ID, true)
 		if err != nil {
 			log.Errorf("Error while purging challenge(%s): %s", w.ID, err.Error())
+			Q.RecordError(fmt.Errorf("purge %s: %w", w.ID, err))
 		}
 
 	default:
 		chall, err := database.QueryFirstChallengeEntry("name", w.ID)
 		if err != nil {
 			log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
+			Q.RecordError(fmt.Errorf("query challenge %s: %w", w.ID, err))
 		}
 
 		if chall.Name != "" {
 			database.UpdateChallenge(&chall, map[string]interface{}{"status": core.DEPLOY_STATUS["undeployed"]})
 			log.Errorf("The action(%s) specified for challenge : %s does not exist", info.Action, w.ID)
+			Q.RecordError(fmt.Errorf("action %s does not exist", info.Action))
 		}
 	}
 
@@ -726,8 +734,8 @@ func undeployChallenge(challengeName string, purge bool) error {
 	// and then remove the challenge from the staging directory.
 	if purge {
 		configFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.CHALLENGE_CONFIG_FILE_NAME)
-		var cfg config.BeastChallengeConfig
-		_, err = toml.DecodeFile(configFile, &cfg)
+		cfg, loadErr := config.LoadChallengeConfig(configFile)
+		err = loadErr
 		if err != nil {
 			return err
 		}

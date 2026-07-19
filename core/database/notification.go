@@ -11,8 +11,8 @@ import (
 type Notification struct {
 	gorm.Model
 
-	Title       string `gorm:not null;unique`
-	Description string `gorm:not null`
+	Title       string `gorm:"not null;unique"`
+	Description string `gorm:"not null"`
 }
 
 // Create an entry for the notification in the Notification table
@@ -57,12 +57,16 @@ func DeleteNotification(notification *Notification) error {
 // Queries all the challenges entries where the column represented by key
 // have the value in value.
 func QueryNotificationEntries(key string, value string) ([]Notification, error) {
-	queryKey := fmt.Sprintf("%s = ?", key)
+	column, err := validatedQueryColumn(key, "id")
+	if err != nil {
+		return nil, err
+	}
+	queryKey := fmt.Sprintf("%s = ?", column)
 
 	var notifications []Notification
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Where(queryKey, value).Find(&notifications)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -95,8 +99,8 @@ func QueryFirstNotificationEntry(key string, value string) (Notification, error)
 func QueryAllNotification() ([]Notification, error) {
 	var notifications []Notification
 
-	DBMux.Lock()
-	defer DBMux.Unlock()
+	DBMux.RLock()
+	defer DBMux.RUnlock()
 
 	tx := Db.Find(&notifications)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {

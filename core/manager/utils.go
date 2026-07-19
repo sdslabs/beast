@@ -4,15 +4,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/sdslabs/beastv4/core/cache"
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 
@@ -23,8 +23,12 @@ import (
 	tools "github.com/sdslabs/beastv4/templates"
 	"github.com/sdslabs/beastv4/utils"
 
-	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	maxChallengeArchiveFiles = 4096
+	maxChallengeArchiveBytes = 512 << 20
 )
 
 type BeastBareDockerfile struct {
@@ -60,6 +64,23 @@ type ChallengePreview struct {
 	Points          uint
 }
 
+func activeLocalServerName() (string, bool) {
+	if server, exists := cfg.Cfg.AvailableServers[core.LOCALHOST]; exists && server.Active && cfg.Cfg.UseLocalDockerDaemon(core.LOCALHOST) {
+		return core.LOCALHOST, true
+	}
+	names := make([]string, 0, len(cfg.Cfg.AvailableServers))
+	for name := range cfg.Cfg.AvailableServers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if server := cfg.Cfg.AvailableServers[name]; server.Active && cfg.Cfg.UseLocalDockerDaemon(name) {
+			return name, true
+		}
+	}
+	return "", false
+}
+
 // This if the function which validates the challenge directory
 // which is provided as an arguments. This validtions includes
 // * A valid directory pointed by challengeDir
@@ -74,8 +95,7 @@ func ValidateChallengeConfig(challengeDir string) error {
 		return err
 	}
 
-	var config cfg.BeastChallengeConfig
-	_, err = toml.DecodeFile(configFile, &config)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
 		return err
 	}
@@ -445,32 +465,38 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			if err != nil {
 				return fmt.Errorf("error while querying user with email %s", user.Email)
 			}
+			if u.ID == 0 || u.Status != 0 || (u.Role != core.USER_ROLES["author"] && u.Role != core.USER_ROLES["maintainer"] && u.Role != core.USER_ROLES["admin"]) {
+				return fmt.Errorf("maintainer %s is not an active manager account", user.Email)
+			}
 			users[i] = &u
 		}
 
 		if userEntry.Email == "" {
-			// if defaultauthorpassword == "" {
-			// 	return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
-			// }
+			if defaultauthorpassword == "" {
+				return fmt.Errorf("author %s does not exist and no creation password was provided", config.Author.Email)
+			}
 			log.Infof("User with the given email does not exist : %v, creating this user", config.Author.Email)
+			authModel, err := auth.CreateModel(config.Author.Email, defaultauthorpassword, core.USER_ROLES["author"])
+			if err != nil {
+				return fmt.Errorf("create author credentials: %w", err)
+			}
 			newUser := database.User{
 				Name:      config.Author.Name,
-				AuthModel: auth.CreateModel(config.Author.Email, defaultauthorpassword, core.USER_ROLES["author"]),
+				AuthModel: authModel,
 				Email:     config.Author.Email,
-				SshKey:    config.Author.SSHKey,
 			}
 			err = database.CreateUserEntry(&newUser)
 			if err != nil {
 				return err
 			}
+			userEntry = newUser
 			log.Infof("Author with the email address %v is created", config.Author.Email)
-			// return nil
 		} else {
-			if userEntry.Email != config.Author.Email &&
-				(userEntry.SshKey != config.Author.SSHKey || config.Author.SSHKey == "") &&
-				(userEntry.Name != config.Author.Name || config.Author.Name == "") &&
-				userEntry.Role != core.USER_ROLES["author"] {
-				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", userEntry.Email)
+			if userEntry.Status != 0 || (userEntry.Role != core.USER_ROLES["author"] && userEntry.Role != core.USER_ROLES["admin"]) {
+				return fmt.Errorf("author %s is not an active author account", userEntry.Email)
+			}
+			if config.Author.Name != "" && userEntry.Name != config.Author.Name {
+				return fmt.Errorf("author name for %s does not match the existing account", userEntry.Email)
 			}
 		}
 
@@ -491,8 +517,16 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		}
 		availableServerHostname := core.LOCALHOST
 		if config.Challenge.Metadata.Type != core.STATIC_CHALLENGE_TYPE_NAME {
-			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
-			availableServerHostname = availableServer.Name
+			availableServer, serverErr := remoteManager.ServerQueue.GetNextAvailableInstance()
+			if serverErr == nil {
+				availableServerHostname = availableServer.Name
+			} else {
+				localServerName, exists := activeLocalServerName()
+				if !exists {
+					return fmt.Errorf("no active challenge server is available")
+				}
+				availableServerHostname = localServerName
+			}
 		}
 		if config.Challenge.Metadata.Difficulty == "" {
 			log.Debug("Setting difficulty to default(medium)")
@@ -547,9 +581,9 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			}
 		}
 
-		database.Db.Model(challEntry).Association("Tags").Append(tags)
-
-		database.Db.Model(challEntry).Association("Users").Append(users)
+		if err := database.SetChallengeRelations(challEntry, tags, users); err != nil {
+			return fmt.Errorf("set challenge relations: %w", err)
+		}
 	}
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
@@ -593,6 +627,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 			portEntry := database.Port{
 				ChallengeID: challEntry.ID,
+				Server:      challEntry.ServerDeployed,
 				PortNo:      port,
 			}
 
@@ -621,8 +656,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 // Provides the Static Content Folder Name from the config
 func GetStaticContentDir(configFile, contextDir string) (string, error) {
-	var config cfg.BeastChallengeConfig
-	_, err := toml.DecodeFile(configFile, &config)
+	config, err := cfg.LoadChallengeConfig(configFile)
 	if err != nil {
 		return "", fmt.Errorf("error while decoding file : %s", configFile)
 	}
@@ -642,13 +676,9 @@ func LogTransaction(identifier string, action string, authorization string) erro
 		return fmt.Errorf("error while querying challenge: %s", identifier)
 	}
 
-	// We are trying to get the username for the request from JWT claims here
-	// Since upto this point the request is already authorized, we use a default
-	// username if any error occurs while getting the username.
 	userName, err := coreUtils.GetUser(authorization)
 	if err != nil {
-		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
-		userName = core.DEFAULT_USER_NAME
+		return fmt.Errorf("resolve transaction user: %w", err)
 	}
 
 	user, err := database.QueryFirstUserEntry("username", userName)
@@ -670,19 +700,36 @@ func LogTransaction(identifier string, action string, authorization string) erro
 // Copies the Static content to the staging/static/folder
 func CopyToStaticContent(challengeName, staticContentDir string) error {
 	dirPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
-	err := utils.CreateIfNotExistDir(dirPath)
-	if err != nil {
-		return fmt.Errorf("error while copying static content : %v", err)
+	if _, err := os.Lstat(dirPath); err == nil {
+		if err := utils.RemoveDirRecursively(dirPath); err != nil {
+			return fmt.Errorf("clear static content: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect static content destination: %w", err)
 	}
 
-	err = utils.ValidateDirExists(staticContentDir)
+	err := utils.ValidateDirExists(staticContentDir)
 	if err != nil {
 		log.Warnf("%s : There is no static directory inside challenge, skipping copy.", challengeName)
 		return nil
 	}
 
-	err = utils.CopyDirectory(staticContentDir, dirPath)
-	return err
+	if err := utils.CopyDirectory(staticContentDir, dirPath); err != nil {
+		return err
+	}
+	return filepath.WalkDir(dirPath, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("static asset is a symbolic link: %s", path)
+		}
+		mode := os.FileMode(0644)
+		if entry.IsDir() {
+			mode = 0755
+		}
+		return os.Chmod(path, mode)
+	})
 }
 
 func GetAvailableChallenges() ([]string, error) {
@@ -723,131 +770,182 @@ func ExtractChallengeNamesFromFileNames(fileNames []string) []string {
 
 // Unzips challenge folder in a destination directory
 func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
-
 	baseFileName := filepath.Base(zipContextPath)
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
-	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
-		log.Fatal(err)
-	}
-
-	// 1. Open the zip file
 	reader, err := zip.OpenReader(zipContextPath)
 	if err != nil {
 		return "", err
 	}
 	defer reader.Close()
 
-	// 2. Get the absolute destination path
 	destination, err := filepath.Abs(targetDir)
 	if err != nil {
 		return "", err
 	}
+	if _, err := os.Lstat(destination); err == nil {
+		return "", fmt.Errorf("archive destination already exists: %s", destination)
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if err := os.MkdirAll(destination, 0700); err != nil {
+		return "", err
+	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = os.RemoveAll(destination)
+		}
+	}()
 
-	// 3. Iterate over zip files inside the archive and unzip each of them
+	if len(reader.File) > maxChallengeArchiveFiles {
+		return "", fmt.Errorf("archive contains too many entries: %d (maximum %d)", len(reader.File), maxChallengeArchiveFiles)
+	}
+
+	var totalSize uint64
+	seen := make(map[string]struct{}, len(reader.File))
 	for _, f := range reader.File {
-		err := unzipFile(f, destination)
+		if f.UncompressedSize64 > maxChallengeArchiveBytes-totalSize {
+			return "", fmt.Errorf("archive expands beyond the %d-byte limit", maxChallengeArchiveBytes)
+		}
+		totalSize += f.UncompressedSize64
+
+		relPath, err := safeArchivePath(f.Name)
 		if err != nil {
 			return "", err
 		}
+		if _, exists := seen[relPath]; exists {
+			return "", fmt.Errorf("archive contains duplicate path %q", f.Name)
+		}
+		seen[relPath] = struct{}{}
+
+		if err := unzipFile(f, destination, relPath); err != nil {
+			return "", err
+		}
 	}
+	complete = true
 	return targetDir, nil
 }
 
-func unzipFile(f *zip.File, destination string) error {
-	// 4. Check if file paths are not vulnerable to [Zip Slip](https://snyk.io/research/zip-slip-vulnerability)
-	filePath := filepath.Join(destination, f.Name)
-	if !strings.HasPrefix(filePath, filepath.Clean(destination)+string(os.PathSeparator)) {
-		return fmt.Errorf("invalid file path: %s", filePath)
+func safeArchivePath(name string) (string, error) {
+	if name == "" || strings.ContainsRune(name, '\x00') || strings.Contains(name, `\`) {
+		return "", fmt.Errorf("archive contains invalid path %q", name)
 	}
+	relPath := filepath.Clean(filepath.FromSlash(name))
+	if relPath == "." || filepath.IsAbs(relPath) || relPath == ".." || strings.HasPrefix(relPath, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("archive path escapes destination: %q", name)
+	}
+	return relPath, nil
+}
 
-	// 5. Create directory tree
+func unzipFile(f *zip.File, destination, relPath string) error {
+	filePath := filepath.Join(destination, relPath)
+
 	if f.FileInfo().IsDir() {
-		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-			return err
-		}
-		return nil
+		return os.MkdirAll(filePath, 0755)
+	}
+	if !f.Mode().IsRegular() {
+		return fmt.Errorf("archive contains unsupported entry %q with mode %s", f.Name, f.Mode())
 	}
 
-	if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return err
 	}
 
-	// 6. Create a destination file for unzipped content
-	destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	mode := f.Mode().Perm() & 0777
+	destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
 		return err
 	}
-	defer destinationFile.Close()
 
-	// 7. Unzip the content of a file and copy it to the destination file
 	zippedFile, err := f.Open()
 	if err != nil {
+		_ = destinationFile.Close()
 		return err
 	}
-	defer zippedFile.Close()
 
-	if _, err := io.Copy(destinationFile, zippedFile); err != nil {
+	written, copyErr := io.Copy(destinationFile, io.LimitReader(zippedFile, int64(f.UncompressedSize64)+1))
+	closeSourceErr := zippedFile.Close()
+	closeDestinationErr := destinationFile.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeSourceErr != nil {
+		return closeSourceErr
+	}
+	if closeDestinationErr != nil {
+		return closeDestinationErr
+	}
+	if written != int64(f.UncompressedSize64) {
+		_ = os.Remove(filePath)
+		return fmt.Errorf("archive entry %q size does not match its header", f.Name)
+	}
+	if err := os.Chmod(filePath, mode); err != nil {
 		return err
 	}
 	return nil
 }
 
-// File copies a single file from src to dst
+// CopyFile copies one regular file without following links or replacing a path.
 func CopyFile(src, dst string) error {
-	var err error
-	var srcfd *os.File
-	var dstfd *os.File
-	var srcinfo os.FileInfo
+	srcInfo, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if !srcInfo.Mode().IsRegular() {
+		return fmt.Errorf("source is not a regular file: %s", src)
+	}
 
-	if srcfd, err = os.Open(src); err != nil {
+	srcFile, err := os.Open(src)
+	if err != nil {
 		return err
 	}
-	defer srcfd.Close()
+	defer srcFile.Close()
 
-	if dstfd, err = os.Create(dst); err != nil {
+	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, srcInfo.Mode().Perm())
+	if err != nil {
 		return err
 	}
-	defer dstfd.Close()
-
-	if _, err = io.Copy(dstfd, srcfd); err != nil {
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		_ = dstFile.Close()
+		_ = os.Remove(dst)
 		return err
 	}
-	if srcinfo, err = os.Stat(src); err != nil {
+	if err := dstFile.Close(); err != nil {
+		_ = os.Remove(dst)
 		return err
 	}
-	return os.Chmod(dst, srcinfo.Mode())
+	return nil
 }
 
-// Dir copies a whole directory recursively
-func CopyDir(src string, dst string) error {
-	var err error
-	var fds []os.FileInfo
-	var srcinfo os.FileInfo
-
-	if srcinfo, err = os.Stat(src); err != nil {
+// CopyDir copies a directory tree without following links or replacing paths.
+func CopyDir(src, dst string) error {
+	srcInfo, err := os.Lstat(src)
+	if err != nil {
 		return err
 	}
-
-	if err = os.MkdirAll(dst, srcinfo.Mode()); err != nil {
-		return err
+	if !srcInfo.IsDir() || srcInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("source is not a directory: %s", src)
 	}
 
-	if fds, err = ioutil.ReadDir(src); err != nil {
+	if err := os.Mkdir(dst, srcInfo.Mode().Perm()); err != nil {
 		return err
 	}
-	for _, fd := range fds {
-		srcfp := path.Join(src, fd.Name())
-		dstfp := path.Join(dst, fd.Name())
-
-		if fd.IsDir() {
-			if err = CopyDir(srcfp, dstfp); err != nil {
-				fmt.Println(err)
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+		if entry.IsDir() {
+			if err := CopyDir(srcPath, dstPath); err != nil {
+				return err
 			}
-		} else {
-			if err = CopyFile(srcfp, dstfp); err != nil {
-				fmt.Println(err)
-			}
+			continue
+		}
+		if err := CopyFile(srcPath, dstPath); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -874,8 +972,7 @@ func UpdateChallenges(defaultauthorpassword string) {
 		for _, dir := range dirs {
 
 			configFile := filepath.Join(dir, core.CHALLENGE_CONFIG_FILE_NAME)
-			var config cfg.BeastChallengeConfig
-			_, err := toml.DecodeFile(configFile, &config)
+			config, err := cfg.LoadChallengeConfig(configFile)
 			if err != nil {
 				log.Errorf("Error while decoding challenge config file for challenge dir %s: %s", dir, err.Error())
 				continue
@@ -898,7 +995,7 @@ func UpdateChallenges(defaultauthorpassword string) {
 				continue
 			}
 
-			challenge, err := database.QueryFirstChallengeEntry("name", config.Challenge.Metadata.Name)
+			challenge, _, err := database.FindFirstChallengeEntry("name", config.Challenge.Metadata.Name)
 			if err != nil {
 				log.Errorf("Error while querying challenge %s : %s", config.Challenge.Metadata.Name, err)
 				continue

@@ -1,7 +1,6 @@
 [author]
 name = "beast-admin"
 email = "admin@beast.local"
-ssh_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ"
 
 [challenge.metadata]
 name = "instanced-service"
@@ -29,10 +28,10 @@ default_port = 9999
 apt_deps = ["gcc", "xinetd"]
 setup_scripts = ["setup.sh"]
 service_path = "pwn"
-base_image = "ubuntu:18.04"
+base_image = "ubuntu:24.04"
 
 [resource]
-cpu_shares = 1024
+cpu_shares = 512
 memory_limit = 536870912
 pids_limit = 100
 cpuslimit = 0.25

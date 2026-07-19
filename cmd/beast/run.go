@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/sdslabs/beastv4/core/cache"
+	"io"
 	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/sdslabs/beastv4/core"
@@ -15,11 +19,72 @@ import (
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	"github.com/sdslabs/beastv4/pkg/sse"
+	"github.com/sdslabs/beastv4/utils"
 
 	"github.com/sdslabs/beastv4/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+const controllerLockFile = "controller.lock"
+
+func loadDefaultAuthorPassword(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	expanded, err := utils.ExpandHomePath(path)
+	if err != nil {
+		return "", err
+	}
+	if err := utils.ValidateSecretFile(expanded); err != nil {
+		return "", fmt.Errorf("validate default author password file: %w", err)
+	}
+	file, err := os.Open(expanded)
+	if err != nil {
+		return "", fmt.Errorf("open default author password file: %w", err)
+	}
+	defer file.Close()
+	contents, err := io.ReadAll(io.LimitReader(file, 130))
+	if err != nil {
+		return "", fmt.Errorf("read default author password file: %w", err)
+	}
+	password := strings.TrimSuffix(strings.TrimSuffix(string(contents), "\n"), "\r")
+	if len(password) < 12 || len(password) > 128 || strings.TrimSpace(password) == "" {
+		return "", fmt.Errorf("default author password must contain between 12 and 128 non-whitespace bytes")
+	}
+	return password, nil
+}
+
+func acquireControllerLock(directory string) (*os.File, error) {
+	path := filepath.Join(directory, controllerLockFile)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("open controller lock: %w", err)
+	}
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		file.Close()
+		return nil, fmt.Errorf("another Beast controller is already active: %w", err)
+	}
+	if err := file.Truncate(0); err != nil {
+		syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		file.Close()
+		return nil, fmt.Errorf("truncate controller lock: %w", err)
+	}
+	if _, err := file.WriteString(strconv.Itoa(os.Getpid()) + "\n"); err != nil {
+		syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		file.Close()
+		return nil, fmt.Errorf("write controller lock: %w", err)
+	}
+	return file, nil
+}
+
+func releaseControllerLock(file *os.File) {
+	if file == nil {
+		return
+	}
+	_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	_ = file.Close()
+}
 
 var (
 	BEAST_GRAPH_CACHE       = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CACHE_DIR, core.BEAST_GRAPH_CACHE)
@@ -35,6 +100,10 @@ func stopApiScheduler() {
 
 func stopWorkerQueue() {
 	log.Infoln("Stopping the worker queue...")
+	if manager.Q == nil {
+		log.Infoln("Worker queue was not started")
+		return
+	}
 	manager.Q.Stop()
 	log.Infoln("Worker queue stopped")
 }
@@ -45,45 +114,11 @@ func stopRemoteManagers() {
 	log.Infoln("Remote Manager queue stopped")
 }
 
-func cleanupRunningContainers() {
-	log.Infoln("Cleaning up running challenges...")
-
-	challenges, err := database.QueryAllChallenges()
-	if err != nil {
-		log.Errorln(fmt.Sprintf("Error while querying challenges for cleanup: %s", err.Error()))
-		return
-	}
-
-	for _, challenge := range challenges {
-		if challenge.Status == core.DEPLOY_STATUS["deployed"] {
-			if challenge.Instanced {
-				_ = manager.KillChallengeInstances(challenge.Name)
-			}
-
-			err = manager.UndeployChallenge(challenge.Name)
-			if err != nil {
-				log.Errorln(fmt.Sprintf("Failed to undeploy challenge [Id: %v] %s", challenge.ID, challenge.Name))
-				log.Errorln(err.Error())
-			} else {
-				log.Infoln(fmt.Sprintf("Successfully undeployed challenge [Id: %v] %s", challenge.ID, challenge.Name))
-			}
-		}
-	}
-}
-
 func cleanupCacheConnections() {
 	log.Infoln("Cleaning up cache connections...")
-
-	err := cache.BackupCache()
-	if err != nil {
-		log.Errorln("Error while backing up cache:", err)
-	} else {
-		log.Infoln("Cache backup completed successfully")
-	}
-
 	log.Infoln("Terminating cache connection...")
 
-	err = cache.Close()
+	err := cache.Close()
 	if err != nil {
 		log.Errorln("Unable to terminate cache connections:", err)
 	} else {
@@ -92,20 +127,17 @@ func cleanupCacheConnections() {
 }
 
 func cleanupDatabaseConnections() {
-	log.Infoln("Backing up database...")
-
-	err := database.BackupDatabase()
-	if err != nil {
-		log.Errorln("Error while backing up database:", err)
-	} else {
-		log.Infoln("Database backup completed successfully")
-	}
-
 	log.Infoln("Terminating database connection...")
 
-	err = database.TerminateDatabaseConnections()
+	if database.Db == nil {
+		log.Infoln("Database was not initialized")
+		return
+	}
+	sqlDB, err := database.Db.DB()
 	if err != nil {
-		log.Errorln("Unable to terminate database connections:", err)
+		log.Errorln("Unable to access database connection:", err)
+	} else if err := sqlDB.Close(); err != nil {
+		log.Errorln("Unable to close database connection:", err)
 	} else {
 		log.Infoln("Database connections terminated successfully")
 	}
@@ -117,7 +149,31 @@ func writeJson(data any, location string) error {
 		return err
 	}
 
-	return os.WriteFile(location, bytes, 0644)
+	temporary, err := os.CreateTemp(filepath.Dir(location), "."+filepath.Base(location)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temporary JSON file: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0600); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("secure temporary JSON file: %w", err)
+	}
+	if _, err := temporary.Write(bytes); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("write temporary JSON file: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("sync temporary JSON file: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("close temporary JSON file: %w", err)
+	}
+	if err := os.Rename(temporaryPath, location); err != nil {
+		return fmt.Errorf("replace JSON file: %w", err)
+	}
+	return nil
 }
 
 func saveLeaderboardCache() {
@@ -153,12 +209,10 @@ func stopSseNotificationHub() {
 func cleanup() {
 	log.Info("Starting graceful shutdown cleanup...")
 
-	stopSseNotificationHub()
 	stopApiScheduler()
-
-	cleanupRunningContainers()
-
 	stopWorkerQueue()
+	stopSseNotificationHub()
+
 	stopRemoteManagers()
 
 	saveLeaderboardCache()
@@ -179,26 +233,49 @@ var runCmd = &cobra.Command{
 	Short: "Run Beast API server",
 	Long:  "Run beast API server using beast/api/server, optionally an argument can be provided to specify the port to run the server on.",
 
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if _, err := os.Stat(core.BEAST_GLOBAL_DIR); os.IsNotExist(err) {
 			log.Infof("%s directory not found... running Beast bootsteps...\n", core.BEAST_GLOBAL_DIR)
 
 			if err := runBeastBootsteps(); err != nil {
-				log.Error("Error while running Beast bootsteps.")
-				os.Exit(1)
+				return fmt.Errorf("run Beast bootsteps: %w", err)
 			}
 
 			log.Infoln("beast bootsteps complete... starting beast server")
+		} else if err != nil {
+			return fmt.Errorf("inspect Beast directory: %w", err)
 		}
+		if Port != "" {
+			port, err := strconv.Atoi(Port)
+			if err != nil || port < 1 || port > 65535 {
+				return fmt.Errorf("invalid API port %q", Port)
+			}
+		}
+		controllerLock, err := acquireControllerLock(core.BEAST_GLOBAL_DIR)
+		if err != nil {
+			return err
+		}
+		defer releaseControllerLock(controllerLock)
 
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		ctx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stopSignals()
 
-		go api.RunBeastApiServer(Port, DefaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
-		<-sigChan
-
-		log.Infoln("\nShutdown signal received.")
-		cleanup()
+		defaultAuthorPassword, err := loadDefaultAuthorPassword(DefaultAuthorPasswordFile)
+		if err != nil {
+			return err
+		}
+		err = api.RunBeastApiServer(ctx, Port, defaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
+		if ctx.Err() != nil {
+			log.Infoln("Shutdown signal received.")
+		}
+		if manager.Q != nil && database.Db != nil {
+			cleanup()
+		}
+		if err != nil {
+			return fmt.Errorf("Beast API stopped: %w", err)
+		}
 		log.Infoln("Server stopped gracefully.")
+		return nil
 	},
 }
