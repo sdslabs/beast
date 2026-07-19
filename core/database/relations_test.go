@@ -99,3 +99,40 @@ func TestPortsAreUniquePerServerAndDeleteByID(t *testing.T) {
 		t.Fatalf("expected only one port after targeted deletion, got %d", count)
 	}
 }
+
+func TestChallengeIdentifiersAllowEmptyAndProtectActiveValues(t *testing.T) {
+	cleanup := setupSubmissionTestDB(t)
+	defer cleanup()
+
+	first := Challenge{Name: "empty-identifiers-a", Format: "static", AuthorID: 1}
+	second := Challenge{Name: "empty-identifiers-b", Format: "static", AuthorID: 1}
+	if err := Db.Create(&first).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := Db.Create(&second).Error; err != nil {
+		t.Fatalf("empty identifiers should be reusable: %v", err)
+	}
+
+	first.ContainerId = "container-id"
+	first.ImageId = "image-id"
+	if err := Db.Save(&first).Error; err != nil {
+		t.Fatal(err)
+	}
+	duplicate := Challenge{
+		Name:        "duplicate-identifiers",
+		Format:      "docker",
+		AuthorID:    1,
+		ContainerId: first.ContainerId,
+		ImageId:     first.ImageId,
+	}
+	if err := Db.Create(&duplicate).Error; err == nil {
+		t.Fatal("active challenge identifiers must remain unique")
+	}
+
+	if err := Db.Delete(&first).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := Db.Create(&duplicate).Error; err != nil {
+		t.Fatalf("deleted challenge identifiers should be reusable: %v", err)
+	}
+}

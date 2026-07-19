@@ -61,6 +61,9 @@ func setupSubmissionTestDB(t *testing.T) func() {
 	if err := MigratePortUniqueness(); err != nil {
 		t.Fatalf("migrate port uniqueness: %v", err)
 	}
+	if err := MigrateChallengeIdentifiers(); err != nil {
+		t.Fatalf("migrate challenge identifiers: %v", err)
+	}
 
 	return func() {
 		Db = previousDB

@@ -50,8 +50,8 @@ type Challenge struct {
 	AdditionalLinks    string `gorm:"type:text"`
 	Description        string `gorm:"type:text"`
 	Format             string `gorm:"not null"`
-	ContainerId        string `gorm:"size:64;unique"`
-	ImageId            string `gorm:"size:64;unique"`
+	ContainerId        string `gorm:"size:64"`
+	ImageId            string `gorm:"size:64"`
 	Status             string `gorm:"not null;default:'Undeployed'"`
 	DeploymentType     string `gorm:"not null;default:'standard_docker'"`
 	AuthorID           uint   `gorm:"not null"`
