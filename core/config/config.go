@@ -478,11 +478,14 @@ type PsqlConfig struct {
 }
 
 type RedisConfig struct {
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	Host     string `toml:"host"`
-	Port     string `toml:"port"`
-	Db       uint32 `toml:"db"`
+	User       string `toml:"user"`
+	Password   string `toml:"password"`
+	Host       string `toml:"host"`
+	Port       string `toml:"port"`
+	Db         uint32 `toml:"db"`
+	TLS        bool   `toml:"tls"`
+	CAFile     string `toml:"ca_file"`
+	ServerName string `toml:"server_name"`
 }
 
 func (config *PsqlConfig) ValidatePsqlConfig() error {
@@ -516,6 +519,29 @@ func (config *RedisConfig) ValidateRedisConfig() error {
 	}
 	if err := validateServiceAddress(config.Host, config.Port); err != nil {
 		return fmt.Errorf("invalid redis address: %w", err)
+	}
+	if !config.TLS {
+		ip := net.ParseIP(config.Host)
+		if config.Host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+			return errors.New("TLS is required for non-loopback Redis connections")
+		}
+		if config.CAFile != "" || config.ServerName != "" {
+			return errors.New("Redis CA file and server name require TLS")
+		}
+		return nil
+	}
+	if config.ServerName != "" && net.ParseIP(config.ServerName) == nil && !hostnamePattern.MatchString(config.ServerName) {
+		return fmt.Errorf("invalid Redis TLS server name %q", config.ServerName)
+	}
+	if config.CAFile != "" {
+		caFile, err := utils.ExpandHomePath(config.CAFile)
+		if err != nil {
+			return fmt.Errorf("expand Redis CA file: %w", err)
+		}
+		config.CAFile = caFile
+		if err := utils.ValidateFileExists(config.CAFile); err != nil {
+			return fmt.Errorf("validate Redis CA file: %w", err)
+		}
 	}
 	return nil
 }

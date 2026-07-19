@@ -113,8 +113,11 @@ sslmode = "prefer"
 [redis_config]
 host = "localhost"
 port = "6379"
-password = ""
-user = ""
+password = "CHANGE_ME"
+user = "beast"
+tls = false
+ca_file = ""
+server_name = ""
 
 [instance_config]
 default_expiration = 300

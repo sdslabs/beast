@@ -6,17 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"github.com/sdslabs/beastv4/core"
+	coreCache "github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
@@ -130,21 +133,35 @@ func initCache() error {
 	log.Infoln("Initializing cache...")
 
 	redisConfig := config.Cfg.RedisConf
+	tlsConfig, err := coreCache.NewTLSConfig(redisConfig.TLS, redisConfig.CAFile, redisConfig.ServerName, redisConfig.Host)
+	if err != nil {
+		return err
+	}
 	var cache *redis.Client
 	if utils.PromptBinary("Do you use password authentication for the redis default user?") {
 		cache = redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
-			Username: core.REDIS_DEFAULT_USER,
-			Password: utils.PromptSecret("Enter default redis user password"),
+			Addr:         net.JoinHostPort(redisConfig.Host, redisConfig.Port),
+			Username:     core.REDIS_DEFAULT_USER,
+			Password:     utils.PromptSecret("Enter default redis user password"),
+			TLSConfig:    tlsConfig,
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 5 * time.Second,
 		})
 	} else {
 		cache = redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
-			Username: core.REDIS_DEFAULT_USER,
+			Addr:         net.JoinHostPort(redisConfig.Host, redisConfig.Port),
+			Username:     core.REDIS_DEFAULT_USER,
+			TLSConfig:    tlsConfig,
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 5 * time.Second,
 		})
 	}
 
-	_, err := cache.Ping(context.Background()).Result()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = cache.Ping(ctx).Result()
 	if err != nil {
 		return fmt.Errorf("failed to connected to redis: %s", err.Error())
 	}

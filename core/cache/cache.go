@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"os"
@@ -26,15 +28,18 @@ var (
 var cacheConfig RedisConfig
 
 type RedisConfig struct {
-	User     string
-	Password string
-	Host     string
-	Port     string
-	DB       uint32
+	User       string
+	Password   string
+	Host       string
+	Port       string
+	DB         uint32
+	TLS        bool
+	CAFile     string
+	ServerName string
 }
 
-func Configure(user, password, host, port string, db uint32) {
-	cacheConfig = RedisConfig{User: user, Password: password, Host: host, Port: port, DB: db}
+func Configure(user, password, host, port string, db uint32, tlsEnabled bool, caFile, serverName string) {
+	cacheConfig = RedisConfig{User: user, Password: password, Host: host, Port: port, DB: db, TLS: tlsEnabled, CAFile: caFile, ServerName: serverName}
 }
 
 func LoadCacheConfig() error {
@@ -48,21 +53,55 @@ func redisAddress(config RedisConfig) string {
 	return net.JoinHostPort(config.Host, config.Port)
 }
 
+func NewTLSConfig(enabled bool, caFile, serverName, host string) (*tls.Config, error) {
+	if !enabled {
+		return nil, nil
+	}
+	if serverName == "" {
+		serverName = host
+	}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: serverName}
+	if caFile == "" {
+		return tlsConfig, nil
+	}
+	certificate, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, fmt.Errorf("read Redis CA file: %w", err)
+	}
+	roots, err := x509.SystemCertPool()
+	if err != nil || roots == nil {
+		roots = x509.NewCertPool()
+	}
+	if !roots.AppendCertsFromPEM(certificate) {
+		return nil, fmt.Errorf("Redis CA file contains no certificates")
+	}
+	tlsConfig.RootCAs = roots
+	return tlsConfig, nil
+}
+
 // Connect redis
 func ConnectCache() error {
 	if err := LoadCacheConfig(); err != nil {
 		return err
 	}
+	tlsConfig, err := NewTLSConfig(cacheConfig.TLS, cacheConfig.CAFile, cacheConfig.ServerName, cacheConfig.Host)
+	if err != nil {
+		return err
+	}
 	client := redis.NewClient(&redis.Options{
-		Addr:     redisAddress(cacheConfig),
-		Username: cacheConfig.User,
-		Password: cacheConfig.Password,
-		DB:       int(cacheConfig.DB),
+		Addr:         redisAddress(cacheConfig),
+		Username:     cacheConfig.User,
+		Password:     cacheConfig.Password,
+		DB:           int(cacheConfig.DB),
+		TLSConfig:    tlsConfig,
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := client.Ping(ctx).Result()
+	_, err = client.Ping(ctx).Result()
 	if err != nil {
 		_ = client.Close()
 		return fmt.Errorf("connect to Redis: %w", err)
@@ -230,15 +269,8 @@ func BackupCache() error {
 
 	backupFile := fmt.Sprintf("%d_%s.bak", cacheConfig.DB, time.Now().Format("20060102150405"))
 
-	args := []string{
-		"-h", cacheConfig.Host,
-		"-p", cacheConfig.Port,
-		"-n", strconv.FormatUint(uint64(cacheConfig.DB), 10),
-		"--rdb", filepath.Join(backupPath, backupFile),
-	}
-	if cacheConfig.User != "" {
-		args = append(args, "--user", cacheConfig.User)
-	}
+	args := redisCLIConnectionArgs()
+	args = append(args, "--rdb", filepath.Join(backupPath, backupFile))
 
 	cmd := exec.Command("redis-cli", args...)
 
@@ -264,14 +296,8 @@ func ResetCache() error {
 		return err
 	}
 
-	dropCmd := exec.Command(
-		"redis-cli",
-		"-h", cacheConfig.Host,
-		"-p", cacheConfig.Port,
-		"--user", cacheConfig.User,
-		"-n", strconv.FormatUint(uint64(cacheConfig.DB), 10),
-		"FLUSHDB",
-	)
+	args := append(redisCLIConnectionArgs(), "FLUSHDB")
+	dropCmd := exec.Command("redis-cli", args...)
 
 	dropCmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", cacheConfig.Password))
 
@@ -293,13 +319,18 @@ func TerminateCacheConnections() error {
 		}
 	}
 
+	tlsConfig, err := NewTLSConfig(cacheConfig.TLS, cacheConfig.CAFile, cacheConfig.ServerName, cacheConfig.Host)
+	if err != nil {
+		return err
+	}
 	cache := redis.NewClient(&redis.Options{
-		Addr:     redisAddress(cacheConfig),
-		Username: core.REDIS_DEFAULT_USER,
-		Password: utils.PromptSecret("Enter default redis user password"),
+		Addr:      redisAddress(cacheConfig),
+		Username:  core.REDIS_DEFAULT_USER,
+		Password:  utils.PromptSecret("Enter default redis user password"),
+		TLSConfig: tlsConfig,
 	})
 
-	_, err := cache.Ping(context.Background()).Result()
+	_, err = cache.Ping(context.Background()).Result()
 	if err != nil {
 		log.Errorf("Terminate connections error: %s\n", err.Error())
 	}
@@ -317,6 +348,27 @@ func TerminateCacheConnections() error {
 	}
 
 	return nil
+}
+
+func redisCLIConnectionArgs() []string {
+	args := []string{
+		"-h", cacheConfig.Host,
+		"-p", cacheConfig.Port,
+		"-n", strconv.FormatUint(uint64(cacheConfig.DB), 10),
+	}
+	if cacheConfig.User != "" {
+		args = append(args, "--user", cacheConfig.User)
+	}
+	if cacheConfig.TLS {
+		args = append(args, "--tls")
+		if cacheConfig.CAFile != "" {
+			args = append(args, "--cacert", cacheConfig.CAFile)
+		}
+		if cacheConfig.ServerName != "" {
+			args = append(args, "--sni", cacheConfig.ServerName)
+		}
+	}
+	return args
 }
 
 func RestoreCache(backupFile string) error {

@@ -103,7 +103,7 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 	if err := database.Init(); err != nil {
 		return err
 	}
-	cache.Configure(config.Cfg.RedisConf.User, config.Cfg.RedisConf.Password, config.Cfg.RedisConf.Host, config.Cfg.RedisConf.Port, config.Cfg.RedisConf.Db)
+	cache.Configure(config.Cfg.RedisConf.User, config.Cfg.RedisConf.Password, config.Cfg.RedisConf.Host, config.Cfg.RedisConf.Port, config.Cfg.RedisConf.Db, config.Cfg.RedisConf.TLS, config.Cfg.RedisConf.CAFile, config.Cfg.RedisConf.ServerName)
 	if err := cache.Init(); err != nil {
 		return err
 	}

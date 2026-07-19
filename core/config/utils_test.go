@@ -352,6 +352,17 @@ func TestDataStoreConfigRejectsUnsafeValues(t *testing.T) {
 	}
 }
 
+func TestRemoteRedisRequiresTLS(t *testing.T) {
+	redis := RedisConfig{User: "beast", Host: "redis.example.com", Port: "6379", Password: "secret"}
+	if err := redis.ValidateRedisConfig(); err == nil || !strings.Contains(err.Error(), "TLS is required") {
+		t.Fatalf("expected remote plaintext Redis rejection, got %v", err)
+	}
+	redis.TLS = true
+	if err := redis.ValidateRedisConfig(); err != nil {
+		t.Fatalf("expected remote TLS Redis config to pass: %v", err)
+	}
+}
+
 func TestCompetitionInfoValidatesTimeWindow(t *testing.T) {
 	info := CompetitionInfo{
 		StartingTime: "00:00:00 UTC: +05:30, 1 January 2030, Tuesday",
