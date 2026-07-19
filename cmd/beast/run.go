@@ -129,7 +129,7 @@ func cleanupRunningContainers() {
 				_ = manager.KillChallengeInstances(challenge.Name)
 			}
 
-			err = manager.UndeployChallenge(challenge.Name)
+			err = manager.StartUndeployChallenge(challenge.Name, false)
 			if err != nil {
 				log.Errorln(fmt.Sprintf("Failed to undeploy challenge [Id: %v] %s", challenge.ID, challenge.Name))
 				log.Errorln(err.Error())
@@ -172,9 +172,15 @@ func cleanupDatabaseConnections() {
 
 	log.Infoln("Terminating database connection...")
 
-	err = database.TerminateDatabaseConnections()
+	if database.Db == nil {
+		log.Infoln("Database was not initialized")
+		return
+	}
+	sqlDB, err := database.Db.DB()
 	if err != nil {
-		log.Errorln("Unable to terminate database connections:", err)
+		log.Errorln("Unable to access database connection:", err)
+	} else if err := sqlDB.Close(); err != nil {
+		log.Errorln("Unable to close database connection:", err)
 	} else {
 		log.Infoln("Database connections terminated successfully")
 	}
@@ -248,28 +254,28 @@ var runCmd = &cobra.Command{
 	Short: "Run Beast API server",
 	Long:  "Run beast API server using beast/api/server, optionally an argument can be provided to specify the port to run the server on.",
 
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if _, err := os.Stat(core.BEAST_GLOBAL_DIR); os.IsNotExist(err) {
 			log.Infof("%s directory not found... running Beast bootsteps...\n", core.BEAST_GLOBAL_DIR)
 
 			if err := runBeastBootsteps(); err != nil {
-				log.Error("Error while running Beast bootsteps.")
-				os.Exit(1)
+				return fmt.Errorf("run Beast bootsteps: %w", err)
 			}
 
 			log.Infoln("beast bootsteps complete... starting beast server")
+		} else if err != nil {
+			return fmt.Errorf("inspect Beast directory: %w", err)
 		}
 		if Port != "" {
 			port, err := strconv.Atoi(Port)
 			if err != nil || port < 1 || port > 65535 {
-				log.Errorf("invalid API port %q", Port)
-				return
+				return fmt.Errorf("invalid API port %q", Port)
 			}
 		}
 		controllerLock, err := acquireControllerLock(core.BEAST_GLOBAL_DIR)
 		if err != nil {
-			log.Error(err)
-			return
+			return err
 		}
 		defer releaseControllerLock(controllerLock)
 
@@ -278,17 +284,19 @@ var runCmd = &cobra.Command{
 
 		defaultAuthorPassword, err := loadDefaultAuthorPassword(DefaultAuthorPasswordFile)
 		if err != nil {
-			log.Error(err)
-			return
+			return err
 		}
 		err = api.RunBeastApiServer(ctx, Port, defaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
-		if err != nil {
-			log.Errorf("Beast API stopped: %v", err)
-		}
 		if ctx.Err() != nil {
 			log.Infoln("Shutdown signal received.")
 		}
-		cleanup()
+		if manager.Q != nil && database.Db != nil {
+			cleanup()
+		}
+		if err != nil {
+			return fmt.Errorf("Beast API stopped: %w", err)
+		}
 		log.Infoln("Server stopped gracefully.")
+		return nil
 	},
 }

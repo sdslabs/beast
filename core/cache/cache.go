@@ -197,10 +197,9 @@ func Close() error {
 
 	err := Cache.Close()
 	if err != nil {
-		log.Errorln(fmt.Sprintf("Error while closing cache connection gracefully: %s, attempting to terminate forcefully", err.Error()))
-		return TerminateCacheConnections()
+		return fmt.Errorf("close cache connection: %w", err)
 	}
-
+	Cache = nil
 	return nil
 }
 

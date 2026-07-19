@@ -95,18 +95,25 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 		return err
 	}
 
-	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
-	manager.Q.StartWorkers(&manager.Worker{})
-
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"], core.USER_ROLES["maintainer"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
-	remoteManager.Init()
 	if err := database.Init(); err != nil {
+		if database.Db != nil {
+			if sqlDB, dbErr := database.Db.DB(); dbErr == nil {
+				_ = sqlDB.Close()
+			}
+		}
 		return err
 	}
 	cache.Configure(config.Cfg.RedisConf.User, config.Cfg.RedisConf.Password, config.Cfg.RedisConf.Host, config.Cfg.RedisConf.Port, config.Cfg.RedisConf.Db, config.Cfg.RedisConf.TLS, config.Cfg.RedisConf.CAFile, config.Cfg.RedisConf.ServerName)
 	if err := cache.Init(); err != nil {
+		if sqlDB, dbErr := database.Db.DB(); dbErr == nil {
+			_ = sqlDB.Close()
+		}
 		return err
 	}
+	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
+	manager.Q.StartWorkers(&manager.Worker{})
+	remoteManager.Init()
 	backgroundCtx, stopBackground := context.WithCancel(ctx)
 	dynamicScoreDone := startDynamicScoreWorker(backgroundCtx)
 	instanceCleanupDone := make(chan struct{})
