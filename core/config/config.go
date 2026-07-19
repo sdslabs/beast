@@ -218,6 +218,9 @@ func (config *BeastConfig) ValidateConfig() error {
 	if err != nil {
 		return fmt.Errorf("error while validating redis config : %s", err)
 	}
+	if err := config.CompetitionInfo.Validate(); err != nil {
+		return fmt.Errorf("validate competition info: %w", err)
+	}
 
 	if len(config.AvailableServers) == 0 {
 		log.Warn("No available servers provided for challenges. Using default localhost")
@@ -510,6 +513,55 @@ type CompetitionInfo struct {
 	TimeZone     string `toml:"timezone"`
 	LogoURL      string `toml:"logo_url"`
 	DynamicScore bool   `toml:"dynamic_score"`
+}
+
+func (config CompetitionInfo) Validate() error {
+	windowConfigured := config.StartingTime != "" || config.EndingTime != "" || config.TimeZone != ""
+	if !windowConfigured {
+		if config.DynamicScore {
+			return errors.New("dynamic scoring requires a competition time window")
+		}
+		return nil
+	}
+	_, _, err := config.ParseWindow()
+	return err
+}
+
+func (config CompetitionInfo) ParseWindow() (time.Time, time.Time, error) {
+	if config.StartingTime == "" || config.EndingTime == "" || config.TimeZone == "" {
+		return time.Time{}, time.Time{}, errors.New("starting_time, ending_time, and timezone must be configured together")
+	}
+	locationName := strings.TrimSpace(strings.SplitN(config.TimeZone, ":", 2)[0])
+	location, err := time.LoadLocation(locationName)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("load competition timezone %q: %w", locationName, err)
+	}
+	start, err := parseCompetitionTimestamp(config.StartingTime, location)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("parse starting_time: %w", err)
+	}
+	end, err := parseCompetitionTimestamp(config.EndingTime, location)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("parse ending_time: %w", err)
+	}
+	if !end.After(start) {
+		return time.Time{}, time.Time{}, errors.New("ending_time must be after starting_time")
+	}
+	return start, end, nil
+}
+
+func parseCompetitionTimestamp(value string, location *time.Location) (time.Time, error) {
+	parts := strings.SplitN(value, ",", 3)
+	timeFields := strings.Fields(parts[0])
+	if len(parts) < 2 || len(timeFields) == 0 {
+		return time.Time{}, fmt.Errorf("invalid timestamp %q", value)
+	}
+	dateAndTime := strings.TrimSpace(parts[1]) + " " + timeFields[0]
+	parsed, err := time.ParseInLocation("2 January 2006 15:04:05", dateAndTime, location)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return parsed, nil
 }
 
 type MailConfig struct {

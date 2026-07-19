@@ -327,3 +327,23 @@ func TestDataStoreConfigRejectsUnsafeValues(t *testing.T) {
 		t.Fatal("expected invalid Redis port error")
 	}
 }
+
+func TestCompetitionInfoValidatesTimeWindow(t *testing.T) {
+	info := CompetitionInfo{
+		StartingTime: "00:00:00 UTC: +05:30, 1 January 2030, Tuesday",
+		EndingTime:   "23:59:59 UTC: +05:30, 2 January 2030, Wednesday",
+		TimeZone:     "Asia/Calcutta: UTC +05:30",
+	}
+	start, end, err := info.ParseWindow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !end.After(start) {
+		t.Fatal("parsed competition window is not ordered")
+	}
+
+	info.EndingTime = "malformed"
+	if err := info.Validate(); err == nil {
+		t.Fatal("expected malformed competition time error")
+	}
+}
