@@ -40,8 +40,15 @@ func promptServerDetails(configuration *config.BeastConfig) {
 		if server.Host == "" {
 			server.Host = core.LOCALHOST
 		}
-		server.Username = utils.PromptString("Enter Username")
-		server.SSHKeyPath = utils.PromptString("Enter SSH Key Path")
+		if server.Host != core.LOCALHOST && server.Host != core.LOCALHOST_IP {
+			server.Username = utils.PromptString("Enter SSH username")
+			server.SSHKeyPath = utils.PromptString("Enter SSH private key path (must be mode 0600)")
+			server.KnownHostsFile = utils.PromptString("Enter known_hosts path (leave empty for $HOME/.ssh/known_hosts)")
+		}
+		server.PortRange = utils.PromptString("Enter allocatable host port range (leave empty for 10000:20000)")
+		if server.PortRange == "" {
+			server.PortRange = "10000:20000"
+		}
 		server.Active = utils.PromptBinary("Enable this server?")
 
 		configuration.AvailableServers[server.Host] = server

@@ -367,7 +367,7 @@ func runBeastBootsteps() error {
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Run Beast initial setup bootsetps.",
-	Long:  "Initializes beast by setting up beast directory, checking for permission. It also configures the logger and local SQLite database to be used by beast",
+	Long:  "Initializes Beast directories, configuration, TLS, Redis ACLs, PostgreSQL schema, and an optional administrator account.",
 
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
