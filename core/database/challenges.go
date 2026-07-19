@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/araddon/dateparse"
-
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
@@ -705,24 +703,16 @@ func QueryUserAttempts(user_id uint) ([]ChallengeAttempt, error) {
 
 // timeElapsed returns the aggregation bucket for the given duration
 func timeElapsed() TimeAggBucket {
-	startStr := config.Cfg.CompetitionInfo.StartingTime
-	// The format is "16:31:23 UTC: +05:30, 03 February 2025, Monday"
-	// We'll parse only the part up to the date, ignoring the weekday
-	// e.g. "16:31:23 UTC: +05:30, 03 February 2025"
-	parts := strings.Split(startStr, ",")
-	if len(parts) < 2 {
-		log.Errorf("invalid StartingTime format: %s", startStr)
+	if config.Cfg == nil {
+		log.Error("cannot aggregate scores before config initialization")
 		return Between1MonthAnd1Year
 	}
-	startTimePart := strings.TrimSpace(parts[0])
-	startDatePart := strings.TrimSpace(parts[1])
-	startParseStr := startTimePart + ", " + startDatePart
-	start, err := dateparse.ParseLocal(startParseStr)
+	start, _, err := config.Cfg.CompetitionInfo.ParseWindow()
 	if err != nil {
-		log.Errorf("failed to parse StartingTime: %v", err)
+		log.Errorf("parse competition window for score aggregation: %v", err)
 		return Between1MonthAnd1Year
 	}
-	end := time.Now()
+	end := time.Now().In(start.Location())
 	diff := end.Sub(start)
 	minutes := diff.Minutes()
 	hours := diff.Hours()
