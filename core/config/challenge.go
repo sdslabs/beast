@@ -648,6 +648,9 @@ func (config *Resources) ValidateRequiredFields() error {
 		log.Debug("CPUsLimit not provided in configuration, using default.")
 		config.CPUsLimit = Cfg.CPUsLimit
 	}
+	if err := cr.ValidateResourceLimits(config.CPUShares, config.CPUsLimit, config.Memory, config.PidsLimit); err != nil {
+		return fmt.Errorf("invalid challenge resource limits: %w", err)
+	}
 	if config.CPUShares > Cfg.CPUShares {
 		return fmt.Errorf("cpu_shares %d exceeds global limit %d", config.CPUShares, Cfg.CPUShares)
 	}

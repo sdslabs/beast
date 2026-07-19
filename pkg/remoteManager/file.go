@@ -74,6 +74,9 @@ func StageChallRemote(server config.AvailableServer, challenge database.Challeng
 
 // BuildImageFromTarContextRemote builds a Docker image from the tar context on the remote server.
 func BuildImageFromTarContextRemote(challengeName string, imageTag string, stagedDir string, server config.AvailableServer, limits cr.BuildLimits) ([]byte, string, error) {
+	if err := limits.Validate(); err != nil {
+		return nil, "", fmt.Errorf("invalid build resource limits: %w", err)
+	}
 	remoteExtractPath := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
 	_, err := RunArgsOnServer(server, "mkdir", "-p", remoteExtractPath)
 	if err == nil {
@@ -87,7 +90,7 @@ func BuildImageFromTarContextRemote(challengeName string, imageTag string, stage
 		"docker", "build", "-t", imageTag,
 		"--cpu-shares", fmt.Sprintf("%d", limits.CPUShares),
 		"--cpu-period", "100000",
-		"--cpu-quota", fmt.Sprintf("%d", int64(limits.CPUs*100000)),
+		"--cpu-quota", fmt.Sprintf("%d", cr.CPUQuota(limits.CPUs)),
 		"--memory", fmt.Sprintf("%d", limits.Memory),
 		"--memory-swap", fmt.Sprintf("%d", limits.Memory),
 		"--ulimit", fmt.Sprintf("nproc=%d:%d", limits.Pids, limits.Pids),

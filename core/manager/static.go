@@ -78,6 +78,10 @@ func DeployStaticContentContainer() error {
 		MountsMap:     staticMount,
 		ImageId:       imageId,
 		ContainerName: core.BEAST_STATIC_CONTAINER_NAME,
+		CPUShares:     cfg.Cfg.CPUShares,
+		CPUsLimit:     cfg.Cfg.CPUsLimit,
+		Memory:        cfg.Cfg.Memory,
+		PidsLimit:     cfg.Cfg.PidsLimit,
 	}
 	containerId, err := cr.CreateContainerFromImage(&containerConfig)
 	if err != nil {

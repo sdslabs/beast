@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -335,6 +336,9 @@ func (config *BeastConfig) ValidateConfig() error {
 	if config.CPUsLimit <= 0 {
 		log.Debug("Per container CPUsLimit Limit not provided using default value")
 		config.CPUsLimit = core.DEFAULT_CPU_LIMIT
+	}
+	if err := cr.ValidateResourceLimits(config.CPUShares, config.CPUsLimit, config.Memory, config.PidsLimit); err != nil {
+		return fmt.Errorf("invalid default container resource limits: %w", err)
 	}
 
 	if config.MailConfig.From == "" || config.MailConfig.Password == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {

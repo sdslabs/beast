@@ -124,6 +124,9 @@ func SearchImageByFilter(filterMap map[string]string) ([]types.ImageSummary, err
 }
 
 func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, dockerCtxFile string, noCache bool, limits BuildLimits) (*bytes.Buffer, string, error) {
+	if err := limits.Validate(); err != nil {
+		return nil, "", fmt.Errorf("invalid build resource limits: %w", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), buildTimeout)
 	defer cancel()
 	builderContext, err := os.Open(tarContextPath)
@@ -139,7 +142,7 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 		NoCache:    noCache,
 		CPUShares:  limits.CPUShares,
 		CPUPeriod:  100000,
-		CPUQuota:   int64(limits.CPUs * 100000),
+		CPUQuota:   CPUQuota(limits.CPUs),
 		Memory:     limits.Memory,
 		MemorySwap: limits.Memory,
 		Ulimits: []*units.Ulimit{{

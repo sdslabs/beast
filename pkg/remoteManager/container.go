@@ -20,6 +20,9 @@ import (
 )
 
 func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, server config.AvailableServer) (string, error) {
+	if err := cr.ValidateResourceLimits(containerConfig.CPUShares, containerConfig.CPUsLimit, containerConfig.Memory, containerConfig.PidsLimit); err != nil {
+		return "", fmt.Errorf("invalid container resource limits: %w", err)
+	}
 	arguments := []string{"docker", "run", "-d", "--cap-drop", "ALL", "--security-opt", "no-new-privileges=true"}
 	if containerConfig.ContainerName != "" {
 		arguments = append(arguments, "--name", containerConfig.ContainerName)

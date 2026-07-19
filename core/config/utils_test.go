@@ -120,12 +120,12 @@ func TestLoadBeastConfigRejectsSymlink(t *testing.T) {
 
 func TestResourcesCannotExceedGlobalLimits(t *testing.T) {
 	previous := Cfg
-	Cfg = &BeastConfig{CPUShares: 100, Memory: 1024, PidsLimit: 10, CPUsLimit: 1}
+	Cfg = &BeastConfig{CPUShares: 100, Memory: 8 << 20, PidsLimit: 10, CPUsLimit: 1}
 	defer func() { Cfg = previous }()
 
 	tests := []Resources{
 		{CPUShares: 101},
-		{Memory: 1025},
+		{Memory: (8 << 20) + 1},
 		{PidsLimit: 11},
 		{CPUsLimit: 1.1},
 	}
@@ -138,14 +138,14 @@ func TestResourcesCannotExceedGlobalLimits(t *testing.T) {
 
 func TestResourcesUseGlobalDefaults(t *testing.T) {
 	previous := Cfg
-	Cfg = &BeastConfig{CPUShares: 100, Memory: 1024, PidsLimit: 10, CPUsLimit: 1}
+	Cfg = &BeastConfig{CPUShares: 100, Memory: 8 << 20, PidsLimit: 10, CPUsLimit: 1}
 	defer func() { Cfg = previous }()
 
 	resources := Resources{}
 	if err := resources.ValidateRequiredFields(); err != nil {
 		t.Fatal(err)
 	}
-	if resources.CPUShares != 100 || resources.Memory != 1024 || resources.PidsLimit != 10 || resources.CPUsLimit != 1 {
+	if resources.CPUShares != 100 || resources.Memory != 8<<20 || resources.PidsLimit != 10 || resources.CPUsLimit != 1 {
 		t.Fatalf("unexpected defaults: %+v", resources)
 	}
 }

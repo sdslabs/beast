@@ -162,6 +162,15 @@ func StopAndRemoveContainer(containerId string) error {
 }
 
 func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, error) {
+	if containerConfig == nil {
+		return "", errors.New("container configuration is required")
+	}
+	if containerConfig.ImageId == "" {
+		return "", errors.New("container image ID is required")
+	}
+	if err := ValidateResourceLimits(containerConfig.CPUShares, containerConfig.CPUsLimit, containerConfig.Memory, containerConfig.PidsLimit); err != nil {
+		return "", fmt.Errorf("invalid container resource limits: %w", err)
+	}
 	containerName := containerConfig.ContainerName
 	ctx, cancel := context.WithTimeout(context.Background(), dockerAPILongTimeout)
 	defer cancel()
