@@ -35,9 +35,7 @@ const (
 var BeastScheduler scheduler.Scheduler = scheduler.NewScheduler()
 
 func runBeastApiBootsteps(defaultauthorpassword string) error {
-	manager.RunBeastBootsteps(defaultauthorpassword)
-
-	return nil
+	return manager.RunBeastBootsteps(defaultauthorpassword)
 }
 
 // @title Beast API
@@ -141,7 +139,9 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 	// Must be started before the Notification Router, since SSE handler has access to SSE Hub
 	sse.Init()
 
-	runBeastApiBootsteps(defaultauthorpassword)
+	if err := runBeastApiBootsteps(defaultauthorpassword); err != nil {
+		return err
+	}
 
 	// Initialize Gin router.
 	router := initGinRouter()
