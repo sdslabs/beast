@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -197,8 +198,13 @@ func submitFlagHandler(c *gin.Context) {
 			return
 		}
 		if claim.Status == database.DynamicFlagClaimedByOtherUser {
-			subuser, _ := database.QueryUserById(claim.ClaimedByID)
-			msg := "User " + user.Username + " has submitted the flag " + flag + " for challenge " + challenge.Name + " which has already been claimed by user " + subuser.Username
+			claimedBy := fmt.Sprintf("ID %d", claim.ClaimedByID)
+			if subuser, lookupErr := database.QueryUserById(claim.ClaimedByID); lookupErr != nil {
+				log.Warnf("failed to resolve dynamic flag claimant %d: %v", claim.ClaimedByID, lookupErr)
+			} else {
+				claimedBy = subuser.Username
+			}
+			msg := fmt.Sprintf("User %s submitted a duplicate dynamic flag for challenge %s already claimed by user %s", user.Username, challenge.Name, claimedBy)
 			go notify.SendNotification(notify.Warning, msg)
 			if err := database.MarkSubmissionCheating(user.ID, challenge.ID, flag); err != nil {
 				log.Warnf("failed to mark duplicate dynamic flag submission as cheating: %v", err)
