@@ -18,13 +18,7 @@ func Init() error {
 			if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 				continue
 			}
-			client, err := CreateSSHClient(server)
-			if err != nil {
-				failures = append(failures, fmt.Errorf("connect to remote %s: %w", serverDeployed, err))
-				continue
-			}
-			_ = client.Close()
-			_, err = RunArgsOnServer(server, "mkdir", "-p", "--", filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR))
+			_, err := RunArgsOnServer(server, "mkdir", "-p", "--", filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR))
 			if err != nil {
 				failures = append(failures, fmt.Errorf("prepare remote %s: %w", serverDeployed, err))
 				continue
