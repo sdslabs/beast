@@ -82,3 +82,21 @@ func TestAuthorizeClaimsRejectsExpiredToken(t *testing.T) {
 		t.Fatal("expected expiration rejection")
 	}
 }
+
+func TestPasswordResetTokenCannotAuthorizeAPIRequests(t *testing.T) {
+	initializeTokenTest()
+	token, err := GeneratePasswordResetJWT("alice", "admin", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AuthorizeClaims(token, ADMIN); err == nil {
+		t.Fatal("password reset token authorized an API request")
+	}
+	claims, err := AuthorizePasswordResetClaims(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claims.User != "alice" {
+		t.Fatalf("unexpected reset subject %q", claims.User)
+	}
+}

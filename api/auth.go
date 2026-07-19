@@ -10,7 +10,6 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
-	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"gorm.io/gorm"
 )
@@ -71,6 +70,24 @@ func managerAuthorize(c *gin.Context) {
 // @Security ApiKeyAuth
 func adminAuthorize(c *gin.Context) {
 	authorizeRoles(c, core.ADMIN)
+}
+
+func resetPasswordAuthorize(c *gin.Context) {
+	values := strings.Fields(c.GetHeader("Authorization"))
+	if len(values) != 2 || values[0] != "Bearer" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, HTTPPlainResp{Message: "No Token Provided"})
+		return
+	}
+	claims, err := auth.AuthorizeClaims(values[1], core.MANAGER|core.ADMIN|core.USER)
+	if err != nil {
+		claims, err = auth.AuthorizePasswordResetClaims(values[1])
+	}
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, HTTPPlainResp{Message: "Invalid reset token"})
+		return
+	}
+	c.Set("authClaims", claims)
+	c.Next()
 }
 
 // Handles route related to receive JWT token
@@ -232,13 +249,15 @@ func resetPasswordHandler(c *gin.Context) {
 	newPass := c.PostForm("new_pass")
 	newPass = strings.TrimSpace(newPass)
 
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
-	if err != nil {
+	claimsValue, exists := c.Get("authClaims")
+	claims, ok := claimsValue.(*auth.CustomClaims)
+	if !exists || !ok {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized user",
 		})
 		return
 	}
+	username := claims.User
 
 	user, err := database.QueryFirstUserEntry("username", username)
 	if err != nil {
