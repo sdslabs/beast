@@ -31,7 +31,13 @@ func initializeCLIRuntime(requireCache, requireRemotes bool) (func(), error) {
 		cacheInitialized = true
 	}
 	if requireRemotes {
-		remoteManager.Init()
+		if err := remoteManager.Init(); err != nil {
+			if cacheInitialized {
+				_ = cache.Close()
+			}
+			closeCLIDatabase()
+			return nil, err
+		}
 	}
 
 	return func() {

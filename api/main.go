@@ -109,9 +109,15 @@ func RunBeastApiServer(ctx context.Context, port, defaultauthorpassword string, 
 		}
 		return err
 	}
+	if err := remoteManager.Init(); err != nil {
+		_ = cache.Close()
+		if sqlDB, dbErr := database.Db.DB(); dbErr == nil {
+			_ = sqlDB.Close()
+		}
+		return err
+	}
 	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
 	manager.Q.StartWorkers(&manager.Worker{})
-	remoteManager.Init()
 	backgroundCtx, stopBackground := context.WithCancel(ctx)
 	dynamicScoreDone := startDynamicScoreWorker(backgroundCtx)
 	instanceCleanupDone := make(chan struct{})
