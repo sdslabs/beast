@@ -3,9 +3,10 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"github.com/sdslabs/beastv4/core/cache"
 	"path/filepath"
 	"strings"
+
+	"github.com/sdslabs/beastv4/core/cache"
 
 	"github.com/BurntSushi/toml"
 	containerType "github.com/docker/docker/api/types"

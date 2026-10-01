@@ -65,6 +65,16 @@ func checkDockerDaemon() error {
 func installAir() error {
 	log.Infoln("Installing air for live reloading...")
 
+	gopath, err := exec.Command("go", "env", "GOPATH").Output()
+	if err != nil {
+		return err
+	}
+	binDir := filepath.Join(strings.TrimSpace(string(gopath)), "bin")
+	if _, err := os.Stat(filepath.Join(binDir, "air")); err == nil {
+		log.Infoln("Air is already installed, skipping...")
+		return nil
+	}
+
 	resp, err := http.Get("https://raw.githubusercontent.com/cosmtrek/air/master/install.sh")
 	if err != nil {
 		return err
@@ -83,12 +93,6 @@ func installAir() error {
 	if _, err = io.Copy(out, resp.Body); err != nil {
 		return err
 	}
-
-	gopath, err := exec.Command("go", "env", "GOPATH").Output()
-	if err != nil {
-		return err
-	}
-	binDir := filepath.Join(strings.TrimSpace(string(gopath)), "bin")
 
 	cmd := exec.Command("sh", install, "-b", binDir)
 	cmd.Stdout = os.Stdout
@@ -121,7 +125,16 @@ func createBeastRedisUser(cache *redis.Client, configuration *config.RedisConfig
 
 	err = cache.Do(ctx, "acl", "save").Err()
 	if err != nil {
-		return fmt.Errorf("error while trying to save the acl file: %s", err.Error())
+		if strings.Contains(err.Error(), "not configured to use an ACL file") {
+			log.Warnln("Redis is not configured with an ACL file, falling back to CONFIG REWRITE to persist users...")
+			if rewriteErr := cache.Do(ctx, "config", "rewrite").Err(); rewriteErr != nil {
+				log.Warnf("Could not persist ACL via CONFIG REWRITE (%v). User configuration remains active in memory.", rewriteErr)
+			} else {
+				log.Infoln("Successfully persisted ACL configuration via CONFIG REWRITE")
+			}
+		} else {
+			return fmt.Errorf("error while trying to save the acl file: %s", err.Error())
+		}
 	}
 
 	return nil
@@ -184,6 +197,8 @@ func dbUserCheck() (bool, error) {
 func initDb() error {
 	log.Infoln("Initializing database...")
 
+	configuration := config.Cfg.PsqlConf
+
 	isPostgres, err := dbUserCheck()
 	if err != nil {
 		return err
@@ -193,7 +208,7 @@ func initDb() error {
 	if isPostgres {
 		log.Infoln("Attempting to connect to postgres as postgres super user...")
 
-		dsn := fmt.Sprintf("user=%s dbname=%s sslmode=%s", "postgres", "postgres", "disable")
+		dsn := fmt.Sprintf("host=%s port=%s user=%s dbname=%s sslmode=%s", configuration.Host, configuration.Port, "postgres", "postgres", "disable")
 		db, err = sql.Open("pgx", dsn)
 
 		if err != nil {
@@ -205,7 +220,7 @@ func initDb() error {
 		if utils.PromptBinary("Do you use password authentication for the postgres super user?") {
 			password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
 
-			dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", "postgres", password, "postgres", "disable")
+			dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", configuration.Host, configuration.Port, "postgres", password, "postgres", "disable")
 			db, err = sql.Open("pgx", dsn)
 
 			if err != nil {
@@ -218,8 +233,6 @@ func initDb() error {
 	}
 
 	defer db.Close()
-
-	configuration := config.Cfg.PsqlConf
 
 	var exists int
 	err = db.QueryRow("SELECT 1 FROM pg_roles WHERE rolname = $1", configuration.User).Scan(&exists)
