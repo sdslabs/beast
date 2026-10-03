@@ -144,8 +144,28 @@ func initCache() error {
 	log.Infoln("Initializing cache...")
 
 	redisConfig := config.Cfg.RedisConf
+
+	// First check if cache is already accessible with the configured user
+	testCache := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
+		Username: redisConfig.User,
+		Password: redisConfig.Password,
+	})
+	if _, pingErr := testCache.Ping(context.Background()).Result(); pingErr == nil {
+		log.Infoln("Successfully connected to Redis cache with configured beast user!")
+		testCache.Close()
+		return nil
+	}
+	testCache.Close()
+
 	var cache *redis.Client
-	if utils.PromptBinary("Do you use password authentication for the redis default user?") {
+	if redisConfig.DefaultPassword != "" {
+		cache = redis.NewClient(&redis.Options{
+			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
+			Username: core.REDIS_DEFAULT_USER,
+			Password: redisConfig.DefaultPassword,
+		})
+	} else if utils.PromptBinary("Do you use password authentication for the redis default user?") {
 		cache = redis.NewClient(&redis.Options{
 			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
 			Username: core.REDIS_DEFAULT_USER,
@@ -198,6 +218,18 @@ func initDb() error {
 	log.Infoln("Initializing database...")
 
 	configuration := config.Cfg.PsqlConf
+
+	// First check if database is already accessible with the configured user
+	testDsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		configuration.Host, configuration.Port, configuration.User, configuration.Password, configuration.Dbname, configuration.SslMode)
+	if testDb, err := sql.Open("pgx", testDsn); err == nil {
+		if pingErr := testDb.Ping(); pingErr == nil {
+			log.Infoln("Successfully connected to database with configured beast user!")
+			testDb.Close()
+			return nil
+		}
+		testDb.Close()
+	}
 
 	isPostgres, err := dbUserCheck()
 	if err != nil {

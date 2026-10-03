@@ -11,6 +11,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
@@ -30,15 +31,7 @@ var (
 )
 
 type Config struct {
-	PsqlConf PSQLConfig `toml:"psql_config"`
-}
-type PSQLConfig struct {
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	Dbname   string `toml:"dbname"`
-	Host     string `toml:"host"`
-	Port     string `toml:"port"`
-	SslMode  string `toml:"sslmode"`
+	PsqlConf config.PsqlConfig `toml:"psql_config"`
 }
 
 // Db config is loaded separately here for temp use because init() function is
@@ -48,6 +41,7 @@ func LoadDbConfig() {
 	if _, err := toml.DecodeFile(filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME), &dbConfig); err != nil {
 		log.Fatalf("Error loading TOML file: %v", err)
 	}
+	dbConfig.PsqlConf.ApplyEnvOverrides()
 }
 
 // Connect psql database

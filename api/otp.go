@@ -161,6 +161,13 @@ func sendOTPHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	email = strings.TrimSpace(strings.ToLower(email))
 
+	if email == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email cannot be empty",
+		})
+		return
+	}
+
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
 
@@ -232,6 +239,13 @@ func verifyOTPHandler(c *gin.Context) {
 	otp := strings.TrimSpace(c.PostForm("otp"))
 	email = strings.TrimSpace(strings.ToLower(email))
 
+	if email == "" || otp == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email and OTP cannot be empty",
+		})
+		return
+	}
+
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
 		smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -251,6 +265,7 @@ func verifyOTPHandler(c *gin.Context) {
 				c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 					Error: "OTP not found",
 				})
+				return
 			} else {
 				log.Println("Failed to query OTP:", err)
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -308,6 +323,13 @@ func sendOTPForForgetHandler(c *gin.Context) {
 	}
 	email := c.PostForm("email")
 	email = strings.TrimSpace(strings.ToLower(email))
+
+	if email == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email cannot be empty",
+		})
+		return
+	}
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -372,6 +394,14 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	otp := strings.TrimSpace(c.PostForm("otp"))
 	email = strings.TrimSpace(strings.ToLower(email))
+
+	if email == "" || otp == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email and OTP cannot be empty",
+		})
+		return
+	}
+
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
 		smtpPort := config.Cfg.MailConfig.SMTPPort

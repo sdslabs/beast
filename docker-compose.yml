@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: beast-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-beast_database_postgress_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-doorword}
+      POSTGRES_DB: ${POSTGRES_DB:-beast}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: beast-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    environment:
+      - REDIS_DEFAULT_PASSWORD=${REDIS_DEFAULT_PASSWORD:-redis_default_password}
+      - REDIS_USER=${REDIS_USER:-beast_user}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-doorword}
+    command: >
+      sh -c "
+        mkdir -p /data
+        echo 'user default on >'$${REDIS_DEFAULT_PASSWORD}' ~* &* +@all' > /data/users.acl
+        if [ -n \"$${REDIS_USER}\" ] && [ \"$${REDIS_USER}\" != \"default\" ]; then
+          echo 'user '$${REDIS_USER}' on >'$${REDIS_PASSWORD}' ~* &* +@all' >> /data/users.acl
+        fi
+        exec redis-server /usr/local/etc/redis/redis.conf
+      "
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

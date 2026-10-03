@@ -1,0 +1,2 @@
+user default on >doorword ~* +@all
+user beast_user on >doorword ~* +@all

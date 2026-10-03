@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -417,14 +418,91 @@ type PsqlConfig struct {
 }
 
 type RedisConfig struct {
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	Host     string `toml:"host"`
-	Port     string `toml:"port"`
-	Db       uint32 `toml:"db"`
+	User            string `toml:"user"`
+	Password        string `toml:"password"`
+	DefaultPassword string `toml:"default_password"`
+	Host            string `toml:"host"`
+	Port            string `toml:"port"`
+	DB              int    `toml:"db"`
+}
+
+// LoadEnvFile attempts to load .env from the working directory or global beast directory
+func LoadEnvFile() {
+	paths := []string{
+		".env",
+		filepath.Join(core.BEAST_GLOBAL_DIR, ".env"),
+	}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				val := strings.TrimSpace(parts[1])
+				val = strings.Trim(val, "\"'")
+				if os.Getenv(key) == "" {
+					_ = os.Setenv(key, val)
+				}
+			}
+		}
+	}
+}
+
+func (config *PsqlConfig) ApplyEnvOverrides() {
+	LoadEnvFile()
+	if val := os.Getenv("POSTGRES_USER"); val != "" {
+		config.User = val
+	}
+	if val := os.Getenv("POSTGRES_PASSWORD"); val != "" {
+		config.Password = val
+	}
+	if val := os.Getenv("POSTGRES_DB"); val != "" {
+		config.Dbname = val
+	}
+	if val := os.Getenv("POSTGRES_HOST"); val != "" {
+		config.Host = val
+	}
+	if val := os.Getenv("POSTGRES_PORT"); val != "" {
+		config.Port = val
+	}
+	if val := os.Getenv("POSTGRES_SSLMODE"); val != "" {
+		config.SslMode = val
+	}
+}
+
+func (config *RedisConfig) ApplyEnvOverrides() {
+	LoadEnvFile()
+	if val := os.Getenv("REDIS_USER"); val != "" {
+		config.User = val
+	}
+	if val := os.Getenv("REDIS_PASSWORD"); val != "" {
+		config.Password = val
+	}
+	if val := os.Getenv("REDIS_DEFAULT_PASSWORD"); val != "" {
+		config.DefaultPassword = val
+	}
+	if val := os.Getenv("REDIS_HOST"); val != "" {
+		config.Host = val
+	}
+	if val := os.Getenv("REDIS_PORT"); val != "" {
+		config.Port = val
+	}
+	if val := os.Getenv("REDIS_DB"); val != "" {
+		if dbVal, err := strconv.Atoi(val); err == nil {
+			config.DB = dbVal
+		}
+	}
 }
 
 func (config *PsqlConfig) ValidatePsqlConfig() error {
+	config.ApplyEnvOverrides()
 	if config.User == "" || config.Password == "" || config.Dbname == "" || config.Host == "" || config.Port == "" {
 		log.Error("One of username, password, dbname, hostname, port is missing in the config")
 		return errors.New("psql config not valid, config parameters missing")
@@ -437,6 +515,7 @@ func (config *PsqlConfig) ValidatePsqlConfig() error {
 }
 
 func (config *RedisConfig) ValidateRedisConfig() error {
+	config.ApplyEnvOverrides()
 	if config.Host == "" || config.Port == "" {
 		log.Error("One of hostname or port is missing in the config")
 		return errors.New("redis config not valid, config parameters missing")
@@ -533,6 +612,9 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 	if err != nil {
 		return config, err
 	}
+
+	config.PsqlConf.ApplyEnvOverrides()
+	config.RedisConf.ApplyEnvOverrides()
 
 	prettyJSON, _ := json.MarshalIndent(config, "", "  ")
 	log.Debugf("Parsed beast global config file is : %s", string(prettyJSON))
