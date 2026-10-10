@@ -928,13 +928,20 @@ func serveAssets(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "challenge and asset parameters are required"})
 		return
 	}
-	filepath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, core.BEAST_STATIC_FOLDER, assetName)
-	err := fileUtils.ValidateFileExists(filepath)
+	targetPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, core.BEAST_STATIC_FOLDER, assetName)
+	err := fileUtils.ValidateFileExists(targetPath)
+	if err != nil {
+		fallbackPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, assetName)
+		if fileUtils.ValidateFileExists(fallbackPath) == nil {
+			targetPath = fallbackPath
+			err = nil
+		}
+	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Incorrect file requested"})
 		return
 	}
-	c.FileAttachment(filepath, assetName)
+	c.FileAttachment(targetPath, assetName)
 
 }
 

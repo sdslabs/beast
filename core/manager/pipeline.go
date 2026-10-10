@@ -318,6 +318,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	var staticMountDir string
 	if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 		staticMountDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
+		_ = utils.CreateIfNotExistDir(staticMountDir)
 	} else {
 		staticMountDir = filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
 	}

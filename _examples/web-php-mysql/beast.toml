@@ -7,8 +7,11 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "web-php-mysql"
 flag = "CTF{sample_flag}"
 type = "web:php:8.2:cli"
+description = "A PHP 8.2 web challenge interacting with MySQL database."
+difficulty = "medium"
 points = 200
 maxAttemptLimit = 10
+tags = ["web", "php", "sql"]
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
@@ -18,9 +21,8 @@ points = 10
 text = "simple_hint_2"
 points = 20
 
-
 [challenge.env]
-apt_deps = ["gcc", "php*-mysql"]
+apt_deps = ["gcc"]
 setup_scripts = ["setup.sh"]
 ports = [10004]
 web_root = "challenge"

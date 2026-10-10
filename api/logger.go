@@ -11,7 +11,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core"
+	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	ansiReset  = "\033[0m"
+	ansiDim    = "\033[2m\033[90m" // Faint + dark gray
+	ansiYellow = "\033[33m"        // Yellow for 4xx errors
+	ansiRed    = "\033[31m"        // Red for 5xx errors
 )
 
 type bodyLogWriter struct {
@@ -76,12 +84,37 @@ func isPayloadLoggingEnabled() bool {
 	return os.Getenv("DEBUG") != ""
 }
 
-// ginLoggerMiddleware returns a Gin logging middleware that ignores OPTIONS preflight requests.
+// ginLoggerMiddleware returns a Gin logging middleware that dims OPTIONS requests.
 func ginLoggerMiddleware() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		if param.Request.Method == "OPTIONS" {
-			return ""
+			if param.StatusCode >= 400 {
+				return fmt.Sprintf("%s[GIN] %v | %3d | %13v | %15s | %-7s %#v%s\n%s",
+					ansiYellow,
+					param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+					param.StatusCode,
+					param.Latency,
+					param.ClientIP,
+					param.Method,
+					param.Path,
+					ansiReset,
+					param.ErrorMessage,
+				)
+			}
+			// Dim the OPTIONS preflight request in faint gray
+			return fmt.Sprintf("%s[GIN] %v | %3d | %13v | %15s | %-7s %#v%s\n%s",
+				ansiDim,
+				param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+				param.StatusCode,
+				param.Latency,
+				param.ClientIP,
+				param.Method,
+				param.Path,
+				ansiReset,
+				param.ErrorMessage,
+			)
 		}
+
 		var statusColor, methodColor, resetColor string
 		if param.IsOutputColor() {
 			statusColor = param.StatusCodeColor()
@@ -100,16 +133,11 @@ func ginLoggerMiddleware() gin.HandlerFunc {
 	})
 }
 
-// requestResponseLogger logs detailed information about incoming HTTP requests and responses,
-// including method, path, client IP, status, latency, request body, and response body.
-// Note: CORS preflight (OPTIONS) requests are ignored to avoid log noise.
+// requestResponseLogger logs detailed information about incoming HTTP requests and responses.
+// OPTIONS requests are dimmed.
+// Invalid requests (status >= 400 like 401, 403, 404, 500) always show up with highlighted status.
 func requestResponseLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !isPayloadLoggingEnabled() || c.Request.Method == "OPTIONS" {
-			c.Next()
-			return
-		}
-
 		startTime := time.Now()
 		path := c.Request.URL.Path
 		rawQuery := c.Request.URL.RawQuery
@@ -139,13 +167,41 @@ func requestResponseLogger() gin.HandlerFunc {
 			}
 		}
 
-		log.Infof("[HTTP REQ] %s %s | ClientIP: %s | Content-Type: %s | Body: %s",
-			c.Request.Method,
-			path,
-			c.ClientIP(),
-			contentType,
-			reqBodyStr,
-		)
+		// Extract user if authorization header is present
+		userStr := ""
+		if authHeader := c.GetHeader("Authorization"); authHeader != "" {
+			if u, err := coreUtils.GetUser(authHeader); err == nil && u != "" {
+				userStr = fmt.Sprintf(" | User: %s", u)
+			}
+		}
+
+		isOptions := c.Request.Method == "OPTIONS"
+		payloadsEnabled := isPayloadLoggingEnabled()
+
+		// If payloads are enabled, log the incoming request immediately
+		if payloadsEnabled {
+			if isOptions {
+				log.Infof("%s[HTTP REQ] %s %s%s | ClientIP: %s | Content-Type: %s | Body: %s%s",
+					ansiDim,
+					c.Request.Method,
+					path,
+					userStr,
+					c.ClientIP(),
+					contentType,
+					reqBodyStr,
+					ansiReset,
+				)
+			} else {
+				log.Infof("[HTTP REQ] %s %s%s | ClientIP: %s | Content-Type: %s | Body: %s",
+					c.Request.Method,
+					path,
+					userStr,
+					c.ClientIP(),
+					contentType,
+					reqBodyStr,
+				)
+			}
+		}
 
 		blw := &bodyLogWriter{
 			body:           bytes.NewBufferString(""),
@@ -171,13 +227,73 @@ func requestResponseLogger() gin.HandlerFunc {
 			}
 		}
 
-		log.Infof("[HTTP RESP] %s %s | Status: %d | Latency: %v | Content-Type: %s | Body: %s\n",
-			c.Request.Method,
-			path,
-			statusCode,
-			duration,
-			respContentType,
-			respBodyStr,
-		)
+		isError := statusCode >= 400
+
+		// If payload logging was disabled, but an error occurred, log the request now for context
+		if !payloadsEnabled && isError {
+			log.Warnf("%s[HTTP REQ] %s %s%s | ClientIP: %s | Content-Type: %s | Body: %s%s",
+				ansiYellow,
+				c.Request.Method,
+				path,
+				userStr,
+				c.ClientIP(),
+				contentType,
+				reqBodyStr,
+				ansiReset,
+			)
+		}
+
+		// Determine how to log the response
+		if isError {
+			if statusCode >= 500 {
+				log.Errorf("%s[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s | Body: %s%s",
+					ansiRed,
+					c.Request.Method,
+					path,
+					userStr,
+					statusCode,
+					duration,
+					respContentType,
+					respBodyStr,
+					ansiReset,
+				)
+			} else {
+				log.Warnf("%s[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s | Body: %s%s",
+					ansiYellow,
+					c.Request.Method,
+					path,
+					userStr,
+					statusCode,
+					duration,
+					respContentType,
+					respBodyStr,
+					ansiReset,
+				)
+			}
+		} else if payloadsEnabled {
+			if isOptions {
+				log.Infof("%s[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s | Body: %s%s",
+					ansiDim,
+					c.Request.Method,
+					path,
+					userStr,
+					statusCode,
+					duration,
+					respContentType,
+					respBodyStr,
+					ansiReset,
+				)
+			} else {
+				log.Infof("[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s | Body: %s",
+					c.Request.Method,
+					path,
+					userStr,
+					statusCode,
+					duration,
+					respContentType,
+					respBodyStr,
+				)
+			}
+		}
 	}
 }

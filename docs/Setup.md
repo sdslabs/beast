@@ -66,7 +66,7 @@ scripts_dir = "/home/fristonio/.beast/scripts"
 
 
 # Base OS image that beast allows the challenges to use.
-allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
+allowed_base_images = ["ubuntu:24.04", "ubuntu:22.04", "ubuntu:20.04", "ubuntu:18.04", "debian:bookworm"]
 
 
 # For authentication purposes beast uses JWT based authentication, this is the

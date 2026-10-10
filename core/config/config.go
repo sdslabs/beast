@@ -35,7 +35,7 @@ import (
 // scripts_dir = "/home/fristonio/.beast/scripts"
 //
 // # Base OS image that beast allows the challenges to use.
-// allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
+// allowed_base_images = ["ubuntu:24.04", "ubuntu:22.04", "ubuntu:20.04", "ubuntu:18.04", "debian:bookworm"]
 //
 // # Beast static URL refers to the host used by beast for serving static content
 // # of the challenges, whenever required. It follows the URL pattern like

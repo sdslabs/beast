@@ -13,7 +13,7 @@ difficulty = "medium"
 tags = ["web", "sql", "instanced"]
 maxAttemptLimit = 100
 instanced = true
-instance_expiration = 12
+instance_expiration = 900
 
 [[challenge.metadata.hints]]
 text = "Check for SQL injection vulnerabilities"

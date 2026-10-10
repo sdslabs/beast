@@ -24,7 +24,7 @@ type HTTPAuthorizeResp struct {
 
 type AvailableImagesResp struct {
 	Message string   `json:"message" example:"Available Base images."`
-	Images  []string `json:"images" example:"['ubuntu16.04', 'ubuntu18.04']"`
+	Images  []string `json:"images" example:"['ubuntu:24.04', 'ubuntu:22.04']"`
 }
 
 type PortsInUseResp struct {

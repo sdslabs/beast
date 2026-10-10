@@ -7,8 +7,12 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "service"
 flag = "CTF{sample_flag}"
 type = "service"
+description = "A standard xinetd service challenge hosted by Beast."
+difficulty = "easy"
 points = 100
 maxAttemptLimit = 10
+tags = ["pwn"]
+assets = ["pwn_me.c"]
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
@@ -18,9 +22,8 @@ points = 10
 text = "simple_hint_2"
 points = 20
 
-
 [challenge.env]
-apt_deps = ["gcc", "socat"]
+apt_deps = ["gcc"]
 setup_scripts = ["setup.sh"]
 service_path = "pwn"
 ports = [10004]

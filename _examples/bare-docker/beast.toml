@@ -4,10 +4,13 @@ email = "contact+fristonio@sdslabs.co.in"
 ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
-name = "docker-type"
+name = "bare-docker"
 flag = "FLAG{r3GEx_i5_3vi1!!}"
 type = "bare"
+description = "A bare Docker challenge using a custom Dockerfile context."
+difficulty = "medium"
 points = 200
+tags = ["misc", "docker"]
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
