@@ -6,6 +6,7 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
@@ -20,6 +21,7 @@ var challengeCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		config.InitConfig()
+		database.Init()
 
 		// Since action is already verfied to exist it does not make sense to check
 		// its existence here therefore we directly parse the action from the command.

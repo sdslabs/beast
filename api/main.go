@@ -81,10 +81,6 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	// Initialize Gin router.
 	router := initGinRouter()
 
-	// Setup gin middlewares
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
-
 	router.GET("/api/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, HTTPPlainResp{
