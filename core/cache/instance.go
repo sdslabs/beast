@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/sdslabs/beastv4/utils"
 	"time"
+
+	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -15,7 +16,7 @@ type Instance struct {
 	ChallengeName  string    `json:"challenge_name"`
 	ContainerID    string    `json:"container_id"`
 	PortOwner      string    `json:"port_owner"`
-	Port           uint32    `json:"port"`
+	Port           []uint32  `json:"port"`
 	UserID         string    `json:"user_id"`
 	Username       string    `json:"username"`
 	CreatedAt      time.Time `json:"created_at"`

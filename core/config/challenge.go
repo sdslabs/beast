@@ -267,9 +267,7 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 type ChallengeEnv struct {
 	AptDeps          []string         `toml:"apt_deps"`
 	Ports            []uint32         `toml:"ports"`
-	DefaultPort      uint32           `toml:"default_port"`
 	PortVariables    []string         `toml:"-"`
-	DefaultPortVar   string           `toml:"default_port_var"`
 	SetupScripts     []string         `toml:"setup_scripts"`
 	StaticContentDir string           `toml:"static_dir"`
 	RunCmd           string           `toml:"run_cmd"`
@@ -435,18 +433,11 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 func (config *ChallengeEnv) ExtractPorts() error {
 	if config.DockerCompose == "" {
-		if len(config.Ports) == 0 && config.DefaultPort == 0 {
+		if len(config.Ports) == 0 {
 			return errors.New("some port is required to be specified by the challenge")
 		}
 		if len(config.Ports) > int(core.MAX_PORT_PER_CHALL) {
 			return fmt.Errorf("max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
-		}
-
-		if config.DefaultPort == 0 {
-			config.DefaultPort = config.Ports[0]
-			log.Warnf("default port is 0 for challenge with default port : %d", config.Ports[0])
-		} else if !utils.UInt32InList(config.DefaultPort, config.Ports) {
-			return fmt.Errorf("default port %d was not found in assigned ports", config.DefaultPort)
 		}
 	}
 
@@ -464,13 +455,6 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 		}
 
 		config.PortVariables = portVariables
-		if config.DefaultPortVar == "" {
-			config.DefaultPortVar = config.PortVariables[0]
-			log.Warnf("default port variable is empty, settting it to %s", config.PortVariables[0])
-		}
-		if !utils.StringInSlice(config.DefaultPortVar, config.PortVariables) {
-			return fmt.Errorf("default port variable: %s was not found", config.DefaultPortVar)
-		}
 	}
 
 	return nil

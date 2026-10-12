@@ -66,7 +66,7 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 	ttl := time.Duration(expirationSeconds) * time.Second
 	expiresAt := time.Now().Add(ttl)
 
-	var port uint32
+	var port []uint32
 	var containerID string
 	var portOwner string
 	var deploymentType string
@@ -82,7 +82,9 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 			return nil, fmt.Errorf("failed to allocate instance ports: %s", err.Error())
 		}
 
-		port = ports[config.Challenge.Env.DefaultPortVar]
+		for _, v := range ports {
+			port = append(port, v)
+		}
 
 		containerID, err = deployInstanceFromCompose(instanceID, challengeName, &config, challengeStagingDir, serverDeployed, ports)
 		portOwner = utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
@@ -109,13 +111,6 @@ func SpawnInstance(challengeName, userID, username string) (*cache.Instance, err
 		ports, err := allocateInstancePorts(serverDeployed, config.Challenge.Env)
 		if err != nil {
 			return nil, fmt.Errorf("failed to allocate instance ports: %s", err.Error())
-		}
-
-		var found bool
-		found, port = utils.Uint32InIndexList(config.Challenge.Env.DefaultPort, config.Challenge.Env.Ports, ports)
-		if !found {
-			coreUtils.FreePortsOnHost(serverDeployed, ports)
-			return nil, fmt.Errorf("failed to allocate instance port for challenge %s", challengeName)
 		}
 
 		containerID, err = deployInstanceContainer(instanceID, challengeName, challenge.ImageId, &config, serverDeployed, ports)
@@ -329,11 +324,6 @@ func selectServerForInstance() string {
 func deployInstanceContainer(instanceID, challengeName string, imageID string, config *cfg.BeastChallengeConfig, serverDeployed string, ports []uint32) (string, error) {
 	// Instanced non compose challenges are managed by the container ID
 	containerName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
-
-	containerPort := config.Challenge.Env.DefaultPort
-	if containerPort == 0 {
-		containerPort = 8080
-	}
 
 	portMapping := make([]cr.PortMapping, len(ports))
 	for i, port := range ports {

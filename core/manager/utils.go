@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/sdslabs/beastv4/core/cache"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/sdslabs/beastv4/core/cache"
 
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
@@ -263,7 +264,8 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	} else if strings.HasPrefix(challengeType, "web") {
 		// Challenge type is web here, so set the required variables.
 		challengeInfo := strings.Split(challengeType, ":")
-		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
+		// TODO : write a assert that len(Ports) == 1 or do something such that web thing becomes capable of doing things with more than 1 port
+		webPort := fmt.Sprint(config.Challenge.Env.Ports[0])
 		var defaultRunCmd string
 		defaultRunCmd, baseImage, modifier = GetWebChallSetup(config.Challenge.Env.WebRoot, webPort, challengeInfo)
 
