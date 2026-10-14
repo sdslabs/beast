@@ -13,6 +13,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
@@ -251,17 +252,42 @@ func challengeInfoHandler(c *gin.Context) {
 
 		}
 		challMetadata := ChallengeMetadata{
-			Name:           challenge.Name,
-			ChallId:        challenge.ID,
-			Tags:           challengeTags,
-			CreatedAt:      challenge.CreatedAt,
-			Points:         challenge.Points,
-			SolvesNumber:   totalSolves,
-			SolveStatus:    solveStatus,
-			Difficulty:     challenge.Difficulty,
-			PreRequisite:   fileUtils.SplitDelimited(challenge.PreReqs, core.DELIMITER),
-			DeployedStatus: challenge.Status,
+			Name:               challenge.Name,
+			ChallId:            challenge.ID,
+			Tags:               challengeTags,
+			CreatedAt:          challenge.CreatedAt,
+			Points:             challenge.Points,
+			SolvesNumber:       totalSolves,
+			SolveStatus:        solveStatus,
+			Difficulty:         challenge.Difficulty,
+			PreRequisite:       fileUtils.SplitDelimited(challenge.PreReqs, core.DELIMITER),
+			DeployedStatus:     challenge.Status,
+			Instanced:          challenge.Instanced,
+			InstanceExpiration: challenge.InstanceExpiration,
 		}
+
+		var ports []uint32
+		if challenge.Instanced {
+			if instance, err := manager.GetUserInstance(fmt.Sprintf("%d", user.ID), challenge.Name); err == nil && instance != nil {
+				ports = instance.Port
+			}
+		} else {
+			if len(challenge.Ports) > 0 {
+				ports = make([]uint32, len(challenge.Ports))
+				for i, p := range challenge.Ports {
+					ports[i] = p.PortNo
+				}
+			} else if allocated, err := database.GetAllocatedPorts(challenge); err == nil && len(allocated) > 0 {
+				ports = make([]uint32, len(allocated))
+				for i, p := range allocated {
+					ports[i] = p.PortNo
+				}
+			}
+		}
+		if ports == nil {
+			ports = []uint32{}
+		}
+
 		challengeInfo := Challenge{
 			ChallengeMetadata: challMetadata,
 			Description:       challenge.Description,
@@ -272,6 +298,7 @@ func challengeInfoHandler(c *gin.Context) {
 			PreviousTries:     previousTries,
 			MaxAttemptLimit:   challenge.MaxAttemptLimit,
 			DeployedLink:      challenge.ServerDeployed,
+			Ports:             ports,
 		}
 		if user.Role == core.USER_ROLES["contestant"] {
 			c.JSON(http.StatusOK, challengeInfo)

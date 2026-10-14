@@ -131,6 +131,7 @@ type Challenge struct {
 	PreviousTries   int        `json:"previousTries" example:"3"`
 	MaxAttemptLimit int        `json:"maxAttemptLimit" example:"5"`
 	DeployedLink    string     `json:"deployedLink" example:"beast.sdslabs.co or ip:port"`
+	Ports           []uint32   `json:"ports" example:"[10005]"`
 }
 
 // ChallengeDetails is an extended struct for admin use, containing additional fields.
