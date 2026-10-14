@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/defaults"
 	utils "github.com/sdslabs/beastv4/utils"
 
@@ -26,6 +28,11 @@ import (
 type PortMapping struct {
 	HostPort      uint32
 	ContainerPort uint32
+}
+
+type ExecResult struct {
+	ExitCode int
+	Output   string
 }
 
 // TrafficType is the protocol supported by container ingress and egress through
@@ -301,6 +308,59 @@ func CommitContainer(containerId string) (string, error) {
 	return commitResp.ID, nil
 }
 
+func RunCommandInContainer(containerID string, cmd []string) (ExecResult, error) {
+	result := ExecResult{
+		ExitCode: 1,
+	}
+
+	cli, err := newDockerClient()
+	if err != nil {
+		return result, err
+	}
+
+	ctx := context.Background()
+
+	execResp, err := cli.ContainerExecCreate(
+		ctx,
+		containerID,
+		types.ExecConfig{
+			Cmd:          cmd,
+			Tty:          true,
+			AttachStdout: true,
+			AttachStderr: true,
+		},
+	)
+	if err != nil {
+		return result, err
+	}
+
+	resp, err := cli.ContainerExecAttach(
+		ctx,
+		execResp.ID,
+		types.ExecStartCheck{},
+	)
+	if err != nil {
+		return result, err
+	}
+	defer resp.Close()
+
+	var output bytes.Buffer
+	_, err = io.Copy(&output, resp.Reader)
+	if err != nil {
+		return result, err
+	}
+
+	result.Output = output.String()
+
+	inspect, err := cli.ContainerExecInspect(ctx, execResp.ID)
+	if err != nil {
+		return result, err
+	}
+
+	result.ExitCode = inspect.ExitCode
+	return result, nil
+}
+
 func DeployContainerFromCompose(challengeName string, projectName string, stagedPath string, composeFileName string, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
@@ -339,6 +399,8 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 		log.Warnf("Could not get primary container ID for challenge %s: %v", challengeName, err)
 		return "", nil // Return empty string but success
 	}
+
+	log.Printf("container Id: %s", primaryContainerId)
 
 	log.Debugf("Verified challenge %s services are running. Primary container: %s", challengeName, primaryContainerId)
 	return primaryContainerId, nil
@@ -403,19 +465,18 @@ func validateAllComposeServicesRunning(projectName, challengeName string) error 
 	return nil
 }
 
-// gets the first container ID from a compose project
 func getPrimaryComposeContainerId(projectName string) (string, error) {
-	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q")
+	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q", core.SSH_CONTAINER_COMPOSE)
 	var output bytes.Buffer
 	psCmd.Stdout = &output
 
 	if err := psCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to get container IDs: %v", err)
+		return "", fmt.Errorf("failed to get container ID for compose service %q: %v", core.SSH_CONTAINER_COMPOSE, err)
 	}
 
 	containerIds := strings.Fields(strings.TrimSpace(output.String()))
 	if len(containerIds) == 0 {
-		return "", fmt.Errorf("no containers found for project %s", projectName)
+		return "", fmt.Errorf("no container found for compose service %q in project %s", core.SSH_CONTAINER_COMPOSE, projectName)
 	}
 
 	// Return first 12 characters of the first container ID

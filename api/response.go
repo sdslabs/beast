@@ -165,7 +165,7 @@ type SubmissionResp struct {
 	Cheating  bool      `json:"cheating" example:"false"`
 }
 
-type FlagSubmitResp struct {
+type ChallengeSubmitResponse struct {
 	Message string `json:"message" example:"Your answer is correct"`
 	Success bool   `json:"success" example:"true"`
 }

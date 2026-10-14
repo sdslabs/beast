@@ -160,6 +160,50 @@ docket_context = ""
 traffic = "tcp"/"udp"
 ```
 
+### Instanced Docker Compose SSH Challenges
+
+Instanced Docker Compose challenges that users SSH into must use the `ssh` service convention and the global external hydra network prepared by Beast provisioning.
+
+```toml
+[challenge.metadata]
+instanced = true
+
+[challenge.env]
+docker_compose = "docker-compose.yml"
+default_port_var = "SSH_PORT"
+```
+
+The compose file must publish only the SSH port from service `ssh`, attach `ssh` to both `hydra-net` and the per-project internal network, and keep backend services only on the internal network.
+
+```yaml
+services:
+  ssh:
+    ports:
+      - "${SSH_PORT}:22"
+    volumes:
+      - challenge:/challenge
+    networks:
+      - exposed
+      - internal
+
+  db:
+    networks:
+      - internal
+
+networks:
+  exposed:
+    external: true
+    name: hydra-net
+  internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  challenge:
+```
+
+Beast setup installs `hydra-net` through `scripts/provision/hydra-net-setup.sh`. Runtime deployment only verifies that the network exists and is compatible.
+
 If you want to checkout some example challenge configuration, checkout `_example` directory in the 
 root of the repository. It has a bunch of challenge templates example to get started with. Pick one from 
 there and start building your own challenge.
