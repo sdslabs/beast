@@ -503,9 +503,12 @@ func QueryAllUniqueTags() ([]string, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Model(&Challenge{}).Distinct().Pluck("tag", &tags)
+	tx := Db.Model(&Tag{}).Where("tag_name != ''").Distinct().Pluck("tag_name", &tags)
 	if tx.Error != nil {
 		return nil, tx.Error
+	}
+	if tags == nil {
+		tags = []string{}
 	}
 	return tags, nil
 }

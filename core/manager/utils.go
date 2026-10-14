@@ -429,9 +429,10 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			return fmt.Errorf("error while querying user with email %s", config.Author.Email)
 		}
 
-		tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
+		cleanTags := utils.CleanStringSlice(config.Challenge.Metadata.Tags)
+		tags := make([]*database.Tag, len(cleanTags))
 
-		for i, tag := range config.Challenge.Metadata.Tags {
+		for i, tag := range cleanTags {
 			tags[i] = &database.Tag{
 				TagName: tag,
 			}
@@ -478,8 +479,9 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		users[len(config.Maintainers)] = &userEntry
 
-		assetsURL := make([]string, len(config.Challenge.Metadata.Assets))
-		copy(assetsURL, config.Challenge.Metadata.Assets)
+		validAssets := utils.CleanStringSlice(config.Challenge.Metadata.Assets)
+		validPreReqs := utils.CleanStringSlice(config.Challenge.Metadata.PreReqs)
+		validLinks := utils.CleanStringSlice(config.Challenge.Metadata.AdditionalLinks)
 		if config.Challenge.Metadata.MaxPoints > 0 {
 			log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
 			config.Challenge.Metadata.Points = config.Challenge.Metadata.MaxPoints
@@ -514,13 +516,13 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			ContainerId:        coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:            coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
 			MaxAttemptLimit:    config.Challenge.Metadata.MaxAttemptLimit,
-			PreReqs:            strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
+			PreReqs:            strings.Join(validPreReqs, core.DELIMITER),
 			DynamicFlag:        config.Challenge.Metadata.DynamicFlag,
 			Flag:               config.Challenge.Metadata.Flag,
 			Type:               config.Challenge.Metadata.Type,
 			Description:        config.Challenge.Metadata.Description,
-			Assets:             strings.Join(assetsURL, core.DELIMITER),
-			AdditionalLinks:    strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),
+			Assets:             strings.Join(validAssets, core.DELIMITER),
+			AdditionalLinks:    strings.Join(validLinks, core.DELIMITER),
 			Points:             config.Challenge.Metadata.Points,
 			MinPoints:          config.Challenge.Metadata.MinPoints,
 			MaxPoints:          config.Challenge.Metadata.MaxPoints,

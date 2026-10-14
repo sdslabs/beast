@@ -17,6 +17,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
+	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 
 	"gorm.io/gorm"
@@ -276,7 +277,10 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 // Check Pre Reqs Status
 func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
 	// Split the PreReqs field to get the list of prerequisite challenge names
-	preReqChallengeNames := strings.Split(challenge.PreReqs, core.DELIMITER)
+	preReqChallengeNames := utils.SplitDelimited(challenge.PreReqs, core.DELIMITER)
+	if len(preReqChallengeNames) == 0 {
+		return true, nil
+	}
 
 	// Check if all prerequisite challenges are solved
 	for _, preReq := range preReqChallengeNames {

@@ -29,6 +29,16 @@ var (
 	graphCacheStale       = true
 )
 
+func extractTagNames(tags []*database.Tag) []string {
+	result := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag != nil && strings.TrimSpace(tag.TagName) != "" {
+			result = append(result, strings.TrimSpace(tag.TagName))
+		}
+	}
+	return result
+}
+
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
 
@@ -216,11 +226,7 @@ func challengeInfoHandler(c *gin.Context) {
 			})
 			return
 		}
-		challengeTags := make([]string, len(challenge.Tags))
-
-		for index, tags := range challenge.Tags {
-			challengeTags[index] = tags.TagName
-		}
+		challengeTags := extractTagNames(challenge.Tags)
 
 		hints, err := database.QueryHintsByChallengeID(challenge.ID)
 		if err != nil {
@@ -253,7 +259,7 @@ func challengeInfoHandler(c *gin.Context) {
 			SolvesNumber:   totalSolves,
 			SolveStatus:    solveStatus,
 			Difficulty:     challenge.Difficulty,
-			PreRequisite:   strings.Split(challenge.PreReqs, core.DELIMITER),
+			PreRequisite:   fileUtils.SplitDelimited(challenge.PreReqs, core.DELIMITER),
 			DeployedStatus: challenge.Status,
 		}
 		challengeInfo := Challenge{
@@ -261,8 +267,8 @@ func challengeInfoHandler(c *gin.Context) {
 			Description:       challenge.Description,
 			Hints:             hintInfos,
 			Category:          challenge.Type,
-			Assets:            strings.Split(challenge.Assets, core.DELIMITER),
-			AdditionalLinks:   strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+			Assets:            fileUtils.SplitDelimited(challenge.Assets, core.DELIMITER),
+			AdditionalLinks:   fileUtils.SplitDelimited(challenge.AdditionalLinks, core.DELIMITER),
 			PreviousTries:     previousTries,
 			MaxAttemptLimit:   challenge.MaxAttemptLimit,
 			DeployedLink:      challenge.ServerDeployed,
@@ -407,11 +413,7 @@ func challengesMetadataHandler(c *gin.Context) {
 				})
 				return
 			}
-			challengeTags := make([]string, len(challenge.Tags))
-
-			for i, tags := range challenge.Tags {
-				challengeTags[i] = tags.TagName
-			}
+			challengeTags := extractTagNames(challenge.Tags)
 
 			availableChallenges = append(availableChallenges, ChallengeMetadata{
 				Name:               challenge.Name,
@@ -422,7 +424,7 @@ func challengesMetadataHandler(c *gin.Context) {
 				SolvesNumber:       totalSolves,
 				SolveStatus:        solveStatus,
 				Difficulty:         challenge.Difficulty,
-				PreRequisite:       strings.Split(challenge.PreReqs, core.DELIMITER),
+				PreRequisite:       fileUtils.SplitDelimited(challenge.PreReqs, core.DELIMITER),
 				DeployedStatus:     challenge.Status,
 				Instanced:          challenge.Instanced,
 				InstanceExpiration: challenge.InstanceExpiration,
@@ -546,10 +548,7 @@ func userInfoHandler(c *gin.Context) {
 	userChallenges := make([]ChallengeSolveResp, len(solvedChallenges))
 	for index, sc := range solvedChallenges {
 
-		challengeTags := make([]string, len(sc.Tags))
-		for i, tag := range sc.Tags {
-			challengeTags[i] = tag.TagName
-		}
+		challengeTags := extractTagNames(sc.Tags)
 
 		challResp := ChallengeSolveResp{
 			Id:       sc.ChallengeID,
@@ -766,12 +765,6 @@ func submissionsHandler(c *gin.Context) {
 			continue
 		}
 
-		challengeTags := make([]string, len(challenge[0].Tags))
-
-		for index, tags := range challenge[0].Tags {
-			challengeTags[index] = tags.TagName
-		}
-
 		singleSubmissionResp := SubmissionResp{
 			UserId:    user.ID,
 			Username:  user.Username,
@@ -905,7 +898,7 @@ func tagHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, TagInfoResp{
-		Tags: tags,
+		Tags: fileUtils.CleanStringSlice(tags),
 	})
 }
 
@@ -1304,11 +1297,6 @@ func getChallengeAttempts(c *gin.Context) {
 		return
 	}
 
-	challengeTags := make([]string, len(challenge[0].Tags))
-	for index, tag := range challenge[0].Tags {
-		challengeTags[index] = tag.TagName
-	}
-
 	attempts, err := database.QueryChallAttempts(challengeID)
 	if err != nil {
 		log.Errorf("DATABASE ERROR while fetching challenge attempts: %s", err.Error())
@@ -1422,11 +1410,6 @@ func getUserAttempts(c *gin.Context) {
 		}
 		if len(challenge) == 0 {
 			continue
-		}
-
-		challengeTags := make([]string, len(challenge[0].Tags))
-		for index, tag := range challenge[0].Tags {
-			challengeTags[index] = tag.TagName
 		}
 
 		submissionResp := SubmissionResp{

@@ -515,14 +515,23 @@ func manageUploadHandler(c *gin.Context) {
 		return
 	}
 
+	tags := utils.CleanStringSlice(config.Challenge.Metadata.Tags)
+	assets := utils.CleanStringSlice(config.Challenge.Metadata.Assets)
+	additionalLinks := utils.CleanStringSlice(config.Challenge.Metadata.AdditionalLinks)
+	preReqs := utils.CleanStringSlice(config.Challenge.Metadata.PreReqs)
+	ports := config.Challenge.Env.Ports
+	if ports == nil {
+		ports = []uint32{}
+	}
+
 	c.JSON(http.StatusOK, ChallengePreviewResp{
 		Name:            config.Challenge.Metadata.Name,
 		Category:        config.Challenge.Metadata.Type,
-		Tags:            config.Challenge.Metadata.Tags,
-		Assets:          config.Challenge.Metadata.Assets,
-		AdditionalLinks: config.Challenge.Metadata.AdditionalLinks,
-		Ports:           config.Challenge.Env.Ports,
-		PreReqs:         config.Challenge.Metadata.PreReqs,
+		Tags:            tags,
+		Assets:          assets,
+		AdditionalLinks: additionalLinks,
+		Ports:           ports,
+		PreReqs:         preReqs,
 		Desc:            config.Challenge.Metadata.Description,
 		Points:          config.Challenge.Metadata.Points,
 	})

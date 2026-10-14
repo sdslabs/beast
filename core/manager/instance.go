@@ -131,13 +131,6 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, fmt.Errorf("failed to allocate instance ports: %s", err.Error())
 		}
 
-		var found bool
-		found, port = utils.Uint32InIndexList(config.Challenge.Env.DefaultPort, config.Challenge.Env.Ports, ports)
-		if !found {
-			coreUtils.FreePortsOnHost(serverDeployed, ports)
-			return nil, fmt.Errorf("failed to allocate instance port for challenge %s", challengeName)
-		}
-
 		containerID, checkHash, err = deployInstanceContainer(instanceID, challengeName, challenge.ImageId, &config, serverDeployed, ports)
 		portOwner = containerID
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
@@ -611,10 +604,11 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 	// Instanced non compose challenges are managed by the container ID
 	containerName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
-	containerPort := config.Challenge.Env.DefaultPort
-	if containerPort != core.SSH_PORT {
-		return "", "", fmt.Errorf("the default port is not set to %d for instance challenge %s", core.SSH_PORT, challengeName)
-	}
+	// TODO : commented this , may be not supposed to.
+	//containerPort := config.Challenge.Env.DefaultPort
+	//if containerPort != core.SSH_PORT {
+	//	return "", "", fmt.Errorf("the default port is not set to %d for instance challenge %s", core.SSH_PORT, challengeName)
+	//}
 
 	portMapping := make([]cr.PortMapping, len(ports))
 	for i, port := range ports {

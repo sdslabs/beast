@@ -47,6 +47,10 @@ func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
 	Metadata.Type = "ChallengeType"
 	Metadata.DynamicFlag = false
 	Metadata.Flag = "ChallengeFlag"
+	Metadata.Assets = []string{}
+	Metadata.Tags = []string{}
+	Metadata.PreReqs = []string{}
+	Metadata.AdditionalLinks = []string{}
 }
 
 func (Env *ChallengeEnv) PopulateChallengeEnv() {
@@ -476,10 +480,10 @@ func (config *ChallengeEnv) ValidateInstancedComposeSSHContract(challdir string)
 	if config.DockerCompose == "" {
 		return nil
 	}
-
+	// TODO config.PortVariables lenth check
 	return utils.ValidateInstancedComposeSSHContract(
 		filepath.Join(challdir, config.DockerCompose),
-		config.DefaultPortVar,
+		config.PortVariables[0],
 		core.HYDRA_NETWORK_NAME,
 		core.SSH_CONTAINER_COMPOSE,
 		core.SSH_PORT,
