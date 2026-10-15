@@ -104,8 +104,11 @@ func createSubmissionTestUser(t *testing.T, username string) User {
 func createSubmissionTestChallenge(t *testing.T, name string, maxAttempts int, dynamic bool) Challenge {
 	t.Helper()
 
+	author := createSubmissionTestUser(t, "author_"+name)
+
 	challenge := Challenge{
 		Name:            name,
+		AuthorID:        author.ID,
 		Type:            "web",
 		Difficulty:      "easy",
 		Flag:            "flag{correct}",

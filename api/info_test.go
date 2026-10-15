@@ -128,6 +128,7 @@ func TestChallengeInfoHandlerReturnsPortsAndInstancedFlag(t *testing.T) {
 	// 2. Create a non-instanced challenge with allocated ports
 	nonInstancedChall := database.Challenge{
 		Name:           "test-non-instanced",
+		AuthorID:       user.ID,
 		Type:           "bare",
 		Difficulty:     "easy",
 		Status:         core.DEPLOY_STATUS["deployed"],
@@ -151,6 +152,7 @@ func TestChallengeInfoHandlerReturnsPortsAndInstancedFlag(t *testing.T) {
 	// 3. Create an instanced challenge
 	instancedChall := database.Challenge{
 		Name:               "test-instanced",
+		AuthorID:           user.ID,
 		Type:               "service",
 		Difficulty:         "medium",
 		Status:             core.DEPLOY_STATUS["deployed"],

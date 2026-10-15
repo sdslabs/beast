@@ -75,7 +75,35 @@ func MigrateSubmissionGuards() error {
 		}
 	}
 
+	if Db.Migrator().HasTable("user_hints") {
+		if err := dedupeUserHintRows(); err != nil {
+			return err
+		}
+		if err := Db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_hints_user_hint ON user_hints (user_id, hint_id)`).Error; err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func dedupeUserHintRows() error {
+	return Db.Transaction(func(tx *gorm.DB) error {
+		if !tx.Migrator().HasTable("user_hints") || !tx.Migrator().HasColumn(&UserHint{}, "id") {
+			return nil
+		}
+		removeDuplicates := `
+DELETE FROM user_hints
+WHERE id NOT IN (
+	SELECT MIN(id)
+	FROM user_hints
+	GROUP BY user_id, hint_id
+)`
+		if err := tx.Exec(removeDuplicates).Error; err != nil {
+			return fmt.Errorf("failed to dedupe user_hints rows: %w", err)
+		}
+		return nil
+	})
 }
 
 func dedupeUserChallengeRows() error {

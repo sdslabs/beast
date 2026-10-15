@@ -7,7 +7,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/utils"
 	"github.com/spf13/cobra"

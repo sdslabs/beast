@@ -64,13 +64,14 @@ type Challenge struct {
 	Status             string `gorm:"not null;default:'Undeployed'"`
 	DeploymentType     string `gorm:"not null;default:'standard_docker'"`
 	AuthorID           uint   `gorm:"not null"`
+	Author             User   `gorm:"foreignKey:AuthorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	HealthCheck        uint   `gorm:"not null;default:1"`
 	Points             uint   `gorm:"default:0"`
 	MaxPoints          uint   `gorm:"default:0"`
 	MinPoints          uint   `gorm:"default:0"`
 	Ports              []Port
 	Tags               []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Users              []*User `gorm:"many2many:user_challenges;"`
+	Users              []*User `gorm:"many2many:user_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	ServerDeployed     string  `gorm:"type:varchar(64)"`
 	Instanced          bool    `gorm:"not null;default:false"`
 	InstanceExpiration int64   `gorm:"default:0"`
@@ -79,10 +80,10 @@ type Challenge struct {
 type UserChallenges struct {
 	ID        uint `gorm:"primaryKey"`
 	CreatedAt time.Time
-	User      User `gorm:"foreignKey:UserID"`
+	User      User `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	UserID    uint
 
-	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
+	Challenge   Challenge `gorm:"foreignKey:ChallengeID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	ChallengeID uint
 	Tries       uint   `gorm:"not null;default:0"`
 	Solved      bool   `gorm:"not null;default:false;index"`

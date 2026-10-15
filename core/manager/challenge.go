@@ -10,7 +10,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	containerType "github.com/docker/docker/api/types"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
