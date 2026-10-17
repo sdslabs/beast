@@ -21,7 +21,7 @@ type UserHint struct {
 	User   User `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 
 	HintID uint `gorm:"not null;uniqueIndex:idx_user_hints_user_hint"`
-	Hint   Hint `gorm:"foreignKey:HintID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Hint   Hint `gorm:"references:HintID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 
 	ChallengeID uint      `gorm:"not null"`
 	Challenge   Challenge `gorm:"foreignKey:ChallengeID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`

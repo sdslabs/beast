@@ -238,8 +238,8 @@ func getTableDataFromChallenges(challenges []database.Challenge) [][]string {
 		row := []string{
 			challenge.Name,
 			challenge.Type,
-			challenge.ContainerId[0:15],
-			challenge.ImageId[0:15],
+			utils.TruncateString(challenge.ContainerId, maxShowLen),
+			utils.TruncateString(challenge.ImageId, maxShowLen),
 			challenge.Status,
 			tagName,
 			fmt.Sprintf("%d", challenge.HealthCheck),

@@ -181,9 +181,9 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 				noCache,
 			)
 		}
-		// For Docker Compose challenges, ensure ImageId is empty in the database
-		if err := database.UpdateChallenge(challenge, map[string]any{"ImageId": ""}); err != nil {
-			return fmt.Errorf("error while setting empty ImageId for Docker Compose challenge: %s", err)
+		// For Docker Compose challenges, ensure ImageId is a unique placeholder in the database
+		if err := database.UpdateChallenge(challenge, map[string]any{"ImageId": coreUtils.GetTempImageId(challenge.Name)}); err != nil {
+			return fmt.Errorf("error while setting placeholder ImageId for Docker Compose challenge: %s", err)
 		}
 	} else {
 		if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
@@ -303,9 +303,14 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			return fmt.Errorf("error while registering ports for challenge %s: %s", challenge.Name, err)
 		}
 
+		containerIdToSave := primaryContainerId
+		if containerIdToSave == "" {
+			containerIdToSave = coreUtils.GetTempContainerId(challengeName)
+		}
+
 		// only for backward compatibility
 		if err := database.UpdateChallenge(challenge, map[string]any{
-			"ContainerId":    primaryContainerId,
+			"ContainerId":    containerIdToSave,
 			"DeploymentType": core.DEPLOYMENT_TYPES["docker_compose"],
 		}); err != nil {
 			return fmt.Errorf("error while updating Docker Compose challenge metadata: %s", err)

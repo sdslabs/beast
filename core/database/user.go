@@ -32,7 +32,7 @@ type User struct {
 	Status      uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score       uint    `gorm:"default:0"`
 	FrozenScore uint    `gorm:"default:0"`
-	Hints       []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Hints       []*Hint `gorm:"many2many:user_hints;joinForeignKey:UserID;joinReferences:HintID;"`
 }
 
 // Queries all the users entries where the column represented by key
