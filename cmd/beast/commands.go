@@ -41,6 +41,8 @@ var rootCmd = &cobra.Command{
 	Short: "Beast is an deployment and management tool for CTF challenges.",
 	Long:  LONG_DESCRIPTION_BEAST,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		config.LoadEnvFile()
+
 		if Verbose {
 			debug.Enable()
 		} else {
@@ -112,7 +114,6 @@ func init() {
 	challDetailsCmd.PersistentFlags().StringVarP(&Tags, "tags", "t", "", "Filter by tagname : pwn / web / image / docker")
 
 	restoreDatabaseCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Backup file to be used for restoration.")
-
 
 	restoreCacheCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Restore file to be used for restoration.")
 

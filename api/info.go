@@ -13,6 +13,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	cfg "github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
@@ -28,6 +29,16 @@ var (
 	graphCache            []database.UserLeaderboardResp
 	graphCacheStale       = true
 )
+
+func extractTagNames(tags []*database.Tag) []string {
+	result := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag != nil && strings.TrimSpace(tag.TagName) != "" {
+			result = append(result, strings.TrimSpace(tag.TagName))
+		}
+	}
+	return result
+}
 
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
@@ -216,11 +227,7 @@ func challengeInfoHandler(c *gin.Context) {
 			})
 			return
 		}
-		challengeTags := make([]string, len(challenge.Tags))
-
-		for index, tags := range challenge.Tags {
-			challengeTags[index] = tags.TagName
-		}
+		challengeTags := extractTagNames(challenge.Tags)
 
 		hints, err := database.QueryHintsByChallengeID(challenge.ID)
 		if err != nil {
@@ -245,27 +252,53 @@ func challengeInfoHandler(c *gin.Context) {
 
 		}
 		challMetadata := ChallengeMetadata{
-			Name:           challenge.Name,
-			ChallId:        challenge.ID,
-			Tags:           challengeTags,
-			CreatedAt:      challenge.CreatedAt,
-			Points:         challenge.Points,
-			SolvesNumber:   totalSolves,
-			SolveStatus:    solveStatus,
-			Difficulty:     challenge.Difficulty,
-			PreRequisite:   strings.Split(challenge.PreReqs, core.DELIMITER),
-			DeployedStatus: challenge.Status,
+			Name:               challenge.Name,
+			ChallId:            challenge.ID,
+			Tags:               challengeTags,
+			CreatedAt:          challenge.CreatedAt,
+			Points:             challenge.Points,
+			SolvesNumber:       totalSolves,
+			SolveStatus:        solveStatus,
+			Difficulty:         challenge.Difficulty,
+			PreRequisite:       fileUtils.SplitDelimited(challenge.PreReqs, core.DELIMITER),
+			DeployedStatus:     challenge.Status,
+			Instanced:          challenge.Instanced,
+			InstanceExpiration: challenge.InstanceExpiration,
 		}
+
+		var ports []uint32
+		if challenge.Instanced {
+			if instance, err := manager.GetUserInstance(fmt.Sprintf("%d", user.ID), challenge.Name); err == nil && instance != nil {
+				ports = instance.Port
+			}
+		} else {
+			if len(challenge.Ports) > 0 {
+				ports = make([]uint32, len(challenge.Ports))
+				for i, p := range challenge.Ports {
+					ports[i] = p.PortNo
+				}
+			} else if allocated, err := database.GetAllocatedPorts(challenge); err == nil && len(allocated) > 0 {
+				ports = make([]uint32, len(allocated))
+				for i, p := range allocated {
+					ports[i] = p.PortNo
+				}
+			}
+		}
+		if ports == nil {
+			ports = []uint32{}
+		}
+
 		challengeInfo := Challenge{
 			ChallengeMetadata: challMetadata,
 			Description:       challenge.Description,
 			Hints:             hintInfos,
 			Category:          challenge.Type,
-			Assets:            strings.Split(challenge.Assets, core.DELIMITER),
-			AdditionalLinks:   strings.Split(challenge.AdditionalLinks, core.DELIMITER),
+			Assets:            fileUtils.SplitDelimited(challenge.Assets, core.DELIMITER),
+			AdditionalLinks:   fileUtils.SplitDelimited(challenge.AdditionalLinks, core.DELIMITER),
 			PreviousTries:     previousTries,
 			MaxAttemptLimit:   challenge.MaxAttemptLimit,
 			DeployedLink:      challenge.ServerDeployed,
+			Ports:             ports,
 		}
 		if user.Role == core.USER_ROLES["contestant"] {
 			c.JSON(http.StatusOK, challengeInfo)
@@ -407,11 +440,7 @@ func challengesMetadataHandler(c *gin.Context) {
 				})
 				return
 			}
-			challengeTags := make([]string, len(challenge.Tags))
-
-			for i, tags := range challenge.Tags {
-				challengeTags[i] = tags.TagName
-			}
+			challengeTags := extractTagNames(challenge.Tags)
 
 			availableChallenges = append(availableChallenges, ChallengeMetadata{
 				Name:               challenge.Name,
@@ -422,7 +451,7 @@ func challengesMetadataHandler(c *gin.Context) {
 				SolvesNumber:       totalSolves,
 				SolveStatus:        solveStatus,
 				Difficulty:         challenge.Difficulty,
-				PreRequisite:       strings.Split(challenge.PreReqs, core.DELIMITER),
+				PreRequisite:       fileUtils.SplitDelimited(challenge.PreReqs, core.DELIMITER),
 				DeployedStatus:     challenge.Status,
 				Instanced:          challenge.Instanced,
 				InstanceExpiration: challenge.InstanceExpiration,
@@ -546,10 +575,7 @@ func userInfoHandler(c *gin.Context) {
 	userChallenges := make([]ChallengeSolveResp, len(solvedChallenges))
 	for index, sc := range solvedChallenges {
 
-		challengeTags := make([]string, len(sc.Tags))
-		for i, tag := range sc.Tags {
-			challengeTags[i] = tag.TagName
-		}
+		challengeTags := extractTagNames(sc.Tags)
 
 		challResp := ChallengeSolveResp{
 			Id:       sc.ChallengeID,
@@ -766,12 +792,6 @@ func submissionsHandler(c *gin.Context) {
 			continue
 		}
 
-		challengeTags := make([]string, len(challenge[0].Tags))
-
-		for index, tags := range challenge[0].Tags {
-			challengeTags[index] = tags.TagName
-		}
-
 		singleSubmissionResp := SubmissionResp{
 			UserId:    user.ID,
 			Username:  user.Username,
@@ -905,7 +925,7 @@ func tagHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, TagInfoResp{
-		Tags: tags,
+		Tags: fileUtils.CleanStringSlice(tags),
 	})
 }
 
@@ -928,13 +948,20 @@ func serveAssets(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "challenge and asset parameters are required"})
 		return
 	}
-	filepath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, core.BEAST_STATIC_FOLDER, assetName)
-	err := fileUtils.ValidateFileExists(filepath)
+	targetPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, core.BEAST_STATIC_FOLDER, assetName)
+	err := fileUtils.ValidateFileExists(targetPath)
+	if err != nil {
+		fallbackPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challenge, assetName)
+		if fileUtils.ValidateFileExists(fallbackPath) == nil {
+			targetPath = fallbackPath
+			err = nil
+		}
+	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Incorrect file requested"})
 		return
 	}
-	c.FileAttachment(filepath, assetName)
+	c.FileAttachment(targetPath, assetName)
 
 }
 
@@ -1297,11 +1324,6 @@ func getChallengeAttempts(c *gin.Context) {
 		return
 	}
 
-	challengeTags := make([]string, len(challenge[0].Tags))
-	for index, tag := range challenge[0].Tags {
-		challengeTags[index] = tag.TagName
-	}
-
 	attempts, err := database.QueryChallAttempts(challengeID)
 	if err != nil {
 		log.Errorf("DATABASE ERROR while fetching challenge attempts: %s", err.Error())
@@ -1415,11 +1437,6 @@ func getUserAttempts(c *gin.Context) {
 		}
 		if len(challenge) == 0 {
 			continue
-		}
-
-		challengeTags := make([]string, len(challenge[0].Tags))
-		for index, tag := range challenge[0].Tags {
-			challengeTags[index] = tag.TagName
 		}
 
 		submissionResp := SubmissionResp{

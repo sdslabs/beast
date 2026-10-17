@@ -7,7 +7,13 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "static-chall"
 flag = "BACKDOOR{SAMPLE_FLAG}"
 type = "static"
-points=150
+description = "Analyze the provided static assets to recover the hidden flag."
+difficulty = "easy"
+points = 100
+maxPoints = 100
+minPoints = 50
+tags = ["easy", "web"]
+assets = ["backdoor.png"]
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
@@ -17,15 +23,5 @@ points = 10
 text = "simple_hint_2"
 points = 20
 
-maxPoints = 100
-minPoints = 50
-tags = ["easy", "web"]
-
 [challenge.env]
-static_dir = "static"
-
-[resource]
-cpu_shares = 1024
-memory_limit = 536870912
-pids_limit = 100
-cpuslimit = 0.25
+static_dir = ""

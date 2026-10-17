@@ -3,13 +3,13 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"github.com/sdslabs/beastv4/core/cache"
 	"path/filepath"
 	"strings"
 
+	"github.com/sdslabs/beastv4/core/cache"
+
 	"github.com/BurntSushi/toml"
 	containerType "github.com/docker/docker/api/types"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -236,7 +236,6 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 	if coreUtils.IsImageIdValid(challenge.ImageId) {
 		var imageExist bool
 		var err error
-		log.Warnf("server: %s", challenge.ServerDeployed)
 		if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
 			imageExist, err = cr.CheckIfImageExists(challenge.ImageId)
 		} else {

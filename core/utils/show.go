@@ -7,7 +7,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/utils"
 	"github.com/spf13/cobra"
@@ -239,8 +238,8 @@ func getTableDataFromChallenges(challenges []database.Challenge) [][]string {
 		row := []string{
 			challenge.Name,
 			challenge.Type,
-			challenge.ContainerId[0:15],
-			challenge.ImageId[0:15],
+			utils.TruncateString(challenge.ContainerId, maxShowLen),
+			utils.TruncateString(challenge.ImageId, maxShowLen),
 			challenge.Status,
 			tagName,
 			fmt.Sprintf("%d", challenge.HealthCheck),

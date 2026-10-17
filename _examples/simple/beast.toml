@@ -1,13 +1,16 @@
 [author]
-name = "hi"
-email = "hi@gmail.com"
-ssh_key = "hi"
+name = "fristonio"
+email = "contact+fristonio@sdslabs.co.in"
+ssh_key = "ssh-rsa AAAAB3NzaC1y"
 
 [challenge.metadata]
 name = "simple"
 flag = "BACKDOOR{SAMPLE_FLAG}"
 type = "bare"
+description = "A simple bare challenge running a TCP listener via socat."
+difficulty = "easy"
 points = 100
+tags = ["pwn", "bare"]
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"

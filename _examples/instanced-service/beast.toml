@@ -13,7 +13,7 @@ difficulty = "easy"
 tags = ["pwn", "beginner", "instanced"]
 maxAttemptLimit = 50
 instanced = true
-instance_expiration = 10
+instance_expiration = 600
 
 [[challenge.metadata.hints]]
 text = "Have you tried overflowing the buffer?"
@@ -26,10 +26,9 @@ points = 50
 [challenge.env]
 ports = [9999]
 default_port = 9999
-apt_deps = ["gcc", "xinetd"]
+apt_deps = ["gcc"]
 setup_scripts = ["setup.sh"]
 service_path = "pwn"
-base_image = "ubuntu:18.04"
 
 [resource]
 cpu_shares = 1024

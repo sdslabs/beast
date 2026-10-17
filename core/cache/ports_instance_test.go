@@ -181,7 +181,7 @@ func TestInstanceMetadataOutlivesExpiryMarkerAndQueue(t *testing.T) {
 		ChallengeName:  "durable-instance",
 		ContainerID:    "container-" + instanceID,
 		PortOwner:      "owner-" + instanceID,
-		Port:           31337,
+		Port:           []uint32{31337},
 		UserID:         "user-1",
 		Username:       "user-1",
 		CreatedAt:      time.Now(),

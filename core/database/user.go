@@ -25,14 +25,14 @@ type User struct {
 	gorm.Model
 	auth.AuthModel
 
-	Challenges  []*Challenge `gorm:"many2many:user_challenges;"`
+	Challenges  []*Challenge `gorm:"many2many:user_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Name        string       `gorm:"not null"`
-	Email       string       `gorm:"non null;unique"`
+	Email       string       `gorm:"not null;unique"`
 	SshKey      string
 	Status      uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score       uint    `gorm:"default:0"`
 	FrozenScore uint    `gorm:"default:0"`
-	Hints       []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
+	Hints       []*Hint `gorm:"many2many:user_hints;joinForeignKey:UserID;joinReferences:HintID;"`
 }
 
 // Queries all the users entries where the column represented by key
@@ -503,9 +503,12 @@ func QueryAllUniqueTags() ([]string, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Model(&Challenge{}).Distinct().Pluck("tag", &tags)
+	tx := Db.Model(&Tag{}).Where("tag_name != ''").Distinct().Pluck("tag_name", &tags)
 	if tx.Error != nil {
 		return nil, tx.Error
+	}
+	if tags == nil {
+		tags = []string{}
 	}
 	return tags, nil
 }

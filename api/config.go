@@ -12,6 +12,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	fileUtils "github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -179,12 +180,12 @@ func updateChallengeInfoHandler(c *gin.Context) {
 
 	assets, exist := c.GetPostForm("assets")
 	if exist {
-		configInfo["Assets"] = assets
+		configInfo["Assets"] = strings.Join(fileUtils.SplitDelimited(assets, core.DELIMITER), core.DELIMITER)
 	}
 
 	additionalLinks, exist := c.GetPostForm("additionalLinks")
 	if exist {
-		configInfo["AdditionalLinks"] = additionalLinks
+		configInfo["AdditionalLinks"] = strings.Join(fileUtils.SplitDelimited(additionalLinks, core.DELIMITER), core.DELIMITER)
 	}
 
 	log.Debug(fmt.Sprintf("Starting to update the challenge : %s", name))
@@ -215,23 +216,28 @@ func updateChallengeInfoHandler(c *gin.Context) {
 			return
 		}
 		ports = strings.ReplaceAll(ports, " ", "")
-		portsArray := strings.Split(ports, ",")
-		for _, port := range portsArray {
-			u64, err := strconv.ParseUint(port, 10, 32)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, HTTPPlainResp{
-					Message: fmt.Sprintf("Error: %s", err.Error()),
-				})
-				return
-			}
+		if ports != "" {
+			portsArray := strings.Split(ports, ",")
+			for _, port := range portsArray {
+				if port == "" {
+					continue
+				}
+				u64, err := strconv.ParseUint(port, 10, 32)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, HTTPPlainResp{
+						Message: fmt.Sprintf("Error: %s", err.Error()),
+					})
+					return
+				}
 
-			newPort := database.Port{ChallengeID: chall.ID, PortNo: uint32(u64)}
-			_, err = database.PortEntryGetOrCreate(&newPort)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, HTTPPlainResp{
-					Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
-				})
-				return
+				newPort := database.Port{ChallengeID: chall.ID, PortNo: uint32(u64)}
+				_, err = database.PortEntryGetOrCreate(&newPort)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, HTTPPlainResp{
+						Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
+					})
+					return
+				}
 			}
 		}
 	}
@@ -239,7 +245,7 @@ func updateChallengeInfoHandler(c *gin.Context) {
 	// Update Tags
 	tags, exist := c.GetPostForm("tags")
 	if exist {
-		tagsArray := strings.Split(tags, core.DELIMITER)
+		tagsArray := fileUtils.SplitDelimited(tags, core.DELIMITER)
 		tagArr := make([]*database.Tag, len(tagsArray))
 
 		for index, tag := range tagsArray {

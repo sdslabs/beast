@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/sdslabs/beastv4/core/cache"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/sdslabs/beastv4/core/cache"
 
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
@@ -263,7 +264,8 @@ func GenerateDockerfile(config *cfg.BeastChallengeConfig) (string, error) {
 	} else if strings.HasPrefix(challengeType, "web") {
 		// Challenge type is web here, so set the required variables.
 		challengeInfo := strings.Split(challengeType, ":")
-		webPort := fmt.Sprint(config.Challenge.Env.DefaultPort)
+		// TODO : write a assert that len(Ports) == 1 or do something such that web thing becomes capable of doing things with more than 1 port
+		webPort := fmt.Sprint(config.Challenge.Env.Ports[0])
 		var defaultRunCmd string
 		defaultRunCmd, baseImage, modifier = GetWebChallSetup(config.Challenge.Env.WebRoot, webPort, challengeInfo)
 
@@ -427,9 +429,10 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			return fmt.Errorf("error while querying user with email %s", config.Author.Email)
 		}
 
-		tags := make([]*database.Tag, len(config.Challenge.Metadata.Tags))
+		cleanTags := utils.CleanStringSlice(config.Challenge.Metadata.Tags)
+		tags := make([]*database.Tag, len(cleanTags))
 
-		for i, tag := range config.Challenge.Metadata.Tags {
+		for i, tag := range cleanTags {
 			tags[i] = &database.Tag{
 				TagName: tag,
 			}
@@ -464,6 +467,7 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
+			userEntry = newUser
 			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
@@ -476,8 +480,9 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 
 		users[len(config.Maintainers)] = &userEntry
 
-		assetsURL := make([]string, len(config.Challenge.Metadata.Assets))
-		copy(assetsURL, config.Challenge.Metadata.Assets)
+		validAssets := utils.CleanStringSlice(config.Challenge.Metadata.Assets)
+		validPreReqs := utils.CleanStringSlice(config.Challenge.Metadata.PreReqs)
+		validLinks := utils.CleanStringSlice(config.Challenge.Metadata.AdditionalLinks)
 		if config.Challenge.Metadata.MaxPoints > 0 {
 			log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
 			config.Challenge.Metadata.Points = config.Challenge.Metadata.MaxPoints
@@ -512,13 +517,13 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			ContainerId:        coreUtils.GetTempContainerId(config.Challenge.Metadata.Name),
 			ImageId:            coreUtils.GetTempImageId(config.Challenge.Metadata.Name),
 			MaxAttemptLimit:    config.Challenge.Metadata.MaxAttemptLimit,
-			PreReqs:            strings.Join(config.Challenge.Metadata.PreReqs, core.DELIMITER),
+			PreReqs:            strings.Join(validPreReqs, core.DELIMITER),
 			DynamicFlag:        config.Challenge.Metadata.DynamicFlag,
 			Flag:               config.Challenge.Metadata.Flag,
 			Type:               config.Challenge.Metadata.Type,
 			Description:        config.Challenge.Metadata.Description,
-			Assets:             strings.Join(assetsURL, core.DELIMITER),
-			AdditionalLinks:    strings.Join(config.Challenge.Metadata.AdditionalLinks, core.DELIMITER),
+			Assets:             strings.Join(validAssets, core.DELIMITER),
+			AdditionalLinks:    strings.Join(validLinks, core.DELIMITER),
 			Points:             config.Challenge.Metadata.Points,
 			MinPoints:          config.Challenge.Metadata.MinPoints,
 			MaxPoints:          config.Challenge.Metadata.MaxPoints,

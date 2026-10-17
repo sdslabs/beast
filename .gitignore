@@ -10,3 +10,12 @@ ubuntu-bionic-18.04-cloudimg-console.log
 target/
 .vscode/
 vendor/
+
+# Environment files
+.env
+.env.*
+!sample.env
+
+# Redis credentials / ACL
+redis/users.acl
+redis/.users.acl

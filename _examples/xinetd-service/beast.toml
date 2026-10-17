@@ -7,8 +7,12 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 name = "xinetd-service"
 flag = "CTF{not_the_flag}"
 type = "service"
+description = "A pwn service challenge configured using a custom xinetd configuration file."
+difficulty = "hard"
 points = 500
 maxAttemptLimit = 10
+tags = ["pwn", "xinetd"]
+preReqs = ["simple", "web-php"]
 
 [[challenge.metadata.hints]]
 text = "simple_hint_1"
@@ -18,13 +22,10 @@ points = 10
 text = "simple_hint_2"
 points = 20
 
-preReqs = ["simple", "web-php"]
-
-
 [challenge.env]
-apt_deps = ["gcc", "socat"]
+apt_deps = ["gcc"]
 setup_scripts = ["setup.sh"]
-xinetd_config = "ctf.xinetd"
+xinetd_conf = "ctf.xinetd"
 service_path = "pwn"
 ports = [10003]
 default_port = 10003

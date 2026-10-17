@@ -2,9 +2,10 @@ package api
 
 import (
 	"fmt"
-	"github.com/sdslabs/beastv4/core"
 	"net/http"
 	"time"
+
+	"github.com/sdslabs/beastv4/core"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/cache"
@@ -18,7 +19,7 @@ type InstanceResponse struct {
 	InstanceID    string    `json:"instance_id"`
 	ChallengeName string    `json:"challenge_name"`
 	HostedAddress string    `json:"hosted_address"`
-	Port          uint32    `json:"port"`
+	Port          []uint32  `json:"port"`
 	CreatedAt     time.Time `json:"created_at"`
 	ExpiresAt     time.Time `json:"expires_at"`
 	TTLSeconds    int64     `json:"ttl_seconds"`
@@ -86,7 +87,7 @@ func spawnInstanceHandler(ctx *gin.Context) {
 
 	userID := fmt.Sprintf("%d", user.ID)
 
-	instance, err := manager.SpawnInstance(challengeName, userID, username)
+	instance, err := manager.SpawnInstance(challengeName, userID, username, user.SshKey)
 	if err != nil {
 		if instance != nil {
 			ctx.JSON(http.StatusConflict, HTTPErrorResp{

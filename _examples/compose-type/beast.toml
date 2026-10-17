@@ -6,11 +6,22 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 [challenge.metadata]
 name = "compose-type"
 flag = "CTF{sample_flag}"
-
 type = "web"
+description = "A multi-container web challenge running with Docker Compose and MySQL backend."
+difficulty = "medium"
 points = 200
+tags = ["web", "docker-compose"]
+
+[[challenge.metadata.hints]]
+text = "Check the database connectivity"
+points = 20
 
 [challenge.env]
 docker_compose = "docker-compose.yml"
 default_port_var = "APP_PORT"
-web_root = "challenge"
+
+[resource]
+cpu_shares = 1024
+memory_limit = 536870912
+pids_limit = 100
+cpuslimit = 0.25

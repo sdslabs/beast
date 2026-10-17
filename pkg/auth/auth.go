@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"errors"
 
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -20,8 +19,8 @@ var (
 
 type AuthModel struct {
 	Username string `gorm:"not null;unique"`
-	Password []byte `gorm:"non null"`
-	Role     string `gorm:"non null"`
+	Password []byte `gorm:"not null"`
+	Role     string `gorm:"not null"`
 	Salt     []byte
 }
 

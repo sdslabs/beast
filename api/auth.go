@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"golang.org/x/crypto/ssh"
 	"log"
 	"net/http"
 	"strings"
@@ -215,10 +216,10 @@ func register(c *gin.Context) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	sshKey = strings.TrimSpace(sshKey)
 
-	if username == "" || password == "" || email == "" {
+	if username == "" || password == "" || email == "" || sshKey == "" {
 
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Username, password and email can not be empty",
+			Message: "Username, password, email, and sshKey can not be empty",
 		})
 		return
 	}
@@ -229,6 +230,15 @@ func register(c *gin.Context) {
 		})
 		return
 	}
+
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sshKey))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "SSH Key is not valid",
+		})
+	}
+
+	sshKey = string(ssh.MarshalAuthorizedKey(key))
 
 	userEntry := database.User{
 		Name:      name,
@@ -268,7 +278,8 @@ func register(c *gin.Context) {
 			}
 		}
 	}
-	err := database.CreateUserEntry(&userEntry)
+
+	err = database.CreateUserEntry(&userEntry)
 
 	if err != nil {
 		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{

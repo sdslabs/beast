@@ -24,7 +24,7 @@ type HTTPAuthorizeResp struct {
 
 type AvailableImagesResp struct {
 	Message string   `json:"message" example:"Available Base images."`
-	Images  []string `json:"images" example:"['ubuntu16.04', 'ubuntu18.04']"`
+	Images  []string `json:"images" example:"['ubuntu:24.04', 'ubuntu:22.04']"`
 }
 
 type PortsInUseResp struct {
@@ -131,6 +131,7 @@ type Challenge struct {
 	PreviousTries   int        `json:"previousTries" example:"3"`
 	MaxAttemptLimit int        `json:"maxAttemptLimit" example:"5"`
 	DeployedLink    string     `json:"deployedLink" example:"beast.sdslabs.co or ip:port"`
+	Ports           []uint32   `json:"ports" example:"[10005]"`
 }
 
 // ChallengeDetails is an extended struct for admin use, containing additional fields.
@@ -165,7 +166,7 @@ type SubmissionResp struct {
 	Cheating  bool      `json:"cheating" example:"false"`
 }
 
-type FlagSubmitResp struct {
+type ChallengeSubmitResponse struct {
 	Message string `json:"message" example:"Your answer is correct"`
 	Success bool   `json:"success" example:"true"`
 }

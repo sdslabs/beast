@@ -215,7 +215,7 @@ func promptCacheConnectionDetails(configuration *config.BeastConfig) {
 	configuration.RedisConf.Port = strconv.FormatInt(utils.PromptInt64("Enter Redis Port", 6379), 10)
 
 	log.Infoln("Setting Redis DB to 0...")
-	configuration.RedisConf.Db = 0
+	configuration.RedisConf.DB = 0
 }
 
 func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {

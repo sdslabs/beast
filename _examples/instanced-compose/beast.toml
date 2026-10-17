@@ -13,7 +13,7 @@ difficulty = "medium"
 tags = ["web", "sql", "instanced"]
 maxAttemptLimit = 100
 instanced = true
-instance_expiration = 12
+instance_expiration = 900
 
 [[challenge.metadata.hints]]
 text = "Check for SQL injection vulnerabilities"
@@ -25,7 +25,7 @@ points = 50
 
 [challenge.env]
 docker_compose = "docker-compose.yml"
-default_port_var = "INSTANCE_PORT"
+default_port_var = "SSH_PORT"
 
 [resource]
 cpu_shares = 1024

@@ -20,6 +20,10 @@ func dummyHandler(c *gin.Context) {
 func initGinRouter() *gin.Engine {
 	router := gin.New()
 
+	router.Use(gin.Recovery())
+	router.Use(ginLoggerMiddleware())
+	router.Use(requestResponseLogger())
+
 	corsConfig := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Cookie"},
@@ -119,9 +123,9 @@ func initGinRouter() *gin.Engine {
 			configGroup.POST("/challenge-info", updateChallengeInfoHandler)
 		}
 
-		submitGroup := apiGroup.Group("/submit")
+		submitGroup := apiGroup.Group("/check")
 		{
-			submitGroup.POST("/challenge", submitFlagHandler)
+			submitGroup.POST("/challenge", checkFlagHandler)
 		}
 
 		adminPanelGroup := apiGroup.Group("/admin", adminAuthorize)
