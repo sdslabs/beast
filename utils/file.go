@@ -3,12 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
-	"path"
-	"path/filepath"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -16,7 +11,7 @@ import (
 // Check if the path provided is a valid path, by calling stat on it
 // if the path is invalid due to either non accesibility or existence
 // an error is returned else FileInfo type is returned.
-func CheckPathValid(path string) (os.FileInfo, error) {
+func checkPathValid(path string) (os.FileInfo, error) {
 	// Check if the provided path exist
 	pathInfo, err := os.Stat(path)
 	if err != nil {
@@ -37,12 +32,11 @@ func CheckPathValid(path string) (os.FileInfo, error) {
 // will return an error. The path specified must also be a directory
 // and not just a regular file.
 func ValidateDirExists(dirPath string) error {
-	dirPathInfo, err := CheckPathValid(dirPath)
+	dirPathInfo, err := checkPathValid(dirPath)
 	if err != nil {
 		return err
 	}
 
-	// Check if the path provided points to a directory
 	if !dirPathInfo.IsDir() {
 		log.Warnf("%s is not a directory", dirPath)
 		return fmt.Errorf("not a directory : %s", dirPath)
@@ -51,11 +45,11 @@ func ValidateDirExists(dirPath string) error {
 	return nil
 }
 
-// Validates if the file pointed by `filePath` exists.
+// ValidateFileExists Validates if the file pointed by `filePath` exists.
 // If the file does not exist or is not accessible it
 // will return an error. The path specified must also be a valid file
 func ValidateFileExists(filePath string) error {
-	filePathInfo, err := CheckPathValid(filePath)
+	filePathInfo, err := checkPathValid(filePath)
 	if err != nil {
 		return err
 	}
@@ -110,139 +104,4 @@ func CreateFileIfNotExist(filePath string) error {
 	}
 
 	return nil
-}
-
-func RemoveDirRecursively(dirPath string) error {
-	err := ValidateDirExists(dirPath)
-	if err != nil {
-		return err
-	}
-
-	err = os.RemoveAll(dirPath)
-	if err != nil {
-		return fmt.Errorf("error while removing directory %s : %s :: MAKE SURE TO CLEAN THE DIRECTORY YOURSELF", dirPath, err)
-	}
-
-	return nil
-}
-
-func CopyFile(src, dst string) error {
-	err := ValidateFileExists(src)
-	if err != nil {
-		return err
-	}
-
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destination, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return fmt.Errorf("error while creating destination file : %s", err)
-	}
-	defer destination.Close()
-
-	_, err = io.Copy(destination, source)
-	return err
-}
-
-func CopyDirectory(src, dst string) error {
-	srcInfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(dst, srcInfo.Mode())
-	if err != nil {
-		return err
-	}
-
-	fds, err := ioutil.ReadDir(src)
-
-	if err != nil {
-		return err
-	}
-	for _, fd := range fds {
-		srcn := path.Join(src, fd.Name())
-		dstn := path.Join(dst, fd.Name())
-
-		if fd.IsDir() {
-			if err = CopyDirectory(srcn, dstn); err != nil {
-				return err
-			}
-		} else {
-			if err = CopyFile(srcn, dstn); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// Gets all directories recursively
-func GetAllDirectoriesName(dirPath string) []string {
-	var directories []string
-
-	_ = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			directories = append(directories, path)
-		}
-
-		return nil
-	})
-
-	return directories
-}
-
-// Gets all directories at the entered depth only.
-func GetAllDirectoriesNameTillDepth(dirPath string, depth int) []string {
-	var directories []string
-
-	_ = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() && strings.Count(path, string(os.PathSeparator)) == depth {
-			directories = append(directories, path)
-		}
-
-		return nil
-	})
-
-	return directories
-}
-
-// Returns a list of directory present in the provided directory
-func GetDirsInDir(dirPath string) (error, []string) {
-	var dirs []string
-	err := ValidateDirExists(dirPath)
-	if err != nil {
-		return err, dirs
-	}
-
-	files, err := ioutil.ReadDir(dirPath)
-	if err != nil {
-		return fmt.Errorf("error while reading directory with path %s : %s", dirPath, err), dirs
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			dirs = append(dirs, file.Name())
-		}
-	}
-
-	return nil, dirs
-}
-
-// GetRootDirectoryName returns the name of the current directory from the path
-func GetCurrentDirectoryName(path string) string {
-	directories := strings.Split(path, string(os.PathSeparator))
-	return directories[len(directories)-1]
 }

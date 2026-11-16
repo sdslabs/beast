@@ -1,45 +1,32 @@
-package database
+package models
 
 import (
+	"net/netip"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-type OTP struct {
-	Email    string `gorm:"primaryKey"`
-	Code     string
-	Expiry   time.Time
-	Verified bool
-}
+// OTPType mirrors the CHECK constraint on auth_otps.type.
+type OTPType string
 
-func CreateOTPEntry(otpEntry *OTP) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
+const (
+	OTPTypeEmailVerification OTPType = "email_verification"
+	OTPTypePasswordReset     OTPType = "password_reset"
+	OTPTypeLogin2FA          OTPType = "login_2fa"
+)
 
-	var existingOTP OTP
-	tx := Db.First(&existingOTP, "email = ?", otpEntry.Email)
-	if tx.Error == nil {
-		existingOTP.Code = otpEntry.Code
-		existingOTP.Expiry = otpEntry.Expiry
-		return Db.Save(&existingOTP).Error
-	}
-
-	return Db.Create(otpEntry).Error
-}
-
-func QueryOTPEntry(email string) (OTP, error) {
-	var otpEntry OTP
-
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	tx := Db.Where("email = ?", email).First(&otpEntry)
-
-	return otpEntry, tx.Error
-}
-
-func VerifyOTPEntry(email string) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	return Db.Model(&OTP{}).Where("email = ?", email).Update("verified", true).Error
+// AuthOTP maps to the auth_otps table.
+type AuthOTP struct {
+	ID          uuid.UUID  `db:"id" json:"id"`
+	UserID      *uuid.UUID `db:"user_id" json:"user_id,omitempty"` // nil when verifying an email that has no account yet
+	Email       string     `db:"email" json:"email"`
+	OTPHash     string     `db:"otp_hash" json:"-"` // SHA-256 of the 6-digit code
+	Type        OTPType    `db:"type" json:"type"`
+	Attempts    int        `db:"attempts" json:"attempts"`
+	MaxAttempts int        `db:"max_attempts" json:"max_attempts"`
+	ExpiresAt   time.Time  `db:"expires_at" json:"expires_at"`
+	ConsumedAt  *time.Time `db:"consumed_at" json:"consumed_at,omitempty"`
+	IPAddress   netip.Addr `db:"ip_address" json:"ip_address"`
+	CreatedAt   time.Time  `db:"created_at" json:"created_at"`
 }

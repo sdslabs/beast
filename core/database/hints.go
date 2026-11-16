@@ -1,241 +1,27 @@
-package database
+package models
 
 import (
-	"errors"
-	"fmt"
 	"time"
 
-	"gorm.io/gorm"
+	"github.com/google/uuid"
 )
 
-type Hint struct {
-	HintID      uint   `gorm:"primaryKey;autoIncrement"`
-	ChallengeID uint   `gorm:"not null"`
-	Points      uint   `gorm:"not null"`
-	Description string `gorm:"size:255"`
+// ChallengeHint maps to challenge_hints.
+type ChallengeHint struct {
+	ID          uuid.UUID  `db:"id" json:"id"`
+	ChallengeID uuid.UUID  `db:"challenge_id" json:"challenge_id"`
+	Content     string     `db:"content" json:"content"` // Markdown; only return it to teams that unlocked the hint
+	CostPoints  int        `db:"cost_points" json:"cost_points"`
+	ReleaseAt   *time.Time `db:"release_at" json:"release_at,omitempty"` // nil = available immediately
 }
 
+// UserHint maps to user_hints: one row per team that unlocked a hint.
+// Note: user_hints.hint_id uses ON DELETE RESTRICT to prohibit deleting hints once purchased.
 type UserHint struct {
-	ID     uint `gorm:"primaryKey"`
-	UserID uint `gorm:"not null;uniqueIndex:idx_user_hints_user_hint"`
-	User   User `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-
-	HintID uint `gorm:"not null;uniqueIndex:idx_user_hints_user_hint"`
-	Hint   Hint `gorm:"references:HintID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-
-	ChallengeID uint      `gorm:"not null"`
-	Challenge   Challenge `gorm:"foreignKey:ChallengeID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-
-	CreatedAt time.Time
-}
-
-func CreateHintEntry(hint *Hint) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	tx := Db.Begin()
-	if tx.Error != nil {
-		return fmt.Errorf("error while starting transaction: %w", tx.Error)
-	}
-
-	if err := tx.FirstOrCreate(hint, *hint).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
-}
-
-func GetHintByID(hintID uint) (*Hint, error) {
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	tx := Db.Begin()
-	if tx.Error != nil {
-		return nil, fmt.Errorf("error while starting transaction: %w", tx.Error)
-	}
-
-	var hint Hint
-	if err := tx.Where("hint_id = ?", hintID).First(&hint).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			tx.Rollback()
-			return nil, fmt.Errorf("not_found")
-		}
-		tx.Rollback()
-		return nil, fmt.Errorf("db_error")
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		return nil, fmt.Errorf("commit error: %w", err)
-	}
-
-	return &hint, nil
-}
-
-// checks if user has already taken the hint
-func UserHasTakenHint(userID, hintID uint) (bool, error) {
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	tx := Db.Begin()
-	if tx.Error != nil {
-		return false, fmt.Errorf("error while starting transaction: %w", tx.Error)
-	}
-
-	var userHint UserHint
-	if err := tx.Where("user_id = ? AND hint_id = ?", userID, hintID).First(&userHint).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			tx.Rollback()
-			return false, nil
-		}
-		tx.Rollback()
-		return false, fmt.Errorf("db_error")
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		return false, fmt.Errorf("commit error: %w", err)
-	}
-
-	return true, nil
-}
-
-func SaveUserHint(userID, challengeID, hintID uint) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	tx := Db.Begin()
-	if tx.Error != nil {
-		return fmt.Errorf("error while starting transaction: %w", tx.Error)
-	}
-
-	// Get the hint to check its points
-	var hint Hint
-	if err := tx.First(&hint, "hint_id = ?", hintID).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	// Get the user to update their points
-	var user User
-	if err := tx.First(&user, "id = ?", userID).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	// Check if user has enough points
-	if user.Score < hint.Points {
-		tx.Rollback()
-		return fmt.Errorf("Not enough points to take this hint")
-	}
-
-	// Deduct points from user
-	user.Score -= hint.Points
-
-	// Update user's score
-	if err := tx.Save(&user).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	// Save the hint usage
-	userHint := UserHint{
-		UserID:      userID,
-		ChallengeID: challengeID,
-		HintID:      hintID,
-	}
-
-	if err := tx.Create(&userHint).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
-}
-
-// QueryHintsTaken retrieves the hints taken by a user for a specific challenge.
-func QueryHintsTaken(userID, challengeID uint) ([]Hint, error) {
-	var userHints []UserHint
-	var hints []Hint
-
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	tx := Db.Where("user_id = ? AND challenge_id = ?", userID, challengeID).Find(&userHints)
-	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-
-	if tx.Error != nil {
-		return nil, tx.Error
-	}
-
-	for _, userHint := range userHints {
-		var hint Hint
-		tx := Db.First(&hint, userHint.HintID)
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			continue
-		}
-
-		if tx.Error != nil {
-			return nil, tx.Error
-		}
-
-		hints = append(hints, hint)
-	}
-
-	return hints, nil
-}
-
-func QueryHintsByChallengeID(challengeID uint) ([]Hint, error) {
-	var hints []Hint
-
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	if err := Db.Where("challenge_id = ?", challengeID).Find(&hints).Error; err != nil {
-		return nil, err
-	}
-
-	return hints, nil
-}
-
-func RestoreHintPointsAndDeleteHints(challengeID uint) error {
-	DBMux.Lock()
-	defer DBMux.Unlock()
-
-	tx := Db.Begin()
-	if tx.Error != nil {
-		return fmt.Errorf("error while starting transaction: %w", tx.Error)
-	}
-
-	var userHints []UserHint
-	if err := tx.Where("challenge_id = ?", challengeID).Find(&userHints).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("error fetching user hints: %v", err)
-	}
-
-	for _, uh := range userHints {
-		var hint Hint
-		if err := tx.Where("hint_id = ?", uh.HintID).First(&hint).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf("error fetching hint %d: %v", uh.HintID, err)
-		}
-		if err := tx.Model(&User{}).Where("id = ?", uh.UserID).
-			UpdateColumn("score", gorm.Expr("score + ?", hint.Points)).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf("error restoring hint points for user %d: %v", uh.UserID, err)
-		}
-	}
-
-	if err := tx.Where("challenge_id = ?", challengeID).Delete(&UserHint{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("error deleting user hints: %v", err)
-	}
-
-	if err := tx.Where("challenge_id = ?", challengeID).Delete(&Hint{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("error deleting hints: %v", err)
-	}
-
-	return tx.Commit().Error
+	ID         uuid.UUID `db:"id" json:"id"`
+	HintID     uuid.UUID `db:"hint_id" json:"hint_id"`
+	TeamID     uuid.UUID `db:"team_id" json:"team_id"`
+	UserID     uuid.UUID `db:"user_id" json:"user_id"`         // teammate who bought it
+	CostPoints int       `db:"cost_points" json:"cost_points"` // price at purchase time
+	UnlockedAt time.Time `db:"unlocked_at" json:"unlocked_at"`
 }

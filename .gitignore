@@ -1,21 +1,44 @@
-*agent
-.beast-local/
-.codex/
-beast.log
-venv/
-site/
-.vagrant/
-.gnupg/
-ubuntu-bionic-18.04-cloudimg-console.log
-target/
-.vscode/
-vendor/
+# Binaries and build outputs
+/bin/
+/dist/
+beast
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# Environment files
+# Test and profiling artifacts
+*.test
+*.out
+*.prof
+
+# Architecture & local runtime state
+.beast-local/
+*.log
+
+# Environment & credentials (never commit secrets)
 .env
 .env.*
 !sample.env
-
-# Redis credentials / ACL
 redis/users.acl
 redis/.users.acl
+
+# Go modules
+vendor/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Assistant & scratch / planning notes
+.codex/
+temp_plans/
+skills/
