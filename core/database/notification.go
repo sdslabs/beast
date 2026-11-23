@@ -10,12 +10,26 @@ import (
 // The column has no CHECK constraint, so other values are possible in the DB.
 type NotificationType string
 
+// TODO : currently these are some dummy notification types. need to change it later
 const (
 	NotificationTypeAnnouncement    NotificationType = "announcement"
 	NotificationTypeChallengeUpdate NotificationType = "challenge_update"
 	NotificationTypeFirstBlood      NotificationType = "first_blood"
 	NotificationTypeTeam            NotificationType = "team"
 )
+
+// IsValid reports whether the notification type is a known valid category.
+func (n NotificationType) IsValid() bool {
+	switch n {
+	case NotificationTypeAnnouncement,
+		NotificationTypeChallengeUpdate,
+		NotificationTypeFirstBlood,
+		NotificationTypeTeam:
+		return true
+	default:
+		return false
+	}
+}
 
 // Notification maps to the notifications table.
 type Notification struct {

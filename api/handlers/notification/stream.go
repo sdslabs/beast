@@ -1,12 +1,16 @@
 package notification
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
-	"github.com/sdslabs/beastv4/api/httputil"
 )
 
 // StreamNotificationsHandler handles GET /api/v1/notifications/stream
 func StreamNotificationsHandler(c *gin.Context) {
 	// TODO: implement SSE stream for real-time notifications
-	httputil.RespondNotImplemented(c, "StreamNotificationsHandler")
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Status(http.StatusOK)
 }

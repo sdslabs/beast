@@ -1,30 +1,49 @@
 package instance
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
+	"github.com/sdslabs/beastv4/api/dto"
 	"github.com/sdslabs/beastv4/api/httputil"
 )
 
 // SpawnInstanceHandler handles POST /api/v1/challenges/:challenge_slug/instance/spawn
 func SpawnInstanceHandler(c *gin.Context) {
+	slug := c.Param("challenge_slug")
+	_ = slug
+
 	// TODO: implement spawning dynamic challenge container
-	httputil.RespondNotImplemented(c, "SpawnInstanceHandler")
+	var resp dto.ParticipantInstanceResponse
+	httputil.RespondJSON(c, http.StatusAccepted, resp)
 }
 
 // GetInstanceHandler handles GET /api/v1/challenges/:challenge_slug/instance
 func GetInstanceHandler(c *gin.Context) {
+	slug := c.Param("challenge_slug")
+	_ = slug
+
 	// TODO: implement checking active instance status & endpoints
-	httputil.RespondNotImplemented(c, "GetInstanceHandler")
+	var resp dto.ParticipantInstanceResponse
+	httputil.RespondJSON(c, http.StatusOK, resp)
 }
 
 // RenewInstanceHandler handles POST /api/v1/challenges/:challenge_slug/instance/renew
 func RenewInstanceHandler(c *gin.Context) {
+	slug := c.Param("challenge_slug")
+	_ = slug
+
 	// TODO: implement instance lifetime extension
-	httputil.RespondNotImplemented(c, "RenewInstanceHandler")
+	var resp dto.ParticipantInstanceResponse
+	httputil.RespondJSON(c, http.StatusOK, resp)
 }
 
 // StopInstanceHandler handles POST /api/v1/challenges/:challenge_slug/instance/stop
 func StopInstanceHandler(c *gin.Context) {
+	slug := c.Param("challenge_slug")
+	_ = slug
+
 	// TODO: implement voluntary instance destruction
-	httputil.RespondNotImplemented(c, "StopInstanceHandler")
+	var resp dto.ParticipantInstanceResponse
+	httputil.RespondJSON(c, http.StatusOK, resp)
 }
