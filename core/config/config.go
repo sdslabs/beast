@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"math"
 	"net"
 	"net/netip"
@@ -14,76 +13,12 @@ import (
 	"strings"
 	"time"
 
-	models "github.com/sdslabs/beastv4/core/database"
+	"github.com/sdslabs/beastv4/core/database/models"
+	"github.com/sdslabs/beastv4/utils"
 )
 
-// Duration is a wrapper around time.Duration supporting TOML parsing.
-type Duration time.Duration
-
-func (d Duration) Std() time.Duration { return time.Duration(d) }
-
-func (d Duration) String() string { return time.Duration(d).String() }
-
-func (d *Duration) UnmarshalText(text []byte) error {
-	dur, err := time.ParseDuration(string(text))
-	if err != nil {
-		return err
-	}
-	*d = Duration(dur)
-	return nil
-}
-
-func (d Duration) MarshalText() ([]byte, error) {
-	return []byte(time.Duration(d).String()), nil
-}
-
-// Secret is a string wrapper that prevents sensitive credentials (passwords, tokens, keys)
-// from leaking through fmt formatting, %#v dumps, JSON serialization, or slog logging.
-type Secret string
-
-// String returns "[redacted]" to prevent leaks in %s, %v, %+v fmt calls.
-func (s Secret) String() string {
-	if s == "" {
-		return ""
-	}
-	return "[redacted]"
-}
-
-// GoString returns "[redacted]" to prevent leaks in %#v fmt calls.
-func (s Secret) GoString() string {
-	if s == "" {
-		return `""`
-	}
-	return `"[redacted]"`
-}
-
-// LogValue implements slog.LogValuer so structured loggers automatically redact the secret.
-func (s Secret) LogValue() slog.Value {
-	if s == "" {
-		return slog.StringValue("")
-	}
-	return slog.StringValue("[redacted]")
-}
-
-// MarshalText implements encoding.TextMarshaler to prevent accidental exposure during serialization.
-func (s Secret) MarshalText() ([]byte, error) {
-	if s == "" {
-		return []byte(""), nil
-	}
-	return []byte("[redacted]"), nil
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler so TOML and text decoders decode into Secret.
-func (s *Secret) UnmarshalText(text []byte) error {
-	*s = Secret(text)
-	return nil
-}
-
-// Expose returns the underlying plaintext string when the secret is needed (e.g. authenticating).
-func (s Secret) Expose() string {
-	return string(s)
-}
-
+type Duration = utils.Duration
+type Secret = utils.Secret
 type Environment string
 
 const (
@@ -97,6 +32,11 @@ func (e Environment) IsProduction() bool {
 
 // Cfg is the active global Beast configuration instance.
 var Cfg *BeastConfig
+
+// IsConfigured reports whether the global configuration Cfg has been initialized.
+func IsConfigured() bool {
+	return Cfg != nil
+}
 
 type BeastConfig struct {
 	Environment   Environment         `toml:"environment"`
@@ -228,7 +168,6 @@ type DocsConfig struct {
 	Password Secret `toml:"password"` // prefer env BEAST_DOCS_PASSWORD
 }
 
-// StorageConfig covers everything written to disk by the API process.
 type StorageConfig struct {
 	GlobalDir string `toml:"global_dir"` // e.g. ~/.beast
 
@@ -298,6 +237,13 @@ type NetworkPolicyConfig struct {
 	Labels map[string]string `toml:"labels"`
 }
 
+// ResourceLimits specifies container resource constraints (memory, CPUs, and process limits).
+type ResourceLimits struct {
+	MemoryMB  int     `toml:"memory_mb,omitempty" json:"memory_mb,omitempty" yaml:"memory_mb,omitempty"`
+	CPUs      float64 `toml:"cpus,omitempty" json:"cpus,omitempty" yaml:"cpus,omitempty"`
+	PidsLimit int     `toml:"pids_limit,omitempty" json:"pids_limit,omitempty" yaml:"pids_limit,omitempty"`
+}
+
 // RuntimeConfig covers Docker defaults and image policy
 // (challenge_runtime_config: image_ref / compose_path).
 type RuntimeConfig struct {
@@ -311,11 +257,7 @@ type RuntimeConfig struct {
 	// protects against upstream image tampering
 	RequireDigestPinning bool `toml:"require_digest_pinning"`
 
-	CPUShares int64   `toml:"default_cpu_shares"`
-	Memory    int64   `toml:"default_memory_limit"`
-	PidsLimit int64   `toml:"default_pids_limit"`
-	CPUsLimit float64 `toml:"default_cpus_limit"`
-
+	ResourceLimits
 	// Network encapsulates all network default sandboxing policies.
 	Network NetworkPolicyConfig `toml:"network"`
 
@@ -324,8 +266,6 @@ type RuntimeConfig struct {
 	StopTimeout  Duration `toml:"stop_timeout"`  // grace before kill
 }
 
-// InstanceConfig is the global default for per-user instances and shared
-// deployments. Per-challenge overrides live in challenge_instance_config.
 type InstanceConfig struct {
 	// Defaults for challenge_instance_config.ttl_minutes / max_renewals.
 	DefaultTTL         Duration `toml:"default_ttl"`
@@ -366,13 +306,10 @@ type GeneratorConfig struct {
 	MaxConcurrent  int   `toml:"max_concurrent"`
 }
 
-// SubmissionConfig holds limits that are not in competition_config.
 type SubmissionConfig struct {
-	// Reject longer values before hashing; submissions.submitted_flag stores the raw text.
 	MaxFlagLength int `toml:"max_flag_length"`
 }
 
-// NotificationsConfig covers /notifications/stream (SSE).
 type NotificationsConfig struct {
 	HeartbeatInterval Duration `toml:"heartbeat_interval"` // keeps proxies from closing idle streams
 	MaxStreamsPerUser int      `toml:"max_streams_per_user"`
@@ -458,10 +395,11 @@ func DefaultConfig() BeastConfig {
 
 		Runtime: RuntimeConfig{
 			RequireDigestPinning: true,
-			CPUShares:            512,
-			Memory:               512 << 20,
-			PidsLimit:            256,
-			CPUsLimit:            1,
+			ResourceLimits: ResourceLimits{
+				MemoryMB:  512,
+				PidsLimit: 256,
+				CPUs:      1,
+			},
 			Network: NetworkPolicyConfig{
 				Prefix:           "beast-",
 				RestrictOutbound: true,
@@ -505,14 +443,16 @@ func DefaultConfig() BeastConfig {
 		},
 
 		PsqlConf: PsqlConfig{
-			Host:            "localhost",
-			Port:            "5432",
-			User:            "beast",
-			Dbname:          "beast",
-			SslMode:         "disable",
-			MaxOpenConns:    25,
-			MaxIdleConns:    5,
-			ConnMaxLifetime: Duration(30 * time.Minute),
+			Host:    "localhost",
+			Port:    "5432",
+			User:    "beast",
+			Dbname:  "beast",
+			SslMode: "disable",
+			DbPoolOptions: DBPoolOptions{
+				MaxOpenConns:    25,
+				MaxIdleConns:    5,
+				ConnMaxLifetime: 30 * time.Minute,
+			},
 		},
 
 		RedisConf: RedisConfig{
@@ -538,21 +478,46 @@ func DefaultConfig() BeastConfig {
 	}
 }
 
-// ApplyEnvOverrides lets secrets come from the environment instead of the file.
 func (c *BeastConfig) ApplyEnvOverrides() error {
-	setSecret := func(dst *Secret, key string) {
-		if v := os.Getenv(key); v != "" {
-			*dst = Secret(v)
+	setSecretKey := func(dst *Secret, keys ...string) {
+		for _, key := range keys {
+			if v := os.Getenv(key); v != "" {
+				*dst = Secret(v)
+				return
+			}
+		}
+	}
+	setString := func(dst *string, keys ...string) {
+		for _, key := range keys {
+			if v := os.Getenv(key); v != "" {
+				*dst = v
+				return
+			}
 		}
 	}
 
-	setSecret(&c.Auth.JWTSecret, "BEAST_JWT_SECRET")
-	setSecret(&c.Auth.OperatorToken, "BEAST_OPERATOR_TOKEN")
-	setSecret(&c.Docs.Password, "BEAST_DOCS_PASSWORD")
-	setSecret(&c.PsqlConf.Password, "BEAST_DB_PASSWORD")
-	setSecret(&c.RedisConf.Password, "BEAST_REDIS_PASSWORD")
-	setSecret(&c.RedisConf.DefaultPassword, "BEAST_REDIS_DEFAULT_PASSWORD")
-	setSecret(&c.MailConfig.Password, "BEAST_SMTP_PASSWORD")
+	setSecretKey(&c.Auth.JWTSecret, "BEAST_JWT_SECRET")
+	setSecretKey(&c.Auth.OperatorToken, "BEAST_OPERATOR_TOKEN")
+	setSecretKey(&c.Docs.Password, "BEAST_DOCS_PASSWORD")
+	setSecretKey(&c.PsqlConf.Password, "BEAST_DB_PASSWORD", "POSTGRES_PASSWORD")
+	setSecretKey(&c.RedisConf.Password, "BEAST_REDIS_PASSWORD", "REDIS_PASSWORD")
+	setSecretKey(&c.RedisConf.DefaultPassword, "BEAST_REDIS_DEFAULT_PASSWORD", "REDIS_DEFAULT_PASSWORD")
+	setSecretKey(&c.MailConfig.Password, "BEAST_SMTP_PASSWORD")
+
+	setString(&c.PsqlConf.Host, "POSTGRES_HOST")
+	setString(&c.PsqlConf.Port, "POSTGRES_PORT")
+	setString(&c.PsqlConf.User, "POSTGRES_USER")
+	setString(&c.PsqlConf.Dbname, "POSTGRES_DB")
+	setString(&c.PsqlConf.SslMode, "POSTGRES_SSLMODE")
+
+	setString(&c.RedisConf.Host, "REDIS_HOST")
+	setString(&c.RedisConf.Port, "REDIS_PORT")
+	setString(&c.RedisConf.User, "REDIS_USER")
+	if v := os.Getenv("REDIS_DB"); v != "" {
+		if dbNum, err := strconv.Atoi(v); err == nil {
+			c.RedisConf.DB = dbNum
+		}
+	}
 
 	payloadEnv := os.Getenv("BEAST_LOG_HTTP_PAYLOADS")
 	if payloadEnv == "" {
@@ -573,7 +538,7 @@ func (c *BeastConfig) ApplyEnvOverrides() error {
 	return nil
 }
 
-// Validate reports every problem at once, so the operator can fix them in one pass.
+// TODO : review Validate function once again (after some changes)
 func (c *BeastConfig) Validate() error {
 
 	for i := range c.NotificationWebhooks {
@@ -697,7 +662,7 @@ func (c *BeastConfig) Validate() error {
 	}
 
 	// Runtime
-	if c.Runtime.Memory <= 0 || c.Runtime.PidsLimit <= 0 || c.Runtime.CPUsLimit <= 0 {
+	if c.Runtime.MemoryMB <= 0 || c.Runtime.PidsLimit <= 0 || c.Runtime.CPUs <= 0 {
 		add("runtime default memory, pids and cpus limits must be > 0")
 	}
 	if prod && len(c.Runtime.AllowedBaseImages) == 0 && len(c.Runtime.AllowedRegistries) == 0 && !c.Runtime.RequireDigestPinning {
@@ -825,7 +790,7 @@ func (c *BeastConfig) Validate() error {
 	if prod && c.PsqlConf.SslMode == "disable" && !isLoopback(c.PsqlConf.Host) {
 		add("psql_config.sslmode must not be \"disable\" for a non-local database in production")
 	}
-	if c.PsqlConf.MaxOpenConns < 1 || c.PsqlConf.MaxIdleConns < 0 || c.PsqlConf.MaxIdleConns > c.PsqlConf.MaxOpenConns {
+	if c.PsqlConf.DbPoolOptions.MaxOpenConns < 1 || c.PsqlConf.DbPoolOptions.MaxIdleConns < 0 || c.PsqlConf.DbPoolOptions.MaxIdleConns > c.PsqlConf.DbPoolOptions.MaxOpenConns {
 		add("psql_config pool: max_open_conns must be >= 1 and max_idle_conns between 0 and max_open_conns")
 	}
 
@@ -837,11 +802,25 @@ func (c *BeastConfig) Validate() error {
 		add("redis_config.port must be a number between 1 and 65535")
 	}
 	// beast init creates the Redis ACL user with ~beast:* only.
-	if !strings.HasPrefix(c.RedisConf.KeyPrefix, "beast:") {
+	if strings.TrimSpace(c.RedisConf.KeyPrefix) == "" {
+		add("redis_config.key_prefix cannot be empty")
+	} else if !strings.HasPrefix(c.RedisConf.KeyPrefix, "beast:") {
 		add("redis_config.key_prefix must start with \"beast:\" (the ACL user can only touch ~beast:*)")
 	}
 	if c.RedisConf.PoolSize < 1 {
 		add("redis_config.pool_size must be >= 1")
+	}
+	if c.RedisConf.DB < 0 {
+		add("redis_config.db must be >= 0")
+	}
+	if c.RedisConf.DialTimeout <= 0 {
+		add("redis_config.dial_timeout must be > 0")
+	}
+	if c.RedisConf.ReadTimeout <= 0 {
+		add("redis_config.read_timeout must be > 0")
+	}
+	if c.RedisConf.WriteTimeout <= 0 {
+		add("redis_config.write_timeout must be > 0")
 	}
 
 	// Mail
@@ -890,8 +869,12 @@ func isLoopback(host string) bool {
 	return addr.Unmap().IsLoopback() // covers all of 127.0.0.0/8, ::1 and ::ffff:127.x.x.x
 }
 
-// PsqlConfig is the PostgreSQL connection for the beast user.
-// Port stays a string because beast init builds DSNs with %s.
+// DBPoolOptions defines optional connection pool settings for GORM.
+type DBPoolOptions struct {
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+}
 type PsqlConfig struct {
 	Host     string `toml:"host"`
 	Port     string `toml:"port"`
@@ -900,10 +883,11 @@ type PsqlConfig struct {
 	Dbname   string `toml:"dbname"`
 	SslMode  string `toml:"sslmode"` // disable | allow | prefer | require | verify-ca | verify-full
 
-	MaxOpenConns    int      `toml:"max_open_conns"`
-	MaxIdleConns    int      `toml:"max_idle_conns"`
-	ConnMaxLifetime Duration `toml:"conn_max_lifetime"`
+	DbPoolOptions DBPoolOptions `toml:"db_pool_options"`
 }
+
+// PgsqlConfig is an alias for PsqlConfig.
+type PgsqlConfig = PsqlConfig
 
 // DSN returns a postgres:// URL. Unlike a key=value string, passwords with
 // spaces, quotes or "@" are escaped correctly. Works with sql.Open("pgx", ...).
@@ -932,7 +916,6 @@ func (p PsqlConfig) DSN() string {
 	return u.String()
 }
 
-// RedisConfig is the Redis connection for the beast ACL user.
 type RedisConfig struct {
 	Host     string `toml:"host"`
 	Port     string `toml:"port"`
@@ -957,8 +940,6 @@ type RedisConfig struct {
 // Addr returns host:port for redis.Options.Addr.
 func (r RedisConfig) Addr() string { return net.JoinHostPort(r.Host, r.Port) }
 
-// MailConfig is the SMTP setup used for e-mail verification, password reset
-// and login 2FA codes (auth_otps).
 type MailConfig struct {
 	Enabled bool `toml:"enabled"` // false = OTP e-mails are not sent
 
@@ -1044,4 +1025,9 @@ func (w NotificationWebhook) Wants(eventType string, targeted bool) bool {
 		return false
 	}
 	return slices.Contains(w.Events, eventType)
+}
+
+// CreateTempDir creates a temporary directory with the specified prefix.
+func CreateTempDir(prefix string) (string, error) {
+	return os.MkdirTemp("", prefix)
 }

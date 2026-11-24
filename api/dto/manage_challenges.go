@@ -1,6 +1,10 @@
 package dto
 
-import "time"
+import (
+	"time"
+
+	"github.com/sdslabs/beastv4/core/config"
+)
 
 type ManageChallengeResponse struct {
 	Slug            string                `json:"slug"`
@@ -46,12 +50,6 @@ type RuntimeEndpointSpec struct {
 	Path          string `json:"path,omitempty"`         // HTTP(S) only
 }
 
-type RuntimeResourceLimits struct {
-	CPUs      float64 `json:"cpus,omitempty"`
-	MemoryMB  int     `json:"memory_mb,omitempty"`
-	PidsLimit int     `json:"pids_limit,omitempty"`
-}
-
 type RuntimeReadinessCheck struct {
 	Protocol        string `json:"protocol" binding:"omitempty,oneof=tcp http"`
 	Port            int    `json:"port,omitempty"`
@@ -67,7 +65,7 @@ type ManageRuntimeConfigResponse struct {
 	ImageRef      *string                `json:"image_ref,omitempty"`
 	ComposeConfig *string                `json:"compose_config,omitempty"` // sanitized YAML or revision ref
 	Endpoints     []RuntimeEndpointSpec  `json:"endpoints"`
-	Resources     *RuntimeResourceLimits `json:"resources,omitempty"`
+	Resources     *config.ResourceLimits `json:"resources,omitempty"`
 	Environment   map[string]string      `json:"environment,omitempty"`
 	Readiness     *RuntimeReadinessCheck `json:"readiness,omitempty"`
 }

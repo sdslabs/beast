@@ -1,12 +1,15 @@
 package dto
 
-import "time"
+import (
+	"time"
+
+	"github.com/sdslabs/beastv4/core/config"
+)
 
 type NodeCapacitySummary struct {
-	ActiveDeployments int     `json:"active_deployments"`
-	CPUsTotal         float64 `json:"cpus_total"`
-	MemoryMBTotal     int     `json:"memory_mb_total"`
-	MemoryMBUsed      int     `json:"memory_mb_used"`
+	ActiveDeployments int                   `json:"active_deployments"`
+	Capacity          config.ResourceLimits `json:"capacity"`
+	Allocated         config.ResourceLimits `json:"allocated"`
 }
 
 type AdminNodeResponse struct {

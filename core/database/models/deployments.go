@@ -13,14 +13,22 @@ const (
 	RuntimeTypeCompose RuntimeType = "compose"
 )
 
+// ChallengeRuntimeConfigBase contains the common runtime configuration fields
+// (runtime type and image reference or compose path).
+type ChallengeRuntimeConfigBase struct {
+	RuntimeType RuntimeType `db:"runtime_type" toml:"type,omitempty" json:"runtime_type" yaml:"type,omitempty"`
+	ImageRef    *string     `db:"image_ref" toml:"image,omitempty" json:"image_ref,omitempty" yaml:"image,omitempty"` // prefer a digest-pinned registry reference
+	ComposePath *string     `db:"compose_path" toml:"compose_path,omitempty" json:"-" yaml:"compose_path,omitempty"`  // trusted host path
+}
+
+type RuntimeConfigBase = ChallengeRuntimeConfigBase
+
 // ChallengeRuntimeConfig maps to challenge_runtime_config (one row per
 // non-offline challenge). Exactly one of ImageRef or ComposePath is set,
 // matching RuntimeType. For workers and admins only.
 type ChallengeRuntimeConfig struct {
-	ChallengeID uuid.UUID   `db:"challenge_id" json:"challenge_id"`
-	RuntimeType RuntimeType `db:"runtime_type" json:"runtime_type"`
-	ImageRef    *string     `db:"image_ref" json:"image_ref,omitempty"` // prefer a digest-pinned registry reference
-	ComposePath *string     `db:"compose_path" json:"-"`                // trusted host path
+	ChallengeID uuid.UUID `db:"challenge_id" json:"challenge_id"`
+	ChallengeRuntimeConfigBase
 }
 
 // ChallengeInstanceConfig maps to challenge_instance_config (one row per

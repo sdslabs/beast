@@ -25,7 +25,7 @@ const (
 var jsonLogger = log.New(os.Stdout, "", 0)
 
 func getLoggingConfig() config.LoggingConfig {
-	if config.Cfg != nil {
+	if config.IsConfigured() {
 		return config.Cfg.Logging
 	}
 	return config.DefaultConfig().Logging
