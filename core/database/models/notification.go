@@ -6,8 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// NotificationType lists the categories documented on notifications.type.
-// The column has no CHECK constraint, so other values are possible in the DB.
 type NotificationType string
 
 // TODO : currently these are some dummy notification types. need to change it later
@@ -18,7 +16,6 @@ const (
 	NotificationTypeTeam            NotificationType = "team"
 )
 
-// IsValid reports whether the notification type is a known valid category.
 func (n NotificationType) IsValid() bool {
 	switch n {
 	case NotificationTypeAnnouncement,
@@ -31,7 +28,6 @@ func (n NotificationType) IsValid() bool {
 	}
 }
 
-// Notification maps to the notifications table.
 type Notification struct {
 	ID          uuid.UUID        `db:"id" json:"id"`
 	Title       string           `db:"title" json:"title"`
@@ -44,7 +40,6 @@ type Notification struct {
 	CreatedAt   time.Time        `db:"created_at" json:"created_at"`
 }
 
-// UserNotificationRead maps to user_notification_reads.
 type UserNotificationRead struct {
 	UserID         uuid.UUID `db:"user_id" json:"user_id"`
 	NotificationID uuid.UUID `db:"notification_id" json:"notification_id"`
