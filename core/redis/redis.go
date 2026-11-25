@@ -18,9 +18,6 @@ var (
 	KeyPrefix string
 )
 
-// Connect initializes the Redis client connection using the provided RedisConfig.
-// It verifies that KeyPrefix is non-empty and starts with "beast:", sets up connection options,
-// and verifies connectivity with a Ping.
 func Connect(cfg config.RedisConfig) (*redis.Client, error) {
 	prefix := strings.TrimSpace(cfg.KeyPrefix)
 	if prefix == "" {
@@ -74,8 +71,6 @@ func Connect(cfg config.RedisConfig) (*redis.Client, error) {
 	return rdb, nil
 }
 
-// ConnectWithConfig initializes the Redis client using config.Cfg.RedisConf.
-// If Beast is not configured, it returns an error indicating that Beast is not configured.
 func ConnectWithConfig() (*redis.Client, error) {
 	if !config.IsConfigured() {
 		return nil, errors.New("beast is not configured, cannot connect to redis")
@@ -83,17 +78,12 @@ func ConnectWithConfig() (*redis.Client, error) {
 	return Connect(config.Cfg.RedisConf)
 }
 
-// GetClient returns the active *redis.Client in a thread-safe manner.
 func GetClient() *redis.Client {
 	redisMu.RLock()
 	defer redisMu.RUnlock()
 	return Client
 }
 
-// FormatKey prefixes the given key with the configured KeyPrefix.
-// Beast's Redis ACL user is strictly restricted to ~beast:*, so all keys
-// manipulated by the application must begin with the configured prefix.
-// If the key or KeyPrefix is empty, it returns an error instead of silently falling back.
 func FormatKey(key string) (string, error) {
 	if strings.TrimSpace(key) == "" {
 		return "", errors.New("redis key cannot be empty")
@@ -111,8 +101,18 @@ func FormatKey(key string) (string, error) {
 	}
 	return prefix + key, nil
 }
+func FormatKeys(keys ...string) ([]string, error) {
+	formatted := make([]string, len(keys))
+	for i, k := range keys {
+		fk, err := FormatKey(k)
+		if err != nil {
+			return nil, err
+		}
+		formatted[i] = fk
+	}
+	return formatted, nil
+}
 
-// Ping checks whether the Redis connection is alive.
 func Ping(ctx context.Context) error {
 	redisMu.RLock()
 	defer redisMu.RUnlock()
@@ -123,7 +123,6 @@ func Ping(ctx context.Context) error {
 	return Client.Ping(ctx).Err()
 }
 
-// Close gracefully closes the Redis client connection and clears the global references.
 func Close() error {
 	redisMu.Lock()
 	defer redisMu.Unlock()

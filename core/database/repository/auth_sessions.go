@@ -1,17 +1,20 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateSession(session *models.AuthSession) error {
-	db := database.GetDb()
+func CreateSession(ctx context.Context, db *gorm.DB, session *models.AuthSession) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if session.CreatedAt.IsZero() {
@@ -23,10 +26,12 @@ func CreateSession(session *models.AuthSession) error {
 	return nil
 }
 
-func GetSessionByID(id int64) (*models.AuthSession, error) {
-	db := database.GetDb()
+func GetSessionByID(ctx context.Context, db *gorm.DB, id int64) (*models.AuthSession, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var session models.AuthSession
@@ -36,10 +41,12 @@ func GetSessionByID(id int64) (*models.AuthSession, error) {
 	return &session, nil
 }
 
-func GetSessionByRefreshHash(hash string) (*models.AuthSession, error) {
-	db := database.GetDb()
+func GetSessionByRefreshHash(ctx context.Context, db *gorm.DB, hash string) (*models.AuthSession, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var session models.AuthSession
@@ -49,10 +56,12 @@ func GetSessionByRefreshHash(hash string) (*models.AuthSession, error) {
 	return &session, nil
 }
 
-func ListSessionsByUserID(userID uuid.UUID) ([]models.AuthSession, error) {
-	db := database.GetDb()
+func ListSessionsByUserID(ctx context.Context, db *gorm.DB, userID uuid.UUID) ([]models.AuthSession, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var sessions []models.AuthSession
@@ -64,17 +73,21 @@ func ListSessionsByUserID(userID uuid.UUID) ([]models.AuthSession, error) {
 	return sessions, nil
 }
 
-func RotateSessionRefreshHash(id int64, newHash string, newExpiresAt time.Time, lastUsedAt time.Time) error {
-	db := database.GetDb()
+func RotateSessionRefreshHash(ctx context.Context, db *gorm.DB, id int64, oldHash, newHash string, newExpiresAt, lastUsedAt time.Time) error {
 	if db == nil {
 		return ErrNoDatabase
 	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
 
-	res := db.Model(&models.AuthSession{}).Where("id = ?", id).Updates(map[string]any{
-		"refresh_token_hash": newHash,
-		"expires_at":         newExpiresAt,
-		"last_used_at":       lastUsedAt,
-	})
+	res := db.Model(&models.AuthSession{}).
+		Where("id = ? AND refresh_token_hash = ? AND is_revoked = FALSE", id, oldHash).
+		Updates(map[string]any{
+			"refresh_token_hash": newHash,
+			"expires_at":         newExpiresAt,
+			"last_used_at":       lastUsedAt,
+		})
 	if res.Error != nil {
 		return MapError(res.Error)
 	}
@@ -84,10 +97,12 @@ func RotateSessionRefreshHash(id int64, newHash string, newExpiresAt time.Time, 
 	return nil
 }
 
-func RevokeSession(id int64) error {
-	db := database.GetDb()
+func RevokeSession(ctx context.Context, db *gorm.DB, id int64) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.AuthSession{}).Where("id = ?", id).Update("is_revoked", true)
@@ -100,10 +115,12 @@ func RevokeSession(id int64) error {
 	return nil
 }
 
-func RevokeAllSessionsForUser(userID uuid.UUID) error {
-	db := database.GetDb()
+func RevokeAllSessionsForUser(ctx context.Context, db *gorm.DB, userID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.AuthSession{}).
@@ -115,10 +132,12 @@ func RevokeAllSessionsForUser(userID uuid.UUID) error {
 	return nil
 }
 
-func DeleteExpiredSessions(before time.Time) (int64, error) {
-	db := database.GetDb()
+func DeleteExpiredSessions(ctx context.Context, db *gorm.DB, before time.Time) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("expires_at < ?", before).Delete(&models.AuthSession{})

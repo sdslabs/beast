@@ -1,17 +1,20 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateChallengeFlag(flag *models.ChallengeFlag) error {
-	db := database.GetDb()
+func CreateChallengeFlag(ctx context.Context, db *gorm.DB, flag *models.ChallengeFlag) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if flag.ID == uuid.Nil {
@@ -26,10 +29,12 @@ func CreateChallengeFlag(flag *models.ChallengeFlag) error {
 	return nil
 }
 
-func GetFlagsByHash(flagHash string) ([]models.ChallengeFlag, error) {
-	db := database.GetDb()
+func GetFlagsByHash(ctx context.Context, db *gorm.DB, flagHash string) ([]models.ChallengeFlag, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var flags []models.ChallengeFlag
@@ -39,10 +44,12 @@ func GetFlagsByHash(flagHash string) ([]models.ChallengeFlag, error) {
 	return flags, nil
 }
 
-func DeleteChallengeFlag(id uuid.UUID) error {
-	db := database.GetDb()
+func DeleteChallengeFlag(ctx context.Context, db *gorm.DB, id uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("id = ?", id).Delete(&models.ChallengeFlag{})

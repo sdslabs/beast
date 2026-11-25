@@ -1,18 +1,21 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-func CreateDeployment(deployment *models.ChallengeDeployment) error {
-	db := database.GetDb()
+func CreateDeployment(ctx context.Context, db *gorm.DB, deployment *models.ChallengeDeployment) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if deployment.ID == uuid.Nil {
@@ -33,10 +36,12 @@ func CreateDeployment(deployment *models.ChallengeDeployment) error {
 	return nil
 }
 
-func GetDeploymentByID(id uuid.UUID) (*models.ChallengeDeployment, error) {
-	db := database.GetDb()
+func GetDeploymentByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.ChallengeDeployment, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var d models.ChallengeDeployment
@@ -46,10 +51,27 @@ func GetDeploymentByID(id uuid.UUID) (*models.ChallengeDeployment, error) {
 	return &d, nil
 }
 
-func GetActiveDeployment(challengeID, teamID uuid.UUID) (*models.ChallengeDeployment, error) {
-	db := database.GetDb()
+func GetDeploymentByIDForUpdate(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.ChallengeDeployment, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	var d models.ChallengeDeployment
+	if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&d).Error; err != nil {
+		return nil, MapError(err)
+	}
+	return &d, nil
+}
+
+func GetActiveDeployment(ctx context.Context, db *gorm.DB, challengeID, teamID uuid.UUID) (*models.ChallengeDeployment, error) {
+	if db == nil {
+		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var d models.ChallengeDeployment
@@ -66,10 +88,12 @@ func GetActiveDeployment(challengeID, teamID uuid.UUID) (*models.ChallengeDeploy
 	return &d, nil
 }
 
-func ListDeployments(offset, limit int) ([]models.ChallengeDeployment, error) {
-	db := database.GetDb()
+func ListDeployments(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.ChallengeDeployment, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if limit <= 0 {
@@ -84,10 +108,12 @@ func ListDeployments(offset, limit int) ([]models.ChallengeDeployment, error) {
 	return list, nil
 }
 
-func ListDeploymentsByNodeID(nodeID string) ([]models.ChallengeDeployment, error) {
-	db := database.GetDb()
+func ListDeploymentsByNodeID(ctx context.Context, db *gorm.DB, nodeID string) ([]models.ChallengeDeployment, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var list []models.ChallengeDeployment
@@ -97,10 +123,12 @@ func ListDeploymentsByNodeID(nodeID string) ([]models.ChallengeDeployment, error
 	return list, nil
 }
 
-func ListExpiredDeployments(now time.Time) ([]models.ChallengeDeployment, error) {
-	db := database.GetDb()
+func ListExpiredDeployments(ctx context.Context, db *gorm.DB, now time.Time) ([]models.ChallengeDeployment, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var list []models.ChallengeDeployment
@@ -113,10 +141,12 @@ func ListExpiredDeployments(now time.Time) ([]models.ChallengeDeployment, error)
 	return list, nil
 }
 
-func ListDeploymentsNeedingCleanup() ([]models.ChallengeDeployment, error) {
-	db := database.GetDb()
+func ListDeploymentsNeedingCleanup(ctx context.Context, db *gorm.DB) ([]models.ChallengeDeployment, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var list []models.ChallengeDeployment
@@ -129,10 +159,12 @@ func ListDeploymentsNeedingCleanup() ([]models.ChallengeDeployment, error) {
 	return list, nil
 }
 
-func CountDeploymentsByStatus(status models.DeploymentStatus) (int64, error) {
-	db := database.GetDb()
+func CountDeploymentsByStatus(ctx context.Context, db *gorm.DB, status models.DeploymentStatus) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -142,10 +174,12 @@ func CountDeploymentsByStatus(status models.DeploymentStatus) (int64, error) {
 	return count, nil
 }
 
-func CountActiveDeploymentsByChallenge(challengeID uuid.UUID) (int64, error) {
-	db := database.GetDb()
+func CountActiveDeploymentsByChallenge(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -158,10 +192,12 @@ func CountActiveDeploymentsByChallenge(challengeID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
-func UpdateDeploymentStatus(id uuid.UUID, status models.DeploymentStatus) error {
-	db := database.GetDb()
+func UpdateDeploymentStatus(ctx context.Context, db *gorm.DB, id uuid.UUID, status models.DeploymentStatus) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	updates := map[string]any{"status": status}
@@ -181,10 +217,12 @@ func UpdateDeploymentStatus(id uuid.UUID, status models.DeploymentStatus) error 
 	return nil
 }
 
-func UpdateDeploymentRuntimeInfo(id uuid.UUID, runtimeID *string, instanceDir *string) error {
-	db := database.GetDb()
+func UpdateDeploymentRuntimeInfo(ctx context.Context, db *gorm.DB, id uuid.UUID, runtimeID *string, instanceDir *string) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.ChallengeDeployment{}).Where("id = ?", id).Updates(map[string]any{
@@ -200,10 +238,12 @@ func UpdateDeploymentRuntimeInfo(id uuid.UUID, runtimeID *string, instanceDir *s
 	return nil
 }
 
-func RenewDeployment(id uuid.UUID, newExpiresAt time.Time) error {
-	db := database.GetDb()
+func RenewDeployment(ctx context.Context, db *gorm.DB, id uuid.UUID, newExpiresAt time.Time) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	now := time.Now()
@@ -221,10 +261,12 @@ func RenewDeployment(id uuid.UUID, newExpiresAt time.Time) error {
 	return nil
 }
 
-func MarkDeploymentStopped(id uuid.UUID, stoppedAt time.Time) error {
-	db := database.GetDb()
+func MarkDeploymentStopped(ctx context.Context, db *gorm.DB, id uuid.UUID, stoppedAt time.Time) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.ChallengeDeployment{}).Where("id = ?", id).Updates(map[string]any{
@@ -240,10 +282,12 @@ func MarkDeploymentStopped(id uuid.UUID, stoppedAt time.Time) error {
 	return nil
 }
 
-func MarkDeploymentCleanedUp(id uuid.UUID, cleanedUpAt time.Time) error {
-	db := database.GetDb()
+func MarkDeploymentCleanedUp(ctx context.Context, db *gorm.DB, id uuid.UUID, cleanedUpAt time.Time) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.ChallengeDeployment{}).Where("id = ?", id).Update("cleaned_up_at", cleanedUpAt)

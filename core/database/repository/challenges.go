@@ -1,18 +1,21 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-func CreateChallenge(challenge *models.Challenge) error {
-	db := database.GetDb()
+func CreateChallenge(ctx context.Context, db *gorm.DB, challenge *models.Challenge) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if challenge.ID == uuid.Nil {
@@ -40,10 +43,12 @@ func CreateChallenge(challenge *models.Challenge) error {
 	return nil
 }
 
-func UpsertChallenge(challenge *models.Challenge) error {
-	db := database.GetDb()
+func UpsertChallenge(ctx context.Context, db *gorm.DB, challenge *models.Challenge) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if challenge.ID == uuid.Nil {
@@ -65,25 +70,28 @@ func UpsertChallenge(challenge *models.Challenge) error {
 		challenge.GeneratorTimeoutS = 30
 	}
 
-	err := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "slug"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"name",
-			"description",
-			"author",
-			"max_points",
-			"min_points",
-			"decay_solves",
-			"max_attempts",
-			"flag_template",
-			"is_hidden",
-			"release_at",
-			"deployment_mode",
-			"generator_path",
-			"generator_timeout_s",
-			"updated_at",
-		}),
-	}).Create(challenge).Error
+	err := db.Clauses(
+		clause.OnConflict{
+			Columns: []clause.Column{{Name: "slug"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"name",
+				"description",
+				"author",
+				"max_points",
+				"min_points",
+				"decay_solves",
+				"max_attempts",
+				"flag_template",
+				"is_hidden",
+				"release_at",
+				"deployment_mode",
+				"generator_path",
+				"generator_timeout_s",
+				"updated_at",
+			}),
+		},
+		clause.Returning{},
+	).Create(challenge).Error
 
 	if err != nil {
 		return MapError(err)
@@ -91,10 +99,12 @@ func UpsertChallenge(challenge *models.Challenge) error {
 	return nil
 }
 
-func GetChallengeBySlug(slug string) (*models.Challenge, error) {
-	db := database.GetDb()
+func GetChallengeBySlug(ctx context.Context, db *gorm.DB, slug string) (*models.Challenge, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var chall models.Challenge
@@ -104,10 +114,12 @@ func GetChallengeBySlug(slug string) (*models.Challenge, error) {
 	return &chall, nil
 }
 
-func GetChallengeByID(id uuid.UUID) (*models.Challenge, error) {
-	db := database.GetDb()
+func GetChallengeByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.Challenge, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var chall models.Challenge
@@ -117,10 +129,12 @@ func GetChallengeByID(id uuid.UUID) (*models.Challenge, error) {
 	return &chall, nil
 }
 
-func ListChallenges(includeHidden bool) ([]models.Challenge, error) {
-	db := database.GetDb()
+func ListChallenges(ctx context.Context, db *gorm.DB, includeHidden bool) ([]models.Challenge, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var challs []models.Challenge
@@ -134,13 +148,16 @@ func ListChallenges(includeHidden bool) ([]models.Challenge, error) {
 	return challs, nil
 }
 
-func ListChallengesByIDs(ids []uuid.UUID) ([]models.Challenge, error) {
-	if len(ids) == 0 {
-		return []models.Challenge{}, nil
-	}
-	db := database.GetDb()
+func ListChallengesByIDs(ctx context.Context, db *gorm.DB, ids []uuid.UUID) ([]models.Challenge, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if len(ids) == 0 {
+		return []models.Challenge{}, nil
 	}
 
 	var challs []models.Challenge
@@ -150,10 +167,12 @@ func ListChallengesByIDs(ids []uuid.UUID) ([]models.Challenge, error) {
 	return challs, nil
 }
 
-func CountChallenges(includeHidden bool) (int64, error) {
-	db := database.GetDb()
+func CountChallenges(ctx context.Context, db *gorm.DB, includeHidden bool) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -167,10 +186,12 @@ func CountChallenges(includeHidden bool) (int64, error) {
 	return count, nil
 }
 
-func DeleteChallenge(id uuid.UUID) error {
-	db := database.GetDb()
+func DeleteChallenge(ctx context.Context, db *gorm.DB, id uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("id = ?", id).Delete(&models.Challenge{})

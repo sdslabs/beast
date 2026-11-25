@@ -1,17 +1,20 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateUser(user *models.User) error {
-	db := database.GetDb()
+func CreateUser(ctx context.Context, db *gorm.DB, user *models.User) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if user.ID == uuid.Nil {
@@ -36,10 +39,12 @@ func CreateUser(user *models.User) error {
 	return nil
 }
 
-func GetUserByID(id uuid.UUID) (*models.User, error) {
-	db := database.GetDb()
+func GetUserByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.User, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var user models.User
@@ -49,10 +54,12 @@ func GetUserByID(id uuid.UUID) (*models.User, error) {
 	return &user, nil
 }
 
-func GetUserByEmail(email string) (*models.User, error) {
-	db := database.GetDb()
+func GetUserByEmail(ctx context.Context, db *gorm.DB, email string) (*models.User, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var user models.User
@@ -62,10 +69,12 @@ func GetUserByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
-func GetUserByUsername(username string) (*models.User, error) {
-	db := database.GetDb()
+func GetUserByUsername(ctx context.Context, db *gorm.DB, username string) (*models.User, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var user models.User
@@ -75,16 +84,19 @@ func GetUserByUsername(username string) (*models.User, error) {
 	return &user, nil
 }
 
-func ListUsers(offset, limit int) ([]models.User, error) {
-	db := database.GetDb()
+func ListUsers(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.User, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
 	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if limit <= 0 {
+		return nil, ErrInvalidLimit
+	}
 
 	var users []models.User
-	if limit == 0 {
-		// TODO : error
-	}
 	q := db.Model(&models.User{}).Order("created_at ASC").Limit(limit).Offset(offset)
 
 	if err := q.Find(&users).Error; err != nil {
@@ -93,13 +105,16 @@ func ListUsers(offset, limit int) ([]models.User, error) {
 	return users, nil
 }
 
-func ListUsersByIDs(ids []uuid.UUID) ([]models.User, error) {
-	if len(ids) == 0 {
-		return []models.User{}, nil
-	}
-	db := database.GetDb()
+func ListUsersByIDs(ctx context.Context, db *gorm.DB, ids []uuid.UUID) ([]models.User, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if len(ids) == 0 {
+		return []models.User{}, nil
 	}
 
 	var users []models.User
@@ -109,10 +124,12 @@ func ListUsersByIDs(ids []uuid.UUID) ([]models.User, error) {
 	return users, nil
 }
 
-func ListUsersByTeamID(teamID uuid.UUID) ([]models.User, error) {
-	db := database.GetDb()
+func ListUsersByTeamID(ctx context.Context, db *gorm.DB, teamID uuid.UUID) ([]models.User, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var users []models.User
@@ -122,10 +139,12 @@ func ListUsersByTeamID(teamID uuid.UUID) ([]models.User, error) {
 	return users, nil
 }
 
-func CountUsersByTeamID(teamID uuid.UUID) (int64, error) {
-	db := database.GetDb()
+func CountUsersByTeamID(ctx context.Context, db *gorm.DB, teamID uuid.UUID) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -135,10 +154,12 @@ func CountUsersByTeamID(teamID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
-func CountUsers() (int64, error) {
-	db := database.GetDb()
+func CountUsers(ctx context.Context, db *gorm.DB) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -148,17 +169,18 @@ func CountUsers() (int64, error) {
 	return count, nil
 }
 
-func UpdateUserProfile(user models.User) error {
-	db := database.GetDb()
+func UpdateUsername(ctx context.Context, db *gorm.DB, id uuid.UUID, username string) error {
 	if db == nil {
 		return ErrNoDatabase
 	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
 
-	user.UpdatedAt = time.Now()
-	res := db.Model(&models.User{}).
-		Where("id = ?", user.ID).
-		Select("username", "email", "public_ssh_key", "updated_at").
-		Updates(user)
+	res := db.Model(&models.User{}).Where("id = ?", id).Updates(map[string]any{
+		"username":   username,
+		"updated_at": time.Now(),
+	})
 	if res.Error != nil {
 		return MapError(res.Error)
 	}
@@ -168,10 +190,33 @@ func UpdateUserProfile(user models.User) error {
 	return nil
 }
 
-func UpdateUserPasswordHash(id uuid.UUID, passwordHash string, saltUUID uuid.UUID) error {
-	db := database.GetDb()
+func UpdateUserPublicSSHKey(ctx context.Context, db *gorm.DB, id uuid.UUID, publicSSHKey *string) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	res := db.Model(&models.User{}).Where("id = ?", id).Updates(map[string]any{
+		"public_ssh_key": publicSSHKey,
+		"updated_at":     time.Now(),
+	})
+	if res.Error != nil {
+		return MapError(res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func UpdateUserPasswordHash(ctx context.Context, db *gorm.DB, id uuid.UUID, passwordHash string, saltUUID uuid.UUID) error {
+	if db == nil {
+		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.User{}).Where("id = ?", id).Updates(map[string]any{
@@ -188,10 +233,12 @@ func UpdateUserPasswordHash(id uuid.UUID, passwordHash string, saltUUID uuid.UUI
 	return nil
 }
 
-func SetUserVerified(id uuid.UUID, verified bool) error {
-	db := database.GetDb()
+func SetUserVerified(ctx context.Context, db *gorm.DB, id uuid.UUID, verified bool) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.User{}).Where("id = ?", id).Updates(map[string]any{
@@ -207,10 +254,12 @@ func SetUserVerified(id uuid.UUID, verified bool) error {
 	return nil
 }
 
-func UpdateUserRole(id uuid.UUID, role string) error {
-	db := database.GetDb()
+func UpdateUserRole(ctx context.Context, db *gorm.DB, id uuid.UUID, role string) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.User{}).Where("id = ?", id).Updates(map[string]any{
@@ -226,10 +275,12 @@ func UpdateUserRole(id uuid.UUID, role string) error {
 	return nil
 }
 
-func SetUserTeamID(userID uuid.UUID, teamID uuid.UUID) error {
-	db := database.GetDb()
+func SetUserTeamID(ctx context.Context, db *gorm.DB, userID uuid.UUID, teamID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]any{
@@ -245,10 +296,12 @@ func SetUserTeamID(userID uuid.UUID, teamID uuid.UUID) error {
 	return nil
 }
 
-func ClearUserTeamID(userID uuid.UUID) error {
-	db := database.GetDb()
+func ClearUserTeamID(ctx context.Context, db *gorm.DB, userID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]any{

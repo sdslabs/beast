@@ -1,16 +1,20 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-func CreateTag(tag *models.Tag) error {
-	db := database.GetDb()
+func CreateTag(ctx context.Context, db *gorm.DB, tag *models.Tag) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if tag.ID == uuid.Nil {
@@ -22,10 +26,12 @@ func CreateTag(tag *models.Tag) error {
 	return nil
 }
 
-func GetTagByID(id uuid.UUID) (*models.Tag, error) {
-	db := database.GetDb()
+func GetTagByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.Tag, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var tag models.Tag
@@ -35,10 +41,12 @@ func GetTagByID(id uuid.UUID) (*models.Tag, error) {
 	return &tag, nil
 }
 
-func GetTagByName(name string) (*models.Tag, error) {
-	db := database.GetDb()
+func GetTagByName(ctx context.Context, db *gorm.DB, name string) (*models.Tag, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var tag models.Tag
@@ -48,10 +56,12 @@ func GetTagByName(name string) (*models.Tag, error) {
 	return &tag, nil
 }
 
-func ListTags() ([]models.Tag, error) {
-	db := database.GetDb()
+func ListTags(ctx context.Context, db *gorm.DB) ([]models.Tag, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var tags []models.Tag
@@ -61,11 +71,12 @@ func ListTags() ([]models.Tag, error) {
 	return tags, nil
 }
 
-// UpdateTag updates a tag's display name.
-func UpdateTag(tag *models.Tag) error {
-	db := database.GetDb()
+func UpdateTag(ctx context.Context, db *gorm.DB, tag *models.Tag) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.Tag{}).Where("id = ?", tag.ID).Update("name", tag.Name)
@@ -78,10 +89,12 @@ func UpdateTag(tag *models.Tag) error {
 	return nil
 }
 
-func DeleteTag(id uuid.UUID) error {
-	db := database.GetDb()
+func DeleteTag(ctx context.Context, db *gorm.DB, id uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("id = ?", id).Delete(&models.Tag{})
@@ -94,10 +107,12 @@ func DeleteTag(id uuid.UUID) error {
 	return nil
 }
 
-func AddChallengeTag(challengeID uuid.UUID, tagID uuid.UUID) error {
-	db := database.GetDb()
+func AddChallengeTag(ctx context.Context, db *gorm.DB, challengeID uuid.UUID, tagID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	ct := models.ChallengeTag{
@@ -110,10 +125,12 @@ func AddChallengeTag(challengeID uuid.UUID, tagID uuid.UUID) error {
 	return nil
 }
 
-func RemoveChallengeTag(challengeID uuid.UUID, tagID uuid.UUID) error {
-	db := database.GetDb()
+func RemoveChallengeTag(ctx context.Context, db *gorm.DB, challengeID uuid.UUID, tagID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("challenge_id = ? AND tag_id = ?", challengeID, tagID).
@@ -127,10 +144,12 @@ func RemoveChallengeTag(challengeID uuid.UUID, tagID uuid.UUID) error {
 	return nil
 }
 
-func ListTagsByChallengeID(challengeID uuid.UUID) ([]models.Tag, error) {
-	db := database.GetDb()
+func ListTagsByChallengeID(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) ([]models.Tag, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var tags []models.Tag
@@ -145,18 +164,20 @@ func ListTagsByChallengeID(challengeID uuid.UUID) ([]models.Tag, error) {
 	return tags, nil
 }
 
-func ListChallengeTagsByChallengeIDs(challengeIDs []uuid.UUID) (map[uuid.UUID][]models.Tag, error) {
+func ListChallengeTagsByChallengeIDs(ctx context.Context, db *gorm.DB, challengeIDs []uuid.UUID) (map[uuid.UUID][]models.Tag, error) {
+	if db == nil {
+		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
 	res := make(map[uuid.UUID][]models.Tag)
 	if len(challengeIDs) == 0 {
 		return res, nil
 	}
 	for _, cid := range challengeIDs {
 		res[cid] = []models.Tag{}
-	}
-
-	db := database.GetDb()
-	if db == nil {
-		return nil, ErrNoDatabase
 	}
 
 	type tagJoinRow struct {
@@ -185,10 +206,12 @@ func ListChallengeTagsByChallengeIDs(challengeIDs []uuid.UUID) (map[uuid.UUID][]
 	return res, nil
 }
 
-func ListChallengesByTagID(tagID uuid.UUID) ([]models.Challenge, error) {
-	db := database.GetDb()
+func ListChallengesByTagID(ctx context.Context, db *gorm.DB, tagID uuid.UUID) ([]models.Challenge, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var challenges []models.Challenge
@@ -203,10 +226,12 @@ func ListChallengesByTagID(tagID uuid.UUID) ([]models.Challenge, error) {
 	return challenges, nil
 }
 
-func ListChallengesByTagName(tagName string) ([]models.Challenge, error) {
-	db := database.GetDb()
+func ListChallengesByTagName(ctx context.Context, db *gorm.DB, tagName string) ([]models.Challenge, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var challenges []models.Challenge

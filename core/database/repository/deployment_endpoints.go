@@ -1,15 +1,19 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateDeploymentEndpoint(endpoint *models.DeploymentEndpoint) error {
-	db := database.GetDb()
+func CreateDeploymentEndpoint(ctx context.Context, db *gorm.DB, endpoint *models.DeploymentEndpoint) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if endpoint.ID == uuid.Nil {
@@ -21,10 +25,12 @@ func CreateDeploymentEndpoint(endpoint *models.DeploymentEndpoint) error {
 	return nil
 }
 
-func ListEndpointsByDeploymentID(deploymentID uuid.UUID) ([]models.DeploymentEndpoint, error) {
-	db := database.GetDb()
+func ListEndpointsByDeploymentID(ctx context.Context, db *gorm.DB, deploymentID uuid.UUID) ([]models.DeploymentEndpoint, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var endpoints []models.DeploymentEndpoint
@@ -34,10 +40,12 @@ func ListEndpointsByDeploymentID(deploymentID uuid.UUID) ([]models.DeploymentEnd
 	return endpoints, nil
 }
 
-func ListActiveEndpointPortsByNode(nodeID string) ([]int, error) {
-	db := database.GetDb()
+func ListActiveEndpointPortsByNode(ctx context.Context, db *gorm.DB, nodeID string) ([]int, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var ports []int
@@ -53,10 +61,12 @@ func ListActiveEndpointPortsByNode(nodeID string) ([]int, error) {
 	return ports, nil
 }
 
-func DeleteEndpointsByDeploymentID(deploymentID uuid.UUID) error {
-	db := database.GetDb()
+func DeleteEndpointsByDeploymentID(ctx context.Context, db *gorm.DB, deploymentID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if err := db.Where("deployment_id = ?", deploymentID).Delete(&models.DeploymentEndpoint{}).Error; err != nil {

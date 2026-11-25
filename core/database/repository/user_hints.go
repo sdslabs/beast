@@ -1,18 +1,21 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func UnlockUserHint(uh *models.UserHint) error {
-	db := database.GetDb()
+func UnlockUserHint(ctx context.Context, db *gorm.DB, uh *models.UserHint) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if uh.ID == uuid.Nil {
@@ -27,10 +30,12 @@ func UnlockUserHint(uh *models.UserHint) error {
 	return nil
 }
 
-func GetUserHintByHintAndTeam(hintID, teamID uuid.UUID) (*models.UserHint, bool, error) {
-	db := database.GetDb()
+func GetUserHintByHintAndTeam(ctx context.Context, db *gorm.DB, hintID, teamID uuid.UUID) (*models.UserHint, bool, error) {
 	if db == nil {
 		return nil, false, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var uh models.UserHint
@@ -45,10 +50,12 @@ func GetUserHintByHintAndTeam(hintID, teamID uuid.UUID) (*models.UserHint, bool,
 	return &uh, true, nil
 }
 
-func ListUserHintsByTeamID(teamID uuid.UUID) ([]models.UserHint, error) {
-	db := database.GetDb()
+func ListUserHintsByTeamID(ctx context.Context, db *gorm.DB, teamID uuid.UUID) ([]models.UserHint, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var list []models.UserHint
@@ -58,10 +65,35 @@ func ListUserHintsByTeamID(teamID uuid.UUID) ([]models.UserHint, error) {
 	return list, nil
 }
 
-func ListUserHintsByChallengeID(challengeID uuid.UUID) ([]models.UserHint, error) {
-	db := database.GetDb()
+func ListUserHints(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.UserHint, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if limit <= 0 {
+		return nil, ErrInvalidLimit
+	}
+
+	var list []models.UserHint
+	if err := db.Model(&models.UserHint{}).
+		Order("unlocked_at ASC, id ASC").
+		Limit(limit).
+		Offset(offset).
+		Find(&list).Error; err != nil {
+		return nil, MapError(err)
+	}
+	return list, nil
+}
+
+func ListUserHintsByChallengeID(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) ([]models.UserHint, error) {
+	if db == nil {
+		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var list []models.UserHint
@@ -77,10 +109,12 @@ func ListUserHintsByChallengeID(challengeID uuid.UUID) ([]models.UserHint, error
 	return list, nil
 }
 
-func ListUnlockedHintsByTeamAndChallenge(challengeID, teamID uuid.UUID) ([]models.UserHint, error) {
-	db := database.GetDb()
+func ListUnlockedHintsByTeamAndChallenge(ctx context.Context, db *gorm.DB, challengeID, teamID uuid.UUID) ([]models.UserHint, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var list []models.UserHint
@@ -96,10 +130,12 @@ func ListUnlockedHintsByTeamAndChallenge(challengeID, teamID uuid.UUID) ([]model
 	return list, nil
 }
 
-func CountUserHintsByTeamID(teamID uuid.UUID) (int64, error) {
-	db := database.GetDb()
+func CountUserHintsByTeamID(ctx context.Context, db *gorm.DB, teamID uuid.UUID) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -109,10 +145,12 @@ func CountUserHintsByTeamID(teamID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
-func CountUserHintsByHintID(hintID uuid.UUID) (int64, error) {
-	db := database.GetDb()
+func CountUserHintsByHintID(ctx context.Context, db *gorm.DB, hintID uuid.UUID) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -122,10 +160,12 @@ func CountUserHintsByHintID(hintID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
-func SumHintCostByTeamID(teamID uuid.UUID) (int64, error) {
-	db := database.GetDb()
+func SumHintCostByTeamID(ctx context.Context, db *gorm.DB, teamID uuid.UUID) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var total int64
@@ -140,12 +180,15 @@ func SumHintCostByTeamID(teamID uuid.UUID) (int64, error) {
 	return total, nil
 }
 
-func ListHintCostTotalsPerTeam() (map[uuid.UUID]int64, error) {
-	res := make(map[uuid.UUID]int64)
-	db := database.GetDb()
+func ListHintCostTotalsPerTeam(ctx context.Context, db *gorm.DB) (map[uuid.UUID]int64, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
 	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	res := make(map[uuid.UUID]int64)
 
 	type teamCostRow struct {
 		TeamID uuid.UUID `gorm:"column:team_id"`

@@ -1,17 +1,20 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateTeam(team *models.Team) error {
-	db := database.GetDb()
+func CreateTeam(ctx context.Context, db *gorm.DB, team *models.Team) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if team.ID == uuid.Nil {
@@ -30,10 +33,12 @@ func CreateTeam(team *models.Team) error {
 	return nil
 }
 
-func GetTeamByID(id uuid.UUID) (*models.Team, error) {
-	db := database.GetDb()
+func GetTeamByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.Team, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var team models.Team
@@ -43,10 +48,12 @@ func GetTeamByID(id uuid.UUID) (*models.Team, error) {
 	return &team, nil
 }
 
-func GetTeamByName(name string) (*models.Team, error) {
-	db := database.GetDb()
+func GetTeamByName(ctx context.Context, db *gorm.DB, name string) (*models.Team, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var team models.Team
@@ -56,10 +63,12 @@ func GetTeamByName(name string) (*models.Team, error) {
 	return &team, nil
 }
 
-func GetTeamByInviteToken(token string) (*models.Team, error) {
-	db := database.GetDb()
+func GetTeamByInviteToken(ctx context.Context, db *gorm.DB, token string) (*models.Team, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var team models.Team
@@ -69,10 +78,12 @@ func GetTeamByInviteToken(token string) (*models.Team, error) {
 	return &team, nil
 }
 
-func GetTeamInviteToken(teamID uuid.UUID) (string, error) {
-	db := database.GetDb()
+func GetTeamInviteToken(ctx context.Context, db *gorm.DB, teamID uuid.UUID) (string, error) {
 	if db == nil {
 		return "", ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var team models.Team
@@ -85,10 +96,12 @@ func GetTeamInviteToken(teamID uuid.UUID) (string, error) {
 	return *team.InviteToken, nil
 }
 
-func ListTeams(offset, limit int) ([]models.Team, error) {
-	db := database.GetDb()
+func ListTeams(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.Team, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if limit <= 0 {
@@ -104,13 +117,16 @@ func ListTeams(offset, limit int) ([]models.Team, error) {
 	return teams, nil
 }
 
-func ListTeamsByIDs(ids []uuid.UUID) ([]models.Team, error) {
-	if len(ids) == 0 {
-		return []models.Team{}, nil
-	}
-	db := database.GetDb()
+func ListTeamsByIDs(ctx context.Context, db *gorm.DB, ids []uuid.UUID) ([]models.Team, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if len(ids) == 0 {
+		return []models.Team{}, nil
 	}
 
 	var teams []models.Team
@@ -120,14 +136,17 @@ func ListTeamsByIDs(ids []uuid.UUID) ([]models.Team, error) {
 	return teams, nil
 }
 
-func ListMemberCountsByTeam(teamIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+func ListMemberCountsByTeam(ctx context.Context, db *gorm.DB, teamIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	if db == nil {
+		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
 	res := make(map[uuid.UUID]int64)
 	if len(teamIDs) == 0 {
 		return res, nil
-	}
-	db := database.GetDb()
-	if db == nil {
-		return nil, ErrNoDatabase
 	}
 
 	type memberCountResult struct {
@@ -153,10 +172,12 @@ func ListMemberCountsByTeam(teamIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
 	return res, nil
 }
 
-func CountTeams() (int64, error) {
-	db := database.GetDb()
+func CountTeams(ctx context.Context, db *gorm.DB) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -166,10 +187,12 @@ func CountTeams() (int64, error) {
 	return count, nil
 }
 
-func UpdateTeamDetails(team models.Team) error {
-	db := database.GetDb()
+func UpdateTeamDetails(ctx context.Context, db *gorm.DB, team models.Team) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	team.UpdatedAt = time.Now()
@@ -186,10 +209,12 @@ func UpdateTeamDetails(team models.Team) error {
 	return nil
 }
 
-func UpdateTeamLeader(teamID uuid.UUID, leaderID uuid.UUID) error {
-	db := database.GetDb()
+func UpdateTeamLeader(ctx context.Context, db *gorm.DB, teamID uuid.UUID, leaderID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.Team{}).Where("id = ?", teamID).Updates(map[string]any{
@@ -205,10 +230,12 @@ func UpdateTeamLeader(teamID uuid.UUID, leaderID uuid.UUID) error {
 	return nil
 }
 
-func UpdateTeamInviteToken(teamID uuid.UUID, token *string) error {
-	db := database.GetDb()
+func UpdateTeamInviteToken(ctx context.Context, db *gorm.DB, teamID uuid.UUID, token *string) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.Team{}).Where("id = ?", teamID).Updates(map[string]any{
@@ -224,10 +251,12 @@ func UpdateTeamInviteToken(teamID uuid.UUID, token *string) error {
 	return nil
 }
 
-func SetTeamBanned(teamID uuid.UUID, banned bool) error {
-	db := database.GetDb()
+func SetTeamBanned(ctx context.Context, db *gorm.DB, teamID uuid.UUID, banned bool) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.Team{}).Where("id = ?", teamID).Updates(map[string]any{

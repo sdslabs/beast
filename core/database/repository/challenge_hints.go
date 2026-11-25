@@ -1,15 +1,19 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateHint(hint *models.ChallengeHint) error {
-	db := database.GetDb()
+func CreateHint(ctx context.Context, db *gorm.DB, hint *models.ChallengeHint) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if hint.ID == uuid.Nil {
@@ -21,10 +25,12 @@ func CreateHint(hint *models.ChallengeHint) error {
 	return nil
 }
 
-func GetHintByID(id uuid.UUID) (*models.ChallengeHint, error) {
-	db := database.GetDb()
+func GetHintByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.ChallengeHint, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var hint models.ChallengeHint
@@ -34,10 +40,12 @@ func GetHintByID(id uuid.UUID) (*models.ChallengeHint, error) {
 	return &hint, nil
 }
 
-func ListHintsByChallengeID(challengeID uuid.UUID) ([]models.ChallengeHint, error) {
-	db := database.GetDb()
+func ListHintsByChallengeID(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) ([]models.ChallengeHint, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var hints []models.ChallengeHint
@@ -49,10 +57,12 @@ func ListHintsByChallengeID(challengeID uuid.UUID) ([]models.ChallengeHint, erro
 	return hints, nil
 }
 
-func ListHintsByChallengeIDOmitContent(challengeID uuid.UUID) ([]models.ChallengeHint, error) {
-	db := database.GetDb()
+func ListHintsByChallengeIDOmitContent(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) ([]models.ChallengeHint, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var hints []models.ChallengeHint
@@ -66,10 +76,12 @@ func ListHintsByChallengeIDOmitContent(challengeID uuid.UUID) ([]models.Challeng
 	return hints, nil
 }
 
-func UpdateHint(updatedHint models.ChallengeHint) error {
-	db := database.GetDb()
+func UpdateHint(ctx context.Context, db *gorm.DB, updatedHint models.ChallengeHint) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.ChallengeHint{}).
@@ -85,10 +97,12 @@ func UpdateHint(updatedHint models.ChallengeHint) error {
 	return nil
 }
 
-func DeleteHint(id uuid.UUID) error {
-	db := database.GetDb()
+func DeleteHint(ctx context.Context, db *gorm.DB, id uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("id = ?", id).Delete(&models.ChallengeHint{})

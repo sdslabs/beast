@@ -1,18 +1,20 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
 	"gorm.io/gorm"
 )
 
-func CreateOTP(otp *models.AuthOTP) error {
-	db := database.GetDb()
+func CreateOTP(ctx context.Context, db *gorm.DB, otp *models.AuthOTP) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if otp.ID == uuid.Nil {
@@ -30,10 +32,12 @@ func CreateOTP(otp *models.AuthOTP) error {
 	return nil
 }
 
-func GetLatestOTP(email string, otpType models.OTPType) (*models.AuthOTP, error) {
-	db := database.GetDb()
+func GetLatestOTP(ctx context.Context, db *gorm.DB, email string, otpType models.OTPType) (*models.AuthOTP, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var otp models.AuthOTP
@@ -45,10 +49,12 @@ func GetLatestOTP(email string, otpType models.OTPType) (*models.AuthOTP, error)
 	return &otp, nil
 }
 
-func CountRecentOTPs(email string, otpType models.OTPType, since time.Time) (int64, error) {
-	db := database.GetDb()
+func CountRecentOTPs(ctx context.Context, db *gorm.DB, email string, otpType models.OTPType, since time.Time) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -60,10 +66,12 @@ func CountRecentOTPs(email string, otpType models.OTPType, since time.Time) (int
 	return count, nil
 }
 
-func IncrementOTPAttempts(id uuid.UUID) error {
-	db := database.GetDb()
+func IncrementOTPAttempts(ctx context.Context, db *gorm.DB, id uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.AuthOTP{}).
@@ -78,14 +86,16 @@ func IncrementOTPAttempts(id uuid.UUID) error {
 	return nil
 }
 
-func MarkOTPConsumed(id uuid.UUID, consumedAt time.Time) error {
-	db := database.GetDb()
+func MarkOTPConsumed(ctx context.Context, db *gorm.DB, id uuid.UUID, consumedAt time.Time) error {
 	if db == nil {
 		return ErrNoDatabase
 	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
 
 	res := db.Model(&models.AuthOTP{}).
-		Where("id = ?", id).
+		Where("id = ? AND consumed_at IS NULL", id).
 		Update("consumed_at", consumedAt)
 	if res.Error != nil {
 		return MapError(res.Error)
@@ -96,10 +106,12 @@ func MarkOTPConsumed(id uuid.UUID, consumedAt time.Time) error {
 	return nil
 }
 
-func DeleteExpiredOTPs(before time.Time) (int64, error) {
-	db := database.GetDb()
+func DeleteExpiredOTPs(ctx context.Context, db *gorm.DB, before time.Time) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("expires_at < ?", before).Delete(&models.AuthOTP{})

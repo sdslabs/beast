@@ -1,17 +1,20 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateChallengeFile(file *models.ChallengeFile) error {
-	db := database.GetDb()
+func CreateChallengeFile(ctx context.Context, db *gorm.DB, file *models.ChallengeFile) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if file.ID == uuid.Nil {
@@ -26,10 +29,12 @@ func CreateChallengeFile(file *models.ChallengeFile) error {
 	return nil
 }
 
-func GetChallengeFileByID(id uuid.UUID) (*models.ChallengeFile, error) {
-	db := database.GetDb()
+func GetChallengeFileByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.ChallengeFile, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var file models.ChallengeFile
@@ -39,11 +44,12 @@ func GetChallengeFileByID(id uuid.UUID) (*models.ChallengeFile, error) {
 	return &file, nil
 }
 
-// ListChallengeFiles retrieves files attached to a challenge (both shared and team-specific), omitting the server storage path.
-func ListChallengeFiles(challengeID uuid.UUID, teamID *uuid.UUID) ([]models.ChallengeFile, error) {
-	db := database.GetDb()
+func ListChallengeFiles(ctx context.Context, db *gorm.DB, challengeID uuid.UUID, teamID *uuid.UUID) ([]models.ChallengeFile, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var files []models.ChallengeFile
@@ -59,10 +65,12 @@ func ListChallengeFiles(challengeID uuid.UUID, teamID *uuid.UUID) ([]models.Chal
 	return files, nil
 }
 
-func DeleteChallengeFile(id uuid.UUID) error {
-	db := database.GetDb()
+func DeleteChallengeFile(ctx context.Context, db *gorm.DB, id uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("id = ?", id).Delete(&models.ChallengeFile{})

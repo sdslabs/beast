@@ -1,16 +1,20 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-func AddChallengePrerequisite(challengeID uuid.UUID, requiresID uuid.UUID) error {
-	db := database.GetDb()
+func AddChallengePrerequisite(ctx context.Context, db *gorm.DB, challengeID uuid.UUID, requiresID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	prereq := models.ChallengePrerequisite{
@@ -23,10 +27,12 @@ func AddChallengePrerequisite(challengeID uuid.UUID, requiresID uuid.UUID) error
 	return nil
 }
 
-func RemoveChallengePrerequisite(challengeID uuid.UUID, requiresID uuid.UUID) error {
-	db := database.GetDb()
+func RemoveChallengePrerequisite(ctx context.Context, db *gorm.DB, challengeID uuid.UUID, requiresID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("challenge_id = ? AND requires_id = ?", challengeID, requiresID).
@@ -40,10 +46,12 @@ func RemoveChallengePrerequisite(challengeID uuid.UUID, requiresID uuid.UUID) er
 	return nil
 }
 
-func ListPrerequisitesByChallengeID(challengeID uuid.UUID) ([]uuid.UUID, error) {
-	db := database.GetDb()
+func ListPrerequisitesByChallengeID(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) ([]uuid.UUID, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var requiredIDs []uuid.UUID
@@ -56,18 +64,20 @@ func ListPrerequisitesByChallengeID(challengeID uuid.UUID) ([]uuid.UUID, error) 
 	return requiredIDs, nil
 }
 
-func ListPrerequisitesByChallengeIDs(challengeIDs []uuid.UUID) (map[uuid.UUID][]uuid.UUID, error) {
+func ListPrerequisitesByChallengeIDs(ctx context.Context, db *gorm.DB, challengeIDs []uuid.UUID) (map[uuid.UUID][]uuid.UUID, error) {
+	if db == nil {
+		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
 	res := make(map[uuid.UUID][]uuid.UUID)
 	if len(challengeIDs) == 0 {
 		return res, nil
 	}
 	for _, cid := range challengeIDs {
 		res[cid] = []uuid.UUID{}
-	}
-
-	db := database.GetDb()
-	if db == nil {
-		return nil, ErrNoDatabase
 	}
 
 	var prereqs []models.ChallengePrerequisite

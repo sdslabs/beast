@@ -1,16 +1,19 @@
 package repository
 
 import (
+	"context"
 	"time"
 
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateAuditEvent(event *models.AuditEvent) error {
-	db := database.GetDb()
+func CreateAuditEvent(ctx context.Context, db *gorm.DB, event *models.AuditEvent) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if event.CreatedAt.IsZero() {
@@ -22,10 +25,12 @@ func CreateAuditEvent(event *models.AuditEvent) error {
 	return nil
 }
 
-func ListAuditEvents(offset, limit int) ([]models.AuditEvent, error) {
-	db := database.GetDb()
+func ListAuditEvents(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.AuditEvent, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if limit <= 0 {

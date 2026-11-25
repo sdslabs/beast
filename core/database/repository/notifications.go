@@ -1,18 +1,21 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-func CreateNotification(notification *models.Notification) error {
-	db := database.GetDb()
+func CreateNotification(ctx context.Context, db *gorm.DB, notification *models.Notification) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if notification.ID == uuid.Nil {
@@ -30,10 +33,12 @@ func CreateNotification(notification *models.Notification) error {
 	return nil
 }
 
-func GetNotificationByID(id uuid.UUID) (*models.Notification, error) {
-	db := database.GetDb()
+func GetNotificationByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.Notification, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var notification models.Notification
@@ -43,11 +48,12 @@ func GetNotificationByID(id uuid.UUID) (*models.Notification, error) {
 	return &notification, nil
 }
 
-// ListNotificationsForUser It assumes that this user is in this team. without content
-func ListNotificationsForUser(userID uuid.UUID, teamID uuid.UUID) ([]models.Notification, error) {
-	db := database.GetDb()
+func ListNotificationsForUser(ctx context.Context, db *gorm.DB, userID uuid.UUID, teamID uuid.UUID) ([]models.Notification, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var notifications []models.Notification
@@ -60,10 +66,12 @@ func ListNotificationsForUser(userID uuid.UUID, teamID uuid.UUID) ([]models.Noti
 	return notifications, nil
 }
 
-func ListAllNotifications(offset, limit int) ([]models.Notification, error) {
-	db := database.GetDb()
+func ListAllNotifications(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.Notification, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if limit <= 0 {
@@ -78,10 +86,12 @@ func ListAllNotifications(offset, limit int) ([]models.Notification, error) {
 	return notifications, nil
 }
 
-func UpdateNotification(notification models.Notification) error {
-	db := database.GetDb()
+func UpdateNotification(ctx context.Context, db *gorm.DB, notification models.Notification) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.Notification{}).
@@ -97,10 +107,12 @@ func UpdateNotification(notification models.Notification) error {
 	return nil
 }
 
-func DeleteNotification(id uuid.UUID) error {
-	db := database.GetDb()
+func DeleteNotification(ctx context.Context, db *gorm.DB, id uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("id = ?", id).Delete(&models.Notification{})
@@ -113,10 +125,12 @@ func DeleteNotification(id uuid.UUID) error {
 	return nil
 }
 
-func MarkNotificationRead(userID uuid.UUID, notificationID uuid.UUID) error {
-	db := database.GetDb()
+func MarkNotificationRead(ctx context.Context, db *gorm.DB, userID uuid.UUID, notificationID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	read := models.UserNotificationRead{
@@ -130,13 +144,16 @@ func MarkNotificationRead(userID uuid.UUID, notificationID uuid.UUID) error {
 	return nil
 }
 
-func MarkAllNotificationsRead(userID uuid.UUID, notificationIDs []uuid.UUID) error {
-	if len(notificationIDs) == 0 {
-		return nil
-	}
-	db := database.GetDb()
+func MarkAllNotificationsRead(ctx context.Context, db *gorm.DB, userID uuid.UUID, notificationIDs []uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if len(notificationIDs) == 0 {
+		return nil
 	}
 
 	now := time.Now()
@@ -154,10 +171,12 @@ func MarkAllNotificationsRead(userID uuid.UUID, notificationIDs []uuid.UUID) err
 	return nil
 }
 
-func ListReadNotificationIDs(userID uuid.UUID) ([]uuid.UUID, error) {
-	db := database.GetDb()
+func ListReadNotificationIDs(ctx context.Context, db *gorm.DB, userID uuid.UUID) ([]uuid.UUID, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var ids []uuid.UUID

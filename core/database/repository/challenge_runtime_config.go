@@ -1,16 +1,20 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-func UpsertRuntimeConfig(cfg *models.ChallengeRuntimeConfig) error {
-	db := database.GetDb()
+func UpsertRuntimeConfig(ctx context.Context, db *gorm.DB, cfg *models.ChallengeRuntimeConfig) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	err := db.Clauses(clause.OnConflict{
@@ -27,10 +31,12 @@ func UpsertRuntimeConfig(cfg *models.ChallengeRuntimeConfig) error {
 	return nil
 }
 
-func GetRuntimeConfig(challengeID uuid.UUID) (*models.ChallengeRuntimeConfig, error) {
-	db := database.GetDb()
+func GetRuntimeConfig(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) (*models.ChallengeRuntimeConfig, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var cfg models.ChallengeRuntimeConfig
@@ -40,10 +46,12 @@ func GetRuntimeConfig(challengeID uuid.UUID) (*models.ChallengeRuntimeConfig, er
 	return &cfg, nil
 }
 
-func DeleteRuntimeConfig(challengeID uuid.UUID) error {
-	db := database.GetDb()
+func DeleteRuntimeConfig(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Where("challenge_id = ?", challengeID).Delete(&models.ChallengeRuntimeConfig{})

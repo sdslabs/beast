@@ -1,21 +1,21 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"time"
 
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
 	"gorm.io/gorm"
 )
 
 // TODO : justify the need of this function
-// EnsureCompetitionConfig guarantees that the singleton competition_config row (id = 1) exists.
-// If it does not exist, it inserts defaultConfig (or a default struct if nil) and returns it.
-func EnsureCompetitionConfig(defaultConfig *models.CompetitionConfig) (*models.CompetitionConfig, error) {
-	db := database.GetDb()
+func EnsureCompetitionConfig(ctx context.Context, db *gorm.DB, defaultConfig *models.CompetitionConfig) (*models.CompetitionConfig, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var cfg models.CompetitionConfig
@@ -53,10 +53,12 @@ func EnsureCompetitionConfig(defaultConfig *models.CompetitionConfig) (*models.C
 	return defaultConfig, nil
 }
 
-func GetCompetitionConfig() (*models.CompetitionConfig, error) {
-	db := database.GetDb()
+func GetCompetitionConfig(ctx context.Context, db *gorm.DB) (*models.CompetitionConfig, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var cfg models.CompetitionConfig
@@ -66,10 +68,12 @@ func GetCompetitionConfig() (*models.CompetitionConfig, error) {
 	return &cfg, nil
 }
 
-func UpdateCompetitionConfig(cfg models.CompetitionConfig) error {
-	db := database.GetDb()
+func UpdateCompetitionConfig(ctx context.Context, db *gorm.DB, cfg models.CompetitionConfig) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	cfg.ID = 1
@@ -85,11 +89,8 @@ func UpdateCompetitionConfig(cfg models.CompetitionConfig) error {
 			"registration_open",
 			"starts_at",
 			"ends_at",
-			"is_frozen",
-			"frozen_at",
 			"max_team_size",
 			"submission_rate_limit_per_min",
-			"logo_path",
 			"updated_at",
 		).
 		Updates(cfg)
@@ -102,10 +103,12 @@ func UpdateCompetitionConfig(cfg models.CompetitionConfig) error {
 	return nil
 }
 
-func SetCompetitionLogoPath(logoPath *string) error {
-	db := database.GetDb()
+func SetCompetitionLogoPath(ctx context.Context, db *gorm.DB, logoPath *string) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.CompetitionConfig{}).Where("id = 1").Updates(map[string]any{
@@ -121,10 +124,12 @@ func SetCompetitionLogoPath(logoPath *string) error {
 	return nil
 }
 
-func SetLeaderboardFreeze(frozen bool, frozenAt *time.Time) error {
-	db := database.GetDb()
+func SetLeaderboardFreeze(ctx context.Context, db *gorm.DB, frozen bool, frozenAt *time.Time) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	now := time.Now()
@@ -145,10 +150,12 @@ func SetLeaderboardFreeze(frozen bool, frozenAt *time.Time) error {
 	return nil
 }
 
-func ClearLeaderboardFreeze() error {
-	db := database.GetDb()
+func ClearLeaderboardFreeze(ctx context.Context, db *gorm.DB) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	res := db.Model(&models.CompetitionConfig{}).Where("id = 1").Updates(map[string]any{

@@ -1,17 +1,20 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/database/models"
+	"gorm.io/gorm"
 )
 
-func CreateSubmission(sub *models.Submission) error {
-	db := database.GetDb()
+func CreateSubmission(ctx context.Context, db *gorm.DB, sub *models.Submission) error {
 	if db == nil {
 		return ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if sub.ID == uuid.Nil {
@@ -26,10 +29,12 @@ func CreateSubmission(sub *models.Submission) error {
 	return nil
 }
 
-func GetSubmissionByID(id uuid.UUID) (*models.Submission, error) {
-	db := database.GetDb()
+func GetSubmissionByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*models.Submission, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var sub models.Submission
@@ -39,10 +44,12 @@ func GetSubmissionByID(id uuid.UUID) (*models.Submission, error) {
 	return &sub, nil
 }
 
-func ListSubmissions(offset, limit int) ([]models.Submission, error) {
-	db := database.GetDb()
+func ListSubmissions(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.Submission, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if limit <= 0 {
@@ -58,10 +65,12 @@ func ListSubmissions(offset, limit int) ([]models.Submission, error) {
 	return list, nil
 }
 
-func ListSubmissionsByTeamID(teamID uuid.UUID, offset, limit int) ([]models.Submission, error) {
-	db := database.GetDb()
+func ListSubmissionsByTeamID(ctx context.Context, db *gorm.DB, teamID uuid.UUID, offset, limit int) ([]models.Submission, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if limit <= 0 {
@@ -76,10 +85,12 @@ func ListSubmissionsByTeamID(teamID uuid.UUID, offset, limit int) ([]models.Subm
 	return list, nil
 }
 
-func ListSubmissionsByChallengeID(challengeID uuid.UUID, offset, limit int) ([]models.Submission, error) {
-	db := database.GetDb()
+func ListSubmissionsByChallengeID(ctx context.Context, db *gorm.DB, challengeID uuid.UUID, offset, limit int) ([]models.Submission, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	if limit <= 0 {
@@ -94,10 +105,12 @@ func ListSubmissionsByChallengeID(challengeID uuid.UUID, offset, limit int) ([]m
 	return list, nil
 }
 
-func CountSubmissions() (int64, error) {
-	db := database.GetDb()
+func CountSubmissions(ctx context.Context, db *gorm.DB) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -107,10 +120,12 @@ func CountSubmissions() (int64, error) {
 	return count, nil
 }
 
-func CountSubmissionsByTeamID(teamID uuid.UUID) (int64, error) {
-	db := database.GetDb()
+func CountSubmissionsByTeamID(ctx context.Context, db *gorm.DB, teamID uuid.UUID) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -120,10 +135,12 @@ func CountSubmissionsByTeamID(teamID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
-func CountSubmissionsByChallenge(challengeID uuid.UUID) (int64, error) {
-	db := database.GetDb()
+func CountSubmissionsByChallenge(ctx context.Context, db *gorm.DB, challengeID uuid.UUID) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
@@ -133,10 +150,12 @@ func CountSubmissionsByChallenge(challengeID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
-func CountSubmissionsByTeamAndChallenge(teamID, challengeID uuid.UUID) (int64, error) {
-	db := database.GetDb()
+func CountSubmissionsByTeamAndChallenge(ctx context.Context, db *gorm.DB, teamID, challengeID uuid.UUID) (int64, error) {
 	if db == nil {
 		return 0, ErrNoDatabase
+	}
+	if ctx != nil {
+		db = db.WithContext(ctx)
 	}
 
 	var count int64
