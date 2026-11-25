@@ -1,78 +1,105 @@
 package database
 
 import (
-	"crypto/rand"
-	"os"
-	"path/filepath"
+	"context"
+	"errors"
 	"sync"
 
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/pkg/auth"
-	log "github.com/sirupsen/logrus"
-	"gorm.io/driver/sqlite"
-	_ "gorm.io/driver/sqlite"
+	"github.com/sdslabs/beastv4/core/config"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 var (
-	DBMux *sync.Mutex
 	Db    *gorm.DB
 	dberr error
+	DBMux sync.RWMutex
 )
 
-var (
-	BEAST_GLOBAL_DIR string = filepath.Join(os.Getenv("HOME"), ".beast")
-	BEAST_DATABASE   string = "beast.db"
-)
+// Connect initializes the PostgreSQL connection using the provided config.PsqlConfig.
+// It sets the active global Db handle, configures the connection pool, and returns the *gorm.DB instance.
+func Connect(cfg config.PsqlConfig) (*gorm.DB, error) {
+	return connectDSN(cfg.DSN(), cfg.DbPoolOptions)
+}
 
-// Set up the initial bootstrapping for interacting with the local
-// SQLite database for beast. The Db variable is the connection variable for the
-// database, which is not closed after creating a connection here and can
-// be used further after this.
-func init() {
-	DBMux = &sync.Mutex{}
-
-	beastDb := filepath.Join(BEAST_GLOBAL_DIR, BEAST_DATABASE)
-	Db, dberr = gorm.Open(sqlite.Open(beastDb), &gorm.Config{})
-
-	if dberr != nil {
-		log.WithFields(log.Fields{
-			"LOCATION": beastDb,
-		}).Fatal(dberr)
+// connectDSN initializes the PostgreSQL connection using gorm.Open with the provided DSN and pool options.
+func connectDSN(dsn string, opts config.DBPoolOptions) (*gorm.DB, error) {
+	if dsn == "" {
+		dberr = errors.New("empty postgres DSN: host, user, and dbname must be configured")
+		return nil, dberr
 	}
 
-	if err := Db.SetupJoinTable(&Challenge{}, "Users", &UserChallenges{}); err != nil {
-		log.Fatalf("Cannot create related models: %s", err)
+	if opts.MaxOpenConns <= 0 {
+		dberr = errors.New("invalid db pool options: max_open_conns must be greater than 0")
+		return nil, dberr
 	}
-	if err := Db.SetupJoinTable(&User{}, "Challenges", &UserChallenges{}); err != nil {
-		log.Fatalf("Cannot create related models: %s", err)
+	if opts.MaxIdleConns <= 0 {
+		dberr = errors.New("invalid db pool options: max_idle_conns must be greater than 0")
+		return nil, dberr
+	}
+	if opts.ConnMaxLifetime <= 0 {
+		dberr = errors.New("invalid db pool options: conn_max_lifetime must be greater than 0")
+		return nil, dberr
 	}
 
-	Db.AutoMigrate(&Challenge{}, &Transaction{}, &Port{}, &User{}, &Tag{}, &Notification{}, &DynamicFlag{})
+	DBMux.Lock()
+	defer DBMux.Unlock()
 
-	users, err := QueryUserEntries("email", core.DEFAULT_USER_EMAIL)
+	var err error
+	Db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Errorf("Error while checking dummy user entry.")
-		os.Exit(1)
+		dberr = err
+		return nil, dberr
 	}
 
-	if users == nil || len(users) == 0 {
-		log.Info("Creating dummy user entry")
+	sqlDB, dbErr := Db.DB()
+	if dbErr != nil {
+		dberr = dbErr
+		return nil, dberr
+	}
+	sqlDB.SetMaxOpenConns(opts.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(opts.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(opts.ConnMaxLifetime)
 
-		salt := make([]byte, 16)
-		rand.Read(salt)
-		randPass := make([]byte, 32)
-		rand.Read(randPass)
+	dberr = nil
+	return Db, nil
+}
 
-		err := CreateUserEntry(&User{
-			Name:      core.DEFAULT_USER_NAME,
-			Email:     core.DEFAULT_USER_EMAIL,
-			AuthModel: auth.CreateModel(core.DEFAULT_USER_NAME, string(randPass), core.USER_ROLES["author"]),
-		})
+// GetDb returns the active *gorm.DB instance.
+func GetDb() *gorm.DB {
+	DBMux.RLock()
+	defer DBMux.RUnlock()
+	return Db
+}
 
+// Ping checks whether the PostgreSQL database connection is alive.
+func Ping(ctx context.Context) error {
+	DBMux.RLock()
+	defer DBMux.RUnlock()
+
+	if Db == nil {
+		return errors.New("database connection is not initialized")
+	}
+	sqlDB, err := Db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.PingContext(ctx)
+}
+
+// Close closes the active PostgreSQL connection and clears global handles.
+func Close() error {
+	DBMux.Lock()
+	defer DBMux.Unlock()
+
+	if Db != nil {
+		sqlDB, err := Db.DB()
+		Db = nil
+		dberr = nil
 		if err != nil {
-			log.Errorf("Error while creating dummy user entry.")
-			os.Exit(1)
+			return err
 		}
+		return sqlDB.Close()
 	}
+	return nil
 }

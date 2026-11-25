@@ -3,561 +3,391 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
-	"github.com/sdslabs/beastv4/core"
-	"github.com/sdslabs/beastv4/pkg/cr"
+	"github.com/sdslabs/beastv4/core/database/models"
 	"github.com/sdslabs/beastv4/utils"
-
-	log "github.com/sirupsen/logrus"
 )
 
-const SERVICE_CONTAINER_DEPS string = "xinetd"
-const SERVICE_CHALL_RUN_CMD string = "xinetd -dontfork"
+type DeploymentMode = models.DeploymentMode
+type RuntimeType = models.RuntimeType
 
-// This is the beast challenge config file structure
-// any other field specified in the file other than this structure
-// will be ignored.
-//
-// Take a look at template beast.toml file in templates package
-// to see how to specify the file and what all fields are available.
-type BeastChallengeConfig struct {
-	Challenge   Challenge `toml:"challenge"`
-	Author      Author    `toml:"author"`
-	Resources   Resources `toml:"resource"`
-	Maintainers []Author  `toml:"maintainer"`
+const (
+	DeploymentModeOffline   = models.DeploymentModeOffline
+	DeploymentModeShared    = models.DeploymentModeShared
+	DeploymentModeInstanced = models.DeploymentModeInstanced
+
+	RuntimeTypeImage   = models.RuntimeTypeImage
+	RuntimeTypeCompose = models.RuntimeTypeCompose
+)
+
+type ChallengeHintConfig struct {
+	Cost      int        `toml:"cost" json:"cost" yaml:"cost"`
+	Content   string     `toml:"content" json:"content" yaml:"content"`
+	ReleaseAt *time.Time `toml:"release_at,omitempty" json:"release_at,omitempty" yaml:"release_at,omitempty"`
 }
 
-func (config *BeastChallengeConfig) PopulateDefaultValues() {
-	config.Author.PopulateAuthor()
-	config.Challenge.Metadata.PopulateChallengeMetadata()
-	config.Challenge.Env.PopulateChallengeEnv()
+type ChallengePortConfig struct {
+	Port     int    `toml:"port" json:"port" yaml:"port"`
+	Protocol string `toml:"protocol" json:"protocol" yaml:"protocol"`
+	Name     string `toml:"name,omitempty" json:"name,omitempty" yaml:"name,omitempty"`
+	Path     string `toml:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
 }
 
-func (Author *Author) PopulateAuthor() {
-	Author.Name = "AuthorName"
-	Author.Email = "AuthorMail"
-	Author.SSHKey = "AuthorPubKey"
+type ChallengeRuntimeConfig struct {
+	Dockerfile  string                `toml:"dockerfile,omitempty" json:"dockerfile,omitempty" yaml:"dockerfile,omitempty"`
+	ComposeFile string                `toml:"compose_file,omitempty" json:"compose_file,omitempty" yaml:"compose_file,omitempty"`
+	Ports       []ChallengePortConfig `toml:"ports,omitempty" json:"ports,omitempty" yaml:"ports,omitempty"`
+	Environment map[string]string     `toml:"environment,omitempty" json:"environment,omitempty" yaml:"environment,omitempty"`
+
+	ResourceLimits
+	models.ChallengeRuntimeConfigBase
+
+	Privileged bool `toml:"privileged,omitempty" json:"privileged,omitempty" yaml:"privileged,omitempty"`
 }
 
-func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
-	Metadata.Name = "ChallengeName"
-	Metadata.Type = "ChallengeType"
-	Metadata.DynamicFlag = false
-	Metadata.Flag = "ChallengeFlag"
-	Metadata.Sidecar = "SidecarHelper"
+type ChallengeInstanceConfig struct {
+	TTLMinutes  int `toml:"ttl_minutes,omitempty" json:"ttl_minutes,omitempty" yaml:"ttl_minutes,omitempty"`
+	MaxRenewals int `toml:"max_renewals,omitempty" json:"max_renewals,omitempty" yaml:"max_renewals,omitempty"`
 }
 
-func (Env *ChallengeEnv) PopulateChallengeEnv() {
-	Env.AptDeps = []string{}
-	Env.Ports = []uint32{}
-	Env.SetupScripts = []string{}
-	Env.StaticContentDir = "StaticContentDir"
-	Env.BaseImage = "ChallengeBase"
-	Env.RunCmd = "RunCmd"
+type ChallengeConfig struct {
+	models.ChallengeBase
+	Flag                string   `toml:"flag,omitempty" json:"flag,omitempty" yaml:"flag,omitempty"`
+	IsFlagCaseSensitive bool     `toml:"is_flag_case_sensitive" json:"is_flag_case_sensitive" yaml:"is_flag_case_sensitive"`
+	Tags                []string `toml:"tags,omitempty" json:"tags,omitempty" yaml:"tags,omitempty"`
+
+	// Prerequisites is a list of challenge slugs that must be solved before unlocking this challenge.
+	Prerequisites []string              `toml:"prerequisites,omitempty" json:"prerequisites,omitempty" yaml:"prerequisites,omitempty"`
+	Hints         []ChallengeHintConfig `toml:"hints,omitempty" json:"hints,omitempty" yaml:"hints,omitempty"`
+
+	StaticFiles    []string `toml:"static_files,omitempty" json:"static_files,omitempty" yaml:"static_files,omitempty"`
+	GeneratedFiles []string `toml:"generated_files,omitempty" json:"generated_files,omitempty" yaml:"generated_files,omitempty"`
+
+	Runtime  *ChallengeRuntimeConfig  `toml:"runtime,omitempty" json:"runtime,omitempty" yaml:"runtime,omitempty"`
+	Ports    []ChallengePortConfig    `toml:"ports,omitempty" json:"ports,omitempty" yaml:"ports,omitempty"`
+	Instance *ChallengeInstanceConfig `toml:"instance,omitempty" json:"instance,omitempty" yaml:"instance,omitempty"`
 }
 
-func (config *BeastChallengeConfig) ValidateRequiredFields(challdir string) error {
-	log.Debugf("Validating BeastChallengeConfig required fields")
-	err := config.Challenge.ValidateRequiredFields(challdir)
-	if err != nil {
-		log.Debugf("Error while validating `Challenge` required fields : %s", err.Error())
-		return err
+func DefaultChallengeConfig() ChallengeConfig {
+	return ChallengeConfig{
+		ChallengeBase: models.ChallengeBase{
+			MaxPoints:         500,
+			MinPoints:         100,
+			DecaySolves:       50,
+			DeploymentMode:    DeploymentModeOffline,
+			GeneratorTimeoutS: 30,
+		},
+		IsFlagCaseSensitive: true,
+	}
+}
+
+// GetGeneratorTimeout returns the effective generator timeout duration.
+func (c *ChallengeConfig) GetGeneratorTimeout() time.Duration {
+	if c.GeneratorTimeoutS > 0 {
+		return time.Duration(c.GeneratorTimeoutS) * time.Second
+	}
+	return 30 * time.Second
+}
+
+// GetAllPorts returns all exposed ports configured either under Root Ports or Runtime.Ports.
+func (c *ChallengeConfig) GetAllPorts() []ChallengePortConfig {
+	var ports []ChallengePortConfig
+	if c.Runtime != nil && len(c.Runtime.Ports) > 0 {
+		ports = append(ports, c.Runtime.Ports...)
+	}
+	if len(c.Ports) > 0 {
+		ports = append(ports, c.Ports...)
+	}
+	return ports
+}
+
+func (c *ChallengeConfig) Validate(challengeDir string) error {
+	var errs []error
+	add := func(format string, args ...any) {
+		errs = append(errs, fmt.Errorf(format, args...))
 	}
 
-	err = config.Author.ValidateRequiredFields()
-	if err != nil {
-		log.Debugf("Error while validating `Author`'s required fields : %s", err.Error())
-		return err
+	challengeDir = strings.TrimSpace(challengeDir)
+	if challengeDir == "" {
+		challengeDir = "."
 	}
 
-	config.Resources.ValidateRequiredFields()
+	if err := utils.ValidateDirExists(challengeDir); err != nil {
+		return fmt.Errorf("invalid challenge directory %q: %w", challengeDir, err)
+	}
 
-	for _, maintainer := range config.Maintainers {
-		err = maintainer.ValidateRequiredFields()
-		if err != nil {
-			log.Debugf("Error while validating `Maintainer`'s required fields : %s", err.Error())
-			return err
+	if strings.TrimSpace(c.Name) == "" {
+		add("challenge name is required")
+	}
+	if strings.TrimSpace(c.Slug) == "" {
+		add("challenge slug is required")
+	} else if !utils.IsValidSlug(c.Slug) {
+		add("challenge slug %q must be lowercase alphanumeric with hyphens (e.g. 'baby-overflow')", c.Slug)
+	}
+
+	if c.MinPoints < 0 {
+		add("min_points must be >= 0")
+	}
+	if c.MaxPoints < c.MinPoints {
+		add("max_points (%d) must be greater than or equal to min_points (%d)", c.MaxPoints, c.MinPoints)
+	}
+	if c.DecaySolves <= 0 {
+		add("decay_solves must be > 0")
+	}
+	if c.MaxAttempts != nil && *c.MaxAttempts <= 0 {
+		add("max_attempts must be > 0 when specified")
+	}
+
+	// Validate Flag & Generator Invariants
+	hasStaticFlag := strings.TrimSpace(c.Flag) != ""
+	hasGenerator := c.GeneratorPath != nil && strings.TrimSpace(*c.GeneratorPath) != ""
+	hasFlagTemplate := c.FlagTemplate != nil && strings.TrimSpace(*c.FlagTemplate) != ""
+
+	if hasStaticFlag && hasGenerator {
+		add("challenge cannot configure both static 'flag' and dynamic 'generator_path'")
+	}
+	if hasGenerator && !hasFlagTemplate {
+		add("generator_path requires flag_template to be configured")
+	}
+	if !hasGenerator && len(c.GeneratedFiles) > 0 {
+		add("generated_files cannot be configured without a generator_path")
+	}
+
+	// Validate Prerequisites
+	seenPrereqs := make(map[string]bool)
+	for i, prereq := range c.Prerequisites {
+		prereqSlug := strings.TrimSpace(prereq)
+		if prereqSlug == "" {
+			add("prerequisite[%d]: slug cannot be empty", i)
+			continue
 		}
+		if !utils.IsValidSlug(prereqSlug) {
+			add("prerequisite[%d]: slug %q must be lowercase alphanumeric with hyphens", i, prereqSlug)
+		}
+		if prereqSlug == strings.TrimSpace(c.Slug) {
+			add("prerequisite[%d]: challenge cannot have itself (%q) as a prerequisite", i, prereqSlug)
+		}
+		if seenPrereqs[prereqSlug] {
+			add("prerequisite[%d]: duplicate prerequisite slug %q", i, prereqSlug)
+		}
+		seenPrereqs[prereqSlug] = true
 	}
 
-	log.Debugf("BeastChallengeConfig required fields validated")
-	return nil
-}
-
-// This structure contains information related to challenge,
-// Challenge Metadata
-//
-// * ChallengeEnv - Challenge environment configuration variables
-// * ChallengeMetadata - Challenge Metadata configuration variables
-type Challenge struct {
-	Metadata ChallengeMetadata `toml:"metadata"`
-	Env      ChallengeEnv      `toml:"env"`
-}
-
-func (config *Challenge) ValidateRequiredFields(challdir string) error {
-	err, staticChall := config.Metadata.ValidateRequiredFields()
-	if err != nil {
-		log.Debugf("Error while validating `ChallengeMetadata`'s required fields : %s", err.Error())
-		return err
-	} else if staticChall {
-		log.Debugf("Challenge provided is a static challenge.")
-		return nil
+	switch c.DeploymentMode {
+	case DeploymentModeOffline, DeploymentModeShared, DeploymentModeInstanced:
+	default:
+		add("invalid deployment_mode %q: must be one of 'offline', 'shared', 'instanced'", c.DeploymentMode)
 	}
 
-	err = config.Env.ValidateRequiredFields(config.Metadata.Type, challdir)
-	if err != nil {
-		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
-		return err
-	}
+	allPorts := c.GetAllPorts()
+	switch c.DeploymentMode {
+	case DeploymentModeOffline:
+		if c.Runtime != nil && (c.Runtime.Dockerfile != "" || (c.Runtime.ImageRef != nil && *c.Runtime.ImageRef != "") || c.Runtime.ComposeFile != "") {
+			add("offline challenge must not configure container runtime (dockerfile, image, or compose_file)")
+		}
+	case DeploymentModeShared, DeploymentModeInstanced:
+		if c.Runtime == nil {
+			add("%s challenge requires runtime configuration", c.DeploymentMode)
+		} else {
+			hasDockerfile := strings.TrimSpace(c.Runtime.Dockerfile) != ""
+			hasImage := c.Runtime.ImageRef != nil && strings.TrimSpace(*c.Runtime.ImageRef) != ""
+			hasCompose := strings.TrimSpace(c.Runtime.ComposeFile) != ""
 
-	return nil
-}
-
-// This contains challenge meta data
-//
-// ```toml
-// # Required Fields
-// flag = "" # Flag for the challenge
-// name = "" # Name of the challenge
-// type = "" # Type of the challenge, one of - Get available types from /api/info/types/available
-// description = "" # Descritption for the challenge.
-//
-// # Optional fields.
-// tags = ["", ""] # Tags that the challenge might belong to, used to do bulk query and handling eg. binary, misc etc.
-// hints = ["", ""]
-// sidecar = "" # Name of the sidecar if any used by the challenge.
-// ```
-type ChallengeMetadata struct {
-	DynamicFlag     bool     `toml:"dynamic_flag"`
-	Flag            string   `toml:"flag"`
-	Name            string   `toml:"name"`
-	Type            string   `toml:"type"`
-	Tags            []string `toml:"tags"`
-	Sidecar         string   `toml:"sidecar"`
-	Description     string   `toml:"description"`
-	Hints           []string `toml:"hints"`
-	Points          uint     `toml:"points"`
-	MaxPoints       uint     `toml:"maxPoints"`
-	MinPoints       uint     `toml:"minPoints"`
-	Assets          []string `toml:"assets"`
-	AdditionalLinks []string `toml:"additionalLinks"`
-}
-
-// In this validation returned boolean value represents if the challenge type is
-// static or not.
-func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
-	if config.Name == "" || (config.Flag == "" && !config.DynamicFlag) {
-		return fmt.Errorf("Name and Flag required for the challenge"), false
-	}
-
-	if !(utils.StringInSlice(config.Sidecar, Cfg.AvailableSidecars) || config.Sidecar == "") {
-		return fmt.Errorf("Sidecar provided is not an available sidecar."), false
-	}
-
-	// Check if the config type is static here and if it is
-	// then return an indication for that, so that caller knows if it need
-	// to check a valid environment or not.
-	challengeTypes := GetAvailableChallengeTypes()
-	for i := range challengeTypes {
-		if challengeTypes[i] == config.Type {
-			if config.Type == core.STATIC_CHALLENGE_TYPE_NAME {
-				// Challenge is a standalone static challenge
-				// No need to validate environment, since we don't need that.
-				return nil, true
+			count := 0
+			if hasDockerfile {
+				count++
+			}
+			if hasImage {
+				count++
+			}
+			if hasCompose {
+				count++
 			}
 
-			return nil, false
-		}
-	}
-
-	return fmt.Errorf("Not a valid challenge type : %s", config.Type), false
-}
-
-// This contains challenge specific properties which includes the following toml fields
-//
-// ```toml
-// # Ports to reserve for the challenge, we bind only one of these to host other are for internal communictaions only.
-// # Should be within a particular permissible range.
-// ports = [0, 0]
-// default_port = 0 # Default port to use for any port specific action by beast. This is the container port.
-//
-// # Ports can also be specified as a mapping between host and the container.
-// # This can be used when we need customized port mapping between container and the host.
-// port_mappings = ["10001:80"]
-//
-// # Dependencies required by challenge, installed using default package manager of base image apt for most cases.
-// apt_deps = ["", ""]
-//
-//
-// # A list of setup scripts to run for building challenge enviroment.
-// # Keep in mind that these are only for building the challenge environment and are executed
-// # in the iamge building step of the deployment pipeline.
-// setup_scripts = ["", ""]
-//
-//
-// # A directory containing any of the static assets for the challenge, exposed by beast static endpoint.
-// static_dir = ""
-//
-//
-// # Command to execute inside the container, if a predefined type is being used try to
-// # use an existing field to let beast automatically calculate what command to run.
-// # If you want to host a binary using xinetd use type service and specify absolute path
-// # of the service using service_path field.
-// run_cmd = ""
-//
-//
-// # Similar to run_cmd but in this case you have the entire container to yourself
-// # and everything you are doing is done using root permissions inside the container
-// # When using this keep in mind you are root inside the container.
-// entrypoint = ""
-//
-//
-// # Relative path to binary which needs to be executed when the specified
-// # Type for the challenge is service.
-// # This can be anything which can be exeucted, a python file, a binary etc.
-// service_path = ""
-//
-//
-// # Relative directory corresponding to root of the challenge where the root
-// # of the web application lies.
-// web_root = ""
-//
-//
-// # Any custom base image you might want to use for your particular challenge.
-// # Exists for flexibility reasons try to use existing base iamges wherever possible.
-// base_image = ""
-//
-//
-// # Docker file name for specific type challenge - `docker`.
-// # Helps to build flexible images for specific user-custom challenges
-// docket_context = ""
-//
-//
-// # Environment variables that can be used in the application code.
-// [[var]]
-//     key = ""
-//     value = ""
-//
-// [[var]]
-//     key = ""
-//     value = ""
-//
-// Type of traffic to expose through the port mapping provided.
-// traffic = "udp" / "tcp"
-// ```
-type ChallengeEnv struct {
-	AptDeps          []string         `toml:"apt_deps"`
-	Ports            []uint32         `toml:"ports"`
-	DefaultPort      uint32           `toml:"default_port"`
-	PortMappings     []string         `toml:"port_mappings"`
-	SetupScripts     []string         `toml:"setup_scripts"`
-	StaticContentDir string           `toml:"static_dir"`
-	RunCmd           string           `toml:"run_cmd"`
-	BaseImage        string           `toml:"base_image"`
-	WebRoot          string           `toml:"web_root"`
-	ServicePath      string           `toml:"service_path"`
-	Entrypoint       string           `toml:"entrypoint"`
-	DockerCtx        string           `toml:"docker_context"`
-	EnvironmentVars  []EnvironmentVar `toml:"var"`
-	Traffic          string           `toml:"traffic"`
-}
-
-func (config *ChallengeEnv) TrafficType() cr.TrafficType {
-	if config.Traffic == "" {
-		return cr.DefaultTraffic
-	}
-	return cr.TrafficType(config.Traffic)
-}
-
-// NewPortMapping returns a new port mapping instance.
-func NewPortMapping(hp, cp uint32) cr.PortMapping {
-	return cr.PortMapping{
-		HostPort:      hp,
-		ContainerPort: cp,
-	}
-}
-
-// Given a port mapping array and a port the function checks whether the port exists in the mapping
-// as a container port.
-func checkIfPortExistInMapping(portMapping []cr.PortMapping, port uint32) bool {
-	for _, portMap := range portMapping {
-		if port == portMap.ContainerPort {
-			return true
-		}
-	}
-
-	return false
-}
-
-// GetPortMappings returns the entire port mapping for the challenge from the challenge
-// environment configuration.
-func (config *ChallengeEnv) GetPortMappings() ([]cr.PortMapping, error) {
-	var mapping []cr.PortMapping
-
-	var containerPorts []uint32
-	for _, portMap := range config.PortMappings {
-		hp, cp, err := utils.ParsePortMapping(portMap)
-		if err != nil {
-			return mapping, err
-		}
-		mapping = append(mapping, NewPortMapping(hp, cp))
-		containerPorts = append(containerPorts, cp)
-	}
-
-	for _, port := range config.Ports {
-		if !utils.UInt32InList(port, containerPorts) {
-			containerPorts = append(containerPorts, port)
-			mapping = append(mapping, NewPortMapping(port, port))
-		}
-	}
-
-	return mapping, nil
-}
-
-// GetAllHostPorts is utility function for the ChallengeEnv configuration which returns
-// the entire list of all the host ports which are being used by the challenge.
-func (config *ChallengeEnv) GetAllHostPorts() ([]uint32, error) {
-	var hostPorts []uint32
-	var containerPorts []uint32
-
-	for _, portMap := range config.PortMappings {
-		hp, cp, err := utils.ParsePortMapping(portMap)
-		if err != nil {
-			return hostPorts, err
-		}
-		hostPorts = append(hostPorts, hp)
-		containerPorts = append(containerPorts, cp)
-	}
-
-	for _, port := range config.Ports {
-		if !utils.UInt32InList(port, containerPorts) {
-			hostPorts = append(hostPorts, port)
-			containerPorts = append(containerPorts, port)
-		}
-	}
-
-	return hostPorts, nil
-}
-
-// GetAllContainerPorts is utility function for the ChallengeEnv configuration which returns
-// the entire list of all the container ports which are being used by the challenge.
-func (config *ChallengeEnv) GetAllContainerPorts() ([]uint32, error) {
-	var containerPorts []uint32
-
-	for _, portMap := range config.PortMappings {
-		_, cp, err := utils.ParsePortMapping(portMap)
-		if err != nil {
-			return containerPorts, err
-		}
-		containerPorts = append(containerPorts, cp)
-	}
-
-	for _, port := range config.Ports {
-		if !utils.UInt32InList(port, containerPorts) {
-			containerPorts = append(containerPorts, port)
-		}
-	}
-
-	return containerPorts, nil
-}
-
-// GetDefaultPort returns the default port used by the challenge from the challenge environment
-// configuration.
-func (config *ChallengeEnv) GetDefaultPort() uint32 {
-	mappings, err := config.GetPortMappings()
-	if err != nil || len(mappings) == 0 {
-		return 0
-	}
-
-	return mappings[0].ContainerPort
-}
-
-// ValidateRequiredFields validates required fields for the Challenge environment configuration.
-// This requires challenge type to be passed so that we can verfiy based on type
-// of the challenge.
-func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir string) error {
-	// Validate port related stuff for the challenge environment configuration.
-	if len(config.Ports) == 0 && len(config.PortMappings) == 0 {
-		return errors.New("Some port is required to be specified by the challenge")
-	}
-
-	if len(config.Ports)+len(config.PortMappings) > int(core.MAX_PORT_PER_CHALL) {
-		return fmt.Errorf("Max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
-	}
-
-	portMappings, err := config.GetPortMappings()
-	if err != nil {
-		return fmt.Errorf("Error while parsing port mapping: %s", err)
-	}
-
-	// By default if no port is specified to be default, the first port
-	// from the list is assumed to be default and the service is deployed accordingly.
-	if config.DefaultPort == 0 {
-		config.DefaultPort = portMappings[0].ContainerPort
-	}
-
-	if !checkIfPortExistInMapping(portMappings, config.DefaultPort) {
-		return fmt.Errorf("`default_port` must be one of the Ports in the `ports` list")
-	}
-
-	for _, portMap := range portMappings {
-		if portMap.HostPort < core.ALLOWED_MIN_PORT_VALUE || portMap.HostPort > core.ALLOWED_MAX_PORT_VALUE {
-			return fmt.Errorf("Port value must be between %s and %s", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE)
-		}
-	}
-
-	if config.StaticContentDir != "" {
-		if filepath.IsAbs(config.StaticContentDir) {
-			return fmt.Errorf("Static content directory path should be relative to challenge directory root")
-		}
-		if err := utils.ValidateDirExists(filepath.Join(challdir, config.StaticContentDir)); err != nil {
-			return err
-		}
-	}
-
-	if config.Entrypoint != "" && config.RunCmd != "" {
-		return fmt.Errorf("run_cmd cannot be non empty when entrypoint is provided")
-	}
-
-	// Run command is only a required value in case of bare challenge types.
-	if config.RunCmd == "" && config.Entrypoint == "" && challType == core.BARE_CHALLENGE_TYPE_NAME {
-		return fmt.Errorf("A valid run_cmd should be provided for the challenge environment")
-	}
-
-	if config.BaseImage == "" {
-		config.BaseImage = core.DEFAULT_BASE_IMAGE
-	}
-
-	if !utils.StringInSlice(config.BaseImage, Cfg.AllowedBaseImages) {
-		return fmt.Errorf("The base image: %s is not supported", config.BaseImage)
-	}
-
-	if challType == core.SERVICE_CHALLENGE_TYPE_NAME {
-		// Challenge type is service.
-		// ServicePath must be relative.
-		if config.ServicePath != "" {
-			if filepath.IsAbs(config.ServicePath) {
-				return fmt.Errorf("For challenge type `services` service_path is a required variable, which should be relative path to executable.")
-			} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.ServicePath)); err != nil {
-				// Skip this, we might create service later too.
-				log.Warnf("Service path file %s does not exist", config.ServicePath)
+			if count != 1 {
+				add("%s challenge runtime must specify exactly one of dockerfile, image, or compose_file", c.DeploymentMode)
+			}
+			if hasDockerfile {
+				// TODO : check if it complies with the rules of Cfg.Runtime
+				dfPath, err := utils.SafeJoin(challengeDir, c.Runtime.Dockerfile)
+				if err != nil {
+					add("runtime dockerfile %q path error: %w", c.Runtime.Dockerfile, err)
+				} else if err := utils.ValidateFileReadable(dfPath); err != nil {
+					add("runtime dockerfile %q is not accessible in challenge directory: %w", c.Runtime.Dockerfile, err)
+				}
+			}
+			if hasCompose {
+				// TODO : check if it complies with the rules of Cfg.Runtime
+				cfPath, err := utils.SafeJoin(challengeDir, c.Runtime.ComposeFile)
+				if err != nil {
+					add("runtime compose_file %q path error: %w", c.Runtime.ComposeFile, err)
+				} else if err := utils.ValidateFileReadable(cfPath); err != nil {
+					add("runtime compose_file %q is not accessible in challenge directory: %w", c.Runtime.ComposeFile, err)
+				}
 			}
 		}
-	} else if strings.HasPrefix(challType, "web") {
-		// Challenge type is web.
-		if config.WebRoot == "" {
-			return errors.New("Web root can not be empty for web challenges")
-		} else if config.WebRoot != "" {
-			if filepath.IsAbs(config.WebRoot) {
-				return fmt.Errorf("Web Root directory path should be relative to challenge directory root")
-			} else if err := utils.ValidateDirExists(filepath.Join(challdir, config.WebRoot)); err != nil {
-				return fmt.Errorf("Web Root directory does not exist")
+
+		if len(allPorts) == 0 {
+			add("%s challenge must expose at least one port", c.DeploymentMode)
+		}
+	}
+
+	validProtocols := map[string]bool{
+		"tcp":   true,
+		"udp":   true,
+		"http":  true,
+		"https": true,
+		"ssh":   true,
+	}
+	seenPorts := make(map[int]bool)
+	for i, p := range allPorts {
+		if p.Port < 1 || p.Port > 65535 {
+			add("port[%d]: port number %d must be between 1 and 65535", i, p.Port)
+		}
+		proto := strings.ToLower(p.Protocol)
+		if !validProtocols[proto] {
+			add("port[%d]: invalid protocol %q (must be tcp, udp, http, https, or ssh)", i, p.Protocol)
+		}
+		if p.Path != "" {
+			if proto != "http" && proto != "https" {
+				add("port[%d]: path is only allowed for http/https protocols", i)
+			} else {
+				if !strings.HasPrefix(p.Path, "/") {
+					add("port[%d]: path %q must start with '/'", i, p.Path)
+				}
+				if strings.Contains(p.Path, "//") {
+					add("port[%d]: path %q must not contain consecutive slashes '//'", i, p.Path)
+				}
+				if strings.ContainsAny(p.Path, " \t\r\n") {
+					add("port[%d]: path %q must not contain whitespace", i, p.Path)
+				}
+				if _, err := url.Parse(p.Path); err != nil {
+					add("port[%d]: invalid URL path %q: %w", i, p.Path, err)
+				}
+			}
+		}
+
+		portKey := fmt.Sprintf("%s:%d", proto, p.Port)
+		if seenPorts[p.Port] {
+			add("port[%d]: duplicate port exposure %q across configured ports", i, portKey)
+		}
+		seenPorts[p.Port] = true
+	}
+
+	for i, h := range c.Hints {
+		if strings.TrimSpace(h.Content) == "" {
+			add("hint[%d]: content cannot be empty", i)
+		}
+		if h.Cost < 0 {
+			add("hint[%d]: cost must be >= 0", i)
+		}
+	}
+
+	for i, sf := range c.StaticFiles {
+		trimmed := strings.TrimSpace(sf)
+		if trimmed == "" {
+			add("static_files[%d]: path cannot be empty", i)
+			continue
+		}
+
+		fullPath, err := utils.SafeJoin(challengeDir, trimmed)
+		if err != nil {
+			add("static file %q path error: %w", trimmed, err)
+		} else if err := utils.ValidateFileReadable(fullPath); err != nil {
+			add("static file %q is not accessible in challenge directory: %w", trimmed, err)
+		}
+	}
+
+	for i, gf := range c.GeneratedFiles {
+		trimmed := strings.TrimSpace(gf)
+		if trimmed == "" {
+			add("generated_files[%d]: path cannot be empty", i)
+			continue
+		}
+	}
+
+	var staticNames []string
+
+	for _, sf := range c.StaticFiles {
+		name := filepath.Base(strings.TrimSpace(sf))
+		staticNames = append(staticNames, name)
+	}
+
+	for _, gf := range c.GeneratedFiles {
+		name := filepath.Base(strings.TrimSpace(gf))
+		staticNames = append(staticNames, name)
+	}
+
+	slices.Sort(staticNames)
+	for i := 1; i < len(staticNames); i++ {
+		if staticNames[i] == staticNames[i-1] {
+			add("same name (%s) multiple file found :", staticNames[i])
+		}
+	}
+
+	if hasGenerator && hasFlagTemplate {
+		genPath, err := utils.SafeJoin(challengeDir, *c.GeneratorPath)
+		if err != nil {
+			add("generator script %q path error: %w", *c.GeneratorPath, err)
+		} else if err := utils.ValidateFileExecutable(genPath); err != nil {
+			add("generator script %q is not executable: %w", *c.GeneratorPath, err)
+		} else {
+			tempDir, err := CreateTempDir("chal-validate-generator-")
+			if err != nil {
+				add("failed to create temporary directory for generator: %w", err)
+			} else {
+				defer utils.DeleteDir(tempDir)
+
+				effectiveFlag, err := utils.GetRandomFlagFromTemplate(*c.FlagTemplate)
+				if err != nil || effectiveFlag == "" {
+					add("failed to parse flag from template: %w", err)
+				} else {
+					timeout := c.GetGeneratorTimeout()
+					if err := utils.RunGeneratorWithTimeout(genPath, effectiveFlag, tempDir, timeout); err != nil {
+						add("generator script execution failed: %w", err)
+					} else {
+						for _, gf := range c.GeneratedFiles {
+							trimmed := strings.TrimSpace(gf)
+							if trimmed == "" {
+								continue
+							}
+							genFilePath, err := utils.SafeJoin(tempDir, trimmed)
+							if err != nil {
+								add("generated file %q path error: %w", trimmed, err)
+							} else if err := utils.ValidateFileReadable(genFilePath); err != nil {
+								add("expected generated file %q was not created by generator: %w", trimmed, err)
+							}
+						}
+					}
+				}
 			}
 		}
 	}
 
-	for _, script := range config.SetupScripts {
-		if filepath.IsAbs(script) {
-			return fmt.Errorf("script path is absolute : %s", script)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, script)); err != nil {
-			return fmt.Errorf("File %s does not exist", script)
+	if c.Instance != nil {
+		if c.Instance.TTLMinutes <= 0 {
+			add("instance.ttl_minutes must be > 0")
+		}
+		if c.Instance.MaxRenewals < 0 {
+			add("instance.max_renewals must be >= 0")
 		}
 	}
 
-	for _, env := range config.EnvironmentVars {
-		if filepath.IsAbs(env.Value) {
-			return fmt.Errorf("Environment Variable contains absolute path : %s", env.Value)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
-			return fmt.Errorf("File %s does not exist", env.Value)
+	if len(errs) > 0 {
+		var b strings.Builder
+		b.WriteString("challenge config validation failed:\n")
+		for _, e := range errs {
+			b.WriteString("  - ")
+			b.WriteString(e.Error())
+			b.WriteString("\n")
 		}
-	}
-
-	if config.Entrypoint != "" {
-		if filepath.IsAbs(config.Entrypoint) {
-			return fmt.Errorf("Entrypoint contains absolute path : %s", config.Entrypoint)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.Entrypoint)); err != nil {
-			return fmt.Errorf("File %s does not exist", config.Entrypoint)
-		}
-	}
-
-	if challType == core.DOCKER_CHALLENGE_TYPE_NAME {
-		if config.DockerCtx == "" {
-			return errors.New("Docker Context file not provided in docker-type challenge")
-		} else if filepath.IsAbs(config.DockerCtx) {
-			return fmt.Errorf("For challenge type `docker-type` docker_context is a required variable, which should be relative path to docker context file.")
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, config.DockerCtx)); err != nil {
-			return fmt.Errorf("File : %s does not exist", config.DockerCtx)
-		}
-	} else {
-		config.DockerCtx = core.DEFAULT_DOCKER_FILE
-	}
-
-	if config.Traffic != "" && !cr.IsValidTrafficType(config.Traffic) {
-		return fmt.Errorf("Not a valid traffic type provided, required (%v), got %s", cr.GetValidTrafficTypes(), config.Traffic)
+		return errors.New(strings.TrimRight(b.String(), "\n"))
 	}
 
 	return nil
-}
-
-// Metadata related to author of the challenge, this structure includes
-//
-// * Name - Name of the author of the challenge
-// * Email - Email of the author
-// * SSHKey - Public SSH key for the challenge author, to give the access
-//		to the challenge container.
-//
-// ```toml
-// # Optional fields
-// name = ""
-//
-// # Required Fields
-// email = ""
-// ssh_key = "" # Public ssh Key of the author.
-// ```
-type Author struct {
-	Name   string `toml:"name"`
-	Email  string `toml:"email"`
-	SSHKey string `toml:"ssh_key"`
-}
-
-func (config *Author) ValidateRequiredFields() error {
-	if config.Email == "" || config.SSHKey == "" {
-		return errors.New("Challenge `email` and `ssh_key` are required")
-	}
-
-	if config.Name == "" {
-		config.Name = core.DEFAULT_AUTHOR_NAME
-	}
-
-	return nil
-}
-
-type EnvironmentVar struct {
-	Key   string `toml:"key"`
-	Value string `toml:"value"`
-}
-
-type Resources struct {
-	CPUShares int64 `toml:"cpu_shares"`
-	Memory    int64 `toml:"memory_limit"`
-	PidsLimit int64 `toml:"pids_limit"`
-}
-
-func (config *Resources) ValidateRequiredFields() {
-	if config.CPUShares <= 0 {
-		log.Debug("CPU shares not provided in configuration, using default.")
-		config.CPUShares = Cfg.CPUShares
-	}
-
-	if config.Memory <= 0 {
-		log.Debug("Memory Limit not provided in configuration, using default.")
-		config.Memory = Cfg.Memory
-	}
-
-	if config.PidsLimit <= 0 {
-		log.Debug("Pids Limit not provided in configuration, using default.")
-		config.PidsLimit = Cfg.PidsLimit
-	}
 }
