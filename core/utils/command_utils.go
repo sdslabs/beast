@@ -9,23 +9,30 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
 )
 
-func CreateAdminOrAuthor(name string, username string, email string, publicKeyPath string, password string, role string) {
+func CreateAdminOrAuthor(name string, username string, email string, publicKeyPath string, password string, role string) error {
 	var sshKey []byte
 	if publicKeyPath != "" {
 		err := utils.ValidateFileExists(publicKeyPath)
 		if err != nil {
-			log.Errorf("Error while checking validity of file(%v): %v : ", publicKeyPath, err)
-			return
+			log.Errorf("Error while checking validity of file(%v): %v", publicKeyPath, err)
+			return err
 		}
 
 		sshKey, err = os.ReadFile(publicKeyPath)
 		if err != nil {
 			log.Errorf("Error while reading file: %v", err)
-			return
+			return err
 		}
 
+		parsedKey, _, _, _, err := ssh.ParseAuthorizedKey(sshKey)
+		if err != nil {
+			log.Errorf("Invalid SSH public key in %v: %v", publicKeyPath, err)
+			return fmt.Errorf("invalid SSH public key: %w", err)
+		}
+		sshKey = ssh.MarshalAuthorizedKey(parsedKey)
 	} else {
 		log.Warn("SSH Key for author is not provided")
 	}
@@ -38,8 +45,10 @@ func CreateAdminOrAuthor(name string, username string, email string, publicKeyPa
 	}
 	err := database.CreateUserEntry(&userEntry)
 	if err != nil {
-		log.Errorf("Error while creating author entry : %v", err)
+		log.Errorf("Error while creating %s entry : %v", role, err)
+		return err
 	}
+	return nil
 }
 
 func DeleteChallengeEntryWithPorts(challname string) error {

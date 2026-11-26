@@ -1,11 +1,16 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/core/utils"
 	wpool "github.com/sdslabs/beastv4/pkg/workerpool"
@@ -18,17 +23,19 @@ var challengeCmd = &cobra.Command{
 	Short: "Performs action to the challs",
 	Long:  "Performs actions like : deploy, undeploy, redeploy, purge to the challs",
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		config.InitConfig()
+		database.Init()
+		cache.Init()
 
 		// Since action is already verfied to exist it does not make sense to check
 		// its existence here therefore we directly parse the action from the command.
 		action := args[0]
 		noCache, _ := cmd.Flags().GetBool("no-cache")
-		if noCache && action == core.MANAGE_ACTION_DEPLOY {
+		if noCache && (action == core.MANAGE_ACTION_DEPLOY || action == core.MANAGE_ACTION_REDEPLOY) {
 			config.NoCache = noCache
 		} else if noCache {
-			log.Errorf("no-cache flag is available only for \"deploy\" action")
+			log.Errorf("no-cache flag is available only for \"deploy\" and \"redeploy\" actions")
 			os.Exit(1)
 		}
 
@@ -69,7 +76,7 @@ var challengeCmd = &cobra.Command{
 
 			}
 
-			return
+			return nil
 		}
 
 		challAction, ok := manager.ChallengeActionHandlers[action]
@@ -85,44 +92,43 @@ var challengeCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			manager.StartDeployPipeline(LocalDirectory, false, false, false)
-			return
+			return manager.StartDeployPipeline(LocalDirectory, false, false, config.NoCache)
 		}
 
-		completionChannel := make(chan bool)
+		completionChannel := make(chan bool, 1)
+		var errorMu sync.Mutex
+		var workerErr error
 
 		manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, completionChannel)
-		manager.Q.StartWorkers(&manager.Worker{})
+		manager.Q.StartWorkers(&manager.Worker{OnError: func(err error) {
+			errorMu.Lock()
+			defer errorMu.Unlock()
+			workerErr = errors.Join(workerErr, err)
+		}})
 
+		var requestErr error
 		if AllChalls {
 			errstrings := manager.HandleAll(action, core.BEAST_LOCAL_SERVER)
-			if len(errstrings) != 0 {
-				log.Errorf("Following errors occurred : %s", strings.Join(errstrings, " || "))
-				os.Exit(1)
-			} else {
-				log.Info("The action will be performed")
+			if len(errstrings) > 0 {
+				requestErr = errors.New(strings.Join(errstrings, " || "))
 			}
 		} else if Tag != "" {
 			errstrings := manager.HandleTagRelatedChallenges(action, Tag, core.BEAST_LOCAL_SERVER)
-			if len(errstrings) != 0 {
-				log.Errorf("Following errors occurred : %s", strings.Join(errstrings, " || "))
-				os.Exit(1)
-			} else {
-				log.Info("The action will be performed")
+			if len(errstrings) > 0 {
+				requestErr = errors.New(strings.Join(errstrings, " || "))
 			}
 		} else {
 			if len(args) == 1 {
-				log.Errorf("Provide chall name")
-				os.Exit(1)
+				return errors.New("provide a challenge name")
 			}
-			err := challAction(args[1])
-			if err != nil {
-				log.Errorf("The action was not performed due to error : %s", err.Error())
-				os.Exit(1)
-			} else {
-				log.Info("The action will be performed")
-			}
+			requestErr = challAction(args[1])
 		}
-		_ = <-completionChannel
+		for manager.Q.Pending() > 0 {
+			<-completionChannel
+		}
+		if err := errors.Join(requestErr, workerErr); err != nil {
+			return fmt.Errorf("challenge %s: %w", action, err)
+		}
+		return nil
 	},
 }

@@ -19,22 +19,26 @@ import (
 var (
 	dynamicScoreWorkerOnce sync.Once
 	dynamicScoreNotify     = make(chan struct{}, 1)
+	dynamicScoreWorkerMu   sync.Mutex
 )
 
 // Verifies and creates an entry in the database for successful submission of flag for a challenge.
 // @Summary Verifies and creates an entry in the database for successful submission of flag for a challenge.
 // @Description Returns success or error response based on the flag submitted. Also, the flag will not be submitted if it was previously submitted
 // @Tags Submit
-// @Accept  json
 // @Produce json
-// @Param chall_id formData string true "Name of challenge"
+// @Param chall_id formData string true "ID of challenge"
 // @Param flag formData string true "Flag for the challenge"
-// @Success 200 {object} api.ChallengeStatusResp
-// @Failure 400 {object} api.HTTPPlainResp
-// @Failure 401 {object} api.HTTPPlainResp
-// @Failure 500 {object} api.HTTPPlainResp
+// @Success 200 {object} api.FlagSubmitResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 401 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/submit/challenge [post]
 func submitFlagHandler(c *gin.Context) {
+	startDynamicScoreWorker()
+
 	challId := c.PostForm("chall_id")
 	flag := c.PostForm("flag")
 	now := time.Now()
@@ -62,7 +66,7 @@ func submitFlagHandler(c *gin.Context) {
 		return
 	}
 
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	username, err := resolveRequestUsername(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 			Error: "Unauthorized user",
@@ -100,7 +104,7 @@ func submitFlagHandler(c *gin.Context) {
 	}
 
 	parsedChallId, err := strconv.Atoi(challId)
-	if err != nil {
+	if err != nil || parsedChallId <= 0 {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: "Invalid challenge id.",
 		})
@@ -250,9 +254,7 @@ func submitFlagHandler(c *gin.Context) {
 		}
 	}
 
-	leaderboardStale = true
-	graphCacheStale = true
-	adminLeaderboardStale = true
+	invalidateLeaderboardCaches()
 
 	c.JSON(http.StatusOK, FlagSubmitResp{
 		Message: "Your flag is correct",
@@ -295,6 +297,13 @@ func notifyDynamicScoreWorker() {
 }
 
 func processDirtyDynamicScores() {
+	dynamicScoreWorkerMu.Lock()
+	defer dynamicScoreWorkerMu.Unlock()
+
+	if database.Db == nil || database.DBMux == nil {
+		return
+	}
+
 	dirtyScores, err := database.QueryDirtyDynamicScores(100)
 	if err != nil {
 		log.Errorf("failed to query dirty dynamic scores: %v", err)
@@ -322,7 +331,7 @@ func recomputeDynamicScore(dirty database.DynamicScoreDirty) error {
 	}
 
 	challenge := challs[0]
-	if !challenge.DynamicFlag {
+	if challenge.MaxPoints == 0 {
 		return nil
 	}
 
@@ -339,45 +348,8 @@ func recomputeDynamicScore(dirty database.DynamicScoreDirty) error {
 
 	if delta != 0 {
 		log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challenge.Points)
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		invalidateLeaderboardCaches()
 	}
 
-	return nil
-}
-
-// updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes
-func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve uint) error {
-	scoreChanged := false
-	for _, submission := range submissions {
-		user, err := database.QueryUserById(submission.UserID)
-		if err != nil {
-			return err
-		}
-		if user.Role == "contestant" {
-			oldScore := user.Score
-			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
-			if newScore <= 0 {
-				newScore = 0
-			}
-			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
-			if err != nil {
-				return err
-			}
-			// Check if this user's score change could affect top 25 leaderboard
-			if !scoreChanged && (len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
-				(len(adminLeaderboardCache) > 0 && (oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
-					newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score))) {
-				scoreChanged = true
-			}
-		}
-	}
-	// Mark cache stale if any user's score change could affect top 25
-	if scoreChanged {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
-	}
 	return nil
 }

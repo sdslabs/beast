@@ -1,172 +1,53 @@
-# Challenge Config
+# Challenge configuration
 
-You can think of beast as a wrapper around the underlying container runtime with a lot of addtional functionalities
-including lifecycle management, health checks etc. On a very high level you can say that **beast is to
-CTF challenges what Docker is to container.**
-
-Now that we know what is beast actually is(just a wrapper around challenge containers) the question is Why Beast?
-The answer to which lies in Why docker when you have runc?
-
-Similar to what docker provides, a high level abstraction to manage the lifecycle, network, state etc among other things
-for containers, beast provides a nice abstraction to create, manage and deploy challenges. This allows a challenge creator to 
-focus on creating the challenge rather than thinking of everything else. It exposes a very little overhead to the 
-side of Challenge Creator apart from creating a challenge and handles everything itself.
-
-Challenge configuration is the heart of challenge deployment using beast. You can think of it as the blueprint for the 
-challenge which requires some metadata holding instructions to beast on how to handle the challenge. Think of it as what Dockerfile is 
-to Docker image.
-
-Internally since everything we do in beast revolves around containers, this configuration is also used to generate a _Dockerfile_ which is
-then used to build the images for the underlying atomic elements to a challenge a container. Think of this challenge coniguration as
-a nice wrapper around the Dockerfile itself which is more understandable from a Security Researcher perspective than all the Jargon 
-in Dockerfile.
-
-## Structure
-
-The configuration corresponding to a challenge is writtern to a file named `beast.toml` in the root of the challenge directory.
-The configuration itself is very minimilistic and is provided in TOML format(mostly because of it's highly readable syntax).
-
-There are three main sections to the configuration the structure of which is as below.
+Each challenge has a `beast.toml` at its root. Its directory name must match `challenge.metadata.name`. This example uses the files in a `public/` directory.
 
 ```toml
-# Section containing the details corresponding the the author of challenge
 [author]
+name = "Challenge Author"
+email = "author@example.test"
+ssh_key = "<author public key>"
 
-# Stores details corresponding to metadata of challenge
 [challenge.metadata]
+name = "example-static"
+type = "static"
+flag = "beast{replace_this}"
+description = "An example static challenge"
+points = 100
 
-# Contains the environment or deployment details of the challenge
 [challenge.env]
+static_dir = "public"
 ```
 
-All the keys accepted by these sections are mentioned below:
+## Metadata
 
-### Author
+The author requires `email` and `ssh_key`. Add `[[maintainer]]` entries with the same fields when needed.
 
-This section contains the metadata about the author, it is used for various purposes among which the most important 
-one is giving the challenge environment access to Author for testing and debugging purposes.
+Challenge metadata includes `name`, `type`, `flag`, `description`, `difficulty`, `points`, and `tags`. Set `dynamicFlag = true` for a dynamic flag challenge. `maxAttemptLimit` limits failed attempts. Omitting it or setting it to zero leaves attempts unlimited. Use `maxPoints` and `minPoints` to configure the scoring range for dynamic scoring.
 
-This section accepts the following fields
+Use `preReqs` for prerequisite challenge names, `assets` for asset references, and `additionalLinks` for related URLs. Add hints through `[[challenge.metadata.hints]]` entries with `text` and `points`.
 
-```toml
-# Optional fields
-name = ""
+Set `instanced = true` for a per-user challenge and `instance_expiration` to override the server's default lifetime in seconds.
 
-# Required Fields
-email = ""
-ssh_key = "" # Public ssh Key of the author.
-```
+## Container deployment
 
-### Challenge Metadata
+| Field | Behavior |
+| --- | --- |
+| `ports` | Container ports for a non-Compose challenge, such as `[8080]`. Beast allocates the host ports from the selected server's `port_range`. The first container port is the primary port for configurations that need one. |
+| `apt_deps`, `setup_scripts` | Packages and relative scripts used when Beast builds a generated image. The generated image runs `post-build.sh`, when present, at container startup. |
+| `run_cmd`, `entrypoint` | Startup command or relative entrypoint for a generated Dockerfile. Configure one of them. |
+| `service_path`, `xinetd_conf` | Relative executable and optional xinetd config for a service challenge. |
+| `web_root` | Relative root of a web application. |
+| `static_dir` | Relative public assets directory. Defaults to `public/` for containerized challenges. Static challenges use their root when this is absent. |
+| `base_image` | Base image for a generated image, subject to the server's allowlist. |
+| `docker_context` | Relative path to a custom Dockerfile. |
+| `docker_compose` | Relative path to a Compose file. Publish host ports using environment variables such as `${APP_PORT}:8080`. Beast supplies the host values. |
+| `traffic` | Port publishing protocol, such as `tcp` or `udp`. |
 
-This section contains metadata information about the challenge and is consumed by beast to be provided to 
-the user.
+Add environment variables through `[[challenge.env.var]]` entries with `key` and `value`. Set container resource overrides in `[resource]` using `cpu_shares`, `memory_limit` in bytes, `pids_limit`, and `cpuslimit`.
 
-Structure of the sections with the acceptable fields are:
+## Instanced Compose SSH
 
-```toml
-# Required Fields
-flag = "" # Flag for the challenge
-name = "" # Name of the challenge
-type = "" # Type of the challenge, one of - Get available types from /api/info/types/available
-description = "" # Descritption for the challenge.
+An instanced Compose challenge requires a service named `ssh` with exactly one published mapping such as `${SSH_PORT}:22`. Connect that service to the external `hydra-net` and to an internal bridge network. Other services use the internal network and keep their ports within the project. The SSH service needs a project-managed named volume at `/challenge` and a checker script at `/challenge/check.sh`.
 
-# Optional fields.
-tags = ["", ""] # Tags that the challenge might belong to, used to do bulk query and handling eg. binary, misc etc.
-hints = ["", ""]
-minPoints = 0 # Minimum points given to the player for correct flag submission. Beast has dynamic scoring, so a range of points is specified
-maxPoints = 0 # Maximum points given to the player for correct flag submission. Beast has dynamic scoring, so a range of points is specified
-assets = ["", ""] # Name of assets to be provided which are included in the ./static folder
-```
-
-### Challenge Environment
-
-This is the core of deployment configuraiton for the challenge which is consumed by beast.
-It contains all the information required by beast to manage the lifecycle of the challenge.
-
-Acceptable fields for this section are:
-
-```toml
-# Ports to reserve for the challenge, we bind only one of these to host other are for internal communictaions only.
-# Should be within a particular permissible range.
-ports = [0, 0]
-default_port = 0 # Default port to use for any port specific action by beast.
-
-# Port mapping is the array of port mapping from host to container.
-# The first port mentioned in the mapping is the host port and the second is the container port.
-# Port Mapping is given preference as compared to ports, so if you have a port and the same port in mapping
-# then the host port corresponding to container port in the port mapping.
-port_mappings = ["10005:80"]
-
-
-# Dependencies required by challenge, installed using default package manager of base image apt for most cases.
-apt_deps = ["", ""] 
-
-
-# A list of setup scripts to run for building challenge enviroment.
-# Keep in mind that these are only for building the challenge environment and are executed
-# in the iamge building step of the deployment pipeline.
-setup_scripts = ["", ""]
-
-
-# A directory containing any of the static assets for the challenge, exposed by beast static endpoint.
-static_dir = ""
-
-
-# Command to execute inside the container, if a predefined type is being used try to
-# use an existing field to let beast automatically calculate what command to run.
-# If you want to host a binary using xinetd use type service and specify absolute path
-# of the service using service_path field.
-run_cmd = ""
-
-
-# Similar to run_cmd but in this case you have the entire container to yourself
-# and everything you are doing is done using root permissions inside the container
-# When using this keep in mind you are root inside the container.
-entrypoint = ""
-
-
-# Relative path to binary which needs to be executed when the specified
-# Type for the challenge is service.
-# This can be anything which can be exeucted, a python file, a binary etc.
-service_path = ""
-
-
-# Relative directory corresponding to root of the challenge where the root
-# of the web application lies.
-web_root = ""
-
-
-# Any custom base image you might want to use for your particular challenge.
-# Exists for flexibility reasons try to use existing base iamges wherever possible.
-base_image = ""
-
-
-# Docker file name for specific type challenge - `docker`.
-# Helps to build flexible images for specific user-custom challenges
-docket_context = ""
-
-
-# Environment variables that can be used in the application code.
-[[var]]
-    key = ""
-    value = ""
-
-[[var]]
-    key = ""
-    value = ""
-
-# Protocol supported by the challenge, currently supported are tcp and udp.
-traffic = "tcp"/"udp"
-```
-
-If you want to checkout some example challenge configuration, checkout `_example` directory in the 
-root of the repository. It has a bunch of challenge templates example to get started with. Pick one from 
-there and start building your own challenge.
-
-## Note
-
-We currently don't do automatic port management for challenge, it is mostly due to historic
-reasons. Beast still handles challenge deployment for [Backdoor](https://backdoor.sdslabs.co/) which has a different database
-as that of beast and to have the port synced among these two database is not easy so for the initial
-milestone of beast we targatted static ports.
+Set `docker_compose` and `instanced = true` in `beast.toml`. Beast reads the SSH port variable from the Compose mapping. Provision Hydra on the Docker host as described in [setup](Setup.md#docker-host-and-static-server). Use the first entry in the instance response's `port` array to reach the SSH service.

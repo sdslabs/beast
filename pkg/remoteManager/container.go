@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api/types"
-	_ "github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/pkg/cr"
@@ -18,7 +20,7 @@ import (
 )
 
 func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, server config.AvailableServer) (string, error) {
-	var containerName, containerEnv, exposedPorts, portMap, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings string
+	var containerName, containerEnv, exposedPorts, portMap, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings, containerLabels, networkArg string
 	if containerConfig.ContainerName != "" {
 		containerName = fmt.Sprintf("--name %s ", containerConfig.ContainerName)
 	}
@@ -28,6 +30,21 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 	for _, portMapping := range containerConfig.PortMapping {
 		portMap += fmt.Sprintf("-p 0.0.0.0:%d:%d/%s ", portMapping.HostPort, portMapping.ContainerPort, containerConfig.TrafficType())
 		exposedPorts += fmt.Sprintf("--expose %d ", portMapping.ContainerPort)
+	}
+	if containerConfig.ContainerNetwork != "" {
+		networkArg = fmt.Sprintf("--network %s ", containerConfig.ContainerNetwork)
+	}
+	labels := map[string]string{
+		"beast.challenge":             containerConfig.ChallengeName,
+		"com.sdslabs.beast.project":   utils.ProjectNameNotInstanced(containerConfig.ChallengeName),
+		"com.docker.compose.project":  utils.ProjectNameNotInstanced(containerConfig.ChallengeName),
+		"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
+	}
+	for k, v := range containerConfig.Labels {
+		labels[k] = v
+	}
+	for k, v := range labels {
+		containerLabels += fmt.Sprintf("--label %s=%s ", k, v)
 	}
 	if containerConfig.CPUShares != 0 {
 		cpuShareLimit = fmt.Sprintf("--cpu-shares %d ", containerConfig.CPUShares)
@@ -47,33 +64,25 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 	for src, dest := range containerConfig.MountsMap {
 		mountBindings += fmt.Sprintf("--mount type=bind,source=%s,target=%s ", src, dest)
 	}
-	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s %s", containerName, containerEnv, exposedPorts, mountBindings, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
-	// fmt.Printf("%s, %s, %s, %s\n", containerName, containerEnv, exposedPorts, portMap)
-	// dockerCommand := fmt.Sprintf("docker run \\
-	// 	--name <container_name> \\
-	// 	--env KEY1=value1 --env KEY2=value2 \\
-	// 	--expose <internal_port> \\
-	// 	--mount type=bind,source=<host_path>,target=<container_path> \\
-	// 	--cpus=<cpu_limit> \\
-	// 	--memory=<memory_limit> \\
-	// 	--pids-limit <pid_limit> \\
-	// 	-p 0.0.0.0:<external_port>:<internal_port> \\
-	// 	<image_id>"
-	// );
+	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s %s %s %s", containerName, networkArg, containerLabels, containerEnv, exposedPorts, mountBindings, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
 	output, err := RunCommandOnServer(server, dockerCommand)
 	if err != nil {
 		return "", fmt.Errorf("failed to create container: %s\nOutput: %s", err, output)
 	}
-	log.Println(output[:12])
-	return strings.TrimSpace(output[:12]), nil
+	trimmed := strings.TrimSpace(output)
+	if len(trimmed) > 12 {
+		trimmed = trimmed[:12]
+	}
+	log.Println(trimmed)
+	return trimmed, nil
 }
 
-// Stops and remove cremote container.
+// Stops and removes remote container.
 // Takes containerID and server config if both is available
 // else just take containerID and find the server config from db
 func StopAndRemoveContainerRemote(containerId string, server config.AvailableServer) error {
 	if server == (config.AvailableServer{}) {
-		chall, err := database.QueryChallengeEntries("id", containerId)
+		chall, err := database.QueryChallengeEntries("container_id", containerId)
 		if err != nil {
 			if err == (gorm.ErrRecordNotFound) {
 				log.Debugf("no container with container id %s present", containerId)
@@ -102,91 +111,114 @@ func StopAndRemoveContainerRemote(containerId string, server config.AvailableSer
 	return nil
 }
 
-// Function searches containers based on the filter map on all remote servers
+func parseRemoteContainerLines(output string) []types.Container {
+	var containers []types.Container
+	for _, raw := range strings.Split(strings.TrimSpace(output), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 3)
+		c := types.Container{ID: strings.TrimSpace(parts[0])}
+		if len(parts) >= 2 && strings.TrimSpace(parts[1]) != "" {
+			c.Names = strings.Split(parts[1], ",")
+		}
+		if len(parts) == 3 && strings.TrimSpace(parts[2]) != "" {
+			labels := make(map[string]string)
+			for _, kv := range strings.Split(parts[2], ",") {
+				if pair := strings.SplitN(kv, "=", 2); len(pair) == 2 {
+					labels[strings.TrimSpace(pair[0])] = strings.TrimSpace(pair[1])
+				}
+			}
+			c.Labels = labels
+		}
+		containers = append(containers, c)
+	}
+	return containers
+}
+
+func searchContainersRemoteWithFlag(filterMap map[string]string, server config.AvailableServer, allFlag string) ([]types.Container, error) {
+	filterArgs := ""
+	for key, val := range filterMap {
+		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
+	}
+	psCmd := fmt.Sprintf("docker ps %s %s --format '{{.ID}}\t{{.Names}}\t{{.Labels}}'", allFlag, filterArgs)
+	if server != (config.AvailableServer{}) {
+		output, err := RunCommandOnServer(server, psCmd)
+		if err != nil {
+			return []types.Container{}, err
+		}
+		return parseRemoteContainerLines(output), nil
+	}
+
+	var containers []types.Container
+	for serverDeployed, s := range config.Cfg.AvailableServers {
+		if s.Active && !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
+			output, err := RunCommandOnServer(s, psCmd)
+			if err != nil {
+				return []types.Container{}, err
+			}
+			containers = append(containers, parseRemoteContainerLines(output)...)
+		}
+	}
+	return containers, nil
+}
+
+// SearchContainerByFilterRemote searches all containers matching filterMap on the specified remote server
+// (or all active remote servers if server is zero-value).
 func SearchContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
-	filterArgs := ""
-	containers := []types.Container{}
-	var output string
-	var err error
-	for key, val := range filterMap {
-		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
-	}
-	for serverDeployed, server := range config.Cfg.AvailableServers {
-		if server.Active {
-			if !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
-				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
-				if err != nil {
-					return []types.Container{}, err
-				}
-				for _, line := range bytes.Split([]byte(output), []byte("\n")) {
-					if len(line) > 0 {
-						containers = append(containers, types.Container{ID: string(line)})
-					}
-				}
-			}
-		}
-	}
-
-	return containers, nil
+	return searchContainersRemoteWithFlag(filterMap, server, "-a")
 }
 
-// Function searches for running containers based on the filter map on all remote server
+// SearchRunningContainerByFilterRemote searches running containers matching filterMap on the specified remote server
+// (or all active remote servers if server is zero-value).
 func SearchRunningContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
-	filterArgs := ""
-	containers := []types.Container{}
-	var output string
-	var err error
-	for key, val := range filterMap {
-		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
-	}
-	for serverDeployed, server := range config.Cfg.AvailableServers {
-		if server.Active {
-			if !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
-				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
-				if err != nil {
-					return []types.Container{}, err
-				}
-				for _, line := range bytes.Split([]byte(output), []byte("\n")) {
-					if len(line) > 0 {
-						containers = append(containers, types.Container{ID: string(line)})
-					}
-				}
-			}
-		}
-	}
-
-	return containers, nil
+	return searchContainersRemoteWithFlag(filterMap, server, "")
 }
 
-// Get Containers stdout, stderr logs
+// VerifyComposeProjectRunningRemote verifies all services in a remote compose project are running.
+func VerifyComposeProjectRunningRemote(projectName string, server config.AvailableServer) error {
+	return validateAllComposeServicesRunningRemote(projectName, projectName, server)
+}
+
+// GetContainerStdLogsRemote returns the separate stdout and stderr streams.
 func GetContainerStdLogsRemote(containerID string, server config.AvailableServer) (*cr.Log, error) {
-	stdoutCmd := fmt.Sprintf("docker logs --details --stdout %s", containerID)
-	stderrCmd := fmt.Sprintf("docker logs --details --stderr %s", containerID)
-
-	stdout, err := RunCommandOnServer(server, stdoutCmd)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching stdout logs: %w", err)
+	var stdout, stderr bytes.Buffer
+	if err := writeContainerLogsRemote(containerID, server, false, &stdout, &stderr); err != nil {
+		return nil, err
 	}
-
-	stderr, err := RunCommandOnServer(server, stderrCmd)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching stderr logs: %w", err)
-	}
-
-	return &cr.Log{Stdout: stdout, Stderr: stderr}, nil
+	return &cr.Log{Stdout: stdout.String(), Stderr: stderr.String()}, nil
 }
 
-// Get live logs of container
 func ShowLiveContainerLogsRemote(containerID string, server config.AvailableServer) error {
-	command := fmt.Sprintf("docker logs --details --follow %s", containerID)
+	return writeContainerLogsRemote(containerID, server, true, os.Stdout, os.Stderr)
+}
 
-	output, err := RunCommandOnServer(server, command)
-	if err != nil {
-		return fmt.Errorf("error streaming live logs: %w", err)
+func writeContainerLogsRemote(containerID string, server config.AvailableServer, follow bool, stdout, stderr io.Writer) error {
+	if !server.Active {
+		return fmt.Errorf("server is inactive in config.toml")
 	}
+	if !utils.IsShortID(containerID) && utils.ValidateID(containerID) != nil {
+		return fmt.Errorf("invalid container ID")
+	}
+	client, err := CreateSSHClient(server)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	session, err := client.NewSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+	session.Stdout = stdout
+	session.Stderr = stderr
 
-	fmt.Println(output)
-	return nil
+	command := "docker logs --details"
+	if follow {
+		command += " --follow"
+	}
+	return session.Run(command + " " + containerID)
 }
 
 // Commit container on remote server
@@ -219,8 +251,7 @@ func DeployContainerFromComposeRemote(challengeName string, projectName string, 
 
 	primaryContainerId, err := getPrimaryComposeContainerIdRemote(projectName, server)
 	if err != nil {
-		log.Warnf("Could not get primary container ID for challenge %s on remote: %v", challengeName, err)
-		return "", nil // Return empty string but success
+		return "", fmt.Errorf("get primary container for remote challenge %s: %w", challengeName, err)
 	}
 
 	log.Debugf("Verified challenge %s services are running on remote. Primary container: %s", challengeName, primaryContainerId)
@@ -285,20 +316,22 @@ func validateAllComposeServicesRunningRemote(projectName, challengeName string, 
 	return nil
 }
 
-// gets the first container ID from a compose project on remote
 func getPrimaryComposeContainerIdRemote(projectName string, server config.AvailableServer) (string, error) {
-	psCommand := fmt.Sprintf("docker compose -p %s ps -q | head -1", projectName)
+	psCommand := fmt.Sprintf("docker compose -p %s ps -q", projectName)
+	if _, instanced := utils.ExtractInstanceIDFromComposeProjectName(projectName); instanced {
+		psCommand += " " + core.SSH_CONTAINER_COMPOSE
+	}
 	output, err := RunCommandOnServer(server, psCommand)
 	if err != nil {
-		return "", fmt.Errorf("failed to get container IDs on remote: %v", err)
+		return "", fmt.Errorf("list containers for remote Compose project %s: %w", projectName, err)
 	}
 
-	containerId := strings.TrimSpace(output)
-	if containerId == "" {
-		return "", fmt.Errorf("no containers found for project %s on remote", projectName)
+	containerIds := strings.Fields(strings.TrimSpace(output))
+	if len(containerIds) == 0 {
+		return "", fmt.Errorf("no primary container found in remote Compose project %s", projectName)
 	}
 
-	// Return first 12 characters
+	containerId := containerIds[0]
 	if len(containerId) >= 12 {
 		return containerId[:12], nil
 	}

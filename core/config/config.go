@@ -1,13 +1,13 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,7 +34,7 @@ import (
 // scripts_dir = "/home/fristonio/.beast/scripts"
 //
 // # Base OS image that beast allows the challenges to use.
-// allowed_base_images = ["ubuntu:18.04", "ubuntu:16.04", "debian:jessie"]
+// allowed_base_images = ["ubuntu:24.04", "ubuntu:22.04", "ubuntu:20.04", "ubuntu:18.04", "debian:bookworm"]
 //
 // # Beast static URL refers to the host used by beast for serving static content
 // # of the challenges, whenever required. It follows the URL pattern like
@@ -147,9 +147,11 @@ func (config *InstanceConfig) Validate() {
 	if config.DefaultExpiration <= 0 {
 		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
 	}
-	if config.MaxExtension <= config.DefaultExpiration {
-		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
+	if config.MaxExtension <= 0 {
 		config.MaxExtension = core.DEFAULT_MAXIMUM_EXTEND_TIME
+	}
+	if config.MaxExtension < config.DefaultExpiration {
+		config.MaxExtension = config.DefaultExpiration
 	}
 	if config.MaxInstancesPerUser <= 0 {
 		config.MaxInstancesPerUser = core.DEFAULT_MAXIMUM_INSTANCES_PER_USER
@@ -313,7 +315,7 @@ func (config *BeastConfig) ValidateConfig() error {
 		config.CPUsLimit = core.DEFAULT_CPU_LIMIT
 	}
 
-	if config.MailConfig.From == "" || config.MailConfig.Password == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {
+	if config.MailConfig.From == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {
 		log.Warn("Mail configuration not provided, email notifications will not work")
 	}
 
@@ -377,20 +379,28 @@ type GitRemote struct {
 	Active     bool   `toml:"active"`
 }
 
+var gitURLPattern = regexp.MustCompile(`^(https?|ssh|git|file)://[^\s]+$|^[^@\s]+@[^:\s]+:[^\s]+$|^/[^\s]+$`)
+
+func isSSHGitRemote(rawURL string) bool {
+	if strings.HasPrefix(rawURL, "ssh://") {
+		return true
+	}
+	return !strings.Contains(rawURL, "://") && !strings.HasPrefix(rawURL, "/") && strings.Contains(rawURL, "@") && strings.Contains(rawURL, ":")
+}
+
 func (config *GitRemote) ValidateGitConfig() error {
-	if config.Url == "" || config.RemoteName == "" || config.Secret == "" {
-		log.Error("One of url, RemoteName or ssh_key is missing in the config")
+	if config.Url == "" || config.RemoteName == "" {
+		log.Error("One of url or RemoteName is missing in the config")
 		return errors.New("git remote config not valid, config parameters missing")
 	}
 
-	gitUrlRegexp, err := regexp.Compile(config.Url)
-	if err != nil {
-		eMsg := fmt.Errorf("error while compiling git url regex : %s", err)
-		return eMsg
+	if !gitURLPattern.MatchString(config.Url) {
+		return errors.New("the provided git url is not valid")
 	}
 
-	if !gitUrlRegexp.MatchString(config.Url) {
-		return errors.New("the provided git url is not valid")
+	if isSSHGitRemote(config.Url) && config.Secret == "" {
+		log.Error("ssh_key is missing in git remote config")
+		return errors.New("git remote config not valid, ssh_key missing for SSH remote")
 	}
 
 	if config.Branch == "" {
@@ -398,10 +408,12 @@ func (config *GitRemote) ValidateGitConfig() error {
 		config.Branch = core.GIT_REMOTE_DEFAULT_BRANCH
 	}
 
-	err = utils.ValidateFileExists(config.Secret)
-	log.Debugf("Using git ssh secret : %s", config.Secret)
-	if err != nil {
-		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.Secret, err)
+	if config.Secret != "" {
+		err := utils.ValidateFileExists(config.Secret)
+		log.Debugf("Using git ssh secret : %s", config.Secret)
+		if err != nil {
+			return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.Secret, err)
+		}
 	}
 
 	return nil
@@ -417,14 +429,67 @@ type PsqlConfig struct {
 }
 
 type RedisConfig struct {
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	Host     string `toml:"host"`
-	Port     string `toml:"port"`
-	Db       uint32 `toml:"db"`
+	User            string `toml:"user"`
+	Password        string `toml:"password"`
+	DefaultPassword string `toml:"default_password"`
+	Host            string `toml:"host"`
+	Port            string `toml:"port"`
+	DB              int    `toml:"db"`
+}
+
+// LoadEnvFile attempts to load .env from the working directory or global beast directory
+func LoadEnvFile() {
+	utils.LoadEnvFile()
+}
+
+func (config *PsqlConfig) ApplyEnvOverrides() {
+	LoadEnvFile()
+	if val := os.Getenv("POSTGRES_USER"); val != "" {
+		config.User = val
+	}
+	if val := os.Getenv("POSTGRES_PASSWORD"); val != "" {
+		config.Password = val
+	}
+	if val := os.Getenv("POSTGRES_DB"); val != "" {
+		config.Dbname = val
+	}
+	if val := os.Getenv("POSTGRES_HOST"); val != "" {
+		config.Host = val
+	}
+	if val := os.Getenv("POSTGRES_PORT"); val != "" {
+		config.Port = val
+	}
+	if val := os.Getenv("POSTGRES_SSLMODE"); val != "" {
+		config.SslMode = val
+	}
+}
+
+func (config *RedisConfig) ApplyEnvOverrides() {
+	LoadEnvFile()
+	if val := os.Getenv("REDIS_USER"); val != "" {
+		config.User = val
+	}
+	if val := os.Getenv("REDIS_PASSWORD"); val != "" {
+		config.Password = val
+	}
+	if val := os.Getenv("REDIS_DEFAULT_PASSWORD"); val != "" {
+		config.DefaultPassword = val
+	}
+	if val := os.Getenv("REDIS_HOST"); val != "" {
+		config.Host = val
+	}
+	if val := os.Getenv("REDIS_PORT"); val != "" {
+		config.Port = val
+	}
+	if val := os.Getenv("REDIS_DB"); val != "" {
+		if dbVal, err := strconv.Atoi(val); err == nil {
+			config.DB = dbVal
+		}
+	}
 }
 
 func (config *PsqlConfig) ValidatePsqlConfig() error {
+	config.ApplyEnvOverrides()
 	if config.User == "" || config.Password == "" || config.Dbname == "" || config.Host == "" || config.Port == "" {
 		log.Error("One of username, password, dbname, hostname, port is missing in the config")
 		return errors.New("psql config not valid, config parameters missing")
@@ -437,6 +502,7 @@ func (config *PsqlConfig) ValidatePsqlConfig() error {
 }
 
 func (config *RedisConfig) ValidateRedisConfig() error {
+	config.ApplyEnvOverrides()
 	if config.Host == "" || config.Port == "" {
 		log.Error("One of hostname or port is missing in the config")
 		return errors.New("redis config not valid, config parameters missing")
@@ -468,6 +534,22 @@ type MailConfig struct {
 	SMTPPort string `toml:"smtpPort"`
 }
 
+func (config *MailConfig) ApplyEnvOverrides() {
+	LoadEnvFile()
+	if val := os.Getenv("SMTP_FROM"); val != "" {
+		config.From = val
+	}
+	if val := os.Getenv("SMTP_PASSWORD"); val != "" {
+		config.Password = val
+	}
+	if val := os.Getenv("SMTP_HOST"); val != "" {
+		config.SMTPHost = val
+	}
+	if val := os.Getenv("SMTP_PORT"); val != "" {
+		config.SMTPPort = val
+	}
+}
+
 func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
 	var config BeastConfig
@@ -496,10 +578,17 @@ func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {
 	if err := configFile.Close(); err != nil {
 		return err
 	}
+	if Cfg != nil {
+		Cfg.CompetitionInfo = *competitionInfo
+	}
 	return err
 }
 
 func GetCompetitionInfo() (CompetitionInfo, error) {
+	if Cfg != nil && Cfg.CompetitionInfo.StartingTime != "" && Cfg.CompetitionInfo.EndingTime != "" {
+		return Cfg.CompetitionInfo, nil
+	}
+
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
 	var config BeastConfig
 	var competitionInfo CompetitionInfo
@@ -534,8 +623,9 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 		return config, err
 	}
 
-	prettyJSON, _ := json.MarshalIndent(config, "", "  ")
-	log.Debugf("Parsed beast global config file is : %s", string(prettyJSON))
+	config.PsqlConf.ApplyEnvOverrides()
+	config.RedisConf.ApplyEnvOverrides()
+	config.MailConfig.ApplyEnvOverrides()
 
 	err = config.ValidateConfig()
 	if err != nil {
@@ -566,7 +656,7 @@ func InitConfig() {
 		os.Exit(1)
 	}
 
-	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
+	log.Debugf("Loaded Beast configuration from %s", configPath)
 	Cfg = &cfg
 }
 
@@ -581,6 +671,6 @@ func ReloadBeastConfig() error {
 	}
 
 	Cfg = &cfg
-	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
+	log.Debugf("Loaded Beast configuration from %s", configPath)
 	return nil
 }

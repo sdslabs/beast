@@ -5,7 +5,6 @@
 # Exit if any steps fail
 set -e
 
-CWD=${PWD}
 
 GO_FLAGS=${GO_FLAGS:-"-tags netgo"}
 GO_CMD=${GO_CMD:-"build"}
@@ -15,8 +14,6 @@ VERBOSE=${VERBOSE:-}
 
 repo_path="github.com/sdslabs/beastv4"
 main_package="github.com/sdslabs/beastv4/cmd/beast"
-mysql_agent="github.com/sdslabs/beastv4/cmd/agents/mysql"
-mongo_agent="github.com/sdslabs/beastv4/cmd/agents/mongo"
 
 # Get branch revision and  version
 version="0.1"
@@ -49,7 +46,12 @@ if [ -n "$VERBOSE" ]; then
   echo "Building with -ldflags $ldflags"
 fi
 
-GOBIN=$PWD go "${GO_CMD}" -o "${GOPATH}/bin/beast" ${GO_FLAGS} -ldflags "${ldflags}" "${main_package}"
+bin_dir=$(go env GOBIN)
+if [ -z "$bin_dir" ]; then
+  go_path=$(go env GOPATH)
+  bin_dir="${go_path%%:*}/bin"
+fi
+go "${GO_CMD}" -o "${bin_dir}/beast" ${GO_FLAGS} -ldflags "${ldflags}" "${main_package}"
 
 echo "[*] Build Complete."
 exit 0

@@ -24,13 +24,14 @@ import (
 // @Summary Handles challenge management actions for multiple challenges.
 // @Description Handles challenge management routes for multiple the challenges with actions which includes - DEPLOY, UNDEPLOY.
 // @Tags manage
-// @Accept  json
 // @Produce json
-// @Param action query string true "Action for the challenge"
-// @Param tag query string false "Tag for a group of challenges"
+// @Param action path string true "Action for the challenge"
+// @Param tag formData string false "Tag for a group of challenges"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/multiple/:action [post]
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
+// @Router /api/manage/multiple/{action} [post]
 func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// If no tags are provided we by default we apply the action to all
 	// the challenges.
@@ -40,8 +41,8 @@ func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// We are trying to get the username for the request from JWT claims here
 	// Since upto this point the request is already authorized, we use a default
 	// username if any error occurs while getting the username.
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
-	if err == nil {
+	username, err := resolveRequestUsername(c)
+	if err != nil {
 		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
 		username = core.DEFAULT_USER_NAME
 	}
@@ -84,17 +85,25 @@ func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 // @Summary Handles challenge management actions.
 // @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE.
 // @Tags manage
-// @Accept  json
 // @Produce json
-// @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
-// @Param action query string true "Action for the challenge"
+// @Param name formData string true "Name of the challenge to be managed, here name is the unique identifier for challenge"
+// @Param action formData string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
+// @Security ApiKeyAuth
+// @Accept x-www-form-urlencoded,mpfd
 // @Router /api/manage/challenge/ [post]
 func manageChallengeHandler(c *gin.Context) {
-	identifier := c.PostForm("name")
+	identifier := strings.TrimSpace(c.PostForm("name"))
 	action := c.PostForm("action")
 	authorization := c.GetHeader("Authorization")
+
+	if identifier == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Challenge name cannot be empty",
+		})
+		return
+	}
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 	if msgs := manager.LogTransaction(identifier, action, authorization); msgs != nil {
@@ -121,9 +130,7 @@ func manageChallengeHandler(c *gin.Context) {
 	}
 
 	if action == core.MANAGE_ACTION_PURGE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		invalidateLeaderboardCaches()
 	}
 
 	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
@@ -136,12 +143,13 @@ func manageChallengeHandler(c *gin.Context) {
 // @Summary Handles multiple challenge management actions.
 // @Description Handles challenge management routes with actions which includes - DEPLOY, UNDEPLOY, PURGE of multiple challenges.
 // @NameBased manage
-// @Accept  json
 // @Produce json
-// @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenges seperated by a comma"
-// @Param action query string true "Action for the challenge"
+// @Param names formData string true "Names of the challenges to be managed, separated by a comma"
+// @Param action formData string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/manage/challenge/multiple/ [post]
 func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	identifier := c.PostForm("names")
@@ -156,7 +164,21 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 		return
 	}
 
-	names := strings.Split(identifier, ",")
+	rawNames := strings.Split(identifier, ",")
+	names := make([]string, 0, len(rawNames))
+	for _, n := range rawNames {
+		n = strings.TrimSpace(n)
+		if n != "" {
+			names = append(names, n)
+		}
+	}
+	if len(names) == 0 {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Challenge names cannot be empty",
+		})
+		return
+	}
+
 	messages := make(map[string]string)
 	var respStr string
 	doesExist := make(map[string]bool)
@@ -184,9 +206,7 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	}
 
 	if action == core.MANAGE_ACTION_PURGE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		invalidateLeaderboardCaches()
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainMapResp{
@@ -198,13 +218,14 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 // @Summary Deploy a local challenge using the path provided in the post parameter
 // @Description Handles deployment of a challenge using the absolute directory path
 // @Tags manage
-// @Accept  json
 // @Produce json
-// @Param challenge_dir query string true "Challenge Directory"
+// @Param challenge_dir formData string true "Challenge Directory"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
-// @Router /api/manage/deploy/local [post]
+// @Security ApiKeyAuth
+// @Accept x-www-form-urlencoded,mpfd
+// @Router /api/manage/deploy/local/ [post]
 func deployLocalChallengeHandler(c *gin.Context) {
 	action := core.MANAGE_ACTION_DEPLOY
 	challDir := c.PostForm("challenge_dir")
@@ -242,12 +263,12 @@ func deployLocalChallengeHandler(c *gin.Context) {
 // @Summary Handles route related to beast static content serving container, takes action as route parameter and perform that action
 // @Description Handles beast static content serving container routes.
 // @Tags manage
-// @Accept  json
 // @Produce json
-// @Param action query string true "Action to apply on the beast static content provider"
+// @Param action path string true "Action to apply on the beast static content provider"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/static/:action [post]
+// @Security ApiKeyAuth
+// @Router /api/manage/static/{action} [post]
 func beastStaticContentHandler(c *gin.Context) {
 	action := c.Param("action")
 	identifier := core.BEAST_STATIC_CONTAINER_NAME
@@ -285,11 +306,12 @@ func beastStaticContentHandler(c *gin.Context) {
 // @Summary Commits the challenge container so that later the challenge image can be used deployment
 // @Description Commits the challenge container for later use
 // @Tags manage
-// @Accept  json
 // @Produce json
-// @Param challenge query string true "Name of the challenge to commit"
+// @Param challenge formData string true "Name of the challenge to commit"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/manage/commit/ [post]
 func commitChallenge(c *gin.Context) {
 	challenge := c.PostForm("challenge")
@@ -311,12 +333,13 @@ func commitChallenge(c *gin.Context) {
 // @Summary Validates the configuration of the challenge and tells if challenge can be deployed or not.
 // @Description Validates challenge configuration for deployment.
 // @Tags manage
-// @Accept  json
 // @Produce json
-// @Param challenge query string true "Name of the challenge to verify the deployment configuration for."
+// @Param challenge formData string true "Name of the challenge to verify the deployment configuration for."
 // @Success 200 {object} api.HTTPPlainResp
-// @Success 200 {object} api.HTTPErrorResp
-// @Router /api/manage/commit/ [post]
+// @Failure 400 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
+// @Router /api/manage/challenge/verify [post]
 func verifyHandler(c *gin.Context) {
 	challengeName := c.PostForm("challenge")
 	challengeRemoteDir := coreUtils.GetChallengeDir(challengeName)
@@ -343,25 +366,25 @@ func verifyHandler(c *gin.Context) {
 // @Summary Schedule an action(deploy, undeploy, purge etc.) on a particular challenge
 // @Description Handles scheduleing of challenge action to executed at some later point of time
 // @Tags manage
-// @Accept  json
 // @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param action query string true "Action for the underlying challenge in context"
-// @Param challenge query string false "The name of the challenge to schedule the action for."
-// @Param tags query string false "Tag corresponding to challenges in context, optional if challenge name is provided"
-// @Param at query string false "Timestamp at which the challenge should be scheduled should be a unix timestamp string."
-// @Param after query string false "Time after which the action on the selector should be executed should be of duration format as in '1m20s' etc."
+// @Param action path string true "Action for the underlying challenge in context"
+// @Param challenge formData string false "The name of the challenge to schedule the action for."
+// @Param tag formData string false "Tag corresponding to challenges in context, optional if challenge name is provided"
+// @Param at formData string false "Timestamp at which the challenge should be scheduled should be a unix timestamp string."
+// @Param after formData string false "Time after which the action on the selector should be executed should be of duration format as in '1m20s' etc."
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/manage/schedule/:action [post]
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
+// @Router /api/manage/schedule/{action} [post]
 func manageScheduledAction(c *gin.Context) {
 	action := c.Param("action")
 	challenge := c.PostForm("challenge")
 	tag := c.PostForm("tag")
 
 	authorization := c.GetHeader("Authorization")
-	username, err := coreUtils.GetUser(authorization)
-	if err == nil {
+	username, err := resolveRequestUsername(c)
+	if err != nil {
 		log.Warn("Error while getting user from authorization header, using default user(since already authorized)")
 		username = core.DEFAULT_USER_NAME
 	}
@@ -433,12 +456,13 @@ func manageScheduledAction(c *gin.Context) {
 // @Description Handles the challenge management from a challenge in zip file. Currently prepare the zip file
 // by running `zip -r chall_dir.zip *` inside the chall_dir.
 // @Tags manage
-// @Accept  json
 // @Produce json
 // @Param file formData file true ".zip file to be uploaded to fetch challenge info"
 // @Success 200 {object} api.ChallengePreviewResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept mpfd
+// @Security ApiKeyAuth
 // @Router /api/manage/challenge/upload [post]
 func manageUploadHandler(c *gin.Context) {
 	file, err := c.FormFile("file")
@@ -456,10 +480,11 @@ func manageUploadHandler(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: fmt.Sprintf("Could not create dir %s: %s", core.BEAST_TEMP_DIR, err),
 			})
+			return
 		}
 	}
 
-	zipContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
+	zipContextPath := filepath.Join(core.BEAST_TEMP_DIR, filepath.Base(file.Filename))
 
 	// The file is received, save it
 	if err := c.SaveUploadedFile(file, zipContextPath); err != nil {
@@ -484,9 +509,10 @@ func manageUploadHandler(c *gin.Context) {
 
 	err = manager.ValidateChallengeConfig(tempStageDir)
 	if err != nil {
-		c.JSON(http.StatusOK, HTTPErrorResp{
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: err.Error(),
 		})
+		return
 	}
 
 	challengeUploadDirectory := filepath.Join(
@@ -515,19 +541,38 @@ func manageUploadHandler(c *gin.Context) {
 		return
 	}
 
+	tags := utils.CleanStringSlice(config.Challenge.Metadata.Tags)
+	assets := utils.CleanStringSlice(config.Challenge.Metadata.Assets)
+	additionalLinks := utils.CleanStringSlice(config.Challenge.Metadata.AdditionalLinks)
+	preReqs := utils.CleanStringSlice(config.Challenge.Metadata.PreReqs)
+	ports := config.Challenge.Env.Ports
+	if ports == nil {
+		ports = []uint32{}
+	}
+
 	c.JSON(http.StatusOK, ChallengePreviewResp{
 		Name:            config.Challenge.Metadata.Name,
 		Category:        config.Challenge.Metadata.Type,
-		Tags:            config.Challenge.Metadata.Tags,
-		Assets:          config.Challenge.Metadata.Assets,
-		AdditionalLinks: config.Challenge.Metadata.AdditionalLinks,
-		Ports:           config.Challenge.Env.Ports,
-		PreReqs:         config.Challenge.Metadata.PreReqs,
+		Tags:            tags,
+		Assets:          assets,
+		AdditionalLinks: additionalLinks,
+		Ports:           ports,
+		PreReqs:         preReqs,
 		Desc:            config.Challenge.Metadata.Description,
 		Points:          config.Challenge.Metadata.Points,
 	})
 }
 
+// @Summary Validate a challenge flag as a manager
+// @Tags manage
+// @Accept x-www-form-urlencoded,mpfd
+// @Produce json
+// @Security ApiKeyAuth
+// @Param challenge_name formData string true "Challenge name"
+// @Param flag formData string true "Flag to validate"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
+// @Router /api/manage/challenge/validateflag [post]
 func validateFlagHandler(c *gin.Context) {
 	flag := c.PostForm("flag")
 	challenge_name := c.PostForm("challenge_name")

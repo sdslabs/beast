@@ -5,12 +5,12 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"html/template"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"text/template"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
@@ -25,14 +25,14 @@ type User struct {
 	gorm.Model
 	auth.AuthModel
 
-	Challenges  []*Challenge `gorm:"many2many:user_challenges;"`
+	Challenges  []*Challenge `gorm:"many2many:user_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Name        string       `gorm:"not null"`
-	Email       string       `gorm:"non null;unique"`
+	Email       string       `gorm:"not null;unique"`
 	SshKey      string
 	Status      uint    `gorm:"not null;default:0"` // 0 for unbanned, 1 for banned
 	Score       uint    `gorm:"default:0"`
 	FrozenScore uint    `gorm:"default:0"`
-	Hints       []*Hint `gorm:"many2many:user_hints;references:HintID;joinReferences:HintID"`
+	Hints       []*Hint `gorm:"many2many:user_hints;joinForeignKey:UserID;joinReferences:HintID;"`
 }
 
 // Queries all the users entries where the column represented by key
@@ -278,12 +278,7 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 
 // hook after update
 func (user *User) AfterUpdate(tx *gorm.DB) error {
-	iFace, _ := tx.InstanceGet("gorm:update_attrs")
-	if iFace == nil {
-		return nil
-	}
-	updatedAttr := iFace.(map[string]interface{})
-	if _, ok := updatedAttr["ssh_key"]; ok {
+	if tx.Statement != nil && (tx.Statement.Changed("SshKey") || tx.Statement.Changed("ssh_key")) {
 		err := deleteFromAuthorizedKeys(user)
 		if err != nil {
 			return fmt.Errorf("Error while deleting from userized_keys : %s", err)
@@ -375,6 +370,9 @@ func deleteFromAuthorizedKeys(user *User) error {
 
 	keys, err := ioutil.ReadFile(config.Cfg.AuthorizedKeysFile)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("Error while reading auth file : %s", err)
 	}
 
@@ -503,9 +501,12 @@ func QueryAllUniqueTags() ([]string, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Model(&Challenge{}).Distinct().Pluck("tag", &tags)
+	tx := Db.Model(&Tag{}).Where("tag_name != ''").Distinct().Pluck("tag_name", &tags)
 	if tx.Error != nil {
 		return nil, tx.Error
+	}
+	if tags == nil {
+		tags = []string{}
 	}
 	return tags, nil
 }

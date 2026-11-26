@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/sdslabs/beastv4/utils"
 	"time"
+
+	"github.com/sdslabs/beastv4/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -15,7 +16,9 @@ type Instance struct {
 	ChallengeName  string    `json:"challenge_name"`
 	ContainerID    string    `json:"container_id"`
 	PortOwner      string    `json:"port_owner"`
-	Port           uint32    `json:"port"`
+	CheckHash      string    `json:"check_hash"`
+	CheckManifest  string    `json:"check_manifest"`
+	Port           []uint32  `json:"port"`
 	UserID         string    `json:"user_id"`
 	Username       string    `json:"username"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -30,6 +33,66 @@ func (instance *Instance) PortOwnerID() string {
 	}
 
 	return instance.ContainerID
+}
+
+const InstanceSpawningTTL = 5 * time.Minute
+
+func MarkInstanceSpawning(instanceID string, ttl time.Duration) error {
+	if Cache == nil {
+		return fmt.Errorf("redis cache not initialized")
+	}
+	if ttl <= 0 {
+		ttl = InstanceSpawningTTL
+	}
+
+	ctx := context.Background()
+	CacheMutex.Lock()
+	defer CacheMutex.Unlock()
+
+	spawningKey := utils.InstanceSpawningToKey(instanceID)
+	if err := Cache.Set(ctx, spawningKey, instanceID, ttl).Err(); err != nil {
+		return fmt.Errorf("failed to mark instance %s as spawning: %w", instanceID, err)
+	}
+
+	return nil
+}
+
+func ClearInstanceSpawning(instanceID string) error {
+	if Cache == nil {
+		return fmt.Errorf("redis cache not initialized")
+	}
+
+	ctx := context.Background()
+	CacheMutex.Lock()
+	defer CacheMutex.Unlock()
+
+	spawningKey := utils.InstanceSpawningToKey(instanceID)
+	if err := Cache.Del(ctx, spawningKey).Err(); err != nil {
+		return fmt.Errorf("failed to clear spawning marker for instance %s: %w", instanceID, err)
+	}
+
+	return nil
+}
+
+func IsInstanceKnown(instanceID string) (bool, error) {
+	if Cache == nil {
+		return false, fmt.Errorf("redis cache not initialized")
+	}
+
+	ctx := context.Background()
+	CacheMutex.Lock()
+	defer CacheMutex.Unlock()
+
+	count, err := Cache.Exists(
+		ctx,
+		utils.InstanceToKey(instanceID),
+		utils.InstanceSpawningToKey(instanceID),
+	).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to check instance status: %w", err)
+	}
+
+	return count > 0, nil
 }
 
 func SaveInstance(instance *Instance, ttl time.Duration) error {
@@ -67,6 +130,10 @@ func SaveInstance(instance *Instance, ttl time.Duration) error {
 	err = Cache.SAdd(ctx, utils.InstancesSetKey, instance.InstanceID).Err()
 	if err != nil {
 		log.Warnf("failed to add instance to set: %v", err)
+	}
+
+	if err := Cache.Del(ctx, utils.InstanceSpawningToKey(instance.InstanceID)).Err(); err != nil {
+		log.Warnf("failed to clear spawning marker for instance %s: %v", instance.InstanceID, err)
 	}
 
 	log.Debugf("Saved instance %s for user %s, challenge %s, port %d, expires in %v",

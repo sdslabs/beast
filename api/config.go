@@ -12,6 +12,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
+	fileUtils "github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,12 +20,11 @@ import (
 // @Summary Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
 // @Description Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
 // @Tags config
-// @Accept  json
 // @Produce json
-// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/config/reload/ [patch]
+// @Security ApiKeyAuth
+// @Router /api/config/reload [patch]
 func reloadBeastConfig(c *gin.Context) {
 	err := config.ReloadBeastConfig()
 	if err != nil {
@@ -44,78 +44,96 @@ func reloadBeastConfig(c *gin.Context) {
 // @Summary Updates competition info in the beast global configuration, located at ~/.beast/config.toml.
 // @Description Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
 // @Tags config
-// @Accept  json
 // @Produce json
-// @Param name formData string true "Competition Name"
-// @Param about formData string true "Some information about competition"
+// @Param name formData string false "Competition Name"
+// @Param about formData string false "Some information about competition"
 // @Param prizes formData string false "Competitions Prizes for the winners"
-// @Param starting_time formData string true "Competition's starting time"
-// @Param ending_time formData string true "Competition's ending time"
-// @Param timezone formData string true "Competition's timezone"
+// @Param starting_time formData string false "Competition's starting time"
+// @Param ending_time formData string false "Competition's ending time"
+// @Param timezone formData string false "Competition's timezone"
+// @Param dynamic_score formData bool false "Enable dynamic scoring"
 // @Param logo formData file false "Competition's logo"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/config/competition-info [post]
 func updateCompetitionInfoHandler(c *gin.Context) {
-	var logoFilePath string
-
-	name := c.PostForm("name")
-	about := c.PostForm("about")
-	prizes := c.PostForm("prizes")
-	starting_time := c.PostForm("starting_time")
-	ending_time := c.PostForm("ending_time")
-	timezone := c.PostForm("timezone")
-	logo, err := c.FormFile("logo")
-
-	// The file cannot be received.
+	configInfo, err := config.GetCompetitionInfo()
 	if err != nil {
-		log.Info("No file recieved from the user")
-	} else {
-		logoFilePath = filepath.Join(
-			core.BEAST_GLOBAL_DIR,
-			core.BEAST_ASSETS_DIR,
-			core.BEAST_LOGO_DIR,
-			logo.Filename,
-		)
+		log.Info("Unable to load previous config")
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: fmt.Sprintf("Unable to load previous config: %s", err),
+		})
+		return
+	}
 
-		competitionInfo, err := config.GetCompetitionInfo()
-		if err != nil {
-			log.Info("Unable to load previous config")
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("Unable to load previous config: %s", err),
+	if v, ok := c.GetPostForm("name"); ok {
+		configInfo.Name = v
+	}
+	if v, ok := c.GetPostForm("about"); ok {
+		configInfo.About = v
+	}
+	if v, ok := c.GetPostForm("prizes"); ok {
+		configInfo.Prizes = v
+	}
+	if v, ok := c.GetPostForm("starting_time"); ok {
+		configInfo.StartingTime = v
+	}
+	if v, ok := c.GetPostForm("ending_time"); ok {
+		configInfo.EndingTime = v
+	}
+	if v, ok := c.GetPostForm("timezone"); ok {
+		configInfo.TimeZone = v
+	}
+	if v, ok := c.GetPostForm("dynamic_score"); ok {
+		parsed, parseErr := strconv.ParseBool(strings.TrimSpace(v))
+		if parseErr != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Invalid dynamic_score value: %s", v),
 			})
 			return
 		}
+		configInfo.DynamicScore = parsed
+	}
+
+	logo, err := c.FormFile("logo")
+	if err != nil {
+		log.Info("No file recieved from the user")
+	} else {
+		logoDir := filepath.Join(
+			core.BEAST_GLOBAL_DIR,
+			core.BEAST_ASSETS_DIR,
+			core.BEAST_LOGO_DIR,
+		)
+		if dirErr := fileUtils.CreateIfNotExistDir(logoDir); dirErr != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("Unable to create logo directory: %s", dirErr),
+			})
+			return
+		}
+		logoFilePath := filepath.Join(logoDir, filepath.Base(logo.Filename))
 
 		// Delete previously uploaded logo file
-		if competitionInfo.LogoURL != "" {
-			if err := os.Remove(competitionInfo.LogoURL); err != nil {
+		if configInfo.LogoURL != "" {
+			if removeErr := os.Remove(configInfo.LogoURL); removeErr != nil && !os.IsNotExist(removeErr) {
 				log.Info("Unable to delete previous logo file")
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: fmt.Sprintf("Unable to delete previous logo file: %s", err),
+					Error: fmt.Sprintf("Unable to delete previous logo file: %s", removeErr),
 				})
 				return
 			}
 		}
 
 		// The file is received, save it
-		if err := c.SaveUploadedFile(logo, logoFilePath); err != nil {
+		if saveErr := c.SaveUploadedFile(logo, logoFilePath); saveErr != nil {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: fmt.Sprintf("Unable to save file: %s", err),
+				Error: fmt.Sprintf("Unable to save file: %s", saveErr),
 			})
 			return
 		}
-	}
-
-	configInfo := config.CompetitionInfo{
-		Name:         name,
-		About:        about,
-		Prizes:       prizes,
-		StartingTime: starting_time,
-		EndingTime:   ending_time,
-		TimeZone:     timezone,
-		LogoURL:      logoFilePath,
+		configInfo.LogoURL = logoFilePath
 	}
 
 	err = config.UpdateCompetitionInfo(&configInfo)
@@ -129,31 +147,33 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "Competition information updated successfully",
 	})
-	return
 }
 
 // This updates challenge info in the respective challenge configuration
 // @Summary Updates challenge info in the database, located at ~/.beast/beast.db.
 // @Description Updates challenge info in the database, located at ~/.beast/beast.db.
 // @Tags config
-// @Accept  json
 // @Produce json
 // @Param name formData string true "Challenge Name"
-// @Param hints formData string true "Challenge's hints"
-// @Param desc formData string false "Challenge's description"
-// @Param points formData string true "Challenge's points"
-// @Param flag formData string true "Challenge's flag"
-// @Param tags formData string true "Challenge's tags"
-// @Param ports formData file false "Challenge's ports"
+// @Param desc formData string false "Challenge description. The description field is also accepted."
+// @Param points formData int false "Challenge's points"
+// @Param flag formData string false "Challenge's flag"
+// @Param tags formData string false "Challenge's tags"
+// @Param ports formData string false "Comma-separated allocated host ports"
+// @Param assets formData string false "Asset names separated by ::::"
+// @Param additionalLinks formData string false "Links separated by ::::"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/config/challenge-info [post]
 func updateChallengeInfoHandler(c *gin.Context) {
 	name, exist := c.GetPostForm("name")
-	if !exist {
+	name = strings.TrimSpace(name)
+	if !exist || name == "" {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: fmt.Sprintf("Can't edit challenge without challenge name"),
+			Message: "Can't edit challenge without challenge name",
 		})
 		return
 	}
@@ -163,13 +183,25 @@ func updateChallengeInfoHandler(c *gin.Context) {
 	}
 
 	desc, exist := c.GetPostForm("desc")
+	if !exist {
+		desc, exist = c.GetPostForm("description")
+	}
 	if exist {
 		configInfo["Description"] = desc
 	}
 
 	points, exist := c.GetPostForm("points")
+	pointsUpdated := false
 	if exist {
-		configInfo["Points"] = points
+		parsedPoints, err := strconv.ParseUint(strings.TrimSpace(points), 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPPlainResp{
+				Message: fmt.Sprintf("Invalid points value: %s", points),
+			})
+			return
+		}
+		configInfo["Points"] = uint(parsedPoints)
+		pointsUpdated = true
 	}
 
 	flag, exist := c.GetPostForm("flag")
@@ -179,12 +211,12 @@ func updateChallengeInfoHandler(c *gin.Context) {
 
 	assets, exist := c.GetPostForm("assets")
 	if exist {
-		configInfo["Assets"] = assets
+		configInfo["Assets"] = strings.Join(fileUtils.SplitDelimited(assets, core.DELIMITER), core.DELIMITER)
 	}
 
 	additionalLinks, exist := c.GetPostForm("additionalLinks")
 	if exist {
-		configInfo["AdditionalLinks"] = additionalLinks
+		configInfo["AdditionalLinks"] = strings.Join(fileUtils.SplitDelimited(additionalLinks, core.DELIMITER), core.DELIMITER)
 	}
 
 	log.Debug(fmt.Sprintf("Starting to update the challenge : %s", name))
@@ -193,6 +225,12 @@ func updateChallengeInfoHandler(c *gin.Context) {
 		log.Errorf("DB_ACCESS_ERROR : %s", err.Error())
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: fmt.Sprintf("DB_ACCESS_ERROR : %s", err.Error()),
+		})
+		return
+	}
+	if chall.ID == 0 || chall.Name == "" {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: fmt.Sprintf("Challenge %s not found", name),
 		})
 		return
 	}
@@ -215,23 +253,28 @@ func updateChallengeInfoHandler(c *gin.Context) {
 			return
 		}
 		ports = strings.ReplaceAll(ports, " ", "")
-		portsArray := strings.Split(ports, ",")
-		for _, port := range portsArray {
-			u64, err := strconv.ParseUint(port, 10, 32)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, HTTPPlainResp{
-					Message: fmt.Sprintf("Error: %s", err.Error()),
-				})
-				return
-			}
+		if ports != "" {
+			portsArray := strings.Split(ports, ",")
+			for _, port := range portsArray {
+				if port == "" {
+					continue
+				}
+				u64, err := strconv.ParseUint(port, 10, 32)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, HTTPPlainResp{
+						Message: fmt.Sprintf("Error: %s", err.Error()),
+					})
+					return
+				}
 
-			newPort := database.Port{ChallengeID: chall.ID, PortNo: uint32(u64)}
-			_, err = database.PortEntryGetOrCreate(&newPort)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, HTTPPlainResp{
-					Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
-				})
-				return
+				newPort := database.Port{ChallengeID: chall.ID, PortNo: uint32(u64)}
+				_, err = database.PortEntryGetOrCreate(&newPort)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, HTTPPlainResp{
+						Message: fmt.Sprintf("Error while updating challenge ports: %s", err.Error()),
+					})
+					return
+				}
 			}
 		}
 	}
@@ -239,7 +282,7 @@ func updateChallengeInfoHandler(c *gin.Context) {
 	// Update Tags
 	tags, exist := c.GetPostForm("tags")
 	if exist {
-		tagsArray := strings.Split(tags, core.DELIMITER)
+		tagsArray := fileUtils.SplitDelimited(tags, core.DELIMITER)
 		tagArr := make([]*database.Tag, len(tagsArray))
 
 		for index, tag := range tagsArray {
@@ -252,11 +295,15 @@ func updateChallengeInfoHandler(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, HTTPPlainResp{
 				Message: fmt.Sprintf("Error while updating tags: %s", err.Error()),
 			})
+			return
 		}
+	}
+
+	if pointsUpdated {
+		invalidateLeaderboardCaches()
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: fmt.Sprintf("Succesfully updated challenge: %s", name),
 	})
-	return
 }

@@ -32,6 +32,9 @@ func stageChallenge(challengeDir string, config *cfg.BeastChallengeConfig) error
 
 	log.Debugf("Found context directory for deploy : %s", contextDir)
 	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	if stagingAbs, err := filepath.Abs(stagingDir); err == nil && contextDir == stagingAbs {
+		return fmt.Errorf("cannot stage challenge %s from its own staging directory %s", challengeName, stagingDir)
+	}
 	if err = utils.CreateIfNotExistDir(stagingDir); err != nil {
 		return err
 	}
@@ -181,9 +184,9 @@ func commitChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 				noCache,
 			)
 		}
-		// For Docker Compose challenges, ensure ImageId is empty in the database
-		if err := database.UpdateChallenge(challenge, map[string]any{"ImageId": ""}); err != nil {
-			return fmt.Errorf("error while setting empty ImageId for Docker Compose challenge: %s", err)
+		// For Docker Compose challenges, ensure ImageId is a unique placeholder in the database
+		if err := database.UpdateChallenge(challenge, map[string]any{"ImageId": coreUtils.GetTempImageId(challenge.Name)}); err != nil {
+			return fmt.Errorf("error while setting placeholder ImageId for Docker Compose challenge: %s", err)
 		}
 	} else {
 		if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
@@ -303,11 +306,28 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 			return fmt.Errorf("error while registering ports for challenge %s: %s", challenge.Name, err)
 		}
 
+		containerIdToSave := primaryContainerId
+		if containerIdToSave == "" {
+			containerIdToSave = coreUtils.GetTempContainerId(challengeName)
+		}
+
+		portList := make([]uint32, 0, len(ports))
+		for _, p := range ports {
+			portList = append(portList, p)
+		}
+		if err := syncChallengePortsInDB(challenge, portList); err != nil {
+			log.Warnf("error while syncing ports in database for challenge %s: %v", challengeName, err)
+		}
+
 		// only for backward compatibility
-		if err := database.UpdateChallenge(challenge, map[string]any{
-			"ContainerId":    primaryContainerId,
+		updates := map[string]any{
+			"ContainerId":    containerIdToSave,
 			"DeploymentType": core.DEPLOYMENT_TYPES["docker_compose"],
-		}); err != nil {
+		}
+		if challenge.ServerDeployed == "" {
+			updates["ServerDeployed"] = host
+		}
+		if err := database.UpdateChallenge(challenge, updates); err != nil {
 			return fmt.Errorf("error while updating Docker Compose challenge metadata: %s", err)
 		}
 		log.Infof("Challenge %s deployed with docker-compose successfully (primary container: %s)", challengeName, primaryContainerId)
@@ -315,24 +335,31 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	staticMount := make(map[string]string)
-	var staticMountDir string
-	if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
-		staticMountDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
-	} else {
-		staticMountDir = filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
-	}
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
 		relativeStaticContentDir = core.PUBLIC
 	}
-	staticMount[staticMountDir] = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir)
+	staticTarget := filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir)
+	if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+		relativePath := filepath.Join(core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
+		files, err := os.ReadDir(filepath.Join(core.BEAST_GLOBAL_DIR, relativePath))
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("read staged static assets: %w", err)
+		}
+		if len(files) > 0 {
+			staticMount[filepath.Join(core.BEAST_MOUNT_DIR, relativePath)] = staticTarget
+		}
+	} else {
+		staticMountDir := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
+		staticMount[staticMountDir] = staticTarget
+	}
 	log.Debugf("Static mount config for deploy : %s", staticMount)
 
 	var containerEnv []string
 	var containerNetwork string
 
 	for _, env := range config.Challenge.Env.EnvironmentVars {
-		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)))
+		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, resolveChallengeEnvValue(challengeName, env.Value)))
 	}
 
 	log.Debugf("Container config for challenge %s are: CPU(%d), Memory(%d), PidsLimit(%d)",
@@ -361,6 +388,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
 		ContainerName:    utils.ProjectNameNotInstanced(config.Challenge.Metadata.Name),
+		ChallengeName:    challengeName,
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
 		Traffic:          config.Challenge.Env.TrafficType(),
@@ -369,7 +397,6 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		Memory:           config.Resources.Memory,
 		PidsLimit:        config.Resources.PidsLimit,
 	}
-	log.Debugf("create container config for challenge(%s): %v", config.Challenge.Metadata.Name, containerConfig)
 	var containerId string
 	if cfg.Cfg.UseLocalDockerDaemon(host) {
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
@@ -396,11 +423,42 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		return fmt.Errorf("error while registering ports for challenge %s: %s", challenge.Name, err)
 	}
 
-	if err = database.UpdateChallenge(challenge, map[string]any{
+	if err := syncChallengePortsInDB(challenge, ports); err != nil {
+		log.Warnf("error while syncing ports in database for challenge %s: %v", challengeName, err)
+	}
+
+	updates := map[string]any{
 		"ContainerId":    containerId,
 		"DeploymentType": core.DEPLOYMENT_TYPES["standard_docker"],
-	}); err != nil {
+	}
+	if challenge.ServerDeployed == "" {
+		updates["ServerDeployed"] = host
+	}
+	if err = database.UpdateChallenge(challenge, updates); err != nil {
 		return fmt.Errorf("error while saving containerId to database : %s", err)
+	}
+	return nil
+}
+
+func syncChallengePortsInDB(challenge *database.Challenge, ports []uint32) error {
+	if challenge == nil || challenge.ID == 0 {
+		return nil
+	}
+	if err := database.UpdatePorts(challenge); err != nil {
+		return err
+	}
+	for _, port := range ports {
+		entry := database.Port{
+			ChallengeID: challenge.ID,
+			PortNo:      port,
+		}
+		gotPort, err := database.PortEntryGetOrCreate(&entry)
+		if err != nil {
+			return err
+		}
+		if gotPort.ChallengeID != challenge.ID {
+			return fmt.Errorf("port %d is already in use by another challenge", gotPort.PortNo)
+		}
 	}
 	return nil
 }
@@ -452,6 +510,18 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		if err != nil {
 			return fmt.Errorf("an error occured while validating the config file : %s, cannot continue with pipeline", err)
 		}
+	} else {
+		config.Resources.ValidateRequiredFields()
+		if config.Challenge.Env.DockerCompose != "" {
+			ports, err := utils.ExtractPortsFromCompose(filepath.Join(challengeDir, "docker-compose.yml"))
+			if err != nil {
+				return fmt.Errorf("read staged Compose ports: %w", err)
+			}
+			if len(ports) == 0 {
+				return fmt.Errorf("staged Compose file does not declare a port variable")
+			}
+			config.Challenge.Env.PortVariables = ports
+		}
 	}
 
 	// Validate challenge directory name with the name of the challenge
@@ -484,7 +554,15 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		if !skipStage {
 			// Deploy pipeline for static challenge will follow.
 			log.Infof("Deploy static challenge request.")
-			DeployStaticChallenge(&config, &challenge, challengeDir)
+			if err := DeployStaticChallenge(&config, &challenge, challengeDir); err != nil {
+				database.UpdateChallenge(&challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["undeployed"]})
+				return fmt.Errorf("STATIC DEPLOY ERROR: %s : %w", challengeName, err)
+			}
+		} else {
+			if err := database.UpdateChallenge(&challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deployed"]}); err != nil {
+				database.UpdateChallenge(&challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["undeployed"]})
+				return fmt.Errorf("STATIC DEPLOY ERROR: %s : %w", challengeName, err)
+			}
 		}
 		return nil
 	}
@@ -595,7 +673,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 
 // This is just a decorator function over bootstrapDeployPipeline and generate
 // notifications to slack on the basis of the result of the deploy pipeline.
-func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) {
+func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) error {
 	challengeName := filepath.Base(challengeDir)
 	var sendNotificationError error
 
@@ -610,4 +688,8 @@ func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, n
 	if sendNotificationError == nil {
 		log.Debugf("%s: Notification sent", challengeName)
 	}
+	if err != nil {
+		log.Error(err)
+	}
+	return err
 }

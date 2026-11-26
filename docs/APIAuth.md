@@ -1,62 +1,30 @@
 # Authentication
 
-Authentication is done to provide restricted access only to the organizers. Authentication is done using asymmetric encryption. After authentication, JWT tokens are used to provide access for further usage of API's.
+Beast authenticates API users with a username and password and issues a signed JWT. Set a unique `jwt_secret` in `~/.beast/config.toml`. SSH public keys belong to the account or challenge author and support SSH access to challenge environments.
 
-## Usage
+## Sign in
 
-### Configuration
+Send form fields `username` and `password` to `POST /auth/login`. Successful responses contain `token`, `role`, and `message`. Login tokens expire after six hours.
 
-For signing JWT tokens using **HMAC** algorithm `jwt_secret` is required which can be configured in the beast global config (config.toml) as:
-
-```toml
-jwt_secret = "beast_jwt_secret_SUPER_STRONG_0x100010000100"
+```sh
+curl -fsS --data-urlencode "username=$BEAST_USERNAME" \
+  --data-urlencode "password=$BEAST_PASSWORD" \
+  http://localhost:5005/auth/login
 ```
 
-The SSH keys are used for assymetric authentication which can be registered directly from the terminal using:
+The CLI can request the same token.
 
-`beast create-author --name <username> --email <email> --publickey <pub-key-location>`
-
-Or it can be given in the challenge description(beast.toml) : 
-
-```toml
-[author]
-ssh_key = "<public key>"
+```sh
+beast getauth --username "$BEAST_USERNAME" --password "$BEAST_PASSWORD" \
+  --host http://localhost:5005/
 ```
 
-This key gets added in the database when beast.toml is validated.
+Pass the returned token as `Authorization: Bearer <token>`. Deployment and other management routes require an author or administrator. Configuration changes, competition administration, Git remote management, and notification writes require an administrator.
 
-## Flow
+## Register or recover an account
 
-Once the public key is registered in the database, the user can get a JWT token through the following steps :
-* First make a GET request on URL : `/auth/<username>`
-* The response will be of the format :
+- Registration uses `POST /auth/register` with `username`, `password`, `email`, and `ssh-key`. The `name` field is optional.
+- With SMTP configured and authorization enabled, first send a code with `POST /auth/send-otp` and verify it with `POST /auth/verify-otp`. Send `email` to the first route and `email` and `otp` to the second.
+- Password recovery uses `POST /auth/send-otp-forget` and `POST /auth/verify-otp-forget` with the same fields. Send the verification token as a bearer token to `POST /auth/reset-password` with the `new_pass` field.
 
-``` JSON
-{
-    "challenge"	:	"Challenge String",
-    "message"	:	"<solve message>"
-}
-```
-
-* The challenge must be decrypted using *ssh private key* and then a POST request has to be made on URL: `/auth/<username>`along with POST form data: `decrmess=<decrypted message>`
-* You will get a response like this : 
-``` JSON
-{
-    "token"    :	"YOUR_AUTHENTICATION_TOKEN",
-    "role"     :	"<User Role>",
-    "message"  :	"<Usage message>"
-}
-```
-
-* Now to access any restricted route you need to add this JWT token in the HTTP header as :
-``` HTTP
-Authorization: Bearer YOUR_AUTHENTICATION_TOKEN
-```
-
-### Alternative
-
-If you have the `beast` binary with you, you can also use command :
-
-`beast getauth --identity <path to ssh-private-key> --username <username> --host <host-string>`
-
-This command will give you the JWT token for usage in other APIs by adding in the HTTP header.
+Email codes expire after five minutes. The recovery endpoint issues a token with a five-minute lifetime. Keep `beast run --noauth` for local development.

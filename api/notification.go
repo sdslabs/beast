@@ -1,8 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,13 +19,14 @@ import (
 // @Summary Adds notifications
 // @Description Adds notifications
 // @Tags notification
-// @Accept  json
 // @Produce json
 // @Param title formData string true "Title of notification to be added"
-// @Param desc formData string true "Description for the notification to be added"
+// @Param desc formData string false "Description for the notification to be added"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/notification/add [post]
 func addNotification(c *gin.Context) {
 	title := c.PostForm("title")
@@ -58,20 +62,40 @@ func addNotification(c *gin.Context) {
 // @Summary Removes notifications
 // @Description Removes notifications
 // @Tags notification
-// @Accept  json
 // @Produce json
-// @Param id formData string true "Title of notification"
+// @Param id query string false "ID of notification"
+// @Param id formData string false "ID of notification"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/delete [post]
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
+// @Router /api/notification/delete [delete]
 func removeNotification(c *gin.Context) {
-	id := c.PostForm("id")
+	id := strings.TrimSpace(c.Query("id"))
+	if id == "" {
+		id = strings.TrimSpace(c.PostForm("id"))
+	}
+	if id == "" && strings.Contains(c.GetHeader("Content-Type"), "application/json") {
+		var body struct {
+			ID interface{} `json:"id"`
+		}
+		if err := c.ShouldBindJSON(&body); err == nil && body.ID != nil {
+			id = strings.TrimSpace(fmt.Sprint(body.ID))
+		}
+	}
 
 	if id == "" {
 		log.Errorf("Please provide notification Id")
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: "Please provide notification Id",
+		})
+		return
+	}
+	if _, err := strconv.ParseUint(id, 10, 64); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid notification Id",
 		})
 		return
 	}
@@ -87,7 +111,7 @@ func removeNotification(c *gin.Context) {
 
 	if notify.ID == 0 {
 		log.Errorf("No notification exist with id : %s", id)
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No such notification exists",
 		})
 		return
@@ -109,19 +133,34 @@ func removeNotification(c *gin.Context) {
 // @Summary Updates notifications
 // @Description Updates any changes in the notifications
 // @Tags notification
-// @Accept  json
 // @Produce json
-// @Param id formData string true "Title of notification"
-// @Param title formData string true "Title of notification"
-// @Param desc formData string true "Description for the notification to be changed"
+// @Param id formData string true "ID of notification"
+// @Param title formData string false "Title of notification"
+// @Param desc formData string false "Description for the notification to be changed"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/update [post]
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
+// @Router /api/notification/update [put]
 func updateNotifications(c *gin.Context) {
-	id := c.PostForm("id")
+	id := strings.TrimSpace(c.PostForm("id"))
 	changedtitle := c.PostForm("title")
 	changedDescription := c.PostForm("desc")
+
+	if id == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Please provide notification Id",
+		})
+		return
+	}
+	if _, err := strconv.ParseUint(id, 10, 64); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid notification Id",
+		})
+		return
+	}
 
 	if changedtitle == "" && changedDescription == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
@@ -141,16 +180,21 @@ func updateNotifications(c *gin.Context) {
 
 	if notify.ID == 0 {
 		log.Errorf("No notification exist with id : %s", id)
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No such notification exists",
 		})
 		return
 	}
 
-	if err := database.UpdateNotification(&notify, map[string]interface{}{
-		"Description": changedDescription,
-		"Title":       changedtitle,
-	}); err != nil {
+	updates := map[string]interface{}{}
+	if changedDescription != "" {
+		updates["Description"] = changedDescription
+	}
+	if changedtitle != "" {
+		updates["Title"] = changedtitle
+	}
+
+	if err := database.UpdateNotification(&notify, updates); err != nil {
 		log.Info("Error while updating notification")
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "Error while updating notification",
@@ -166,11 +210,11 @@ func updateNotifications(c *gin.Context) {
 // @Summary Fetch available notifications
 // @Description Fetch all the notifications from database
 // @Tags notification
-// @Accept  json
 // @Produce json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/available [post]
+// @Security ApiKeyAuth
+// @Router /api/notification/available [get]
 func availableNotificationHandler(c *gin.Context) {
 	notifications, err := database.QueryAllNotification()
 	if err != nil {
@@ -204,6 +248,13 @@ func availableNotificationHandler(c *gin.Context) {
 	return
 }
 
+// @Summary Stream competition notifications
+// @Tags notification
+// @Description Streams user_connected, notification, and ping events over server-sent events.
+// @Produce text/event-stream
+// @Security ApiKeyAuth
+// @Success 200 {string} string
+// @Router /api/notification/stream [get]
 func streamNotification(c *gin.Context) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")

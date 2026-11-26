@@ -1,7 +1,12 @@
 package api
 
 import (
+	"context"
+	"errors"
+	"net"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/cache"
@@ -27,6 +32,25 @@ const (
 
 var BeastScheduler scheduler.Scheduler = scheduler.NewScheduler()
 
+var (
+	httpServerMu sync.Mutex
+	httpServer   *http.Server
+)
+
+func ShutdownHTTPServer(timeout time.Duration) {
+	httpServerMu.Lock()
+	srv := httpServer
+	httpServerMu.Unlock()
+	if srv == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Warnf("HTTP server shutdown error: %v", err)
+	}
+}
+
 func runBeastApiBootsteps(defaultauthorpassword string) error {
 	manager.RunBeastBootsteps(defaultauthorpassword)
 
@@ -44,23 +68,17 @@ func runBeastApiBootsteps(defaultauthorpassword string) error {
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host playCTF.sdslabs.co
 // @BasePath /
 
 // @securityDefinitions.apikey ApiKeyAuth
 // @in header
 // @name Authorization
+// @description Paste the complete header value, including the Bearer prefix.
 
-func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) {
+func RunBeastApiServer(listener net.Listener, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) error {
 	log.Info("Bootstrapping Beast API server")
 
 	config.InitConfig()
-
-	if port != "" {
-		port = ":" + port
-	} else {
-		port = DEFAULT_BEAST_PORT
-	}
 
 	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
 	manager.Q.StartWorkers(&manager.Worker{})
@@ -69,7 +87,6 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	remoteManager.Init()
 	database.Init()
 	cache.Init()
-	startDynamicScoreWorker()
 	go manager.InstanceCleanupProber()
 
 	// Initialise and start the Hub
@@ -80,10 +97,6 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 
 	// Initialize Gin router.
 	router := initGinRouter()
-
-	// Setup gin middlewares
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
 
 	router.GET("/api/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/", func(c *gin.Context) {
@@ -100,6 +113,7 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 
 	log.Info("Starting beast scheduler")
 	BeastScheduler.Start()
+	startDynamicScoreWorker()
 
 	if periodicSync {
 		log.Infof("Scheduling periodic remote sync and auto update for beast with period: %v", config.Cfg.RemoteSyncPeriod)
@@ -117,5 +131,17 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	if noCache {
 		log.Infof("Starting Beast server in no cache mode")
 	}
-	router.Run(port)
+
+	srv := &http.Server{
+		Addr:    listener.Addr().String(),
+		Handler: router,
+	}
+	httpServerMu.Lock()
+	httpServer = srv
+	httpServerMu.Unlock()
+
+	if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -18,12 +19,11 @@ var generateTemplateCmd = &cobra.Command{
 	Short: "generate config file",
 	Long:  "generate basic challenge config and public directory ",
 
-	Run: func(cmd *cobra.Command, args []string) {
-		log.Debug("Generating Config Template")
-
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path, err := os.Getwd()
 		if err != nil {
-			log.Errorf("Error while finding directory's path :: %s : using empty string instead", err)
+			return fmt.Errorf("find challenge directory: %w", err)
 		}
 
 		challName := filepath.Base(path)
@@ -31,89 +31,57 @@ var generateTemplateCmd = &cobra.Command{
 			challName = ""
 		}
 
-		var config config.BeastChallengeConfig
-		config.PopulateDefaultValues()
+		var challengeCfg config.BeastChallengeConfig
+		challengeCfg.PopulateDefaultValues()
+		if challName != "" {
+			challengeCfg.Challenge.Metadata.Name = challName
+		} else {
+			challengeCfg.Challenge.Metadata.Name = "my-challenge"
+		}
+		challengeCfg.Author.Name = "Author"
+		challengeCfg.Author.Email = "author@example.com"
+		challengeCfg.Author.SSHKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleAuthorKeyPlaceholder author@example.com"
+		challengeCfg.Challenge.Metadata.Type = core.BARE_CHALLENGE_TYPE_NAME
+		challengeCfg.Challenge.Metadata.Flag = "beast{example_flag}"
+		challengeCfg.Challenge.Metadata.Difficulty = "medium"
+		challengeCfg.Challenge.Metadata.Description = "Describe the challenge here"
+		challengeCfg.Challenge.Metadata.Points = 100
+		challengeCfg.Challenge.Env.StaticContentDir = ""
+		challengeCfg.Challenge.Env.BaseImage = core.DEFAULT_BASE_IMAGE
+		challengeCfg.Challenge.Env.RunCmd = "sleep infinity"
 
 		var configfile bytes.Buffer
-		log.Debugf("Preparing Config template")
 		configfileTemplate, err := template.New("configfile").Parse(tools.CHALLENGE_CONFIG_FILE_TEMPLATE)
 		if err != nil {
-			log.Errorf("Error while parsing configfile template :: %s", err)
-			return
+			return fmt.Errorf("parse challenge template: %w", err)
+		}
+		if err := configfileTemplate.Execute(&configfile, challengeCfg); err != nil {
+			return fmt.Errorf("render challenge template: %w", err)
 		}
 
-		log.Debugf("Executing dockerfile template with challenge config")
-		err = configfileTemplate.Execute(&configfile, config)
+		file, err := os.OpenFile(core.CHALLENGE_CONFIG_FILE_NAME, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 		if err != nil {
-			log.Errorf("Error while executing configfile template :: %s", err)
-			return
+			return fmt.Errorf("create challenge config: %w", err)
 		}
-
-		err = createFile()
-		if err != nil {
-			log.Errorf("Error while creating beast.toml :: %s", err)
-			return
+		complete := false
+		defer func() {
+			if !complete {
+				_ = os.Remove(core.CHALLENGE_CONFIG_FILE_NAME)
+			}
+		}()
+		_, writeErr := configfile.WriteTo(file)
+		closeErr := file.Close()
+		if writeErr != nil {
+			return fmt.Errorf("write challenge config: %w", writeErr)
 		}
-
-		var file, erro = os.OpenFile(core.CHALLENGE_CONFIG_FILE_NAME, os.O_RDWR, 0644)
-		if erro != nil {
-			log.Fatal(erro)
+		if closeErr != nil {
+			return fmt.Errorf("close challenge config: %w", closeErr)
 		}
-
-		_, err = file.WriteString(configfile.String())
-		if err != nil {
-			log.Errorf("Error while writing beast.toml :: %s", err)
+		if err := os.MkdirAll(core.PUBLIC, 0755); err != nil {
+			return fmt.Errorf("create public directory: %w", err)
 		}
-
-		defer file.Close()
-		log.Debugf("beast.toml generated for the challenge")
-
-		err = createPublicDir()
-		if err != nil {
-			log.Errorf("Error while creating public directory")
-		}
-
+		complete = true
+		log.Debug("beast.toml generated for the challenge")
+		return nil
 	},
-}
-
-func createFile() error {
-	// check if file exists
-	_, err := os.Stat(core.CHALLENGE_CONFIG_FILE_NAME)
-
-	// create file if not exists
-	if os.IsNotExist(err) {
-
-		file, err := os.Create(core.CHALLENGE_CONFIG_FILE_NAME)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		return nil
-
-	} else if err != nil {
-		return err
-	}
-
-	log.Errorf("%s already exists", core.CHALLENGE_CONFIG_FILE_NAME)
-
-	return nil
-}
-
-func createPublicDir() error {
-	// check if public directory exists
-	_, err := os.Stat(core.PUBLIC)
-
-	// create public directory if not exists
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(core.PUBLIC, 0755)
-		if err != nil {
-			return err
-		}
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	log.Errorf("%s directory already exists", core.PUBLIC)
-	return nil
 }

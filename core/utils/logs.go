@@ -1,12 +1,10 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	container_types "github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
@@ -20,47 +18,24 @@ func GetLogs(challname string, live bool) (*cr.Log, error) {
 		return nil, fmt.Errorf("Error while database access : %s", err)
 	}
 
-	if chall.Format == core.STATIC_CHALLENGE_TYPE_NAME {
-		return nil, fmt.Errorf("The challenge is a static challenge, no log present")
+	if chall.Type == core.STATIC_CHALLENGE_TYPE_NAME || chall.Format == core.STATIC_CHALLENGE_TYPE_NAME {
+		return nil, fmt.Errorf("static challenge %q does not have container logs", challname)
 	}
-
 	if !IsContainerIdValid(chall.ContainerId) {
-		return nil, fmt.Errorf("Underlying challenge configuration present is not valid.")
-	}
-	var containers, remoteContainers []container_types.Container
-	server := config.AvailableServer{}
-	remoteContainers, err = remoteManager.SearchContainerByFilterRemote(map[string]string{"id": chall.ContainerId}, server)
-	if err != nil {
-		return nil, fmt.Errorf("Error while searching for remote container with id %s", chall.ContainerId)
-	}
-	containers, err = cr.SearchContainerByFilter(map[string]string{"id": chall.ContainerId})
-	if err != nil {
-		return nil, fmt.Errorf("Error while searching for container with id %s", chall.ContainerId)
-	}
-	containers = append(containers, remoteContainers...)
-	if len(containers) > 1 {
-		return nil, errors.New("Got more than one containers, something fishy here. Contact admin to check manually.")
-	}
-
-	if len(containers) == 0 {
-		return nil, fmt.Errorf("Underlying container for getting log is not present.")
-	}
-
-	if live {
-		if config.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
-			cr.ShowLiveContainerLogs(chall.ContainerId)
-		} else {
-			server := config.Cfg.AvailableServers[chall.ServerDeployed]
-			remoteManager.ShowLiveContainerLogsRemote(chall.ContainerId, server)
-		}
-		return nil, nil
+		return nil, fmt.Errorf("challenge %q does not have a deployed container", challname)
 	}
 
 	if config.Cfg.UseLocalDockerDaemon(chall.ServerDeployed) {
+		if live {
+			return nil, cr.ShowLiveContainerLogs(chall.ContainerId)
+		}
 		return cr.GetContainerStdLogs(chall.ContainerId)
 	}
 
-	server = config.Cfg.AvailableServers[chall.ServerDeployed]
+	server := config.Cfg.AvailableServers[chall.ServerDeployed]
+	if live {
+		return nil, remoteManager.ShowLiveContainerLogsRemote(chall.ContainerId, server)
+	}
 	return remoteManager.GetContainerStdLogsRemote(chall.ContainerId, server)
 }
 

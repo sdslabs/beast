@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -37,28 +38,83 @@ func (q *Queue) Push(w Task) error {
 	select {
 	case q.TaskQueue <- w:
 	default:
+		q.Mux.Lock()
+		delete(q.InQueue, w.ID)
+		q.Mux.Unlock()
 		return fmt.Errorf("Queue is full")
 	}
-	// TODO : get size of the queue
 	return nil
 }
 
 func (q *Queue) Pop(ID string) {
 	q.Mux.Lock()
 	delete(q.InQueue, ID)
-	if q.CompletionChannel != nil && len(q.InQueue) == 0 {
-		q.CompletionChannel <- true
-	}
+	shouldSignal := q.CompletionChannel != nil && len(q.InQueue) == 0
 	q.Mux.Unlock()
+	if shouldSignal {
+		select {
+		case q.CompletionChannel <- true:
+		default:
+		}
+	}
+}
+
+func (q *Queue) finishTask(id string, nextTask *Task) {
+	q.Mux.Lock()
+	delete(q.InQueue, id)
+	if nextTask != nil {
+		if _, ex := q.InQueue[nextTask.ID]; !ex {
+			q.InQueue[nextTask.ID] = true
+			select {
+			case q.TaskQueue <- *nextTask:
+			default:
+				delete(q.InQueue, nextTask.ID)
+				log.Warnf("Queue is full while re-enqueuing follow-up task %s", nextTask.ID)
+			}
+		}
+	}
+	shouldSignal := q.CompletionChannel != nil && len(q.InQueue) == 0
+	q.Mux.Unlock()
+	if shouldSignal {
+		select {
+		case q.CompletionChannel <- true:
+		default:
+		}
+	}
+}
+
+func (q *Queue) Pending() int {
+	q.Mux.RLock()
+	defer q.Mux.RUnlock()
+	return len(q.InQueue)
+}
+
+func (q *Queue) Drain(timeout time.Duration) bool {
+	if q == nil {
+		return true
+	}
+	deadline := time.Now().Add(timeout)
+	for {
+		if q.Pending() == 0 {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 func (q *Queue) Stop() {
-	ids := make([]string, len(q.InQueue))
-	i := 0
-	for id := range q.InQueue {
-		ids[i] = id
-		i++
+	if q == nil {
+		return
 	}
+	q.Mux.Lock()
+	ids := make([]string, 0, len(q.InQueue))
+	for id := range q.InQueue {
+		ids = append(ids, id)
+	}
+	q.Mux.Unlock()
 
 	for _, id := range ids {
 		q.Pop(id)
@@ -69,12 +125,7 @@ func (q *Queue) startConcurrentWorker(i int, worker Worker) {
 	for {
 		w := <-q.TaskQueue
 		newTask := worker.PerformTask(w)
-
-		q.Pop(w.ID)
-
-		if newTask != nil {
-			q.Push(*newTask)
-		}
+		q.finishTask(w.ID, newTask)
 	}
 }
 

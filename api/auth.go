@@ -2,6 +2,8 @@ package api
 
 import (
 	"errors"
+	"fmt"
+	"golang.org/x/crypto/ssh"
 	"log"
 	"net/http"
 	"strings"
@@ -14,6 +16,17 @@ import (
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"gorm.io/gorm"
 )
+
+func resolveRequestUsername(c *gin.Context) (string, error) {
+	authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
+	if authHeader != "" {
+		return coreUtils.GetUser(authHeader)
+	}
+	if config.SkipAuthorization {
+		return core.DEFAULT_USER_NAME, nil
+	}
+	return "", fmt.Errorf("No Token Provided")
+}
 
 // Acts as a middleware to authorize user
 // @Summary Handles authorization of user
@@ -133,7 +146,6 @@ func adminAuthorize(c *gin.Context) {
 // @Summary Handles signin and token production
 // @Description JWT can be received by signing in
 // @Tags auth
-// @Accept json
 // @Produce json
 // @Param username formData string true "Username"
 // @Param password formData string true "Password"
@@ -141,6 +153,7 @@ func adminAuthorize(c *gin.Context) {
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 401 {object} api.HTTPPlainResp
 // @Failure 403 {object} api.HTTPPlainResp
+// @Accept x-www-form-urlencoded,mpfd
 // @Router /auth/login [post]
 func login(c *gin.Context) {
 	username := c.PostForm("username")
@@ -153,6 +166,7 @@ func login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: "Username and password can not be empty",
 		})
+		return
 	}
 
 	userEntry, err := database.QueryFirstUserEntry("username", username)
@@ -160,6 +174,12 @@ func login(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
 			Message: err.Error(),
+		})
+		return
+	}
+	if userEntry.ID == 0 {
+		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
+			Message: "Invalid username or password",
 		})
 		return
 	}
@@ -185,7 +205,6 @@ func login(c *gin.Context) {
 		Role:    userEntry.Role,
 		Message: "Expires in 6 hours. To access APIs send the token in header as \"Authorization: Bearer <token>\"",
 	})
-	return
 }
 
 // Signup
@@ -197,10 +216,11 @@ func login(c *gin.Context) {
 // @Param username formData string true "Username"
 // @Param password formData string true "Password"
 // @Param email formData string true "User's email id"
-// @Param ssh-key formData string false "User's ssh-key"
+// @Param ssh-key formData string true "User's ssh-key"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
+// @Accept x-www-form-urlencoded,mpfd
 // @Router /auth/register [post]
 func register(c *gin.Context) {
 	name := c.PostForm("name")
@@ -215,10 +235,10 @@ func register(c *gin.Context) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	sshKey = strings.TrimSpace(sshKey)
 
-	if username == "" || password == "" || email == "" {
+	if username == "" || password == "" || email == "" || sshKey == "" {
 
 		c.JSON(http.StatusBadRequest, HTTPPlainResp{
-			Message: "Username, password and email can not be empty",
+			Message: "Username, password, email, and sshKey can not be empty",
 		})
 		return
 	}
@@ -229,6 +249,16 @@ func register(c *gin.Context) {
 		})
 		return
 	}
+
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sshKey))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "SSH Key is not valid",
+		})
+		return
+	}
+
+	sshKey = string(ssh.MarshalAuthorizedKey(key))
 
 	userEntry := database.User{
 		Name:      name,
@@ -268,7 +298,8 @@ func register(c *gin.Context) {
 			}
 		}
 	}
-	err := database.CreateUserEntry(&userEntry)
+
+	err = database.CreateUserEntry(&userEntry)
 
 	if err != nil {
 		c.JSON(http.StatusNotAcceptable, HTTPErrorResp{
@@ -277,11 +308,7 @@ func register(c *gin.Context) {
 		return
 	}
 
-	if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
-	}
+	invalidateLeaderboardCachesIfSmall()
 
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: "User created successfully",
@@ -295,14 +322,22 @@ func register(c *gin.Context) {
 // @Produce json
 // @Param new_pass formData string true "New Password"
 // @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPPlainResp
 // @Failure 401 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /auth/reset-password [post]
 func resetPasswordHandler(c *gin.Context) {
-	newPass := c.PostForm("new_pass")
-	newPass = strings.TrimSpace(newPass)
+	newPass := strings.TrimSpace(c.PostForm("new_pass"))
+	if newPass == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "New password cannot be empty",
+		})
+		return
+	}
 
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
+	username, err := resolveRequestUsername(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized user",
@@ -311,10 +346,11 @@ func resetPasswordHandler(c *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil {
+	if err != nil || user.ID == 0 {
 		c.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized user",
 		})
+		return
 	}
 
 	authModel := auth.CreateModel(username, newPass, user.Role)

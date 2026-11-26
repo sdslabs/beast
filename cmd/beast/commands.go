@@ -32,15 +32,19 @@ var (
 	Tags                  string
 	NoCache               bool
 	RestoreFile           string
+	NonInteractive        bool
 )
 
 // Root command `beast` all commands are either a flag to this command
 // or a subcommand for this.
 var rootCmd = &cobra.Command{
-	Use:   "beast",
-	Short: "Beast is an deployment and management tool for CTF challenges.",
-	Long:  LONG_DESCRIPTION_BEAST,
+	Use:               "beast",
+	Short:             "Deploy and manage CTF challenges with Beast",
+	Long:              LONG_DESCRIPTION_BEAST,
+	DisableAutoGenTag: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		config.LoadEnvFile()
+
 		if Verbose {
 			debug.Enable()
 		} else {
@@ -74,7 +78,7 @@ func Execute() {
 // * Initialize Beast, run bootsteps and check if it is configured properly
 // * runCmd: Run beast API server.
 func init() {
-	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Print extra information in stdout1")
+	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose logging")
 
 	runCmd.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to run the beast server on.")
 	runCmd.PersistentFlags().StringVarP(&DefaultAuthorPassword, "defaultauthorpassword", "q", "", "Default password for creating author, users are not created if value is empty string")
@@ -103,7 +107,7 @@ func init() {
 	challengeCmd.PersistentFlags().BoolVarP(&AllChalls, "all", "a", false, "Performs action to all challs")
 	challengeCmd.PersistentFlags().StringVarP(&Tag, "tag", "t", "", "Performs action to the tag provided")
 	challengeCmd.PersistentFlags().StringVarP(&LocalDirectory, "local-directory", "l", "", "Deploys challenge from local directory")
-	challengeCmd.PersistentFlags().BoolVarP(&DeleteEntry, "delete-entry", "d", false, "Deletes db entry related to this challenge")
+	challengeCmd.PersistentFlags().BoolVarP(&DeleteEntry, "delete-entry", "d", false, "Compatibility flag for purge, which already removes the challenge record")
 	challengeCmd.PersistentFlags().BoolVarP(&NoCache, "no-cache", "c", false, "Build image of challenge without using cache")
 
 	cmdRef.PersistentFlags().StringVarP(&RefDirectory, "reference-directory", "r", "", "Generate beast command reference files in reference directory")
@@ -113,8 +117,10 @@ func init() {
 
 	restoreDatabaseCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Backup file to be used for restoration.")
 
-
 	restoreCacheCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Restore file to be used for restoration.")
+
+	initCmd.PersistentFlags().BoolVarP(&NonInteractive, "non-interactive", "y", false, "Run setup non-interactively with defaults")
+	configCmd.PersistentFlags().BoolVarP(&NonInteractive, "non-interactive", "y", false, "Run configuration non-interactively with defaults")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)

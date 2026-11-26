@@ -2,12 +2,14 @@ package api
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"html/template"
 	"log"
-	"math/rand"
+	"math/big"
+	"net"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -24,17 +26,24 @@ import (
 	"gorm.io/gorm"
 )
 
-func generateOTP() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return fmt.Sprintf("%06d", r.Intn(1000000)) // 6-digit OTP
+func generateOTP() (string, error) {
+	code, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", code.Int64()), nil
 }
 
-// sendEmail sends an OTP email using an SMTP client with TLS. Falls back to plain text if template is missing.
+// sendEmail sends an OTP email using an SMTP client (supports implicit TLS on port 465, STARTTLS, and plain SMTP with optional auth). Falls back to plain text if template is missing.
 func sendEmail(email, otp string) error {
 	from := config.Cfg.MailConfig.From
 	password := config.Cfg.MailConfig.Password
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
+
+	if from == "" {
+		from = "noreply@beast.local"
+	}
 
 	// Email subject
 	subject := "Your OTP Code"
@@ -69,7 +78,7 @@ func sendEmail(email, otp string) error {
 	} else {
 		// Template does not exist, send plain text email
 		log.Println("Template not found, sending plain text email.")
-		body.WriteString(fmt.Sprintf("Hello,\n\nYour OTP is: %s\nThis OTP will expire in 10 minutes.\n\nRegards,\nTeam", otp))
+		body.WriteString(fmt.Sprintf("Hello,\n\nYour OTP is: %s\nThis OTP will expire in 5 minutes.\n\nRegards,\nTeam", otp))
 	}
 
 	// Create email headers
@@ -79,7 +88,7 @@ func sendEmail(email, otp string) error {
 		"MIME-Version: 1.0\r\n"
 
 	// Set Content-Type based on template availability
-	if body.String()[0] == '<' {
+	if body.Len() > 0 && body.String()[0] == '<' {
 		message += "Content-Type: text/html; charset=\"utf-8\"\r\n\r\n"
 	} else {
 		message += "Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n"
@@ -87,31 +96,39 @@ func sendEmail(email, otp string) error {
 
 	message += body.String()
 
-	// Setup TLS connection
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true, // Set true only if SMTP server uses self-signed certs
-		ServerName:         smtpHost,
-	}
-
-	// Connect to SMTP server
-	conn, err := tls.Dial("tcp", smtpHost+":"+smtpPort, tlsConfig)
+	addr := net.JoinHostPort(smtpHost, smtpPort)
+	tlsConfig := &tls.Config{ServerName: smtpHost, MinVersion: tls.VersionTLS12}
+	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
-		log.Println("Failed to connect to SMTP server:", err)
+		return fmt.Errorf("connect to SMTP: %w", err)
+	}
+	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(15 * time.Second)); err != nil {
 		return err
 	}
-
+	if smtpPort == "465" {
+		conn = tls.Client(conn, tlsConfig)
+	}
 	client, err := smtp.NewClient(conn, smtpHost)
 	if err != nil {
-		log.Println("Failed to create SMTP client:", err)
-		return err
+		return fmt.Errorf("initialize SMTP session: %w", err)
 	}
 	defer client.Close()
+	if smtpPort != "465" {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(tlsConfig); err != nil {
+				return fmt.Errorf("start SMTP TLS: %w", err)
+			}
+		}
+	}
 
-	// Authenticate
-	auth := smtp.PlainAuth("", from, password, smtpHost)
-	if err := client.Auth(auth); err != nil {
-		log.Println("SMTP authentication failed:", err)
-		return err
+	// Authenticate only when credentials are configured
+	if password != "" {
+		auth := smtp.PlainAuth("", from, password, smtpHost)
+		if err := client.Auth(auth); err != nil {
+			log.Println("SMTP authentication failed:", err)
+			return err
+		}
 	}
 
 	// Set sender and recipient
@@ -154,12 +171,31 @@ func sendEmail(email, otp string) error {
 	return nil
 }
 
+// @Summary Send a registration verification code
+// @Tags auth
+// @Accept x-www-form-urlencoded,mpfd
+// @Produce json
+// @Param email formData string true "Email address"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /auth/send-otp [post]
 func sendOTPHandler(c *gin.Context) {
 	if config.SkipAuthorization {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "OTP verification skipped in no-auth mode",
+		})
 		return
 	}
 	email := c.PostForm("email")
 	email = strings.TrimSpace(strings.ToLower(email))
+
+	if email == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email cannot be empty",
+		})
+		return
+	}
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -172,7 +208,11 @@ func sendOTPHandler(c *gin.Context) {
 		return
 	}
 
-	otp := generateOTP()
+	otp, err := generateOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Failed to generate OTP"})
+		return
+	}
 	expiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
 
 	otpEntry, err := database.QueryOTPEntry(email)
@@ -227,10 +267,28 @@ func sendOTPHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Verify a registration code
+// @Tags auth
+// @Accept x-www-form-urlencoded,mpfd
+// @Produce json
+// @Param email formData string true "Email address"
+// @Param otp formData string true "Six-digit email code"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 401 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /auth/verify-otp [post]
 func verifyOTPHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	otp := strings.TrimSpace(c.PostForm("otp"))
 	email = strings.TrimSpace(strings.ToLower(email))
+
+	if email == "" || otp == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email and OTP cannot be empty",
+		})
+		return
+	}
 
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
@@ -251,6 +309,7 @@ func verifyOTPHandler(c *gin.Context) {
 				c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 					Error: "OTP not found",
 				})
+				return
 			} else {
 				log.Println("Failed to query OTP:", err)
 				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
@@ -263,13 +322,6 @@ func verifyOTPHandler(c *gin.Context) {
 		if otpEntry.Verified {
 			c.JSON(http.StatusOK, HTTPPlainResp{
 				Message: "Email already verified",
-			})
-			return
-		}
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "Failed to verify OTP",
 			})
 			return
 		}
@@ -302,12 +354,31 @@ func verifyOTPHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Send a password recovery code
+// @Tags auth
+// @Accept x-www-form-urlencoded,mpfd
+// @Produce json
+// @Param email formData string true "Email address"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /auth/send-otp-forget [post]
 func sendOTPForForgetHandler(c *gin.Context) {
 	if config.SkipAuthorization {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "OTP verification skipped in no-auth mode",
+		})
 		return
 	}
 	email := c.PostForm("email")
 	email = strings.TrimSpace(strings.ToLower(email))
+
+	if email == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email cannot be empty",
+		})
+		return
+	}
 
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -320,7 +391,11 @@ func sendOTPForForgetHandler(c *gin.Context) {
 		return
 	}
 
-	otp := generateOTP()
+	otp, err := generateOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{Error: "Failed to generate OTP"})
+		return
+	}
 	expiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
 
 	otpEntry, err := database.QueryOTPEntry(email)
@@ -368,10 +443,29 @@ func sendOTPForForgetHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Verify a password recovery code
+// @Tags auth
+// @Accept x-www-form-urlencoded,mpfd
+// @Produce json
+// @Param email formData string true "Email address"
+// @Param otp formData string true "Six-digit email code"
+// @Success 200 {object} api.HTTPAuthorizeResp
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 401 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /auth/verify-otp-forget [post]
 func verifyOTPForForgetHandler(c *gin.Context) {
 	email := c.PostForm("email")
 	otp := strings.TrimSpace(c.PostForm("otp"))
 	email = strings.TrimSpace(strings.ToLower(email))
+
+	if email == "" || otp == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Email and OTP cannot be empty",
+		})
+		return
+	}
+
 	if !config.SkipAuthorization {
 		smtpHost := config.Cfg.MailConfig.SMTPHost
 		smtpPort := config.Cfg.MailConfig.SMTPPort
@@ -399,7 +493,7 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 			return
 		}
 
-		if otpEntry.Code != otp {
+		if otpEntry.Code == "" || otpEntry.Code != otp {
 			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 				Error: "Invalid OTP",
 			})
@@ -412,11 +506,21 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 			})
 			return
 		}
+
+		otpEntry.Code = ""
+		otpEntry.Expiry = time.Unix(0, 0)
+		_ = database.CreateOTPEntry(&otpEntry)
 	}
 	userEntry, err := database.QueryFirstUserEntry("email", email)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: err.Error(),
+		})
+		return
+	}
+	if userEntry.ID == 0 {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "User not found",
 		})
 		return
 	}

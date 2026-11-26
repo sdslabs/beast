@@ -1,6 +1,17 @@
 #!/bin/bash
 
 echo -e "Setting up sample environment for beast..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HYDRA_SETUP_SCRIPT="${SCRIPT_DIR}/hydra-net-setup.sh"
+
+setup_hydra_net() {
+    if [ ! -f "$HYDRA_SETUP_SCRIPT" ]; then
+        echo -e "\e[31mHydra network setup script not found at $HYDRA_SETUP_SCRIPT"
+        exit 1
+    fi
+    echo -e "Setting up hydra-net..."
+    bash "$HYDRA_SETUP_SCRIPT"
+}
 
 # Creating required directories
 mkdir -p "$HOME/.beast" "$HOME/.beast/assets/logo" "$HOME/.beast/remote" "$HOMER/.beast/uploads" "$HOME/.beast/secrets" "$HOME/.beast/scripts" "$HOME/.beast/staging"
@@ -49,3 +60,4 @@ else
     exit
 fi
 
+setup_hydra_net

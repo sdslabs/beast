@@ -7,8 +7,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/cache"
+	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
-	"os/exec"
 	"strings"
 )
 
@@ -44,8 +44,12 @@ func CleanupOrphans() {
 			continue
 		}
 
-		_, err = cache.GetInstance(instanceID)
+		known, err := cache.IsInstanceKnown(instanceID)
 		if err != nil {
+			log.Warnf("Skipping orphan check for instance %s on %s: %v", instanceID, core.LOCALHOST, err)
+			continue
+		}
+		if !known {
 			containerName := ""
 			if len(container.Names) > 0 {
 				containerName = strings.TrimPrefix(container.Names[0], "/")
@@ -80,16 +84,18 @@ func CleanupOrphanedComposeInstances() {
 	}
 
 	for _, projectName := range projectNames {
-		// Extract instance ID from project name: beast-instance-{encoded_challenge}-{instanceID}
-		parts := strings.Split(projectName, "-")
-		if len(parts) < 4 {
+		instanceID, ok := utils.ExtractInstanceIDFromComposeProjectName(projectName)
+		if !ok {
 			continue
 		}
-		instanceID := parts[len(parts)-1]
 
-		// Check if instance still exists in cache
-		_, err = cache.GetInstance(instanceID)
+		// Check if instance still exists or is spawning in cache
+		known, err := cache.IsInstanceKnown(instanceID)
 		if err != nil {
+			log.Warnf("Skipping orphan check for compose instance %s on %s: %v", instanceID, core.LOCALHOST, err)
+			continue
+		}
+		if !known {
 			log.Infof("Removing orphaned compose instance project: %s (instance %s) on %s", projectName, instanceID, core.LOCALHOST)
 
 			err = composeDownProject(projectName)
@@ -106,7 +112,7 @@ func CleanupOrphanedComposeInstances() {
 // getOrphanedComposeInstanceProjects returns a list of docker compose project names
 // that match the instance naming pattern (beast-instance-*)
 func getOrphanedComposeInstanceProjects() ([]string, error) {
-	cmd := exec.Command("docker", "compose", "ls", "--format", "json")
+	cmd := newDockerCmd("compose", "ls", "--format", "json")
 	var output bytes.Buffer
 	cmd.Stdout = &output
 	cmd.Stderr = &output
@@ -152,7 +158,7 @@ func getOrphanedComposeInstanceProjects() ([]string, error) {
 
 // composeDownProject removes a docker compose project by name
 func composeDownProject(projectName string) error {
-	cmd := exec.Command("docker", "compose", "-p", projectName, "down", "--remove-orphans", "-v")
+	cmd := newDockerCmd("compose", "-p", projectName, "down", "--remove-orphans", "-v")
 	var output bytes.Buffer
 	cmd.Stdout = &output
 	cmd.Stderr = &output

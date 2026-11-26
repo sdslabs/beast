@@ -21,7 +21,7 @@
 - [Overview](#overview)
 - [Features](#features)
 - [Supported Challenge](#supported-challenges)
-- [Download](#download)
+- [Setup](#setup)
 - [Tech Stack](#tech-stack)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -47,7 +47,7 @@ If you're looking for the source code of playCTF, the frontend powered by Beast,
 - Single source of truth for all the static content related to all the challenges making it easy to debug, monitor and manage
   static content through a single interface.
 - Support for various notification channels like slack, discord.
-- Everything embedded to a single go binary which can be easily used anywhere.
+- Single Go binary for the CLI and API, with Docker, PostgreSQL, and Redis as runtime dependencies.
 
 For more details on the features, refer to [Features](./docs/Features.md)
 
@@ -59,19 +59,13 @@ As of now beast support the following type of challenges:
 - Web - Web based challenges for various languages including PHP, Python, Node.js etc.
 - Static - Challenges with static files, this may include forensics challenges.
 - Bare - Highly customisable challenges.
-- Docker - Challenges which are provided with their own docker file.
+- Custom Dockerfile - Challenges that provide their own image build using `docker_context`.
+- Docker Compose - Multi-service challenges that provide a Compose file using `docker_compose`.
+- Instanced - Per-user containers for supported service and Docker Compose configurations.
 
-## Download
+## Setup
 
-Assuming you have the [docker](https://www.docker.com/) installed, head over to Beast's [releases](https://github.com/sdslabs/beast/releases) page and grab the latest binary and `setup.sh` script.
-
-Run the `setup.sh` script once. It will setup the required folders and configuration files for you.
-
-Run the downloaded binary with
-
-```bash
-$ ./beast run -v
-```
+Build from this checkout to use the code described here. The setup guide covers Docker, PostgreSQL, Redis, and first-time configuration. [Setup guide](./docs/Setup.md)
 
 ## Tech Stack
 
@@ -79,27 +73,24 @@ Beast is written completely in Golang and comes with a clean REST API interface 
 The REST API server is implemented using `gin` go library and uses JWT as an authentication mechanism. Being written in go, Beast is compiled into
 a single binary which can run on any linux distribution.
 
-Beast uses Docker as a container runtimes to run challenges in a sandboxed environment. Note that container does not provide a very strong isolation, but our host is safe as long as there is no 0-day in linux kernel itself. Even though container provide a security layer for the challenges, we follow some practices to harden those security measures.
+Beast uses Docker and Docker Compose to run and manage challenge workloads.
 
 We use Swagger for automatic generation of API documentation and you can find the docs at `/api/docs/index.html` from beast server root.
 
-To save the state of the deployments and challenges beast uses SQLite as a database, all the information ranging from challenge deployment state to allocated ports and author information is stored in this database. This database is created automatically in the root of your beast configuration directory.
+To save the state of deployments, challenges, users, and submissions Beast uses PostgreSQL (`psql_config`) and Redis (`redis_config`) for caching and instanced-challenge state/port allocation.
 
 ## Development
 
-Beast go version is under development; follow the below instructions to get started.
+Beast go version is under active development; follow the below instructions to get started.
 
-- Make sure you have docker up and running.
-- Install go [1.18.X](https://golang.org/dl/) or above
-- Make sure that `GO111MODULES` environment variable should be set to `on`, or do `export GO111MODULES=on`
+- Make sure you have Docker, PostgreSQL, and Redis up and running.
+- Install Go 1.23+ (`go.mod` targets `go 1.23.0`)
 - Clone the repository.
-- Jump to `$GOPATH/src/github.com/sdslabs/beast/` and start hacking.
+- Run `make help` inside the repository root to inspect available targets.
 
 ```bash
 $ go version
-go version go1.18 linux/amd64
-
-$ export GO111MODULES=on
+go version go1.23.0 linux/amd64
 
 $ git clone git@github.com:sdslabs/beast.git
 
@@ -111,11 +102,12 @@ BEAST: An automated challenge deployment tool for backdoor
 * check_format: Check for formatting errors using gofmt
 * format: format the go files using go_fmt in the project directory.
 * requirements: Build beast extra artifacts requirements
-* test: Run tests for beast
+* test: Run the Go test suite
+* test-examples: Validate all bundled challenge configurations
 * tools: Set up required tools for Beast which includes - docker-enter, importenv
 ```
 
-**All the dependencies are already vendored with the project, so no need to install any dependencies**. The project uses go modules from go 1.18.X of dependency management. Make sure you vendor any library used using `go mod vendor`
+**Dependencies are tracked in `go.mod` (with optional `vendor/` sync via `go mod vendor`).**
 
 ### Building
 
@@ -123,9 +115,11 @@ To build Beast from Source use the Makefile provided.
 
 - `make build`
 
-This will build Beast and place the binary in `$GOPATH/bin/` and copy the necessery tools to the desired place. To build this in production make sure you also have built the static-content docker image in `/extras/static-content`
+This builds Beast into the Go binary directory (`go env GOBIN`, or the first `go env GOPATH` entry followed by `/bin`) and installs the tools needed for SSH access and provisioning. To run the separate static content server, build the image in [extras/static-content](./extras/static-content).
 
-To run the API server for Beast, use the command `beast run -v`
+To run the API server for Beast, use the command `beast run -v` (or `beast run -nv` for local development without JWT authorization)
+
+`make up NAME=myctf` starts the PostgreSQL and Redis dependencies. Start the Beast API separately with `beast run`. When running Beast in a container, provision the Hydra network and firewall rules on the Docker host before deploying instanced Compose challenges. See the [instanced Compose example](./_examples/instanced-compose).
 
 ### Hot reloading support
 
@@ -140,51 +134,28 @@ curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh
 
 ### Testing
 
-To test use the sample challenges in the `_examples` directory. Use the challenge simple and try to deploy it using
-Beast. Follow the below instructions.
+Run `make test` for the Go suite and `make test-examples` to validate all ten bundled configurations. The example check requires a built and configured Beast. The PostgreSQL, Redis, and Docker integration tests use disposable services.
 
-You can find swagger API documentation here: http://localhost:5005/api/docs/index.html
+| Test dependency | Configuration |
+| --- | --- |
+| PostgreSQL | Set `BEAST_TEST_PG_DSN` to the test database connection string. |
+| Redis | Set `BEAST_TEST_REDIS_ADDR`. For the API tests, set `REDIS_HOST` and `REDIS_PORT` to a disposable Redis server that accepts unauthenticated test connections. Set `BEAST_TEST_REDIS_FLUSH=1` only on an isolated test database to enable tests that clear it. |
+| Docker | Set `BEAST_TEST_DOCKER=1` and, optionally, `BEAST_TEST_DOCKER_IMAGE`. |
 
-```bash
-# Build beast
-$ make build
+Run `go test -race -count=1 ./...` with the fixture variables set to include integration checks. The submission concurrency script under `scripts/test/` uses its own PostgreSQL and Redis connection settings and recreates the selected test database.
 
-# Run beast server
-# Beast server will start running on port 5005 port by default
-$ beast run -v
-
-# In another terminal Start the local deployment of the challenge, using the directory
-$ curl -X POST localhost:5005/api/manage/deploy/local/ --data "challenge_dir=<absolute_path_to_challenge_simple>"
-
-# Or you can directly deploy the challenge using name in the remote
-$ curl -X POST --data "action=deploy&name=<challenge_name>" localhost:5005/api/manage/challenge/
-
-# Wait for Beast to finish the image build and deployment of the challenge
-# This might take some time. Have some snacks ready!
-# Try connecting to the deployed service
-$ nc localhost 10001
-
---- Menu ---
-1.New note
-2.Delete note
-3.Help
-4.Exit
-choice > 4
-```
+For a smoke test, follow the [static challenge walkthrough](./docs/GettingStarted.md). Swagger is available at `/api/docs/index.html` on a running Beast server.
 
 ### Building documentation
 
-The documentation for the project lies in [/docs](/docs). We use `mkdocs` to automatically generate documentation from markdown. The configuration file for the same can be found at [mkdocs.yml](/mkdocs.yml). To view the documentation locally, create a virtual environment locally and install [requirements](/requirements-dev.txt).
-
-```bash
-$ virtualenv venv && source venv/bin/activate
-
-$ pip install -r requirements.txt
-
-$ mkdocs serve
-
-Serving on http://127.0.0.1:8000
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+make docs
 ```
+
+The documentation site and its Swagger page are generated into `site/`. Run `make cmdref` to refresh the CLI pages after changing commands. See the [API contributor notes](./api/README.md) for Swagger regeneration.
 
 ## Contributing
 

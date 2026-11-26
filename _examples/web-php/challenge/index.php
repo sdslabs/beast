@@ -1,8 +1,8 @@
 <?php 
 
 echo "Hey this is a php script, served through PHP Cli web server.\n";
-echo "Below is the source code for the file.";
+echo "Below is the source code for the file.\n";
 
-highlight_file("./index.php", true);
+highlight_file("./index.php");
 
 ?>

@@ -5,11 +5,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"html/template"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/araddon/dateparse"
@@ -17,6 +17,7 @@ import (
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
 	tools "github.com/sdslabs/beastv4/templates"
+	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 
 	"gorm.io/gorm"
@@ -63,13 +64,14 @@ type Challenge struct {
 	Status             string `gorm:"not null;default:'Undeployed'"`
 	DeploymentType     string `gorm:"not null;default:'standard_docker'"`
 	AuthorID           uint   `gorm:"not null"`
+	Author             User   `gorm:"foreignKey:AuthorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	HealthCheck        uint   `gorm:"not null;default:1"`
 	Points             uint   `gorm:"default:0"`
 	MaxPoints          uint   `gorm:"default:0"`
 	MinPoints          uint   `gorm:"default:0"`
 	Ports              []Port
 	Tags               []*Tag  `gorm:"many2many:tag_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Users              []*User `gorm:"many2many:user_challenges;"`
+	Users              []*User `gorm:"many2many:user_challenges;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	ServerDeployed     string  `gorm:"type:varchar(64)"`
 	Instanced          bool    `gorm:"not null;default:false"`
 	InstanceExpiration int64   `gorm:"default:0"`
@@ -78,10 +80,10 @@ type Challenge struct {
 type UserChallenges struct {
 	ID        uint `gorm:"primaryKey"`
 	CreatedAt time.Time
-	User      User `gorm:"foreignKey:UserID"`
+	User      User `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	UserID    uint
 
-	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
+	Challenge   Challenge `gorm:"foreignKey:ChallengeID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	ChallengeID uint
 	Tries       uint   `gorm:"not null;default:0"`
 	Solved      bool   `gorm:"not null;default:false;index"`
@@ -107,7 +109,7 @@ type UserLeaderboardResp struct {
 	TimeSeriesdata []TimeSeries `json:"timeSeriesData"`
 }
 type TimeSeries struct {
-	Timestamp time.Time `json:"timestamp" example:"2018-12-31T22:20:08"`
+	Timestamp time.Time `json:"timestamp" example:"2018-12-31T22:20:08.123+00:00"`
 	Score     uint      `json:"score" example:"750"`
 }
 
@@ -276,7 +278,10 @@ func QueryFirstChallengeEntry(key string, value string) (Challenge, error) {
 // Check Pre Reqs Status
 func CheckPreReqsStatus(challenge Challenge, userID uint) (bool, error) {
 	// Split the PreReqs field to get the list of prerequisite challenge names
-	preReqChallengeNames := strings.Split(challenge.PreReqs, core.DELIMITER)
+	preReqChallengeNames := utils.SplitDelimited(challenge.PreReqs, core.DELIMITER)
+	if len(preReqChallengeNames) == 0 {
+		return true, nil
+	}
 
 	// Check if all prerequisite challenges are solved
 	for _, preReq := range preReqChallengeNames {
@@ -386,7 +391,7 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(challenge).Association("Tags").Error; err != nil {
+	if err := Db.Model(challenge).Association("Tags").Find(&tags); err != nil {
 		return tags, err
 	}
 
@@ -518,7 +523,7 @@ func QuerySubmissions(whereMap map[string]interface{}) ([]UserChallenges, error)
 	return userChallenges, nil
 }
 
-func SaveFlagSubmission(user_challenges *UserChallenges) error {
+func SaveChallengeSubmission(user_challenges *UserChallenges) error {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
@@ -556,15 +561,11 @@ func SaveFlagSubmission(user_challenges *UserChallenges) error {
 
 // hook after update of challenge
 func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
-	iFace, _ := tx.InstanceGet("gorm:update_attrs")
-	if iFace == nil {
-		return nil
-	}
-	updatedAttr := iFace.(map[string]interface{})
-	if _, ok := updatedAttr["container_id"]; ok {
+	if tx.Statement != nil && (tx.Statement.Changed("ContainerId") || tx.Statement.Changed("container_id")) {
 		var users []*User
-		Db.Model(challenge).Association("Users")
-		go updateScripts(users)
+		if err := Db.Model(challenge).Association("Users").Find(&users); err == nil && len(users) > 0 {
+			go updateScripts(users)
+		}
 	}
 	return nil
 }
@@ -572,8 +573,9 @@ func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
 // hook after create of challenge
 func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
 	var users []*User
-	Db.Model(challenge).Association("Users")
-	go updateScripts(users)
+	if err := Db.Model(challenge).Association("Users").Find(&users); err == nil && len(users) > 0 {
+		go updateScripts(users)
+	}
 
 	return nil
 }
@@ -581,8 +583,9 @@ func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
 // hook after deleting the challenge
 func (challenge *Challenge) AfterDelete(tx *gorm.DB) error {
 	var users []*User
-	Db.Model(challenge).Association("Users")
-	go updateScripts(users)
+	if err := Db.Model(challenge).Association("Users").Find(&users); err == nil && len(users) > 0 {
+		go updateScripts(users)
+	}
 	return nil
 }
 

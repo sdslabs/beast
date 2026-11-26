@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/sdslabs/beastv4/core/database"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -9,8 +11,8 @@ import (
 var resetDatabaseCmd = &cobra.Command{
 	Use:   "reset-database",
 	Short: "Backups the existing database and cleans up old db and remote/staging directories",
-	Run: func(cmd *cobra.Command, args []string) {
-		database.BackupAndReset()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return database.BackupAndReset()
 	},
 }
 
@@ -22,6 +24,7 @@ var restoreDatabaseCmd = &cobra.Command{
 			err := database.RestoreDatabase(RestoreFile)
 			if err != nil {
 				log.Errorf("Error restoring database from file %s: %v\n", RestoreFile, err)
+				os.Exit(1)
 			}
 		} else {
 			log.Fatalf("Restore file not specified.")

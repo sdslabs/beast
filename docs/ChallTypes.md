@@ -1,66 +1,14 @@
-# Challenge Types
+# Challenge types
 
-## Service Challenge
+Set `type` in `[challenge.metadata]` and the deployment settings in `[challenge.env]`.
 
-Any service whether it is a binary file, or a shell script, which needs to be instantiated on every connection can be easily hosted using `service` type challenge. **Xinetd** is for hosting these type of challenges inside a docker container.
+| Type | Deployment settings |
+| --- | --- |
+| `static` | Place public assets in the challenge directory or set `static_dir`. Beast stages the files and serves them through the asset API or a separate static server. |
+| `service` | Set `service_path` to a relative executable path and provide a container port. Beast generates an xinetd configuration unless you provide `xinetd_conf`. |
+| `bare` | Set `run_cmd` or `entrypoint` for a generated Dockerfile. Supply container ports and any build dependencies. |
+| `web` and `web:<language>:<version>:<framework>` | Choose a web preset and provide `web_root` and container ports. Examples include `web:php:8.2:cli`, `web:node:20`, and `web:python:3.12:flask`. A plain `web` challenge without a custom build needs its own `run_cmd`. |
 
-###Primary Requirements
+Set `docker_context` to use a custom Dockerfile or `docker_compose` to deploy a multi-service project. These are deployment settings under `[challenge.env]`. The metadata still uses a supported type such as `bare` or `web`.
 
-```toml
-# Relative path to binary or script which needs to be executed when the specified
-# Type for the challenge is service.
-# This can be anything which can be exeucted, a python file, a binary etc.
-service_path = ""
-```
-
-## Web Challenge
-
-Web challenges are hosted using the corresponding images from Dockerhub. Currently only these types are supported:
-
-* Node
-* Python : Django and Flask
-* Php
-
-###Primary Requirements
-
-```toml
-# Relative directory corresponding to root of the challenge where the root
-# of the web application lies.
-web_root = ""
-```
-
-## Static Challenge
-
-All the challenges which requires the hackers to only have static files comes under `static` challenges. All the files are mounted on a single container which serves all the static files to the hackers.
-
-## Bare Challenge
-
-A challenge which requires high level of customization can be hosted using `bare` challenge. In these case, a bare base image is provided with exposed ports. 
-
-###Primary Requirements
-
-```toml
-# Command to execute inside the container, if a predefined type is being used try to
-# use an existing field to let beast automatically calculate what command to run.
-run_cmd = ""
-
-# OR
-
-# Provide a script to run on startup of container
-# Similar to run_cmd but in this case you have the entire container to yourself
-# and everything you are doing is done using root permissions inside the container
-# When using this keep in mind you are root inside the container.
-entrypoint = ""
-```
-
-## Docker Challenge
-
-Authors might have tested the challenges in a isolated docker environment and might not want to port the challenge to one of these types. So they can use `docker` type challenge in which you can provide your own docker context file and ports.
-
-###Primary Requirements
-
-```toml
-# Docker file name for specific type challenge - `docker`.
-# Helps to build flexible images for specific user-custom challenges
-docket_context = ""
-```
+Set `instanced = true` in the metadata to prepare a containerized challenge for per-user spawning. Instanced Compose has a separate SSH and networking contract. See the [configuration reference](ChallConfig.md).

@@ -3,9 +3,9 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type Response struct {
@@ -14,52 +14,34 @@ type Response struct {
 	Token     string `json:"token"`
 }
 
-func Authorize(password string, host string, username string) {
-
-	u, err := url.Parse("auth/login")
-	if err != nil {
-		fmt.Printf("Error while parsing url : %v", err)
-		return
-	}
-
+func Authorize(password string, host string, username string) error {
 	base, err := url.Parse(host)
-	if err != nil {
-		fmt.Printf("Error while parsing url : %v", err)
-		return
+	if err != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") {
+		return fmt.Errorf("invalid Beast server URL")
 	}
 
-	res, err := http.PostForm(base.ResolveReference(u).String(), url.Values{
+	httpClient := &http.Client{Timeout: 15 * time.Second}
+	res, err := httpClient.PostForm(base.JoinPath("auth", "login").String(), url.Values{
 		"username": {username},
 		"password": {password},
 	})
 	if err != nil {
-		fmt.Printf("Error while making post request : %v", err)
-		return
+		return fmt.Errorf("request Beast token: %w", err)
 	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Printf("Error while making post request : %v", err)
-		return
-	}
+	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		fmt.Printf("Response code : %v \nBody : %v", res.StatusCode, string(body))
-		return
+		return fmt.Errorf("Beast login returned %s", res.Status)
 	}
 
 	var response Response
-
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		fmt.Printf("Error while parsing response : %v", err)
-		return
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return fmt.Errorf("decode Beast login response: %w", err)
+	}
+	if response.Token == "" {
+		return fmt.Errorf("Beast login response did not contain a token")
 	}
 
-	fmt.Printf(`
-The response:
-Token 	: %v
-Message	: %v
-	`, response.Token, response.Message)
-
+	fmt.Printf("\nThe response:\nToken \t: %v\nMessage\t: %v\n", response.Token, response.Message)
+	return nil
 }

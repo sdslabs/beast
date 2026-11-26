@@ -1,25 +1,27 @@
 package templates
 
-var CHALLENGE_CONFIG_FILE_TEMPLATE string = `# This a sample challenge configuration file.
+var CHALLENGE_CONFIG_FILE_TEMPLATE string = `# This is a sample challenge configuration file.
 [author]
-name      = {{.Author.Name}}                      # Required: Name of the challenge creator
-email     = {{.Author.Email}}                      # Required: Email for contact
-ssh_key   = {{.Author.SSHKey}}                    # Required: Public SSH key for the challenge author
+name      = "{{.Author.Name}}"                     # Required: Name of the challenge creator
+email     = "{{.Author.Email}}"                    # Required: Email for contact
+ssh_key   = "{{.Author.SSHKey}}"                   # Required: Public SSH key for the challenge author
 
 [challenge.metadata]
-name            = {{.Challenge.Metadata.Name}}         # Required: Name of the challenge, should be same as directory.
-type            = {{.Challenge.Metadata.Type}}         # Required: Type of challenge -> [web:<language>:<version>:<framework> static service]
-dynamicFlag    = {{.Challenge.Metadata.DynamicFlag}} # Required: Dynamic flag or not -> [true/false]
-flag            = {{.Challenge.Metadata.Flag}}         # Challenge Flag if dynamicFlag is false
-difficulty      = {{.Challenge.Metadata.Difficulty}}     # Specify the difficulty of the challenge
+name            = "{{.Challenge.Metadata.Name}}"         # Required: Name of the challenge, should match directory name
+type            = "{{.Challenge.Metadata.Type}}"         # Required: Type of challenge -> [bare web:<lang>:<ver>:<framework> static service]
+dynamicFlag     = {{.Challenge.Metadata.DynamicFlag}}    # Dynamic flag or not -> [true/false]
+flag            = "{{.Challenge.Metadata.Flag}}"         # Challenge flag if dynamicFlag is false
+difficulty      = "{{.Challenge.Metadata.Difficulty}}"   # Specify the difficulty of the challenge
+description     = "{{.Challenge.Metadata.Description}}"  # Challenge description
+points          = {{.Challenge.Metadata.Points}}         # Points awarded for solving
 
 [challenge.env]
-apt_deps         = {{.Challenge.Env.AptDeps}}              # Custom apt-dependencies for challenge
-ports            = {{.Challenge.Env.Ports}}                # Required: Port to expose for the challenge
-setup_script     = {{.Challenge.Env.SetupScripts}}          # Setup script to run additional steps for challenge deployment
-static_dir       = {{.Challenge.Env.StaticContentDir}}     # Static directory to be served for the challenge
-base             = {{.Challenge.Env.BaseImage}}        # Base image-type for the challenge[bare("web", "service"), php(web), node(web)]
-run_cmd          = {{.Challenge.Env.RunCmd}}               # Required(not for web): Entrypoint command for the challenge container(for bare base specify compelete command)
+apt_deps         = []                                    # Custom apt-dependencies for challenge
+ports            = [10000]                               # Required (unless static): Ports to expose for the challenge
+setup_scripts    = []                                    # Setup scripts to run during image build
+static_dir       = "{{.Challenge.Env.StaticContentDir}}" # Static directory to be served for the challenge
+base_image       = "{{.Challenge.Env.BaseImage}}"        # Base image for the challenge
+run_cmd          = "{{.Challenge.Env.RunCmd}}"           # Required for bare challenges: entrypoint command
 `
 
 var BEAST_DOCKERFILE_TEMPLATE string = `# Beast Dockerfile
@@ -31,8 +33,7 @@ LABEL author="SDSLabs"
 RUN groupadd -g 1337 beast-grp
 RUN useradd -u 1337 -g 1337 -ms /bin/bash beast
 
-RUN apt-get -y update && apt-get -y upgrade
-RUN apt-get -y install {{.AptDeps}}
+RUN apt-get -y update && apt-get -y upgrade{{if .AptDeps}} && apt-get -y install {{.AptDeps}}{{end}}
 
 {{if .Ports}}EXPOSE {{.Ports}} {{end}}
 VOLUME ["{{.MountVolume}}"]

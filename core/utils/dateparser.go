@@ -10,35 +10,39 @@ import (
 	"github.com/araddon/dateparse"
 )
 
-func CheckTime() (error, int) {
+func parseBeastDateTime(raw string, loc *time.Location) (time.Time, error) {
+	parts := strings.Split(raw, ",")
+	if len(parts) < 2 {
+		return dateparse.ParseIn(strings.TrimSpace(raw), loc)
+	}
+	dateFields := strings.Fields(parts[1])
+	timeFields := strings.Fields(parts[0])
+	if len(dateFields) < 3 || len(timeFields) < 1 {
+		return time.Time{}, fmt.Errorf("invalid competition time format: %q", raw)
+	}
+	formatted := fmt.Sprintf("%s %s, %s, %s", dateFields[1], dateFields[0], dateFields[2], timeFields[0])
+	return dateparse.ParseIn(formatted, loc)
+}
 
+func CheckTime() (error, int) {
 	competitionInfo, err := config.GetCompetitionInfo()
 	if err != nil {
 		return err, -1
 	}
 
-	loc, _ := time.LoadLocation(strings.Split(competitionInfo.TimeZone, ":")[0])
-	time.Local = loc
+	tzName := strings.TrimSpace(strings.Split(competitionInfo.TimeZone, ":")[0])
+	loc, locErr := time.LoadLocation(tzName)
+	if locErr != nil || loc == nil {
+		loc = time.UTC
+	}
 	currentTime := time.Now().In(loc)
 
-	compStartTime := strings.Split(competitionInfo.StartingTime, ",")
-	compStartDate := strings.Split(compStartTime[1][1:], " ")
-	startDate := fmt.Sprintf("%s %s, %s", compStartDate[1], compStartDate[0], compStartDate[2])
-	startTime := strings.Split(compStartTime[0], " ")[0]
-	startTime = fmt.Sprintf("%s, %s", startDate, startTime)
-
-	st, err := dateparse.ParseLocal(startTime)
+	st, err := parseBeastDateTime(competitionInfo.StartingTime, loc)
 	if err != nil {
 		return err, -1
 	}
 
-	compEndTime := strings.Split(competitionInfo.EndingTime, ",")
-	compEndDate := strings.Split(compEndTime[1][1:], " ")
-	endDate := fmt.Sprintf("%s %s, %s", compEndDate[1], compEndDate[0], compEndDate[2])
-	endTime := strings.Split(compEndTime[0], " ")[0]
-	endTime = fmt.Sprintf("%s, %s", endDate, endTime)
-
-	et, err := dateparse.ParseLocal(endTime)
+	et, err := parseBeastDateTime(competitionInfo.EndingTime, loc)
 	if err != nil {
 		return err, -1
 	}

@@ -16,14 +16,15 @@ type Hint struct {
 }
 
 type UserHint struct {
-	UserID uint
-	User   User `gorm:"foreignKey:UserID"`
+	ID     uint `gorm:"primaryKey"`
+	UserID uint `gorm:"not null;uniqueIndex:idx_user_hints_user_hint"`
+	User   User `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 
-	HintID uint
-	Hint   Hint `gorm:"foreignKey:HintID"`
+	HintID uint `gorm:"not null;uniqueIndex:idx_user_hints_user_hint"`
+	Hint   Hint `gorm:"references:HintID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 
-	ChallengeID uint
-	Challenge   Challenge `gorm:"foreignKey:ChallengeID"`
+	ChallengeID uint      `gorm:"not null"`
+	Challenge   Challenge `gorm:"foreignKey:ChallengeID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 
 	CreatedAt time.Time
 }

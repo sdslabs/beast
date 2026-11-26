@@ -17,8 +17,19 @@ func dummyHandler(c *gin.Context) {
 	})
 }
 
+// @Summary List challenges with their deployment status
+// @Tags status
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} api.ChallengeStatusResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /api/status/all [get]
 func initGinRouter() *gin.Engine {
 	router := gin.New()
+
+	router.Use(gin.Recovery())
+	router.Use(ginLoggerMiddleware())
+	router.Use(requestResponseLogger())
 
 	corsConfig := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
@@ -117,6 +128,11 @@ func initGinRouter() *gin.Engine {
 			configGroup.PATCH("/reload", reloadBeastConfig)
 			configGroup.POST("/competition-info", updateCompetitionInfoHandler)
 			configGroup.POST("/challenge-info", updateChallengeInfoHandler)
+		}
+
+		checkGroup := apiGroup.Group("/check")
+		{
+			checkGroup.POST("/challenge", checkFlagHandler)
 		}
 
 		submitGroup := apiGroup.Group("/submit")

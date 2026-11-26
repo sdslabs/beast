@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -15,7 +14,9 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/pkg/defaults"
 	utils "github.com/sdslabs/beastv4/utils"
 
@@ -26,6 +27,11 @@ import (
 type PortMapping struct {
 	HostPort      uint32
 	ContainerPort uint32
+}
+
+type ExecResult struct {
+	ExitCode int
+	Output   string
 }
 
 // TrafficType is the protocol supported by container ingress and egress through
@@ -217,6 +223,13 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+	if err != nil && len(containerConfig.MountsMap) > 0 && strings.Contains(err.Error(), "bind source path does not exist") {
+		if binds, ok := verifiedHostBinds(containerConfig.MountsMap); ok {
+			hostConfig.Mounts = nil
+			hostConfig.Binds = binds
+			createResp, err = cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+		}
+	}
 	if err != nil {
 		log.Errorf("Error while creating the container with name %s", containerName)
 		return "", err
@@ -228,62 +241,73 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	if err := cli.ContainerStart(ctx, containerId, types.ContainerStartOptions{}); err != nil {
-		log.Errorf("Error while starting the container : %s", err)
+		if cleanupErr := cli.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); cleanupErr != nil {
+			log.Warnf("Unable to remove container %s after startup failure: %v", containerId, cleanupErr)
+		}
 		return "", err
 	}
 
 	return containerId, nil
 }
 
-func GetContainerStdLogs(containerID string) (*Log, error) {
-	cli, err := newDockerClient()
-	if err != nil {
-		return nil, err
+func verifiedHostBinds(mountsMap map[string]string) ([]string, bool) {
+	if len(mountsMap) == 0 {
+		return nil, false
 	}
-
-	stdout, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
-		ShowStdout: true,
-		Details:    true,
-	})
-	if err != nil {
-		return nil, err
+	binds := make([]string, 0, len(mountsMap))
+	for src, dest := range mountsMap {
+		if src == "" || dest == "" || strings.Contains(src, ":") || strings.Contains(dest, ":") {
+			return nil, false
+		}
+		if _, err := os.Stat(src); err != nil {
+			return nil, false
+		}
+		binds = append(binds, fmt.Sprintf("%s:%s", src, dest))
 	}
-	defer stdout.Close()
-
-	stdoutlogs, _ := ioutil.ReadAll(stdout)
-
-	stderr, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
-		ShowStderr: true,
-		Details:    true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer stderr.Close()
-
-	stderrlogs, _ := ioutil.ReadAll(stderr)
-
-	return &Log{Stdout: string(stdoutlogs), Stderr: string(stderrlogs)}, nil
+	return binds, true
 }
 
-func ShowLiveContainerLogs(containerID string) {
+func GetContainerStdLogs(containerID string) (*Log, error) {
+	var stdout, stderr bytes.Buffer
+	if err := writeContainerLogs(containerID, false, &stdout, &stderr); err != nil {
+		return nil, err
+	}
+	return &Log{Stdout: stdout.String(), Stderr: stderr.String()}, nil
+}
+
+func ShowLiveContainerLogs(containerID string) error {
+	return writeContainerLogs(containerID, true, os.Stdout, os.Stderr)
+}
+
+func writeContainerLogs(containerID string, follow bool, stdout, stderr io.Writer) error {
+	ctx := context.Background()
 	cli, err := newDockerClient()
 	if err != nil {
-		log.Error(err)
+		return err
 	}
+	defer cli.Close()
 
-	stream, err := cli.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	info, err := cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return err
+	}
+	stream, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Details:    true,
+		Follow:     follow,
 	})
 	if err != nil {
-		log.Error(err)
+		return err
 	}
 	defer stream.Close()
 
-	logs, _ := ioutil.ReadAll(stream)
-	fmt.Println(string(logs))
+	if info.Config != nil && info.Config.Tty {
+		_, err = io.Copy(stdout, stream)
+	} else {
+		_, err = stdcopy.StdCopy(stdout, stderr, stream)
+	}
+	return err
 }
 
 func CommitContainer(containerId string) (string, error) {
@@ -301,6 +325,93 @@ func CommitContainer(containerId string) (string, error) {
 	return commitResp.ID, nil
 }
 
+func RunCommandInContainer(containerID string, cmd []string) (ExecResult, error) {
+	result := ExecResult{
+		ExitCode: 1,
+	}
+
+	cli, err := newDockerClient()
+	if err != nil {
+		return result, err
+	}
+
+	ctx := context.Background()
+
+	execResp, err := cli.ContainerExecCreate(
+		ctx,
+		containerID,
+		types.ExecConfig{
+			Cmd:          cmd,
+			Tty:          true,
+			AttachStdout: true,
+			AttachStderr: true,
+		},
+	)
+	if err != nil {
+		return result, err
+	}
+
+	resp, err := cli.ContainerExecAttach(
+		ctx,
+		execResp.ID,
+		types.ExecStartCheck{},
+	)
+	if err != nil {
+		return result, err
+	}
+	defer resp.Close()
+
+	var output bytes.Buffer
+	_, err = io.Copy(&output, resp.Reader)
+	if err != nil {
+		return result, err
+	}
+
+	result.Output = output.String()
+
+	inspect, err := cli.ContainerExecInspect(ctx, execResp.ID)
+	if err != nil {
+		return result, err
+	}
+
+	result.ExitCode = inspect.ExitCode
+	return result, nil
+}
+
+// HasExposedPort checks via the Docker SDK whether the container has the specified port
+// published/configured in NetworkSettings.Ports or Config.ExposedPorts.
+func HasExposedPort(containerID string, port uint32, traffic TrafficType) (bool, error) {
+	cli, err := newDockerClient()
+	if err != nil {
+		return false, err
+	}
+	inspect, err := cli.ContainerInspect(context.Background(), containerID)
+	if err != nil {
+		return false, err
+	}
+	proto := traffic.String()
+	if proto == "" {
+		proto = DefaultTraffic.String()
+	}
+	key := nat.Port(fmt.Sprintf("%d/%s", port, proto))
+	if inspect.NetworkSettings != nil {
+		if bindings, ok := inspect.NetworkSettings.Ports[key]; ok && len(bindings) > 0 {
+			return true, nil
+		}
+	}
+	if inspect.Config != nil {
+		if _, ok := inspect.Config.ExposedPorts[key]; ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// VerifyComposeProjectRunning verifies all services in a docker compose project are running.
+func VerifyComposeProjectRunning(projectName string) error {
+	return validateAllComposeServicesRunning(projectName, projectName)
+}
+
 func DeployContainerFromCompose(challengeName string, projectName string, stagedPath string, composeFileName string, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
@@ -309,17 +420,17 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 
 	// Deploy with project name - Docker Compose automatically labels containers with
 	// com.docker.compose.project=<projectName>
-	upCmd := exec.Command("docker", "compose",
+	upCmd := newDockerCmd("compose",
 		"-f", composeFile,
 		"-p", projectName,
 		"up", "-d")
 
-	environment := os.Environ()
+	extraEnv := make([]string, 0, len(ports))
 	for variable, port := range ports {
-		environment = append(environment, fmt.Sprintf("%s=%s", variable, strconv.FormatUint(uint64(port), 10)))
+		extraEnv = append(extraEnv, fmt.Sprintf("%s=%s", variable, strconv.FormatUint(uint64(port), 10)))
 	}
 
-	upCmd.Env = environment
+	upCmd.Env = dockerCommandEnv(extraEnv...)
 
 	var upOutput bytes.Buffer
 	upCmd.Stdout = &upOutput
@@ -336,16 +447,17 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 
 	primaryContainerId, err := getPrimaryComposeContainerId(projectName)
 	if err != nil {
-		log.Warnf("Could not get primary container ID for challenge %s: %v", challengeName, err)
-		return "", nil // Return empty string but success
+		return "", fmt.Errorf("get primary container for %s: %w", challengeName, err)
 	}
+
+	log.Printf("container Id: %s", primaryContainerId)
 
 	log.Debugf("Verified challenge %s services are running. Primary container: %s", challengeName, primaryContainerId)
 	return primaryContainerId, nil
 }
 
 func validateAllComposeServicesRunning(projectName, challengeName string) error {
-	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "--format", "json")
+	psCmd := newDockerCmd("compose", "-p", projectName, "ps", "--format", "json")
 	var psOutput bytes.Buffer
 	psCmd.Stdout = &psOutput
 	psCmd.Stderr = &psOutput
@@ -370,19 +482,27 @@ func validateAllComposeServicesRunning(projectName, challengeName string) error 
 	var services []ComposeService
 	var notRunningServices []string
 
-	for _, line := range strings.Split(output, "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
+	if strings.HasPrefix(output, "[") {
+		if err := json.Unmarshal([]byte(output), &services); err != nil {
+			return fmt.Errorf("failed to parse compose services JSON array for %s: %v", challengeName, err)
 		}
+	} else {
+		for _, line := range strings.Split(output, "\n") {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
 
-		var service ComposeService
-		if err := json.Unmarshal([]byte(line), &service); err != nil {
-			log.Warnf("Failed to parse compose service JSON: %v. Line: %s", err, line)
-			continue
+			var service ComposeService
+			if err := json.Unmarshal([]byte(line), &service); err != nil {
+				log.Warnf("Failed to parse compose service JSON: %v. Line: %s", err, line)
+				continue
+			}
+
+			services = append(services, service)
 		}
+	}
 
-		services = append(services, service)
-
+	for _, service := range services {
 		if service.State != "running" && !strings.HasPrefix(service.Status, "Up") {
 			notRunningServices = append(notRunningServices, service.Service)
 			log.Warnf("Service %s is not running. State: %s, Status: %s", service.Service, service.State, service.Status)
@@ -403,19 +523,22 @@ func validateAllComposeServicesRunning(projectName, challengeName string) error 
 	return nil
 }
 
-// gets the first container ID from a compose project
 func getPrimaryComposeContainerId(projectName string) (string, error) {
-	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q")
+	args := []string{"compose", "-p", projectName, "ps", "-q"}
+	if _, instanced := utils.ExtractInstanceIDFromComposeProjectName(projectName); instanced {
+		args = append(args, core.SSH_CONTAINER_COMPOSE)
+	}
+	psCmd := newDockerCmd(args...)
 	var output bytes.Buffer
 	psCmd.Stdout = &output
 
 	if err := psCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to get container IDs: %v", err)
+		return "", fmt.Errorf("list containers for Compose project %s: %w", projectName, err)
 	}
 
 	containerIds := strings.Fields(strings.TrimSpace(output.String()))
 	if len(containerIds) == 0 {
-		return "", fmt.Errorf("no containers found for project %s", projectName)
+		return "", fmt.Errorf("no primary container found in Compose project %s", projectName)
 	}
 
 	// Return first 12 characters of the first container ID
@@ -429,7 +552,7 @@ func getPrimaryComposeContainerId(projectName string) (string, error) {
 func ComposeDownProject(projectName string) error {
 	log.Debugf("Stopping docker compose project %s", projectName)
 
-	downCmd := exec.Command("docker", "compose", "-p", projectName, "down")
+	downCmd := newDockerCmd("compose", "-p", projectName, "down")
 	var downOutput bytes.Buffer
 	downCmd.Stdout = &downOutput
 	downCmd.Stderr = &downOutput
@@ -446,7 +569,7 @@ func ComposeDownProject(projectName string) error {
 func ComposePurgeProject(projectName string) error {
 	log.Debugf("Purging docker compose project %s", projectName)
 
-	purgeCmd := exec.Command("docker", "compose", "-p", projectName,
+	purgeCmd := newDockerCmd("compose", "-p", projectName,
 		"down", "--remove-orphans", "--volumes", "--rmi", "all")
 
 	var purgeOutput bytes.Buffer

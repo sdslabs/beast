@@ -91,3 +91,26 @@ func PortMappingToEnvironmentVariable(ports map[string]uint32) string {
 
 	return strings.Join(env, " ")
 }
+
+// CleanStringSlice filters out empty and whitespace-only strings from a slice.
+// If the result has length 0 or the input is nil, it returns an empty slice []string{}.
+func CleanStringSlice(slice []string) []string {
+	res := make([]string, 0, len(slice))
+	for _, s := range slice {
+		trimmed := strings.TrimSpace(s)
+		if trimmed != "" {
+			res = append(res, trimmed)
+		}
+	}
+	return res
+}
+
+// SplitDelimited splits a delimited string into a slice of non-empty strings.
+// Returns an empty slice []string{} if the string is empty or contains only whitespace/empty segments.
+func SplitDelimited(s string, sep string) []string {
+	if strings.TrimSpace(s) == "" {
+		return []string{}
+	}
+
+	return CleanStringSlice(strings.Split(s, sep))
+}

@@ -7,13 +7,65 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/utils"
 	"github.com/spf13/cobra"
 )
 
 const maxShowLen int = 20
+
+func formatChallengePorts(chall database.Challenge) (string, error) {
+	ports, err := database.GetAllocatedPorts(chall)
+	if err != nil {
+		return "", err
+	}
+	if len(ports) > 0 {
+		parts := make([]string, 0, len(ports))
+		for _, port := range ports {
+			parts = append(parts, fmt.Sprint(port.PortNo))
+		}
+		return strings.Join(parts, " "), nil
+	}
+
+	if len(chall.Ports) > 0 {
+		parts := make([]string, 0, len(chall.Ports))
+		for _, port := range chall.Ports {
+			parts = append(parts, fmt.Sprint(port.PortNo))
+		}
+		return strings.Join(parts, " "), nil
+	}
+
+	if cache.Cache != nil && chall.ServerDeployed != "" && chall.ContainerId != "" {
+		redisPorts, redisErr := cache.GetContainerPortsOnHost(chall.ServerDeployed, chall.ContainerId)
+		if redisErr == nil && len(redisPorts) > 0 {
+			parts := make([]string, 0, len(redisPorts))
+			for _, port := range redisPorts {
+				parts = append(parts, fmt.Sprint(port))
+			}
+			return strings.Join(parts, " "), nil
+		}
+	}
+
+	if chall.Instanced && cache.Cache != nil {
+		instances, instErr := cache.GetChallengeInstances(chall.Name)
+		if instErr == nil && len(instances) > 0 {
+			var parts []string
+			for _, inst := range instances {
+				for _, p := range inst.Port {
+					parts = append(parts, fmt.Sprint(p))
+				}
+			}
+			if len(parts) > 0 {
+				return fmt.Sprintf("instanced (%s)", strings.Join(parts, ",")), nil
+			}
+		}
+		return "instanced", nil
+	}
+
+	return "", nil
+}
 
 func ShowAllChallenges() []error {
 	challenges, err := database.QueryAllChallenges()
@@ -32,13 +84,11 @@ func ShowAllChallenges() []error {
 		s := []string{challenge.Name, utils.TruncateString(challenge.ContainerId, maxShowLen), utils.TruncateString(challenge.ImageId, maxShowLen), challenge.Status}
 		fmt.Fprint(w, strings.Join(s, "\t"))
 		fmt.Fprint(w, "\t")
-		ports, err := database.GetAllocatedPorts(challenge)
-		if err != nil {
-			errs = append(errs, err)
-		} else {
-			for _, port := range ports {
-				fmt.Fprint(w, " ", port.PortNo)
-			}
+		portStr, portErr := formatChallengePorts(challenge)
+		if portErr != nil {
+			errs = append(errs, portErr)
+		} else if portStr != "" {
+			fmt.Fprint(w, " ", portStr)
 		}
 		fmt.Fprintln(w)
 	}
@@ -67,13 +117,11 @@ func ShowTagRelatedChallenges(Tag string) []error {
 		s := []string{challenge.Name, utils.TruncateString(challenge.ContainerId, maxShowLen), utils.TruncateString(challenge.ImageId, maxShowLen), challenge.Status}
 		fmt.Fprint(w, strings.Join(s, "\t"))
 		fmt.Fprint(w, "\t")
-		ports, err := database.GetAllocatedPorts(challenge)
-		if err != nil {
-			errs = append(errs, err)
-		} else {
-			for _, port := range ports {
-				fmt.Fprint(w, " ", port.PortNo)
-			}
+		portStr, portErr := formatChallengePorts(challenge)
+		if portErr != nil {
+			errs = append(errs, portErr)
+		} else if portStr != "" {
+			fmt.Fprint(w, " ", portStr)
 		}
 		fmt.Fprintln(w)
 	}
@@ -91,14 +139,12 @@ func ShowChallenge(chall database.Challenge) []error {
 	s := []string{chall.Name, utils.TruncateString(chall.ContainerId, maxShowLen), utils.TruncateString(chall.ImageId, maxShowLen), chall.Status}
 	fmt.Fprint(w, strings.Join(s, "\t"))
 	fmt.Fprint(w, "\t")
-	ports, err := database.GetAllocatedPorts(chall)
+	portStr, err := formatChallengePorts(chall)
 
 	if err != nil {
 		errs = append(errs, err)
-	} else {
-		for _, port := range ports {
-			fmt.Fprint(w, " ", port.PortNo)
-		}
+	} else if portStr != "" {
+		fmt.Fprint(w, " ", portStr)
 	}
 	fmt.Fprintln(w)
 	w.Flush()
@@ -116,14 +162,9 @@ func ShowChallengeByName(name string) []error {
 	}
 
 	if len(challenge) > 0 {
-		err := ShowChallenge(challenge[0])
-		for _, e := range err {
-			errs = append(errs, e)
-			return errs
-		}
+		errs = append(errs, ShowChallenge(challenge[0])...)
 	} else {
 		errs = append(errs, errors.New("Provide valid chall name"))
-		return errs
 	}
 
 	return errs
@@ -138,37 +179,29 @@ func PrintTableHeader(w *tabwriter.Writer) {
 
 // ShowFilteredChallengesInfo logs info of challenges filtered by provided status and tags
 func ShowFilteredChallengesInfo(cmd *cobra.Command, args []string) error {
+	status, _ := cmd.Flags().GetString("status")
+	status = strings.ToLower(strings.TrimSpace(status))
+	if _, valid := core.DEPLOY_STATUS[status]; status != "all" && !valid {
+		return fmt.Errorf("invalid deployment status %q", status)
+	}
+	tags, _ := cmd.Flags().GetString("tags")
 
 	challenges, err := database.QueryAllChallenges()
 	if err != nil {
 		return fmt.Errorf("Database query error : %v", err)
 	}
 
-	var filteredChallenges []database.Challenge
-
-	if len(challenges) > 0 {
-		status, _ := cmd.Flags().GetString("status")
-		status = strings.ToLower(status)
-		tags, _ := cmd.Flags().GetString("tags")
-		tags = strings.ToLower(tags)
-		var tagsArray []string
-		if len(tags) > 0 {
-			tagsArray = strings.Split(tags, ",")
-		}
-		filteredChallenges = filterChallenges(challenges, status, tagsArray)
-	} else {
-		return fmt.Errorf("No challenges present in the database.")
+	filteredChallenges := filterChallenges(challenges, status, utils.SplitDelimited(tags, ","))
+	if len(filteredChallenges) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No challenges match the selected filters.")
+		return nil
 	}
 
-	if len(filteredChallenges) > 0 {
-		header := []string{"Name", "Type", "Container ID", "Image ID", "Status", "Tagname", "Health Check", "Ports"}
-		border := utils.CreateBorder(true, false, true, false)
-		tConfigs := utils.CreateTableConfigs(border, header, "|")
-		tData := getTableDataFromChallenges(filteredChallenges)
-		utils.LogTable(tConfigs, tData)
-	} else {
-		return fmt.Errorf("No challenges found for the provided filters.")
-	}
+	header := []string{"Name", "Type", "Container ID", "Image ID", "Status", "Tagname", "Health Check", "Ports"}
+	border := utils.CreateBorder(true, false, true, false)
+	tConfigs := utils.CreateTableConfigs(border, header, "|")
+	tData := getTableDataFromChallenges(filteredChallenges)
+	utils.LogTable(tConfigs, tData)
 
 	return nil
 }
@@ -185,15 +218,6 @@ func tagsIntersection(tagsInput []string, tags []*database.Tag) bool {
 	}
 
 	return false
-}
-
-// concatenateAllPorts returns a string of all the ports of the queried challenge
-func concatenateAllPorts(ports []database.Port) string {
-	var portNumber string
-	for _, port := range ports {
-		portNumber = portNumber + fmt.Sprint(port.PortNo) + " "
-	}
-	return portNumber
 }
 
 // concatenateAllTags returns a string of all the tags of the queried challenge
@@ -235,12 +259,15 @@ func getTableDataFromChallenges(challenges []database.Challenge) [][]string {
 	data := [][]string{}
 	for _, challenge := range challenges {
 		var tagName string = concatenateAllTags(challenge.Tags)
-		var portNumber string = concatenateAllPorts(challenge.Ports)
+		portNumber, err := formatChallengePorts(challenge)
+		if err != nil {
+			portNumber = ""
+		}
 		row := []string{
 			challenge.Name,
 			challenge.Type,
-			challenge.ContainerId[0:15],
-			challenge.ImageId[0:15],
+			utils.TruncateString(challenge.ContainerId, maxShowLen),
+			utils.TruncateString(challenge.ImageId, maxShowLen),
 			challenge.Status,
 			tagName,
 			fmt.Sprintf("%d", challenge.HealthCheck),

@@ -9,6 +9,7 @@ type Scheduler struct {
 	Tasks        TaskMap
 	FuncRegister TaskFunctionRegister
 
+	mu       sync.Mutex
 	stopChan chan bool
 	ticker   *time.Ticker
 
@@ -54,6 +55,9 @@ func (Scheduler *Scheduler) Wait() {
 }
 
 func (scheduler *Scheduler) ScheduleAt(time time.Time, function Function, params ...FuncParam) error {
+	scheduler.mu.Lock()
+	defer scheduler.mu.Unlock()
+
 	funcID, err := scheduler.FuncRegister.AddFunction(function, params...)
 	if err != nil {
 		return err
@@ -73,6 +77,9 @@ func (scheduler *Scheduler) ScheduleAfter(duration time.Duration, function Funct
 }
 
 func (scheduler *Scheduler) ScheduleEvery(duration time.Duration, function Function, params ...FuncParam) error {
+	scheduler.mu.Lock()
+	defer scheduler.mu.Unlock()
+
 	funcID, err := scheduler.FuncRegister.AddFunction(function, params...)
 	if err != nil {
 		return err
@@ -89,10 +96,14 @@ func (scheduler *Scheduler) ScheduleEvery(duration time.Duration, function Funct
 }
 
 func (scheduler *Scheduler) runPending() {
+	scheduler.mu.Lock()
+	defer scheduler.mu.Unlock()
+
 	for id, task := range scheduler.Tasks {
 		if task.IsDue() {
 			if function, ok := scheduler.FuncRegister.Functions[task.FunctionID]; ok {
-				go function.Run()
+				fn := function
+				go fn.Run()
 			}
 
 			if !task.Schedule.IsRecurring {

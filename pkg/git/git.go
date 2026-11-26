@@ -16,6 +16,9 @@ import (
 // The paramter sshKeyFile is the path to the file containing the private
 // key to be used during the transport.
 func getSSHAuth(sshKeyFile string) (*gitssh.PublicKeys, error) {
+	if sshKeyFile == "" {
+		return nil, nil
+	}
 
 	pem, err := ioutil.ReadFile(sshKeyFile)
 	if err != nil {

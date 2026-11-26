@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
@@ -46,6 +47,10 @@ func (Metadata *ChallengeMetadata) PopulateChallengeMetadata() {
 	Metadata.Type = "ChallengeType"
 	Metadata.DynamicFlag = false
 	Metadata.Flag = "ChallengeFlag"
+	Metadata.Assets = []string{}
+	Metadata.Tags = []string{}
+	Metadata.PreReqs = []string{}
+	Metadata.AdditionalLinks = []string{}
 }
 
 func (Env *ChallengeEnv) PopulateChallengeEnv() {
@@ -109,6 +114,21 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 	if err != nil {
 		log.Debugf("Error while validating `ChallengeEnv`'s required fields : %s", err.Error())
 		return err
+	}
+
+	if config.Metadata.IsInstanced() && config.Env.DockerCompose == "" &&
+		slices.Contains(config.Env.Ports, core.SSH_PORT) &&
+		!slices.Contains(config.Env.AptDeps, "openssh-server") {
+		log.Warn("openssh-server not found as dependency for instanced SSH challenge... adding dependency")
+		config.Env.AptDeps = append(config.Env.AptDeps, "openssh-server")
+	}
+
+	if config.Metadata.IsInstanced() && config.Env.DockerCompose != "" {
+		err = config.Env.ValidateInstancedComposeSSHContract(challdir)
+		if err != nil {
+			log.Debugf("Error while validating instanced Docker Compose SSH contract : %s", err.Error())
+			return err
+		}
 	}
 
 	return nil
@@ -267,9 +287,7 @@ func (config *ChallengeMetadata) ValidateRequiredFields() (error, bool) {
 type ChallengeEnv struct {
 	AptDeps          []string         `toml:"apt_deps"`
 	Ports            []uint32         `toml:"ports"`
-	DefaultPort      uint32           `toml:"default_port"`
 	PortVariables    []string         `toml:"-"`
-	DefaultPortVar   string           `toml:"default_port_var"`
 	SetupScripts     []string         `toml:"setup_scripts"`
 	StaticContentDir string           `toml:"static_dir"`
 	RunCmd           string           `toml:"run_cmd"`
@@ -339,7 +357,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if config.DockerCtx != "" {
 			log.Warn("docker_context will be ignored when docker_compose is specified")
 		}
-		if config.BaseImage != core.DEFAULT_BASE_IMAGE {
+		if config.BaseImage != "" && config.BaseImage != core.DEFAULT_BASE_IMAGE {
 			log.Warn("base_image will be ignored when docker_compose is specified")
 		}
 		if config.WebRoot != "" {
@@ -411,10 +429,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	for _, env := range config.EnvironmentVars {
-		if filepath.IsAbs(env.Value) {
-			return fmt.Errorf("environment Variable contains absolute path : %s", env.Value)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
-			return fmt.Errorf("file %s does not exist", env.Value)
+		if env.Key == "" {
+			return fmt.Errorf("environment variable key cannot be empty")
 		}
 	}
 
@@ -435,18 +451,11 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 
 func (config *ChallengeEnv) ExtractPorts() error {
 	if config.DockerCompose == "" {
-		if len(config.Ports) == 0 && config.DefaultPort == 0 {
+		if len(config.Ports) == 0 {
 			return errors.New("some port is required to be specified by the challenge")
 		}
 		if len(config.Ports) > int(core.MAX_PORT_PER_CHALL) {
 			return fmt.Errorf("max ports allowed for challenge : %d given : %d", core.MAX_PORT_PER_CHALL, len(config.Ports))
-		}
-
-		if config.DefaultPort == 0 {
-			config.DefaultPort = config.Ports[0]
-			log.Warnf("default port is 0 for challenge with default port : %d", config.Ports[0])
-		} else if !utils.UInt32InList(config.DefaultPort, config.Ports) {
-			return fmt.Errorf("default port %d was not found in assigned ports", config.DefaultPort)
 		}
 	}
 
@@ -464,16 +473,25 @@ func (config *ChallengeEnv) ExtractPortsCompose(challdir string) error {
 		}
 
 		config.PortVariables = portVariables
-		if config.DefaultPortVar == "" {
-			config.DefaultPortVar = config.PortVariables[0]
-			log.Warnf("default port variable is empty, settting it to %s", config.PortVariables[0])
-		}
-		if !utils.StringInSlice(config.DefaultPortVar, config.PortVariables) {
-			return fmt.Errorf("default port variable: %s was not found", config.DefaultPortVar)
-		}
 	}
 
 	return nil
+}
+
+func (config *ChallengeEnv) ValidateInstancedComposeSSHContract(challdir string) error {
+	if config.DockerCompose == "" {
+		return nil
+	}
+	if len(config.PortVariables) == 0 {
+		return errors.New("no port variables found in docker_compose for instanced SSH challenge")
+	}
+	return utils.ValidateInstancedComposeSSHContract(
+		filepath.Join(challdir, config.DockerCompose),
+		config.PortVariables[0],
+		core.HYDRA_NETWORK_NAME,
+		core.SSH_CONTAINER_COMPOSE,
+		core.SSH_PORT,
+	)
 }
 
 // Metadata related to author of the challenge, this structure includes
