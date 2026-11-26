@@ -117,23 +117,29 @@ func BuildImageFromTarContext(challengeName, challengeTag, tarContextPath, docke
 func BuildImagesFromCompose(challengeName, challengeTag, stagedPath, ComposeFile string, noCache bool) (*bytes.Buffer, error) {
 	extractPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, challengeName)
 
-	extractCmd := fmt.Sprintf("mkdir -p %s && tar -xf %s -C %s", extractPath, stagedPath, extractPath)
-	err := exec.Command("bash", "-c", extractCmd).Run()
-	if err != nil {
-		return nil, fmt.Errorf("error while extracting tar file %s to %s: %v", stagedPath, extractPath, err)
+	if err := os.MkdirAll(extractPath, 0755); err != nil {
+		return nil, fmt.Errorf("error while creating extract directory %s: %v", extractPath, err)
 	}
 
-	cmdArgs := []string{"compose", "build"}
+	extractCmd := exec.Command("tar", "-xf", stagedPath, "-C", extractPath)
+	if out, err := extractCmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("error while extracting tar file %s to %s: %v (%s)", stagedPath, extractPath, err, strings.TrimSpace(string(out)))
+	}
+
+	cmdArgs := []string{"compose"}
+	if ComposeFile != "" {
+		cmdArgs = append(cmdArgs, "-f", ComposeFile)
+	}
+	cmdArgs = append(cmdArgs, "build")
 	if noCache {
 		cmdArgs = append(cmdArgs, "--no-cache")
 	}
 	// Note: docker compose build does not support --label flag
 	// Labels are automatically added to containers during 'docker compose up -p <project>'
-	composeCmd := fmt.Sprintf("docker %s", strings.Join(cmdArgs, " "))
 	log.Debugf("Building image for challenge %s with tag %s", challengeName, challengeTag)
 	log.Debugf("Running the command: docker %v", cmdArgs)
 
-	cmd := exec.Command("bash", "-c", composeCmd)
+	cmd := newDockerCmd(cmdArgs...)
 	cmd.Dir = extractPath
 	var outBuffer bytes.Buffer
 	cmd.Stdout = &outBuffer

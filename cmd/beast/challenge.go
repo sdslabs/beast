@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
@@ -22,15 +23,16 @@ var challengeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		config.InitConfig()
 		database.Init()
+		cache.Init()
 
 		// Since action is already verfied to exist it does not make sense to check
 		// its existence here therefore we directly parse the action from the command.
 		action := args[0]
 		noCache, _ := cmd.Flags().GetBool("no-cache")
-		if noCache && action == core.MANAGE_ACTION_DEPLOY {
+		if noCache && (action == core.MANAGE_ACTION_DEPLOY || action == core.MANAGE_ACTION_REDEPLOY) {
 			config.NoCache = noCache
 		} else if noCache {
-			log.Errorf("no-cache flag is available only for \"deploy\" action")
+			log.Errorf("no-cache flag is available only for \"deploy\" and \"redeploy\" actions")
 			os.Exit(1)
 		}
 
@@ -87,7 +89,7 @@ var challengeCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			manager.StartDeployPipeline(LocalDirectory, false, false, false)
+			manager.StartDeployPipeline(LocalDirectory, false, false, config.NoCache)
 			return
 		}
 

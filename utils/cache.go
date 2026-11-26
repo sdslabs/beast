@@ -6,11 +6,12 @@ import (
 )
 
 const (
-	instanceKeyPrefix     = "beast:instance"
-	instanceExpiryPrefix  = "beast:instance_expiry"
-	userInstanceKeyPrefix = "beast:user_instance"
-	InstancesSetKey       = "beast:instances"
-	InstanceDeletionQueue = "beast:instances:to_delete"
+	instanceKeyPrefix      = "beast:instance"
+	instanceExpiryPrefix   = "beast:instance_expiry"
+	instanceSpawningPrefix = "beast:instance_spawning"
+	userInstanceKeyPrefix  = "beast:user_instance"
+	InstancesSetKey        = "beast:instances"
+	InstanceDeletionQueue  = "beast:instances:to_delete"
 
 	hostPrefixKey      = "beast:host"
 	containerPrefixKey = "container"
@@ -30,6 +31,10 @@ func InstanceToKey(instanceID string) string {
 
 func InstanceExpiryToKey(instanceID string) string {
 	return fmt.Sprintf("%s:%s", instanceExpiryPrefix, instanceID)
+}
+
+func InstanceSpawningToKey(instanceID string) string {
+	return fmt.Sprintf("%s:%s", instanceSpawningPrefix, instanceID)
 }
 
 func InstanceIDFromExpiryKey(key string) (string, bool) {

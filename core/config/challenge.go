@@ -116,6 +116,13 @@ func (config *Challenge) ValidateRequiredFields(challdir string) error {
 		return err
 	}
 
+	if config.Metadata.IsInstanced() && config.Env.DockerCompose == "" &&
+		slices.Contains(config.Env.Ports, core.SSH_PORT) &&
+		!slices.Contains(config.Env.AptDeps, "openssh-server") {
+		log.Warn("openssh-server not found as dependency for instanced SSH challenge... adding dependency")
+		config.Env.AptDeps = append(config.Env.AptDeps, "openssh-server")
+	}
+
 	if config.Metadata.IsInstanced() && config.Env.DockerCompose != "" {
 		err = config.Env.ValidateInstancedComposeSSHContract(challdir)
 		if err != nil {
@@ -350,7 +357,7 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 		if config.DockerCtx != "" {
 			log.Warn("docker_context will be ignored when docker_compose is specified")
 		}
-		if config.BaseImage != core.DEFAULT_BASE_IMAGE {
+		if config.BaseImage != "" && config.BaseImage != core.DEFAULT_BASE_IMAGE {
 			log.Warn("base_image will be ignored when docker_compose is specified")
 		}
 		if config.WebRoot != "" {
@@ -370,9 +377,6 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 			return err
 		}
 		return nil
-	} else if !slices.Contains(config.AptDeps, "openssh-server") {
-		log.Warn("openssh-server not found as dependency for sad challenge... adding dependency")
-		config.AptDeps = append(config.AptDeps, "openssh-server")
 	}
 
 	if err := config.ExtractPorts(); err != nil {
@@ -425,10 +429,8 @@ func (config *ChallengeEnv) ValidateRequiredFields(challType string, challdir st
 	}
 
 	for _, env := range config.EnvironmentVars {
-		if filepath.IsAbs(env.Value) {
-			return fmt.Errorf("environment Variable contains absolute path : %s", env.Value)
-		} else if err := utils.ValidateFileExists(filepath.Join(challdir, env.Value)); err != nil {
-			return fmt.Errorf("file %s does not exist", env.Value)
+		if env.Key == "" {
+			return fmt.Errorf("environment variable key cannot be empty")
 		}
 	}
 
@@ -480,7 +482,9 @@ func (config *ChallengeEnv) ValidateInstancedComposeSSHContract(challdir string)
 	if config.DockerCompose == "" {
 		return nil
 	}
-	// TODO config.PortVariables lenth check
+	if len(config.PortVariables) == 0 {
+		return errors.New("no port variables found in docker_compose for instanced SSH challenge")
+	}
 	return utils.ValidateInstancedComposeSSHContract(
 		filepath.Join(challdir, config.DockerCompose),
 		config.PortVariables[0],

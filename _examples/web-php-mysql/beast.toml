@@ -6,7 +6,7 @@ ssh_key = "ssh-rsa AAAAB3NzaC1y"
 [challenge.metadata]
 name = "web-php-mysql"
 flag = "CTF{sample_flag}"
-type = "web:php:8.2:cli"
+type = "web"
 description = "A PHP 8.2 web challenge interacting with MySQL database."
 difficulty = "medium"
 points = 200
@@ -22,11 +22,8 @@ text = "simple_hint_2"
 points = 20
 
 [challenge.env]
-apt_deps = ["gcc"]
-setup_scripts = ["setup.sh"]
-ports = [10004]
-web_root = "challenge"
-default_port = 10004
+docker_compose = "docker-compose.yml"
+default_port_var = "APP_PORT"
 
 [resource]
 cpu_shares = 1024

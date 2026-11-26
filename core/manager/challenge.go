@@ -91,10 +91,25 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 		}
 
 	case core.MANAGE_ACTION_REDEPLOY:
-		err := StartUndeployChallenge(w.ID, true)
+		err := StartUndeployChallenge(w.ID, false)
 		if err != nil {
-			log.Errorf("Error while redeplying challenge(%s): %s", w.ID, err.Error())
+			log.Errorf("Error while redeploying challenge(%s): %s", w.ID, err.Error())
 			return nil
+		}
+		stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, w.ID)
+		if challengeDir := coreUtils.GetChallengeDir(w.ID); challengeDir != "" && filepath.Clean(challengeDir) != filepath.Clean(stagingDir) {
+			if err := ValidateChallengeDir(challengeDir); err == nil {
+				return &wpool.Task{
+					ID: w.ID,
+					Info: TaskInfo{
+						Action:     core.MANAGE_ACTION_DEPLOY,
+						ChallDir:   challengeDir,
+						SkipStage:  false,
+						SkipCommit: false,
+						NoCache:    config.NoCache,
+					},
+				}
+			}
 		}
 		work, err := GetDeployWork(w.ID)
 		if err != nil {
@@ -144,7 +159,7 @@ func DeployChallengePipeline(challengeDir string) error {
 		ChallDir:   challengeDir,
 		SkipStage:  false,
 		SkipCommit: false,
-		NoCache:    false,
+		NoCache:    config.NoCache,
 	}
 
 	//TODO: add status queued
@@ -175,7 +190,12 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 
 	// Check if a container for the challenge is already deployed.
 
-	if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+	if challenge.Type == core.STATIC_CHALLENGE_TYPE_NAME {
+		if challenge.Status == core.DEPLOY_STATUS["deployed"] {
+			log.Debugf("Found an already deployed static challenge: %s", challengeName)
+			return nil, fmt.Errorf("challenge already deployed")
+		}
+	} else if challenge.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
 		if challenge.Status == core.DEPLOY_STATUS["deployed"] {
 			log.Debugf("Found an already deployed docker-compose challenge: %s", challengeName)
 			return nil, fmt.Errorf("challenge already deployed")
@@ -215,7 +235,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 
 	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
 	challengeDir := coreUtils.GetChallengeDir(challengeName)
-	if config.NoCache {
+	if config.NoCache && challengeDir != "" && filepath.Clean(challengeDir) != filepath.Clean(challengeStagingDir) {
 		// no-cache flag is set true. so we need to rebuild the image of the challenge
 		log.Infof("Rebuilding image without cache for challenge: %s", challengeName)
 		log.Debugf("Pushing the task of building image of previously deployed challenge in the queue.")
@@ -233,7 +253,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 		}, nil
 	}
 
-	if coreUtils.IsImageIdValid(challenge.ImageId) {
+	if !config.NoCache && coreUtils.IsImageIdValid(challenge.ImageId) {
 		var imageExist bool
 		var err error
 		if config.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
@@ -307,7 +327,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			ChallDir:   challengeDir,
 			SkipStage:  false,
 			SkipCommit: false,
-			NoCache:    false,
+			NoCache:    config.NoCache,
 		}
 		return &wpool.Task{
 			ID:   challengeName,
@@ -325,7 +345,7 @@ func GetDeployWork(challengeName string) (*wpool.Task, error) {
 			ChallDir:   challengeStagingDir,
 			SkipStage:  true,
 			SkipCommit: false,
-			NoCache:    false,
+			NoCache:    config.NoCache,
 		}
 		return &wpool.Task{
 			ID:   challengeName,
@@ -707,6 +727,9 @@ func undeployChallenge(challengeName string, purge bool) error {
 		if err != nil {
 			return fmt.Errorf("error while freeing ports for container %s on host %s: %s", portOwner, challenge.ServerDeployed, err)
 		}
+		if err := database.UpdatePorts(&challenge); err != nil {
+			log.Warnf("error while clearing database ports for challenge %s: %v", challenge.Name, err)
+		}
 	}
 
 	err = database.UpdateChallenge(&challenge, map[string]interface{}{
@@ -726,14 +749,12 @@ func undeployChallenge(challengeName string, purge bool) error {
 	if purge {
 		configFile := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.CHALLENGE_CONFIG_FILE_NAME)
 		var cfg config.BeastChallengeConfig
-		_, err = toml.DecodeFile(configFile, &cfg)
-		if err != nil {
-			return err
-		}
-
-		err = coreUtils.CleanupChallengeIfExist(cfg)
-		if err != nil {
-			return fmt.Errorf("error while cleaning up the challenge: %s", err)
+		if _, err = toml.DecodeFile(configFile, &cfg); err == nil {
+			if err = coreUtils.CleanupChallengeIfExist(cfg); err != nil {
+				return fmt.Errorf("error while cleaning up the challenge: %s", err)
+			}
+		} else {
+			log.Warnf("Could not decode staged config %s during purge (%v), continuing cleanup", configFile, err)
 		}
 
 		log.Infof("Purging the challenge : %s", challenge.Name)

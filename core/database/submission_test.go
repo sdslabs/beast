@@ -92,6 +92,7 @@ func createSubmissionTestUser(t *testing.T, username string) User {
 		Email: username + "@example.test",
 		AuthModel: auth.AuthModel{
 			Username: username,
+			Password: []byte("test-password"),
 			Role:     core.USER_ROLES["contestant"],
 		},
 	}

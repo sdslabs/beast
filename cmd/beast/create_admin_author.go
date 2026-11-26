@@ -6,6 +6,7 @@ import (
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/config"
+	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
 	"github.com/sdslabs/beastv4/pkg/auth"
 	"github.com/spf13/cobra"
@@ -13,6 +14,7 @@ import (
 
 func createAuthorAdminPrereq() {
 	config.InitConfig()
+	database.Init()
 
 	auth.Init(core.ITERATIONS, core.HASH_LENGTH, core.TIMEPERIOD, core.ISSUER, config.Cfg.JWTSecret, []string{core.USER_ROLES["author"]}, []string{core.USER_ROLES["admin"]}, []string{core.USER_ROLES["contestant"]})
 }
@@ -23,32 +25,34 @@ var createAuthorCmd = &cobra.Command{
 	Long:  "Creates new author using command line arguments",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		if Name == "" {
-			fmt.Printf("Name of Author not provided")
+			fmt.Println("Name of Author not provided")
 			os.Exit(1)
 		}
 		if Username == "" {
-			fmt.Printf("Username of Author not provided")
+			fmt.Println("Username of Author not provided")
 			os.Exit(1)
 		}
 
 		if Email == "" {
-			fmt.Printf("Email not provided")
+			fmt.Println("Email not provided")
 			os.Exit(1)
 		}
 
 		if PublicKeyPath == "" {
-			fmt.Printf("Public Key Path not provided")
+			fmt.Println("Public Key Path not provided")
 		}
 
 		if Password == "" {
-			fmt.Printf("Password not provided")
+			fmt.Println("Password not provided")
 			os.Exit(1)
 		}
 	},
 
 	Run: func(cmd *cobra.Command, args []string) {
 		createAuthorAdminPrereq()
-		utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "author")
+		if err := utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "author"); err != nil {
+			os.Exit(1)
+		}
 	},
 }
 
@@ -58,31 +62,33 @@ var createAdminCmd = &cobra.Command{
 	Long:  "Creates new admin using command line arguments",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		if Name == "" {
-			fmt.Printf("Name of Admin not provided")
+			fmt.Println("Name of Admin not provided")
 			os.Exit(1)
 		}
 		if Username == "" {
-			fmt.Printf("Username of Admin not provided")
+			fmt.Println("Username of Admin not provided")
 			os.Exit(1)
 		}
 
 		if Email == "" {
-			fmt.Printf("Email not provided")
+			fmt.Println("Email not provided")
 			os.Exit(1)
 		}
 
 		if PublicKeyPath == "" {
-			fmt.Printf("Public Key Path not provided")
+			fmt.Println("Public Key Path not provided")
 		}
 
 		if Password == "" {
-			fmt.Printf("Password not provided")
+			fmt.Println("Password not provided")
 			os.Exit(1)
 		}
 	},
 
 	Run: func(cmd *cobra.Command, args []string) {
 		createAuthorAdminPrereq()
-		utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "admin")
+		if err := utils.CreateAdminOrAuthor(Name, Username, Email, PublicKeyPath, Password, "admin"); err != nil {
+			os.Exit(1)
+		}
 	},
 }

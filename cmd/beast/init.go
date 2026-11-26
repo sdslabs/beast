@@ -20,6 +20,7 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	coreUtils "github.com/sdslabs/beastv4/core/utils"
+	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -58,16 +59,24 @@ func initDirectories() error {
 
 func checkDockerDaemon() error {
 	log.Infoln("Checking docker daemon...")
+	if err := cr.PingDaemon(); err == nil {
+		return nil
+	}
 	_, err := os.Stat(core.DOCKER_PID)
 	return err
 }
 
 func installAir() error {
+	if isNonInteractive() {
+		log.Infoln("Non-interactive mode: skipping air installation...")
+		return nil
+	}
 	log.Infoln("Installing air for live reloading...")
 
 	gopath, err := exec.Command("go", "env", "GOPATH").Output()
 	if err != nil {
-		return err
+		log.Warnf("Could not determine GOPATH for air (%v); skipping", err)
+		return nil
 	}
 	binDir := filepath.Join(strings.TrimSpace(string(gopath)), "bin")
 	if _, err := os.Stat(filepath.Join(binDir, "air")); err == nil {
@@ -77,7 +86,8 @@ func installAir() error {
 
 	resp, err := http.Get("https://raw.githubusercontent.com/cosmtrek/air/master/install.sh")
 	if err != nil {
-		return err
+		log.Warnf("Could not download air installer (%v); skipping", err)
+		return nil
 	}
 	defer resp.Body.Close()
 
@@ -165,7 +175,7 @@ func initCache() error {
 			Username: core.REDIS_DEFAULT_USER,
 			Password: redisConfig.DefaultPassword,
 		})
-	} else if utils.PromptBinary("Do you use password authentication for the redis default user?") {
+	} else if !isNonInteractive() && utils.PromptBinary("Do you use password authentication for the redis default user?") {
 		cache = redis.NewClient(&redis.Options{
 			Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
 			Username: core.REDIS_DEFAULT_USER,
@@ -188,8 +198,10 @@ func initCache() error {
 }
 
 func createBeastDbUser(db *sql.DB, configuration *config.PsqlConfig) error {
-	if result := utils.PromptBinary("Create default beast postgres user?"); !result {
-		return errors.New("failed to create database")
+	if !isNonInteractive() {
+		if result := utils.PromptBinary("Create default beast postgres user?"); !result {
+			return errors.New("failed to create database")
+		}
 	}
 
 	_, err := db.Exec(fmt.Sprintf("CREATE USER %s WITH PASSWORD %s;", pq.QuoteIdentifier(configuration.User), utils.QuoteLiteral(configuration.Password)))
@@ -197,8 +209,10 @@ func createBeastDbUser(db *sql.DB, configuration *config.PsqlConfig) error {
 }
 
 func createBeastDatabase(db *sql.DB, configuration *config.PsqlConfig) error {
-	if result := utils.PromptBinary("Create default beast postgres database?"); !result {
-		return errors.New("failed to create database")
+	if !isNonInteractive() {
+		if result := utils.PromptBinary("Create default beast postgres database?"); !result {
+			return errors.New("failed to create database")
+		}
 	}
 
 	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s", pq.QuoteIdentifier(configuration.Dbname)))
@@ -249,7 +263,7 @@ func initDb() error {
 	} else {
 		log.Warnln("Current user is not postgres super user...")
 
-		if utils.PromptBinary("Do you use password authentication for the postgres super user?") {
+		if !isNonInteractive() && utils.PromptBinary("Do you use password authentication for the postgres super user?") {
 			password := utils.PromptSecret("Enter postgres super user password (leave blank if none):")
 
 			dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", configuration.Host, configuration.Port, "postgres", password, "postgres", "disable")
@@ -306,6 +320,10 @@ func initDb() error {
 }
 
 func initAdmin() error {
+	if isNonInteractive() {
+		log.Infoln("Non-interactive mode: skipping admin user prompt")
+		return nil
+	}
 	if result := utils.PromptBinary("Create an administrative user for beast?"); result {
 		config.InitConfig()
 
@@ -340,7 +358,9 @@ func initAdmin() error {
 		database.Init()
 
 		createAuthorAdminPrereq()
-		coreUtils.CreateAdminOrAuthor(name, username, email, publicKeyPath, password, "admin")
+		if err := coreUtils.CreateAdminOrAuthor(name, username, email, publicKeyPath, password, "admin"); err != nil {
+			return err
+		}
 	}
 
 	return nil

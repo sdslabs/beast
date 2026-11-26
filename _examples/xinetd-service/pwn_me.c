@@ -19,9 +19,11 @@ void test()
 {	char input[50];
 	printf("Please enter your name: ");
 	fflush(stdout);
-	gets(input);
+	if (fgets(input, sizeof(input), stdin) == NULL)
+		return;
 	sleep(1);
-	fprintf(stderr, "ECHO: %s\n",input); 
+	printf("ECHO: %s", input);
+	fflush(stdout);
 }
 
 int main()

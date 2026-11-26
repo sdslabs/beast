@@ -36,12 +36,14 @@ func CheckStaticChallenge(chall database.Challenge) error {
 
 	assets := strings.Split(chall.Assets, core.DELIMITER)
 	for _, asset := range assets {
-		filepath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, chall.Name, core.BEAST_STATIC_FOLDER, asset)
-		err := utils.ValidateFileExists(filepath)
-		if err != nil {
-			err = fmt.Errorf("static chall: %s not staged. Asset: %s Missing", chall.Name, asset)
-			log.Error(err)
-			return err
+		staticFilePath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, chall.Name, core.BEAST_STATIC_FOLDER, asset)
+		rootFilePath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, chall.Name, asset)
+		if err := utils.ValidateFileExists(staticFilePath); err != nil {
+			if rootErr := utils.ValidateFileExists(rootFilePath); rootErr != nil {
+				err = fmt.Errorf("static chall: %s not staged. Asset: %s Missing", chall.Name, asset)
+				log.Error(err)
+				return err
+			}
 		}
 	}
 	return nil
@@ -50,6 +52,15 @@ func CheckStaticChallenge(chall database.Challenge) error {
 // Check for container running or not.
 func containerProber(chall database.Challenge) error {
 	serverDeployed := chall.ServerDeployed
+	if chall.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		projectName := utils.ProjectNameNotInstanced(chall.Name)
+		if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
+			return cr.VerifyComposeProjectRunning(projectName)
+		}
+		server := config.Cfg.AvailableServers[chall.ServerDeployed]
+		return remoteManager.VerifyComposeProjectRunningRemote(projectName, server)
+	}
+
 	if config.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		containers, err := cr.SearchRunningContainerByFilter(map[string]string{"id": chall.ContainerId})
 		if err != nil || len(containers) <= 0 {

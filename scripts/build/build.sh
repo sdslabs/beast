@@ -15,8 +15,6 @@ VERBOSE=${VERBOSE:-}
 
 repo_path="github.com/sdslabs/beastv4"
 main_package="github.com/sdslabs/beastv4/cmd/beast"
-mysql_agent="github.com/sdslabs/beastv4/cmd/agents/mysql"
-mongo_agent="github.com/sdslabs/beastv4/cmd/agents/mongo"
 
 # Get branch revision and  version
 version="0.1"

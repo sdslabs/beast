@@ -28,5 +28,10 @@ func GetChallengeDir(challengeName string) string {
 		return challengeRemoteDir
 	}
 
-	return challengeRemoteDir
+	challengeStagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	if err := utils.ValidateFileExists(filepath.Join(challengeStagingDir, core.CHALLENGE_CONFIG_FILE_NAME)); err == nil {
+		return challengeStagingDir
+	}
+
+	return ""
 }

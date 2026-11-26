@@ -1,26 +1,34 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
 	"github.com/sdslabs/beastv4/core"
 )
 
-func GetTempImageId(a string) string {
-	b := fmt.Sprintf("%s_%s", core.IMAGE_NA, a)
-	if len(b) > 30 {
-		return b[:30]
+func formatTempID(prefix, name string) string {
+	b := fmt.Sprintf("%s_%s", prefix, name)
+	if len(b) <= 30 {
+		return b
 	}
-	return b
+	sum := sha256.Sum256([]byte(name))
+	hashSuffix := hex.EncodeToString(sum[:])[:8]
+	maxPrefixLen := 30 - 1 - len(hashSuffix)
+	if maxPrefixLen < len(prefix)+1 {
+		maxPrefixLen = len(prefix) + 1
+	}
+	return fmt.Sprintf("%s_%s", b[:maxPrefixLen], hashSuffix)
+}
+
+func GetTempImageId(a string) string {
+	return formatTempID(core.IMAGE_NA, a)
 }
 
 func GetTempContainerId(a string) string {
-	b := fmt.Sprintf("%s_%s", core.CONTAINER_NA, a)
-	if len(b) > 30 {
-		return b[:30]
-	}
-	return b
+	return formatTempID(core.CONTAINER_NA, a)
 }
 
 func IsImageIdValid(a string) bool {

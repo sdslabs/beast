@@ -131,35 +131,32 @@ func BackupAndReset() {
 		return
 	}
 
-	backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_REMOTES_DIR)
-	err = utils.CreateIfNotExistDir(backupPath)
-	if err != nil {
-		log.Errorf("Error while creating backup directory: %s", err)
-		return
-	}
-
-	backupPath = filepath.Join(backupPath, core.BEAST_REMOTES_DIR+time.Now().Format("20060102150405")+".bak")
 	oldPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR)
-	err = os.Rename(oldPath, backupPath)
-	if err != nil {
-		log.Errorf("Error while backing up remote dir: %s", err)
-		return
-	}
-
-	backupPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_STAGING_DIR)
-
-	err = utils.CreateIfNotExistDir(backupPath)
-	if err != nil {
-		log.Errorf("Error while creating backup directory: %s", err)
-		return
+	if err := utils.ValidateDirExists(oldPath); err == nil {
+		backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_REMOTES_DIR)
+		if err = utils.CreateIfNotExistDir(backupPath); err != nil {
+			log.Errorf("Error while creating backup directory: %s", err)
+			return
+		}
+		backupPath = filepath.Join(backupPath, core.BEAST_REMOTES_DIR+time.Now().Format("20060102150405")+".bak")
+		if err = os.Rename(oldPath, backupPath); err != nil {
+			log.Errorf("Error while backing up remote dir: %s", err)
+			return
+		}
 	}
 
 	oldPath = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR)
-	backupPath = filepath.Join(backupPath, core.BEAST_STAGING_DIR+time.Now().Format("20060102150405")+".bak")
-	err = os.Rename(oldPath, backupPath)
-	if err != nil {
-		log.Errorf("Error while backing up staging dir: %s", err)
-		return
+	if err := utils.ValidateDirExists(oldPath); err == nil {
+		backupPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_BACKUP_DIR, core.BEAST_STAGING_DIR)
+		if err = utils.CreateIfNotExistDir(backupPath); err != nil {
+			log.Errorf("Error while creating backup directory: %s", err)
+			return
+		}
+		backupPath = filepath.Join(backupPath, core.BEAST_STAGING_DIR+time.Now().Format("20060102150405")+".bak")
+		if err = os.Rename(oldPath, backupPath); err != nil {
+			log.Errorf("Error while backing up staging dir: %s", err)
+			return
+		}
 	}
 }
 

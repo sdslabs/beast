@@ -1,9 +1,13 @@
 package main
 
 import (
+	"os"
+
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/utils"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -15,6 +19,10 @@ var challDetailsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		config.InitConfig()
 		database.Init()
-		utils.ShowFilteredChallengesInfo(cmd, args)
+		cache.Init()
+		if err := utils.ShowFilteredChallengesInfo(cmd, args); err != nil {
+			log.Errorf("Error showing challenge details: %v", err)
+			os.Exit(1)
+		}
 	},
 }

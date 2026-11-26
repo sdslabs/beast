@@ -1,7 +1,6 @@
 package remoteManager
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -18,7 +17,7 @@ import (
 )
 
 func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, server config.AvailableServer) (string, error) {
-	var containerName, containerEnv, exposedPorts, portMap, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings string
+	var containerName, containerEnv, exposedPorts, portMap, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, imageID, mountBindings, containerLabels, networkArg string
 	if containerConfig.ContainerName != "" {
 		containerName = fmt.Sprintf("--name %s ", containerConfig.ContainerName)
 	}
@@ -28,6 +27,21 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 	for _, portMapping := range containerConfig.PortMapping {
 		portMap += fmt.Sprintf("-p 0.0.0.0:%d:%d/%s ", portMapping.HostPort, portMapping.ContainerPort, containerConfig.TrafficType())
 		exposedPorts += fmt.Sprintf("--expose %d ", portMapping.ContainerPort)
+	}
+	if containerConfig.ContainerNetwork != "" {
+		networkArg = fmt.Sprintf("--network %s ", containerConfig.ContainerNetwork)
+	}
+	labels := map[string]string{
+		"beast.challenge":             containerConfig.ChallengeName,
+		"com.sdslabs.beast.project":   utils.ProjectNameNotInstanced(containerConfig.ChallengeName),
+		"com.docker.compose.project":  utils.ProjectNameNotInstanced(containerConfig.ChallengeName),
+		"com.sdslabs.beast.challenge": containerConfig.ChallengeName,
+	}
+	for k, v := range containerConfig.Labels {
+		labels[k] = v
+	}
+	for k, v := range labels {
+		containerLabels += fmt.Sprintf("--label %s=%s ", k, v)
 	}
 	if containerConfig.CPUShares != 0 {
 		cpuShareLimit = fmt.Sprintf("--cpu-shares %d ", containerConfig.CPUShares)
@@ -47,33 +61,25 @@ func CreateContainerFromImageRemote(containerConfig cr.CreateContainerConfig, se
 	for src, dest := range containerConfig.MountsMap {
 		mountBindings += fmt.Sprintf("--mount type=bind,source=%s,target=%s ", src, dest)
 	}
-	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s %s", containerName, containerEnv, exposedPorts, mountBindings, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
-	// fmt.Printf("%s, %s, %s, %s\n", containerName, containerEnv, exposedPorts, portMap)
-	// dockerCommand := fmt.Sprintf("docker run \\
-	// 	--name <container_name> \\
-	// 	--env KEY1=value1 --env KEY2=value2 \\
-	// 	--expose <internal_port> \\
-	// 	--mount type=bind,source=<host_path>,target=<container_path> \\
-	// 	--cpus=<cpu_limit> \\
-	// 	--memory=<memory_limit> \\
-	// 	--pids-limit <pid_limit> \\
-	// 	-p 0.0.0.0:<external_port>:<internal_port> \\
-	// 	<image_id>"
-	// );
+	dockerCommand := fmt.Sprintf("docker run -d %s %s %s %s %s %s %s %s %s %s %s %s", containerName, networkArg, containerLabels, containerEnv, exposedPorts, mountBindings, cpuShareLimit, cpuLimit, memoryLimit, pidLimit, portMap, imageID)
 	output, err := RunCommandOnServer(server, dockerCommand)
 	if err != nil {
 		return "", fmt.Errorf("failed to create container: %s\nOutput: %s", err, output)
 	}
-	log.Println(output[:12])
-	return strings.TrimSpace(output[:12]), nil
+	trimmed := strings.TrimSpace(output)
+	if len(trimmed) > 12 {
+		trimmed = trimmed[:12]
+	}
+	log.Println(trimmed)
+	return trimmed, nil
 }
 
-// Stops and remove cremote container.
+// Stops and removes remote container.
 // Takes containerID and server config if both is available
 // else just take containerID and find the server config from db
 func StopAndRemoveContainerRemote(containerId string, server config.AvailableServer) error {
 	if server == (config.AvailableServer{}) {
-		chall, err := database.QueryChallengeEntries("id", containerId)
+		chall, err := database.QueryChallengeEntries("container_id", containerId)
 		if err != nil {
 			if err == (gorm.ErrRecordNotFound) {
 				log.Debugf("no container with container id %s present", containerId)
@@ -102,60 +108,74 @@ func StopAndRemoveContainerRemote(containerId string, server config.AvailableSer
 	return nil
 }
 
-// Function searches containers based on the filter map on all remote servers
-func SearchContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
+func parseRemoteContainerLines(output string) []types.Container {
+	var containers []types.Container
+	for _, raw := range strings.Split(strings.TrimSpace(output), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 3)
+		c := types.Container{ID: strings.TrimSpace(parts[0])}
+		if len(parts) >= 2 && strings.TrimSpace(parts[1]) != "" {
+			c.Names = strings.Split(parts[1], ",")
+		}
+		if len(parts) == 3 && strings.TrimSpace(parts[2]) != "" {
+			labels := make(map[string]string)
+			for _, kv := range strings.Split(parts[2], ",") {
+				if pair := strings.SplitN(kv, "=", 2); len(pair) == 2 {
+					labels[strings.TrimSpace(pair[0])] = strings.TrimSpace(pair[1])
+				}
+			}
+			c.Labels = labels
+		}
+		containers = append(containers, c)
+	}
+	return containers
+}
+
+func searchContainersRemoteWithFlag(filterMap map[string]string, server config.AvailableServer, allFlag string) ([]types.Container, error) {
 	filterArgs := ""
-	containers := []types.Container{}
-	var output string
-	var err error
 	for key, val := range filterMap {
 		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
 	}
-	for serverDeployed, server := range config.Cfg.AvailableServers {
-		if server.Active {
-			if !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
-				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps -a %s --format '{{.ID}}'", filterArgs))
-				if err != nil {
-					return []types.Container{}, err
-				}
-				for _, line := range bytes.Split([]byte(output), []byte("\n")) {
-					if len(line) > 0 {
-						containers = append(containers, types.Container{ID: string(line)})
-					}
-				}
-			}
+	psCmd := fmt.Sprintf("docker ps %s %s --format '{{.ID}}\t{{.Names}}\t{{.Labels}}'", allFlag, filterArgs)
+	if server != (config.AvailableServer{}) {
+		output, err := RunCommandOnServer(server, psCmd)
+		if err != nil {
+			return []types.Container{}, err
 		}
+		return parseRemoteContainerLines(output), nil
 	}
 
+	var containers []types.Container
+	for serverDeployed, s := range config.Cfg.AvailableServers {
+		if s.Active && !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
+			output, err := RunCommandOnServer(s, psCmd)
+			if err != nil {
+				return []types.Container{}, err
+			}
+			containers = append(containers, parseRemoteContainerLines(output)...)
+		}
+	}
 	return containers, nil
 }
 
-// Function searches for running containers based on the filter map on all remote server
-func SearchRunningContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
-	filterArgs := ""
-	containers := []types.Container{}
-	var output string
-	var err error
-	for key, val := range filterMap {
-		filterArgs += fmt.Sprintf("--filter='%s=%s' ", key, val)
-	}
-	for serverDeployed, server := range config.Cfg.AvailableServers {
-		if server.Active {
-			if !config.Cfg.UseLocalDockerDaemon(serverDeployed) {
-				output, err = RunCommandOnServer(server, fmt.Sprintf("docker ps %s --format '{{.ID}}'", filterArgs))
-				if err != nil {
-					return []types.Container{}, err
-				}
-				for _, line := range bytes.Split([]byte(output), []byte("\n")) {
-					if len(line) > 0 {
-						containers = append(containers, types.Container{ID: string(line)})
-					}
-				}
-			}
-		}
-	}
+// SearchContainerByFilterRemote searches all containers matching filterMap on the specified remote server
+// (or all active remote servers if server is zero-value).
+func SearchContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
+	return searchContainersRemoteWithFlag(filterMap, server, "-a")
+}
 
-	return containers, nil
+// SearchRunningContainerByFilterRemote searches running containers matching filterMap on the specified remote server
+// (or all active remote servers if server is zero-value).
+func SearchRunningContainerByFilterRemote(filterMap map[string]string, server config.AvailableServer) ([]types.Container, error) {
+	return searchContainersRemoteWithFlag(filterMap, server, "")
+}
+
+// VerifyComposeProjectRunningRemote verifies all services in a remote compose project are running.
+func VerifyComposeProjectRunningRemote(projectName string, server config.AvailableServer) error {
+	return validateAllComposeServicesRunningRemote(projectName, projectName, server)
 }
 
 // Get Containers stdout, stderr logs

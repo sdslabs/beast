@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -69,7 +70,7 @@ func challengeStatusHandler(c *gin.Context) {
 // @Success 200 {array} api.ChallengeStatusResp
 // @Router /api/status/all/:filter [get]
 func statusHandler(c *gin.Context) {
-	filter := c.Param("filter")
+	filter := strings.ToLower(strings.TrimSpace(c.Param("filter")))
 
 	var availableStatus []string
 	for key := range core.DEPLOY_STATUS {
@@ -96,7 +97,7 @@ func statusHandler(c *gin.Context) {
 			Message: "DATABASE ERROR while processing the request.",
 		})
 	} else {
-		var resp []ChallengeStatusResp
+		resp := make([]ChallengeStatusResp, 0, len(challenges))
 		for _, challenge := range challenges {
 			r := ChallengeStatusResp{
 				Name:      challenge.Name,

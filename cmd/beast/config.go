@@ -9,6 +9,7 @@ import (
 	"github.com/sdslabs/beastv4/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"io"
 	"net/http"
 	"os"
@@ -26,6 +27,10 @@ var (
 	BEAST_EXAMPLE_DIRECTORY string = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_EXAMPLE_DIR)
 	BEAST_EXAMPLE_CONFIG    string = filepath.Join(BEAST_EXAMPLE_DIRECTORY, core.BEAST_EX_CONFIG_FILE_NAME)
 )
+
+func isNonInteractive() bool {
+	return NonInteractive || !term.IsTerminal(int(os.Stdin.Fd()))
+}
 
 func copySSHKey() error {
 	location, err := utils.PromptPublicKeyFile()
@@ -72,6 +77,10 @@ func initAuthorizedKeysFile() error {
 		return err
 	}
 
+	if isNonInteractive() {
+		return nil
+	}
+
 	for utils.PromptBinary("Would you like to add a public key to the authorized_keys file?") {
 		err = copySSHKey()
 		if err != nil {
@@ -111,6 +120,9 @@ func downloadExampleBeastConfig() error {
 }
 
 func promptServerDetails(configuration *config.BeastConfig) {
+	if isNonInteractive() {
+		return
+	}
 	for utils.PromptBinary("Configure an available server?") {
 		var server config.AvailableServer
 
@@ -127,6 +139,22 @@ func promptServerDetails(configuration *config.BeastConfig) {
 }
 
 func promptResourceLimits(configuration *config.BeastConfig) {
+	if isNonInteractive() {
+		if configuration.CPUShares <= 0 {
+			configuration.CPUShares = core.DEFAULT_CPU_SHARE
+		}
+		if configuration.CPUsLimit <= 0 {
+			configuration.CPUsLimit = core.DEFAULT_CPU_LIMIT
+		}
+		if configuration.PidsLimit <= 0 {
+			configuration.PidsLimit = core.DEFAULT_PIDS_LIMIT
+		}
+		if configuration.Memory < MINIMUM_MEMORY_LIMIT {
+			configuration.Memory = core.DEFAULT_MEMORY_LIMIT
+		}
+		return
+	}
+
 	configuration.CPUShares = utils.PromptInt64("Default CPU Share (must be over 6MB):", core.DEFAULT_CPU_SHARE)
 	configuration.CPUsLimit = utils.PromptFloat32("Default CPU Limit", core.DEFAULT_CPU_LIMIT)
 	configuration.PidsLimit = utils.PromptInt64("Default PIDs Limit:", core.DEFAULT_PIDS_LIMIT)
@@ -139,6 +167,9 @@ func promptResourceLimits(configuration *config.BeastConfig) {
 }
 
 func promptRemoteRepository(configuration *config.BeastConfig) {
+	if isNonInteractive() {
+		return
+	}
 	for utils.PromptBinary("Configure a Remote Repository?") {
 		var remote config.GitRemote
 
@@ -160,6 +191,24 @@ func promptRemoteRepository(configuration *config.BeastConfig) {
 }
 
 func promptCompetitionDetails(configuration *config.BeastConfig) {
+	if isNonInteractive() {
+		if configuration.CompetitionInfo.Name == "" {
+			configuration.CompetitionInfo.Name = "Beast CTF"
+		}
+		if configuration.CompetitionInfo.TimeZone == "" {
+			configuration.CompetitionInfo.TimeZone = "UTC"
+		}
+		startTime := time.Now().UTC()
+		endTime := startTime.Add(24 * time.Hour)
+		if configuration.CompetitionInfo.StartingTime == "" {
+			configuration.CompetitionInfo.StartingTime = utils.FormatTime(startTime)
+		}
+		if configuration.CompetitionInfo.EndingTime == "" {
+			configuration.CompetitionInfo.EndingTime = utils.FormatTime(endTime)
+		}
+		return
+	}
+
 	configuration.CompetitionInfo.Name = utils.PromptString("Enter Competition Name")
 	configuration.CompetitionInfo.About = utils.PromptString("Enter Competition About Text")
 	configuration.CompetitionInfo.Prizes = utils.PromptString("Enter Competition Prizes Text")
@@ -178,6 +227,10 @@ func promptCompetitionDetails(configuration *config.BeastConfig) {
 		}
 
 		log.Errorln("Competition start time is after end time")
+		if isNonInteractive() {
+			endTime = startTime.Add(24 * time.Hour)
+			break
+		}
 	}
 
 	configuration.CompetitionInfo.StartingTime = utils.FormatTime(startTime)
@@ -185,6 +238,9 @@ func promptCompetitionDetails(configuration *config.BeastConfig) {
 }
 
 func promptNotificationWebhooks(configuration *config.BeastConfig) {
+	if isNonInteractive() {
+		return
+	}
 	for utils.PromptBinary("Configure a Notification Webhook?") {
 		var notification config.NotificationWebhook
 
@@ -197,6 +253,23 @@ func promptNotificationWebhooks(configuration *config.BeastConfig) {
 }
 
 func promptCacheConnectionDetails(configuration *config.BeastConfig) {
+	if isNonInteractive() {
+		if configuration.RedisConf.User == "" {
+			configuration.RedisConf.User = "beast"
+		}
+		if configuration.RedisConf.Password == "" {
+			configuration.RedisConf.Password = "beast"
+		}
+		if configuration.RedisConf.Host == "" {
+			configuration.RedisConf.Host = core.LOCALHOST
+		}
+		if configuration.RedisConf.Port == "" {
+			configuration.RedisConf.Port = "6379"
+		}
+		configuration.RedisConf.ApplyEnvOverrides()
+		return
+	}
+
 	configuration.RedisConf.User = utils.PromptString("Enter Redis User Name (this user will be created if does not exist)... leaving it empty will default it to beast")
 	if configuration.RedisConf.User == "" {
 		configuration.RedisConf.User = "beast"
@@ -219,6 +292,29 @@ func promptCacheConnectionDetails(configuration *config.BeastConfig) {
 }
 
 func promptDatabaseConnectionDetails(configuration *config.BeastConfig) {
+	if isNonInteractive() {
+		if configuration.PsqlConf.User == "" {
+			configuration.PsqlConf.User = "beast"
+		}
+		if configuration.PsqlConf.Dbname == "" {
+			configuration.PsqlConf.Dbname = "beast"
+		}
+		if configuration.PsqlConf.Password == "" {
+			configuration.PsqlConf.Password = "beast"
+		}
+		if configuration.PsqlConf.Host == "" {
+			configuration.PsqlConf.Host = core.LOCALHOST
+		}
+		if configuration.PsqlConf.Port == "" {
+			configuration.PsqlConf.Port = "5432"
+		}
+		if configuration.PsqlConf.SslMode == "" {
+			configuration.PsqlConf.SslMode = "disable"
+		}
+		configuration.PsqlConf.ApplyEnvOverrides()
+		return
+	}
+
 	configuration.PsqlConf.User = utils.PromptString("Enter Postgres User Name (this user will be created if does not exist)... leaving it empty will default it to beast")
 	if configuration.PsqlConf.User == "" {
 		configuration.PsqlConf.User = "beast"
@@ -263,21 +359,44 @@ func tryCopyExampleConfig() error {
 	if _, err := os.Stat(BEAST_EXAMPLE_CONFIG); os.IsNotExist(err) {
 		log.Println("No example config file found...")
 
-		if err = downloadExampleBeastConfig(); err != nil {
-			return err
+		localExample := filepath.Join("_examples", core.BEAST_EX_CONFIG_FILE_NAME)
+		if localData, localErr := os.ReadFile(localExample); localErr == nil {
+			if mkErr := os.MkdirAll(BEAST_EXAMPLE_DIRECTORY, 0755); mkErr == nil {
+				_ = os.WriteFile(BEAST_EXAMPLE_CONFIG, localData, 0644)
+			}
+		} else if dlErr := downloadExampleBeastConfig(); dlErr != nil {
+			log.Warnf("Could not download example config (%v); generating built-in defaults", dlErr)
 		}
 	}
 
-	log.Println("Reading example config file at", BEAST_EXAMPLE_CONFIG)
-
-	data, err := os.ReadFile(BEAST_EXAMPLE_CONFIG)
-	if err != nil {
-		return err
+	if data, err := os.ReadFile(BEAST_EXAMPLE_CONFIG); err == nil {
+		log.Println("Reading example config file at", BEAST_EXAMPLE_CONFIG)
+		if _, decErr := toml.Decode(string(data), &configuration); decErr != nil {
+			log.Warnf("Example config at %s is incompatible (%v); using built-in defaults", BEAST_EXAMPLE_CONFIG, decErr)
+			configuration = config.BeastConfig{}
+		}
 	}
 
-	if _, err = toml.Decode(string(data), &configuration); err != nil {
-		return err
+	if configuration.JWTSecret == "" {
+		configuration.JWTSecret = "change_this_jwt_secret"
 	}
+	if configuration.BeastStaticUrl == "" {
+		configuration.BeastStaticUrl = "http://localhost:8080"
+	}
+	if len(configuration.AllowedBaseImages) == 0 {
+		configuration.AllowedBaseImages = []string{core.DEFAULT_BASE_IMAGE}
+	}
+	if len(configuration.AvailableServers) == 0 {
+		configuration.AvailableServers = map[string]config.AvailableServer{
+			core.LOCALHOST: {
+				Name:      core.LOCALHOST,
+				Host:      core.LOCALHOST,
+				Active:    true,
+				PortRange: fmt.Sprintf("%d:%d", core.ALLOWED_MIN_PORT_VALUE, core.ALLOWED_MAX_PORT_VALUE),
+			},
+		}
+	}
+	configuration.InstanceConfig.Validate()
 
 	promptBeastConfiguration(&configuration)
 

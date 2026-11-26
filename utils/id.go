@@ -144,3 +144,20 @@ func ProjectNameNotInstanced(challengeName string) string {
 func ComposeDockerProjectNameInstanced(challengeName, instanceID string) string {
 	return GetChallengeIdentifier(GetInstanceIdentifier(challengeName, instanceID))
 }
+
+// ExtractInstanceIDFromComposeProjectName extracts the instanceID (which may contain hyphens,
+// such as a 12-char UUID prefix) from a docker compose project name formatted as:
+//
+//	beast-instance-<encodedChallengeName>-<instanceID>
+func ExtractInstanceIDFromComposeProjectName(projectName string) (string, bool) {
+	const prefix = "beast-instance-"
+	if !strings.HasPrefix(projectName, prefix) {
+		return "", false
+	}
+	rest := strings.TrimPrefix(projectName, prefix)
+	idx := strings.IndexByte(rest, '-')
+	if idx <= 0 || idx+1 >= len(rest) {
+		return "", false
+	}
+	return rest[idx+1:], true
+}

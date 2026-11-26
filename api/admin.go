@@ -60,6 +60,12 @@ func userActionHandler(c *gin.Context) {
 		})
 		return
 	}
+	if user.ID == 0 {
+		c.JSON(http.StatusNotFound, HTTPPlainResp{
+			Message: "User not found",
+		})
+		return
+	}
 
 	err = database.UpdateUser(&user, map[string]interface{}{"status": userState})
 	if err != nil {
@@ -69,8 +75,7 @@ func userActionHandler(c *gin.Context) {
 		return
 	}
 	if val, _ := database.IsFrozenScoreSet(); !val {
-		leaderboardStale = true
-		graphCacheStale = true
+		invalidatePublicLeaderboardCaches()
 	}
 	c.JSON(http.StatusOK, HTTPPlainResp{
 		Message: fmt.Sprintf("Successfully %sned the user with id %s", action, userId),

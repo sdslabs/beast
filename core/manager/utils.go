@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/sdslabs/beastv4/core/cache"
@@ -416,45 +417,76 @@ func copyAdditionalContextToStaging(fileCtx map[string]string, stagingDir string
 	log.Debugf("Copied additional context to staging directory")
 }
 
+func resolveChallengeEnvValue(challengeName, value string) string {
+	if value == "" || filepath.IsAbs(value) {
+		return value
+	}
+
+	stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName)
+	if err := utils.ValidateFileExists(filepath.Join(stagingDir, value)); err == nil {
+		return filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, value)
+	}
+
+	if challDir := coreUtils.GetChallengeDir(challengeName); challDir != "" {
+		if err := utils.ValidateFileExists(filepath.Join(challDir, value)); err == nil {
+			return filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, value)
+		}
+	}
+
+	return value
+}
+
+var authorCreateMux sync.Mutex
+
 // TODO: Refactor this.
 func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.BeastChallengeConfig, defaultauthorpassword string) error {
+	cleanTags := utils.CleanStringSlice(config.Challenge.Metadata.Tags)
+	tags := make([]*database.Tag, len(cleanTags))
+	for i, tag := range cleanTags {
+		tags[i] = &database.Tag{
+			TagName: tag,
+		}
+		if err := database.QueryOrCreateTagEntry(tags[i]); err != nil {
+			return fmt.Errorf("error while querying the tags for challenge(%s) : %v", config.Challenge.Metadata.Name, err)
+		}
+	}
+
+	validAssets := utils.CleanStringSlice(config.Challenge.Metadata.Assets)
+	validPreReqs := utils.CleanStringSlice(config.Challenge.Metadata.PreReqs)
+	validLinks := utils.CleanStringSlice(config.Challenge.Metadata.AdditionalLinks)
+	if config.Challenge.Metadata.MaxPoints > 0 {
+		log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
+		config.Challenge.Metadata.Points = config.Challenge.Metadata.MaxPoints
+	} else {
+		log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
+		config.Challenge.Metadata.MaxPoints = config.Challenge.Metadata.Points
+	}
+	if config.Challenge.Metadata.MinPoints == 0 {
+		log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
+		config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
+	}
+	if config.Challenge.Metadata.Difficulty == "" {
+		log.Debug("Setting difficulty to default(medium)")
+		config.Challenge.Metadata.Difficulty = "medium"
+	}
+
+	deploymentType := core.DEPLOYMENT_TYPES["standard_docker"]
+	if config.Challenge.Env.DockerCompose != "" {
+		deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
+	}
+
 	// Challenge is nil, which means the challenge entry does not exist
 	// So create a new challenge entry on the basis of the fields provided
 	// in the config file for the challenge.
 	if challEntry.Name == "" {
-		// For creating a new entry for the challenge first create an entry
-		// in the challenge table using the config file.
+		authorCreateMux.Lock()
 		userEntry, err := database.QueryFirstUserEntry("email", config.Author.Email)
 		if err != nil {
+			authorCreateMux.Unlock()
 			return fmt.Errorf("error while querying user with email %s", config.Author.Email)
 		}
 
-		cleanTags := utils.CleanStringSlice(config.Challenge.Metadata.Tags)
-		tags := make([]*database.Tag, len(cleanTags))
-
-		for i, tag := range cleanTags {
-			tags[i] = &database.Tag{
-				TagName: tag,
-			}
-			if err = database.QueryOrCreateTagEntry(tags[i]); err != nil {
-				return fmt.Errorf("error while querying the tags for challenge(%s) : %v", config.Challenge.Metadata.Name, err)
-			}
-		}
-
-		users := make([]*database.User, len(config.Maintainers)+1)
-
-		for i, user := range config.Maintainers {
-			u, err := database.QueryFirstUserEntry("email", user.Email)
-			if err != nil {
-				return fmt.Errorf("error while querying user with email %s", user.Email)
-			}
-			users[i] = &u
-		}
-
 		if userEntry.Email == "" {
-			// if defaultauthorpassword == "" {
-			// 	return fmt.Errorf("User with the given email does not exist : %v. You can pass q flag with password to autogenerate authors in this case.", config.Author.Email)
-			// }
 			log.Infof("User with the given email does not exist : %v, creating this user", config.Author.Email)
 			newUser := database.User{
 				Name:      config.Author.Name,
@@ -464,49 +496,54 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 			}
 			err = database.CreateUserEntry(&newUser)
 			if err != nil {
+				authorCreateMux.Unlock()
 				return err
 			}
 			log.Infof("Author with the email address %v is created", config.Author.Email)
 			userEntry = newUser
-			// return nil
 		} else {
 			if userEntry.Email != config.Author.Email &&
 				(userEntry.SshKey != config.Author.SSHKey || config.Author.SSHKey == "") &&
 				(userEntry.Name != config.Author.Name || config.Author.Name == "") &&
 				userEntry.Role != core.USER_ROLES["author"] {
+				authorCreateMux.Unlock()
 				return fmt.Errorf("ERROR, author details for %s did not match with the ones in database", userEntry.Email)
 			}
 		}
 
-		users[len(config.Maintainers)] = &userEntry
+		users := make([]*database.User, 0, len(config.Maintainers)+1)
+		for _, user := range config.Maintainers {
+			u, err := database.QueryFirstUserEntry("email", user.Email)
+			if err != nil {
+				authorCreateMux.Unlock()
+				return fmt.Errorf("error while querying user with email %s", user.Email)
+			}
+			if u.Email == "" {
+				log.Infof("Maintainer with email %s does not exist, creating user", user.Email)
+				newMaintainer := database.User{
+					Name:      user.Name,
+					AuthModel: auth.CreateModel(user.Email, defaultauthorpassword, core.USER_ROLES["author"]),
+					Email:     user.Email,
+					SshKey:    user.SSHKey,
+				}
+				if createErr := database.CreateUserEntry(&newMaintainer); createErr != nil {
+					authorCreateMux.Unlock()
+					return createErr
+				}
+				u = newMaintainer
+			}
+			users = append(users, &u)
+		}
+		authorCreateMux.Unlock()
 
-		validAssets := utils.CleanStringSlice(config.Challenge.Metadata.Assets)
-		validPreReqs := utils.CleanStringSlice(config.Challenge.Metadata.PreReqs)
-		validLinks := utils.CleanStringSlice(config.Challenge.Metadata.AdditionalLinks)
-		if config.Challenge.Metadata.MaxPoints > 0 {
-			log.Debugf("Setting points for challenge %s equal to it's maxpoints = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.MaxPoints)
-			config.Challenge.Metadata.Points = config.Challenge.Metadata.MaxPoints
-		} else {
-			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
-			config.Challenge.Metadata.MaxPoints = config.Challenge.Metadata.Points
-		}
-		if config.Challenge.Metadata.MinPoints == 0 {
-			log.Debugf("MinPoints for challenge %s is not set. Setting it equal to its points = %d", config.Challenge.Metadata.Name, config.Challenge.Metadata.Points)
-			config.Challenge.Metadata.MinPoints = config.Challenge.Metadata.Points
-		}
+		users = append(users, &userEntry)
+
 		availableServerHostname := core.LOCALHOST
 		if config.Challenge.Metadata.Type != core.STATIC_CHALLENGE_TYPE_NAME {
-			availableServer, _ := remoteManager.ServerQueue.GetNextAvailableInstance()
-			availableServerHostname = availableServer.Name
-		}
-		if config.Challenge.Metadata.Difficulty == "" {
-			log.Debug("Setting difficulty to default(medium)")
-			config.Challenge.Metadata.Difficulty = "medium"
-		}
-
-		deploymentType := core.DEPLOYMENT_TYPES["standard_docker"]
-		if config.Challenge.Env.DockerCompose != "" {
-			deploymentType = core.DEPLOYMENT_TYPES["docker_compose"]
+			availableServer, err := remoteManager.ServerQueue.GetNextAvailableInstance()
+			if err == nil && availableServer.Name != "" {
+				availableServerHostname = availableServer.Name
+			}
 		}
 
 		*challEntry = database.Challenge{
@@ -555,6 +592,33 @@ func UpdateOrCreateChallengeDbEntry(challEntry *database.Challenge, config cfg.B
 		database.Db.Model(challEntry).Association("Tags").Append(tags)
 
 		database.Db.Model(challEntry).Association("Users").Append(users)
+	} else {
+		updates := map[string]interface{}{
+			"Flag":               config.Challenge.Metadata.Flag,
+			"DynamicFlag":        config.Challenge.Metadata.DynamicFlag,
+			"Description":        config.Challenge.Metadata.Description,
+			"Difficulty":         config.Challenge.Metadata.Difficulty,
+			"MaxAttemptLimit":    config.Challenge.Metadata.MaxAttemptLimit,
+			"PreReqs":            strings.Join(validPreReqs, core.DELIMITER),
+			"Assets":             strings.Join(validAssets, core.DELIMITER),
+			"AdditionalLinks":    strings.Join(validLinks, core.DELIMITER),
+			"Instanced":          config.Challenge.Metadata.Instanced,
+			"InstanceExpiration": config.Challenge.Metadata.InstanceExpiration,
+			"DeploymentType":     deploymentType,
+			"Type":               config.Challenge.Metadata.Type,
+			"Format":             config.Challenge.Metadata.Type,
+			"MaxPoints":          config.Challenge.Metadata.MaxPoints,
+			"MinPoints":          config.Challenge.Metadata.MinPoints,
+		}
+		if !cfg.Cfg.CompetitionInfo.DynamicScore || challEntry.Points == 0 {
+			updates["Points"] = config.Challenge.Metadata.Points
+		}
+		if err := database.UpdateChallenge(challEntry, updates); err != nil {
+			return fmt.Errorf("error while updating challenge entry %s: %w", challEntry.Name, err)
+		}
+		if err := database.Db.Model(challEntry).Association("Tags").Replace(tags); err != nil {
+			log.Warnf("error while syncing tags for challenge %s: %v", challEntry.Name, err)
+		}
 	}
 
 	allocatedPorts, err := database.GetAllocatedPorts(*challEntry)
@@ -733,7 +797,7 @@ func UnzipChallengeFolder(zipContextPath, dstPath string) (string, error) {
 	targetDir := filepath.Join(dstPath, strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName)))
 
 	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 
 	// 1. Open the zip file

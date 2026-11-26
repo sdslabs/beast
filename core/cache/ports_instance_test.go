@@ -268,3 +268,79 @@ func TestRedisExpiryMarkerSubscription(t *testing.T) {
 		t.Fatalf("timed out waiting for Redis expiry marker event")
 	}
 }
+
+func TestSpawningReservationPreventsOrphanStatus(t *testing.T) {
+	cleanup := setupRedisIntegrationTest(t)
+	defer cleanup()
+
+	instanceID := fmt.Sprintf("spawn-%d", time.Now().UnixNano())
+	defer func() {
+		_ = ClearInstanceSpawning(instanceID)
+		_ = DeleteInstance(instanceID)
+	}()
+
+	known, err := IsInstanceKnown(instanceID)
+	if err != nil {
+		t.Fatalf("check unknown instance: %v", err)
+	}
+	if known {
+		t.Fatalf("expected unknown instance %s not to be marked known", instanceID)
+	}
+
+	if err := MarkInstanceSpawning(instanceID, 5*time.Second); err != nil {
+		t.Fatalf("mark instance spawning: %v", err)
+	}
+
+	known, err = IsInstanceKnown(instanceID)
+	if err != nil {
+		t.Fatalf("check spawning instance: %v", err)
+	}
+	if !known {
+		t.Fatalf("expected spawning instance %s to be marked known", instanceID)
+	}
+
+	instance := &Instance{
+		InstanceID:     instanceID,
+		ChallengeName:  "spawning-test",
+		ContainerID:    "container-" + instanceID,
+		PortOwner:      "owner-" + instanceID,
+		Port:           []uint32{31338},
+		UserID:         "user-spawn",
+		Username:       "user-spawn",
+		CreatedAt:      time.Now(),
+		ExpiresAt:      time.Now().Add(time.Minute),
+		DeploymentType: "docker_compose",
+		ServerDeployed: "localhost",
+	}
+	if err := SaveInstance(instance, time.Minute); err != nil {
+		t.Fatalf("save instance: %v", err)
+	}
+
+	exists, err := Cache.Exists(context.Background(), utils.InstanceSpawningToKey(instanceID)).Result()
+	if err != nil {
+		t.Fatalf("check spawning key after save: %v", err)
+	}
+	if exists != 0 {
+		t.Fatalf("expected spawning marker to be removed on SaveInstance")
+	}
+
+	known, err = IsInstanceKnown(instanceID)
+	if err != nil {
+		t.Fatalf("check saved instance: %v", err)
+	}
+	if !known {
+		t.Fatalf("expected saved instance %s to remain known", instanceID)
+	}
+
+	if err := DeleteInstance(instanceID); err != nil {
+		t.Fatalf("delete saved instance: %v", err)
+	}
+
+	known, err = IsInstanceKnown(instanceID)
+	if err != nil {
+		t.Fatalf("check deleted instance: %v", err)
+	}
+	if known {
+		t.Fatalf("expected deleted instance %s not to be marked known", instanceID)
+	}
+}

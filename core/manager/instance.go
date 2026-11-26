@@ -2,8 +2,8 @@ package manager
 
 import (
 	"fmt"
-	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -64,9 +64,17 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 
 	instanceID := uuid.New().String()[:12]
 
+	if err := cache.MarkInstanceSpawning(instanceID, cache.InstanceSpawningTTL); err != nil {
+		return nil, fmt.Errorf("failed to reserve spawning instance: %w", err)
+	}
+	defer func() {
+		if clearErr := cache.ClearInstanceSpawning(instanceID); clearErr != nil {
+			log.Warnf("failed to clear spawning marker for instance %s: %v", instanceID, clearErr)
+		}
+	}()
+
 	expirationSeconds := config.Challenge.Metadata.GetInstanceExpiration()
 	ttl := time.Duration(expirationSeconds) * time.Second
-	expiresAt := time.Now().Add(ttl)
 
 	var port []uint32
 	var checkHash string
@@ -131,6 +139,8 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, fmt.Errorf("failed to allocate instance ports: %s", err.Error())
 		}
 
+		port = append(port, ports...)
+
 		containerID, checkHash, err = deployInstanceContainer(instanceID, challengeName, challenge.ImageId, &config, serverDeployed, ports)
 		portOwner = containerID
 		deploymentType = core.DEPLOYMENT_TYPES["standard_docker"]
@@ -140,18 +150,20 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 			return nil, fmt.Errorf("error while creating container for challenge %s: %s", challenge.Name, err.Error())
 		}
 
-		if serverDeployed == core.LOCALHOST || serverDeployed == "" {
-			err = addUserSSHKeyLocal(containerID, userSSHKey)
-		} else {
-			err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
-		}
-
-		if err != nil {
-			if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
-				log.Warnf("failed to cleanup instance %s after ssh key injection failure: %v", instanceID, cleanupErr)
+		if slices.Contains(config.Challenge.Env.Ports, core.SSH_PORT) {
+			if serverDeployed == core.LOCALHOST || serverDeployed == "" {
+				err = addUserSSHKeyLocal(containerID, userSSHKey)
+			} else {
+				err = addUserSSHKeyRemote(containerID, cfg.Cfg.AvailableServers[serverDeployed], userSSHKey)
 			}
-			coreUtils.FreePortsOnHost(serverDeployed, ports)
-			return nil, fmt.Errorf("failed to add user ssh key: %s", err.Error())
+
+			if err != nil {
+				if cleanupErr := killInstanceContainer(containerID, deploymentType, instanceID, challengeName, serverDeployed); cleanupErr != nil {
+					log.Warnf("failed to cleanup instance %s after ssh key injection failure: %v", instanceID, cleanupErr)
+				}
+				coreUtils.FreePortsOnHost(serverDeployed, ports)
+				return nil, fmt.Errorf("failed to add user ssh key: %s", err.Error())
+			}
 		}
 
 		if err := coreUtils.AssignPortsOnContainerToHost(serverDeployed, containerID, ports); err != nil {
@@ -163,6 +175,9 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		}
 	}
 
+	now := time.Now()
+	expiresAt := now.Add(ttl)
+
 	instance := &cache.Instance{
 		InstanceID:     instanceID,
 		ChallengeName:  challengeName,
@@ -173,7 +188,7 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		Port:           port,
 		UserID:         userID,
 		Username:       username,
-		CreatedAt:      time.Now(),
+		CreatedAt:      now,
 		ExpiresAt:      expiresAt,
 		DeploymentType: deploymentType,
 		ServerDeployed: serverDeployed,
@@ -191,7 +206,7 @@ func SpawnInstance(challengeName, userID, username string, userSSHKey string) (*
 		return nil, fmt.Errorf("failed to save instance: %w", err)
 	}
 
-	log.Infof("Successfully spawned instance %s for user %s, challenge %s on port %d (server: %s)",
+	log.Infof("Successfully spawned instance %s for user %s, challenge %s on port %v (server: %s)",
 		instanceID, userID, challengeName, port, serverDeployed)
 
 	return instance, nil
@@ -516,9 +531,12 @@ func ExecuteCheckerScript(instance *cache.Instance) (cr.ExecResult, error) {
 }
 
 func verifySSHLocal(containerId string) error {
-	err := exec.Command("docker", "port", containerId, fmt.Sprintf("%v/tcp", core.SSH_PORT)).Run()
+	ok, err := cr.HasExposedPort(containerId, core.SSH_PORT, cr.TCPTraffic)
 	if err != nil {
 		return err
+	}
+	if !ok {
+		return fmt.Errorf("port %v/tcp is not exposed for container %s", core.SSH_PORT, containerId)
 	}
 
 	var result cr.ExecResult
@@ -546,9 +564,7 @@ func verifySSHRemote(containerId string, server cfg.AvailableServer) error {
 
 	var result cr.ExecResult
 	sshServiceStartCommand := fmt.Sprintf("service ssh start")
-	result, err = cr.RunCommandInContainer(containerId, []string{
-		"sh", "-c", sshServiceStartCommand,
-	})
+	result, err = remoteManager.RunCommandInContainerOnServer(server, containerId, sshServiceStartCommand)
 
 	if err != nil {
 		return err
@@ -604,12 +620,6 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 	// Instanced non compose challenges are managed by the container ID
 	containerName := utils.ComposeDockerProjectNameInstanced(challengeName, instanceID)
 
-	// TODO : commented this , may be not supposed to.
-	//containerPort := config.Challenge.Env.DefaultPort
-	//if containerPort != core.SSH_PORT {
-	//	return "", "", fmt.Errorf("the default port is not set to %d for instance challenge %s", core.SSH_PORT, challengeName)
-	//}
-
 	portMapping := make([]cr.PortMapping, len(ports))
 	for i, port := range ports {
 		portMapping[i] = cr.PortMapping{
@@ -620,7 +630,7 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 
 	var containerEnv []string
 	for _, env := range config.Challenge.Env.EnvironmentVars {
-		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, env.Value)))
+		containerEnv = append(containerEnv, fmt.Sprintf("%s=%s", env.Key, resolveChallengeEnvValue(challengeName, env.Value)))
 	}
 
 	containerConfig := cr.CreateContainerConfig{
@@ -644,6 +654,7 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 	var err error
 	var checkHash string
 	var containerId string
+	hasSSHPort := slices.Contains(config.Challenge.Env.Ports, core.SSH_PORT)
 
 	if cfg.Cfg.UseLocalDockerDaemon(serverDeployed) {
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
@@ -651,16 +662,18 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 			return "", "", fmt.Errorf("failed to create container from image: %w", err)
 		}
 
-		err = verifySSHLocal(containerId)
-		if err != nil {
-			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
-			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
-		}
+		if hasSSHPort {
+			err = verifySSHLocal(containerId)
+			if err != nil {
+				_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
+				return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on localhost", core.SSH_PORT, containerId)
+			}
 
-		checkHash, err = verifyCheckLocal(containerId)
-		if err != nil {
-			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
-			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
+			checkHash, err = verifyCheckLocal(containerId)
+			if err != nil {
+				_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
+				return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on localhost: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, err)
+			}
 		}
 	} else {
 		server := cfg.Cfg.AvailableServers[serverDeployed]
@@ -669,16 +682,18 @@ func deployInstanceContainer(instanceID, challengeName string, imageID string, c
 			return "", "", fmt.Errorf("failed to create container from image: %w", err)
 		}
 
-		err = verifySSHRemote(containerId, server)
-		if err != nil {
-			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
-			return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
-		}
+		if hasSSHPort {
+			err = verifySSHRemote(containerId, server)
+			if err != nil {
+				_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
+				return "", "", fmt.Errorf("failed to verify exposes of port %v in container %s on host %s", core.SSH_PORT, containerId, server.Host)
+			}
 
-		checkHash, err = verifyCheckRemote(containerId, server)
-		if err != nil {
-			_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
-			return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
+			checkHash, err = verifyCheckRemote(containerId, server)
+			if err != nil {
+				_ = killInstanceContainer(containerId, core.DEPLOYMENT_TYPES["standard_docker"], instanceID, challengeName, serverDeployed)
+				return "", "", fmt.Errorf("failed to verify check.sh at location %s in container: %s on host: %s: %w", core.SAD_CHECK_SCRIPT_LOCATION, containerId, server.Host, err)
+			}
 		}
 	}
 

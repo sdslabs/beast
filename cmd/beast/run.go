@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"
@@ -35,7 +36,12 @@ func stopApiScheduler() {
 
 func stopWorkerQueue() {
 	log.Infoln("Stopping the worker queue...")
-	manager.Q.Stop()
+	if manager.Q != nil {
+		if !manager.Q.Drain(10 * time.Second) {
+			log.Warnln("Timed out waiting for pending worker queue tasks to drain")
+		}
+		manager.Q.Stop()
+	}
 	log.Infoln("Worker queue stopped")
 }
 
@@ -153,6 +159,7 @@ func stopSseNotificationHub() {
 func cleanup() {
 	log.Info("Starting graceful shutdown cleanup...")
 
+	api.ShutdownHTTPServer(5 * time.Second)
 	stopSseNotificationHub()
 	stopApiScheduler()
 

@@ -12,7 +12,6 @@ import (
 	"github.com/sdslabs/beastv4/core/config"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
-	coreUtils "github.com/sdslabs/beastv4/core/utils"
 )
 
 type InstanceResponse struct {
@@ -69,7 +68,7 @@ func spawnInstanceHandler(ctx *gin.Context) {
 		return
 	}
 
-	username, err := coreUtils.GetUser(ctx.GetHeader("Authorization"))
+	username, err := resolveRequestUsername(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized",
@@ -78,7 +77,7 @@ func spawnInstanceHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil {
+	if err != nil || user.ID == 0 {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -113,7 +112,7 @@ func getUserInstanceHandler(ctx *gin.Context) {
 		return
 	}
 
-	username, err := coreUtils.GetUser(ctx.GetHeader("Authorization"))
+	username, err := resolveRequestUsername(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized",
@@ -122,7 +121,7 @@ func getUserInstanceHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil {
+	if err != nil || user.ID == 0 {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -143,7 +142,7 @@ func getUserInstanceHandler(ctx *gin.Context) {
 }
 
 func getUserInstancesHandler(ctx *gin.Context) {
-	username, err := coreUtils.GetUser(ctx.GetHeader("Authorization"))
+	username, err := resolveRequestUsername(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized",
@@ -152,7 +151,7 @@ func getUserInstancesHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil {
+	if err != nil || user.ID == 0 {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -190,7 +189,7 @@ func extendInstanceHandler(ctx *gin.Context) {
 		return
 	}
 
-	username, err := coreUtils.GetUser(ctx.GetHeader("Authorization"))
+	username, err := resolveRequestUsername(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized",
@@ -199,7 +198,7 @@ func extendInstanceHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil {
+	if err != nil || user.ID == 0 {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})
@@ -258,7 +257,7 @@ func killUserInstanceHandler(ctx *gin.Context) {
 		return
 	}
 
-	username, err := coreUtils.GetUser(ctx.GetHeader("Authorization"))
+	username, err := resolveRequestUsername(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "Unauthorized",
@@ -267,7 +266,7 @@ func killUserInstanceHandler(ctx *gin.Context) {
 	}
 
 	user, err := database.QueryFirstUserEntry("username", username)
-	if err != nil {
+	if err != nil || user.ID == 0 {
 		ctx.JSON(http.StatusUnauthorized, HTTPPlainResp{
 			Message: "User not found",
 		})

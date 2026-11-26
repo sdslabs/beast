@@ -148,9 +148,11 @@ func (config *InstanceConfig) Validate() {
 	if config.DefaultExpiration <= 0 {
 		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
 	}
-	if config.MaxExtension <= config.DefaultExpiration {
-		config.DefaultExpiration = core.DEFAULT_MINIMUM_EXTEND_TIME
+	if config.MaxExtension <= 0 {
 		config.MaxExtension = core.DEFAULT_MAXIMUM_EXTEND_TIME
+	}
+	if config.MaxExtension < config.DefaultExpiration {
+		config.MaxExtension = config.DefaultExpiration
 	}
 	if config.MaxInstancesPerUser <= 0 {
 		config.MaxInstancesPerUser = core.DEFAULT_MAXIMUM_INSTANCES_PER_USER
@@ -314,7 +316,7 @@ func (config *BeastConfig) ValidateConfig() error {
 		config.CPUsLimit = core.DEFAULT_CPU_LIMIT
 	}
 
-	if config.MailConfig.From == "" || config.MailConfig.Password == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {
+	if config.MailConfig.From == "" || config.MailConfig.SMTPHost == "" || config.MailConfig.SMTPPort == "" {
 		log.Warn("Mail configuration not provided, email notifications will not work")
 	}
 
@@ -378,20 +380,28 @@ type GitRemote struct {
 	Active     bool   `toml:"active"`
 }
 
+var gitURLPattern = regexp.MustCompile(`^(https?|ssh|git|file)://[^\s]+$|^[^@\s]+@[^:\s]+:[^\s]+$|^/[^\s]+$`)
+
+func isSSHGitRemote(rawURL string) bool {
+	if strings.HasPrefix(rawURL, "ssh://") {
+		return true
+	}
+	return !strings.Contains(rawURL, "://") && !strings.HasPrefix(rawURL, "/") && strings.Contains(rawURL, "@") && strings.Contains(rawURL, ":")
+}
+
 func (config *GitRemote) ValidateGitConfig() error {
-	if config.Url == "" || config.RemoteName == "" || config.Secret == "" {
-		log.Error("One of url, RemoteName or ssh_key is missing in the config")
+	if config.Url == "" || config.RemoteName == "" {
+		log.Error("One of url or RemoteName is missing in the config")
 		return errors.New("git remote config not valid, config parameters missing")
 	}
 
-	gitUrlRegexp, err := regexp.Compile(config.Url)
-	if err != nil {
-		eMsg := fmt.Errorf("error while compiling git url regex : %s", err)
-		return eMsg
+	if !gitURLPattern.MatchString(config.Url) {
+		return errors.New("the provided git url is not valid")
 	}
 
-	if !gitUrlRegexp.MatchString(config.Url) {
-		return errors.New("the provided git url is not valid")
+	if isSSHGitRemote(config.Url) && config.Secret == "" {
+		log.Error("ssh_key is missing in git remote config")
+		return errors.New("git remote config not valid, ssh_key missing for SSH remote")
 	}
 
 	if config.Branch == "" {
@@ -399,10 +409,12 @@ func (config *GitRemote) ValidateGitConfig() error {
 		config.Branch = core.GIT_REMOTE_DEFAULT_BRANCH
 	}
 
-	err = utils.ValidateFileExists(config.Secret)
-	log.Debugf("Using git ssh secret : %s", config.Secret)
-	if err != nil {
-		return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.Secret, err)
+	if config.Secret != "" {
+		err := utils.ValidateFileExists(config.Secret)
+		log.Debugf("Using git ssh secret : %s", config.Secret)
+		if err != nil {
+			return fmt.Errorf("provided ssh key file(%s) does not exists : %s", config.Secret, err)
+		}
 	}
 
 	return nil
@@ -428,31 +440,7 @@ type RedisConfig struct {
 
 // LoadEnvFile attempts to load .env from the working directory or global beast directory
 func LoadEnvFile() {
-	paths := []string{
-		".env",
-		filepath.Join(core.BEAST_GLOBAL_DIR, ".env"),
-	}
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				key := strings.TrimSpace(parts[0])
-				val := strings.TrimSpace(parts[1])
-				val = strings.Trim(val, "\"'")
-				if os.Getenv(key) == "" {
-					_ = os.Setenv(key, val)
-				}
-			}
-		}
-	}
+	utils.LoadEnvFile()
 }
 
 func (config *PsqlConfig) ApplyEnvOverrides() {
@@ -547,6 +535,22 @@ type MailConfig struct {
 	SMTPPort string `toml:"smtpPort"`
 }
 
+func (config *MailConfig) ApplyEnvOverrides() {
+	LoadEnvFile()
+	if val := os.Getenv("SMTP_FROM"); val != "" {
+		config.From = val
+	}
+	if val := os.Getenv("SMTP_PASSWORD"); val != "" {
+		config.Password = val
+	}
+	if val := os.Getenv("SMTP_HOST"); val != "" {
+		config.SMTPHost = val
+	}
+	if val := os.Getenv("SMTP_PORT"); val != "" {
+		config.SMTPPort = val
+	}
+}
+
 func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
 	var config BeastConfig
@@ -575,10 +579,17 @@ func UpdateCompetitionInfo(competitionInfo *CompetitionInfo) error {
 	if err := configFile.Close(); err != nil {
 		return err
 	}
+	if Cfg != nil {
+		Cfg.CompetitionInfo = *competitionInfo
+	}
 	return err
 }
 
 func GetCompetitionInfo() (CompetitionInfo, error) {
+	if Cfg != nil && Cfg.CompetitionInfo.StartingTime != "" && Cfg.CompetitionInfo.EndingTime != "" {
+		return Cfg.CompetitionInfo, nil
+	}
+
 	configPath := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_CONFIG_FILE_NAME)
 	var config BeastConfig
 	var competitionInfo CompetitionInfo
@@ -615,6 +626,7 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 
 	config.PsqlConf.ApplyEnvOverrides()
 	config.RedisConf.ApplyEnvOverrides()
+	config.MailConfig.ApplyEnvOverrides()
 
 	prettyJSON, _ := json.MarshalIndent(config, "", "  ")
 	log.Debugf("Parsed beast global config file is : %s", string(prettyJSON))

@@ -32,7 +32,10 @@ void vulnerable() {
     fflush(stdout);
     
     // Vulnerable: no bounds checking!
-    gets(buffer);
+    ssize_t n = read(0, buffer, 256);
+    if (n > 0 && n < 256) {
+        buffer[n] = '\0';
+    }
     
     printf("You entered: %s\n", buffer);
     printf("Better luck next time!\n");

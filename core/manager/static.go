@@ -107,35 +107,81 @@ func UndeployStaticContentContainer() {
 }
 
 // Deploy a static challenge
-func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *database.Challenge, challengeDir string) {
+func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *database.Challenge, challengeDir string) error {
 	log.Infof("Starting static challenge deploy pipeline")
 	challengeStagingRoot := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, challConf.Challenge.Metadata.Name)
-	// challengeStagingDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
+	challengeStaticDir := filepath.Join(challengeStagingRoot, core.BEAST_STATIC_FOLDER)
+
+	challAbs, err := filepath.Abs(challengeDir)
+	if err != nil {
+		log.Errorf("Error resolving challenge directory %s : %s", challengeDir, err)
+		return err
+	}
+	stagingAbs, err := filepath.Abs(challengeStagingRoot)
+	if err != nil {
+		log.Errorf("Error resolving staging directory %s : %s", challengeStagingRoot, err)
+		return err
+	}
+
+	if challAbs == stagingAbs {
+		if err := utils.ValidateDirExists(challengeStaticDir); err != nil {
+			log.Errorf("Staged static assets directory missing for %s: %s", challConf.Challenge.Metadata.Name, err)
+			return fmt.Errorf("staged static assets not found for %s: %w", challConf.Challenge.Metadata.Name, err)
+		}
+		if err := database.UpdateChallenge(challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deployed"]}); err != nil {
+			return fmt.Errorf("error while updating static challenge status: %w", err)
+		}
+		log.Infof("Challenge %s has been deployed as a static challenge from staging", challConf.Challenge.Metadata.Name)
+		return nil
+	}
 
 	// Check if the challenge is already in staged state
 	// Remove the already staged challenge and then copy the new files.
-	err := utils.ValidateDirExists(challengeStagingRoot)
+	err = utils.ValidateDirExists(challengeStagingRoot)
 	if err == nil {
 		err = utils.RemoveDirRecursively(challengeStagingRoot)
 		if err != nil {
 			log.Errorf("Error while cleaning already staged static challenge %s : %s", challConf.Challenge.Metadata.Name, err)
-			return
+			return err
 		}
 	}
 
-	err = utils.CopyDirectory(challengeDir, challengeStagingRoot)
+	if err = utils.CreateIfNotExistDir(challengeStaticDir); err != nil {
+		log.Errorf("Error while creating staging directory: %s", err)
+		return err
+	}
+
+	assetsSrcDir := challengeDir
+	if challConf.Challenge.Env.StaticContentDir != "" {
+		assetsSrcDir = filepath.Join(challengeDir, challConf.Challenge.Env.StaticContentDir)
+	}
+
+	err = utils.CopyDirectory(assetsSrcDir, challengeStaticDir)
 	if err != nil {
 		log.Errorf("Error while copying to the staging directory: %s", err)
-	} else {
-		log.Infof("Challenge %s has been deployed as a static challenge", challConf.Challenge.Metadata.Name)
-
-		database.UpdateChallenge(challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deployed"]})
-
-		// configFile := filepath.Join(challengeStaticDir, core.CHALLENGE_CONFIG_FILE_NAME)
-		// err = os.Rename(configFile, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))
-		// if err != nil {
-		// 	log.Errorf("Error while removing challenge config file: %s", err)
-		// }
-
+		return err
 	}
+
+	for _, sensitive := range []string{
+		core.CHALLENGE_CONFIG_FILE_NAME,
+		".env",
+		"Dockerfile",
+		"docker-compose.yml",
+		"docker-compose.yaml",
+		"check.sh",
+		"xinetd.conf",
+	} {
+		_ = utils.RemoveFileIfExists(filepath.Join(challengeStaticDir, sensitive))
+	}
+
+	configSrc := filepath.Join(challengeDir, core.CHALLENGE_CONFIG_FILE_NAME)
+	if err := utils.ValidateFileExists(configSrc); err == nil {
+		_ = utils.CopyFile(configSrc, filepath.Join(challengeStagingRoot, core.CHALLENGE_CONFIG_FILE_NAME))
+	}
+
+	if err := database.UpdateChallenge(challenge, map[string]interface{}{"status": core.DEPLOY_STATUS["deployed"]}); err != nil {
+		return fmt.Errorf("error while updating static challenge status: %w", err)
+	}
+	log.Infof("Challenge %s has been deployed as a static challenge", challConf.Challenge.Metadata.Name)
+	return nil
 }

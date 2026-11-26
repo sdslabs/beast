@@ -1,8 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -60,18 +63,37 @@ func addNotification(c *gin.Context) {
 // @Tags notification
 // @Accept  json
 // @Produce json
-// @Param id formData string true "Title of notification"
+// @Param id query string false "ID of notification"
+// @Param id formData string false "ID of notification"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/delete [post]
+// @Router /api/notification/delete [delete]
 func removeNotification(c *gin.Context) {
-	id := c.PostForm("id")
+	id := strings.TrimSpace(c.Query("id"))
+	if id == "" {
+		id = strings.TrimSpace(c.PostForm("id"))
+	}
+	if id == "" && strings.Contains(c.GetHeader("Content-Type"), "application/json") {
+		var body struct {
+			ID interface{} `json:"id"`
+		}
+		if err := c.ShouldBindJSON(&body); err == nil && body.ID != nil {
+			id = strings.TrimSpace(fmt.Sprint(body.ID))
+		}
+	}
 
 	if id == "" {
 		log.Errorf("Please provide notification Id")
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: "Please provide notification Id",
+		})
+		return
+	}
+	if _, err := strconv.ParseUint(id, 10, 64); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid notification Id",
 		})
 		return
 	}
@@ -87,7 +109,7 @@ func removeNotification(c *gin.Context) {
 
 	if notify.ID == 0 {
 		log.Errorf("No notification exist with id : %s", id)
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No such notification exists",
 		})
 		return
@@ -111,17 +133,31 @@ func removeNotification(c *gin.Context) {
 // @Tags notification
 // @Accept  json
 // @Produce json
-// @Param id formData string true "Title of notification"
+// @Param id formData string true "ID of notification"
 // @Param title formData string true "Title of notification"
 // @Param desc formData string true "Description for the notification to be changed"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/update [post]
+// @Router /api/notification/update [put]
 func updateNotifications(c *gin.Context) {
-	id := c.PostForm("id")
+	id := strings.TrimSpace(c.PostForm("id"))
 	changedtitle := c.PostForm("title")
 	changedDescription := c.PostForm("desc")
+
+	if id == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Please provide notification Id",
+		})
+		return
+	}
+	if _, err := strconv.ParseUint(id, 10, 64); err != nil {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid notification Id",
+		})
+		return
+	}
 
 	if changedtitle == "" && changedDescription == "" {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
@@ -141,16 +177,21 @@ func updateNotifications(c *gin.Context) {
 
 	if notify.ID == 0 {
 		log.Errorf("No notification exist with id : %s", id)
-		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
 			Error: "No such notification exists",
 		})
 		return
 	}
 
-	if err := database.UpdateNotification(&notify, map[string]interface{}{
-		"Description": changedDescription,
-		"Title":       changedtitle,
-	}); err != nil {
+	updates := map[string]interface{}{}
+	if changedDescription != "" {
+		updates["Description"] = changedDescription
+	}
+	if changedtitle != "" {
+		updates["Title"] = changedtitle
+	}
+
+	if err := database.UpdateNotification(&notify, updates); err != nil {
 		log.Info("Error while updating notification")
 		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 			Error: "Error while updating notification",

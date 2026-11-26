@@ -12,7 +12,6 @@ import (
 	"github.com/sdslabs/beastv4/pkg/cr"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
 	log "github.com/sirupsen/logrus"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,16 +24,20 @@ import (
 // @Tags Submit
 // @Accept  json
 // @Produce json
-// @Param chall_id formData string true "Name of challenge"
+// @Param chall_id formData string true "ID of challenge"
 // @Param instance_id formData string true "Instance ID for challenge"
-// @Success 200 {object} api.ChallengeStatusResp
-// @Failure 400 {object} api.HTTPPlainResp
-// @Failure 401 {object} api.HTTPPlainResp
-// @Failure 500 {object} api.HTTPPlainResp
+// @Success 200 {object} api.ChallengeSubmitResponse
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 401 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
 // @Router /api/check/challenge [post]
 func checkFlagHandler(c *gin.Context) {
+	startDynamicScoreWorker()
+
 	challId := c.PostForm("chall_id")
 	instanceId := c.PostForm("instance_id")
+	now := time.Now()
 
 	err, state := coreUtils.CheckTime()
 	if err != nil {
@@ -55,342 +58,266 @@ func checkFlagHandler(c *gin.Context) {
 		})
 		return
 	}
-	if state == 1 {
-		username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Unauthorized user",
-			})
-			return
-		}
-
-		if challId == "" {
-			c.JSON(http.StatusBadRequest, HTTPErrorResp{
-				Error: "Id of the challenge is a required parameter to process request.",
-			})
-			return
-		}
-
-		if instanceId == "" {
-			c.JSON(http.StatusBadRequest, HTTPErrorResp{
-				Error: "Instance of id is required",
-			})
-			return
-		}
-
-		user, err := database.QueryFirstUserEntry("username", username)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Unauthorized user",
-			})
-			return
-		}
-
-		if user.Status == 1 {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Banned user",
-			})
-			return
-		}
-
-		parsedChallId, err := strconv.Atoi(challId)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		chall, err := database.QueryChallengeEntries("id", challId)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		lockManager := GetUserLockManager()
-		lockId := fmt.Sprintf("%d_%s", user.ID, challId)
-		if !lockManager.TryLock(lockId) {
-			c.JSON(http.StatusOK, ChallengeSubmitResponse{
-				Message: "Request already in process",
-				Success: false,
-			})
-			return
-		}
-		defer lockManager.Unlock(lockId)
-
-		challenge := chall[0]
-		if challenge.Status != core.DEPLOY_STATUS["deployed"] {
-			c.JSON(http.StatusOK, ChallengeSubmitResponse{
-				Message: "Challenge is unavailable",
-				Success: false,
-			})
-			return
-		}
-
-		if challenge.PreReqs != "" {
-			preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
-
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request.",
-				})
-				return
-			}
-
-			if !preReqsStatus {
-				c.JSON(http.StatusOK, ChallengeSubmitResponse{
-					Message: "You have not solved the prerequisites of this challenge.",
-					Success: false,
-				})
-				return
-			}
-		}
-
-		if challenge.MaxAttemptLimit > 0 {
-			previousTries, err := database.GetUserPreviousTries(user.ID, challenge.ID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "DATABASE ERROR while processing the request."})
-				return
-			}
-
-			if previousTries >= challenge.MaxAttemptLimit {
-				c.JSON(http.StatusOK, ChallengeSubmitResponse{
-					Message: "You have reached the maximum number of tries for this challenge.",
-					Success: false,
-				})
-				return
-			}
-		}
-
-		// Increase user tries by 1
-		err = database.UpdateUserChallengeTries(user.ID, challenge.ID)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-		solved, err := database.CheckPreviousSubmissions(user.ID, challenge.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if solved {
-			c.JSON(http.StatusOK, ChallengeSubmitResponse{
-				Message: "Challenge has already been solved.",
-				Success: false,
-			})
-			return
-		}
-
-		instance, err := cache.GetInstance(instanceId)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "CACHE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if instance.Username != username {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Unauthorized user",
-			})
-			return
-		}
-		if instance.ChallengeName != challenge.Name {
-			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
-				Error: "Unauthorized challenge",
-			})
-			return
-		}
-
-		localDeploy := config.Cfg.UseLocalDockerDaemon(instance.ServerDeployed)
-
-		var result cr.ExecResult
-		if instance.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
-			verified, err := manager.ValidateCheckerManifest(instance)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while validating checker manifest: %s", err.Error()),
-				})
-				return
-			}
-			if !verified {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "VALIDATION ERROR: challenge files do not match the recorded checker manifest.",
-				})
-				return
-			}
-
-			result, err = manager.ExecuteCheckerScript(instance)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing checker script: %s", err.Error()),
-				})
-				return
-			}
-		} else {
-			exists, err := checkScriptExistence(localDeploy, instance)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while verifying the existence of check script: %s", err.Error()),
-				})
-				return
-			}
-
-			if !exists {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: fmt.Sprintf("VALIDATION ERROR: check script not found at %s.", core.SAD_CHECK_SCRIPT_LOCATION),
-				})
-				return
-			}
-
-			verified, err := validateCheckScriptHash(localDeploy, instance)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while processing the request: %s", err.Error()),
-				})
-				return
-			}
-			if !verified {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: "VALIDATION ERROR: hash of check.sh does not match, file tampered with.",
-				})
-				return
-			}
-
-			result, err = executeCheckScript(localDeploy, instance)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-					Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing check script: %s", err.Error()),
-				})
-				return
-			}
-		}
-
-		if result.ExitCode != 0 {
-			c.JSON(http.StatusOK, ChallengeSubmitResponse{
-				Message: fmt.Sprintf("Challenge check failed with EXIT CODE: %v", result.ExitCode),
-				Success: false,
-			})
-			return
-		}
-
-		challengePoints := challenge.Points
-		log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
-		if config.Cfg.CompetitionInfo.DynamicScore {
-			submissions, err := database.QuerySubmissions(map[string]interface{}{
-				"challenge_id": parsedChallId,
-			})
-			if err != nil {
-				log.Error(err)
-			}
-			solvers := len(submissions)
-			newPoints := dynamicScore(challenge.MaxPoints, challenge.MinPoints, uint(solvers))
-			if newPoints != challengePoints {
-				database.UpdateChallenge(&challenge, map[string]interface{}{
-					"Points": newPoints,
-				})
-				log.Debugf("By dynamic scoring the points of challenge %s are changed to %d from %d", challenge.Name, newPoints, challengePoints)
-				err = updatePointsOfSolvers(submissions, newPoints, challengePoints)
-				if err != nil {
-					log.Error(err)
-				}
-				challengePoints = newPoints
-			}
-		}
-
-		newScore := user.Score + challengePoints
-		if newScore <= 0 {
-			newScore = 0
-		}
-		err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		if len(adminLeaderboardCache) < core.LEADERBOARD_SIZE || (len(adminLeaderboardCache) > 0 && newScore > adminLeaderboardCache[len(adminLeaderboardCache)-1].Score) {
-			leaderboardStale = true
-			graphCacheStale = true
-			adminLeaderboardStale = true
-		}
-
-		UserChallengesEntry := database.UserChallenges{
-			CreatedAt:   time.Now(),
-			UserID:      user.ID,
-			ChallengeID: challenge.ID,
-			Solved:      true,
-		}
-
-		err = database.SaveChallengeSubmission(&UserChallengesEntry)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "DATABASE ERROR while processing the request.",
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, ChallengeSubmitResponse{
-			Message: "Your challenge submission has been verified",
-			Success: true,
-		})
-
+	if state != 1 {
 		return
 	}
-}
 
-// dynamicScore returns dynamic score of the challenge based on number of solves
-func dynamicScore(maxPoints, minPoints, solvers uint) uint {
-	if solvers == 0 || solvers == 1 {
-		return maxPoints
+	username, err := resolveRequestUsername(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
 	}
-	divisor := (1 + math.Pow((float64(solvers)-1)/11.92201, 1.206069))
-	return uint(math.Round(float64(minPoints) + (float64(maxPoints)-float64(minPoints))/divisor))
-}
 
-// updatePointsOfSolvers updates the points of solvers, whenever points of challenge changes
-func updatePointsOfSolvers(submissions []database.UserChallenges, newChallengePointsAfterSolve, oldChallengePointsBeforeSolve uint) error {
-	scoreChanged := false
-	for _, submission := range submissions {
-		user, err := database.QueryUserById(submission.UserID)
+	if challId == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Id of the challenge is a required parameter to process request.",
+		})
+		return
+	}
+
+	if instanceId == "" {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Instance of id is required",
+		})
+		return
+	}
+
+	user, err := database.QueryFirstUserEntry("username", username)
+	if err != nil || user.ID == 0 {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+
+	if user.Status == 1 {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Banned user",
+		})
+		return
+	}
+
+	parsedChallId, err := strconv.Atoi(challId)
+	if err != nil || parsedChallId <= 0 {
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
+			Error: "Invalid challenge id.",
+		})
+		return
+	}
+
+	chall, err := database.QueryChallengeEntries("id", strconv.Itoa(parsedChallId))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	if len(chall) == 0 {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "Challenge not found.",
+		})
+		return
+	}
+
+	lockManager := GetUserLockManager()
+	lockId := fmt.Sprintf("%d_%d", user.ID, parsedChallId)
+	if !lockManager.TryLock(lockId) {
+		c.JSON(http.StatusOK, ChallengeSubmitResponse{
+			Message: "Request already in process",
+			Success: false,
+		})
+		return
+	}
+	defer lockManager.Unlock(lockId)
+
+	challenge := chall[0]
+	if challenge.Status != core.DEPLOY_STATUS["deployed"] {
+		c.JSON(http.StatusOK, ChallengeSubmitResponse{
+			Message: "Challenge is unavailable",
+			Success: false,
+		})
+		return
+	}
+
+	if challenge.PreReqs != "" {
+		preReqsStatus, err := database.CheckPreReqsStatus(challenge, user.ID)
 		if err != nil {
-			return err
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "DATABASE ERROR while processing the request.",
+			})
+			return
 		}
-		if user.Role == "contestant" {
-			oldScore := user.Score
-			newScore := user.Score + (newChallengePointsAfterSolve - oldChallengePointsBeforeSolve)
-			if newScore <= 0 {
-				newScore = 0
-			}
-			err = database.UpdateUser(&user, map[string]interface{}{"Score": newScore})
-			if err != nil {
-				return err
-			}
-			// Check if this user's score change could affect top 25 leaderboard
-			if !scoreChanged && (len(adminLeaderboardCache) < core.LEADERBOARD_SIZE ||
-				(len(adminLeaderboardCache) > 0 && (oldScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score ||
-					newScore >= adminLeaderboardCache[len(adminLeaderboardCache)-1].Score))) {
-				scoreChanged = true
-			}
+
+		if !preReqsStatus {
+			c.JSON(http.StatusOK, ChallengeSubmitResponse{
+				Message: "You have not solved the prerequisites of this challenge.",
+				Success: false,
+			})
+			return
 		}
 	}
-	// Mark cache stale if any user's score change could affect top 25
-	if scoreChanged {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+
+	instance, err := cache.GetInstance(instanceId)
+	if err != nil {
+		if strings.Contains(err.Error(), "instance not found") {
+			c.JSON(http.StatusNotFound, HTTPErrorResp{
+				Error: "Instance not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "CACHE ERROR while processing the request.",
+		})
+		return
 	}
-	return nil
+
+	if instance.Username != username {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized user",
+		})
+		return
+	}
+	if instance.ChallengeName != challenge.Name {
+		c.JSON(http.StatusUnauthorized, HTTPErrorResp{
+			Error: "Unauthorized challenge",
+		})
+		return
+	}
+
+	attempt, err := database.ReserveSubmissionAttempt(user.ID, challenge.ID, challenge.MaxAttemptLimit, "", now)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	switch attempt.Status {
+	case database.SubmissionAttemptAlreadySolved:
+		c.JSON(http.StatusOK, ChallengeSubmitResponse{
+			Message: "Challenge has already been solved.",
+			Success: false,
+		})
+		return
+	case database.SubmissionAttemptMaxAttempts:
+		c.JSON(http.StatusOK, ChallengeSubmitResponse{
+			Message: "You have reached the maximum number of tries for this challenge.",
+			Success: false,
+		})
+		return
+	}
+
+	localDeploy := config.Cfg.UseLocalDockerDaemon(instance.ServerDeployed)
+
+	var result cr.ExecResult
+	if instance.DeploymentType == core.DEPLOYMENT_TYPES["docker_compose"] {
+		verified, err := manager.ValidateCheckerManifest(instance)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while validating checker manifest: %s", err.Error()),
+			})
+			return
+		}
+		if !verified {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "VALIDATION ERROR: challenge files do not match the recorded checker manifest.",
+			})
+			return
+		}
+
+		result, err = manager.ExecuteCheckerScript(instance)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing checker script: %s", err.Error()),
+			})
+			return
+		}
+	} else {
+		exists, err := checkScriptExistence(localDeploy, instance)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while verifying the existence of check script: %s", err.Error()),
+			})
+			return
+		}
+
+		if !exists {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("VALIDATION ERROR: check script not found at %s.", core.SAD_CHECK_SCRIPT_LOCATION),
+			})
+			return
+		}
+
+		verified, err := validateCheckScriptHash(localDeploy, instance)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while processing the request: %s", err.Error()),
+			})
+			return
+		}
+		if !verified {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: "VALIDATION ERROR: hash of check.sh does not match, file tampered with.",
+			})
+			return
+		}
+
+		result, err = executeCheckScript(localDeploy, instance)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+				Error: fmt.Sprintf("CONTAINER RUNTIME ERROR while executing check script: %s", err.Error()),
+			})
+			return
+		}
+	}
+
+	if result.ExitCode != 0 {
+		c.JSON(http.StatusOK, ChallengeSubmitResponse{
+			Message: fmt.Sprintf("Challenge check failed with EXIT CODE: %v", result.ExitCode),
+			Success: false,
+		})
+		return
+	}
+
+	wonSolveRace, err := database.MarkSubmissionSolved(user.ID, challenge.ID, "", false, now)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+	if !wonSolveRace {
+		c.JSON(http.StatusOK, ChallengeSubmitResponse{
+			Message: "Challenge has already been solved.",
+			Success: false,
+		})
+		return
+	}
+
+	challengePoints := challenge.Points
+	if err := database.AwardUserScore(user.ID, int64(challengePoints)); err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPErrorResp{
+			Error: "DATABASE ERROR while processing the request.",
+		})
+		return
+	}
+
+	log.Debugf("Dynamic scoring is set to %t", config.Cfg.CompetitionInfo.DynamicScore)
+	if config.Cfg.CompetitionInfo.DynamicScore {
+		if err := database.MarkDynamicScoreDirty(challenge.ID, user.ID, now); err != nil {
+			log.Errorf("failed to mark dynamic score dirty for challenge %s: %v", challenge.Name, err)
+		} else {
+			notifyDynamicScoreWorker()
+		}
+	}
+
+	invalidateLeaderboardCaches()
+
+	c.JSON(http.StatusOK, ChallengeSubmitResponse{
+		Message: "Your challenge submission has been verified",
+		Success: true,
+	})
 }
 
 func checkScriptExistence(localDeploy bool, instance *cache.Instance) (bool, error) {

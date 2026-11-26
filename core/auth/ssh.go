@@ -8,9 +8,9 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"html/template"
 	"io/ioutil"
 	"path/filepath"
+	"text/template"
 
 	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/database"

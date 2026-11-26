@@ -62,8 +62,8 @@ func UpdatePorts(challenge *Challenge) error {
 	}
 	tx.Commit()
 
-	if err := Db.Unscoped().Where("challenge_id = ?", challenge.ID).Delete(ports); err != nil {
-		return err.Error
+	if err := Db.Unscoped().Where("challenge_id = ?", challenge.ID).Delete(&Port{}).Error; err != nil {
+		return err
 	}
 
 	return nil

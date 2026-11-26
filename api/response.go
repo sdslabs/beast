@@ -171,6 +171,8 @@ type ChallengeSubmitResponse struct {
 	Success bool   `json:"success" example:"true"`
 }
 
+type FlagSubmitResp = ChallengeSubmitResponse
+
 type UsersStatisticsResp struct {
 	TotalRegisteredUsers uint `json:"total_registered_users" example:"120"`
 	BannedUsers          uint `json:"banned_users" example:"60"`

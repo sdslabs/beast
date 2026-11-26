@@ -19,3 +19,16 @@ vendor/
 # Redis credentials / ACL
 redis/users.acl
 redis/.users.acl
+
+# IDE
+.idea/
+
+# Build artifacts / binaries
+/beast
+/bin/
+
+# Local notes, agent skills, and accidental $HOME artifact
+/notes.md
+/skills/
+/$HOME/
+

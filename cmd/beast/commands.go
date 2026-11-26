@@ -32,6 +32,7 @@ var (
 	Tags                  string
 	NoCache               bool
 	RestoreFile           string
+	NonInteractive        bool
 )
 
 // Root command `beast` all commands are either a flag to this command
@@ -116,6 +117,9 @@ func init() {
 	restoreDatabaseCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Backup file to be used for restoration.")
 
 	restoreCacheCmd.PersistentFlags().StringVarP(&RestoreFile, "restore-file", "r", "", "Restore file to be used for restoration.")
+
+	initCmd.PersistentFlags().BoolVarP(&NonInteractive, "non-interactive", "y", false, "Run setup non-interactively with defaults")
+	configCmd.PersistentFlags().BoolVarP(&NonInteractive, "non-interactive", "y", false, "Run configuration non-interactively with defaults")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)

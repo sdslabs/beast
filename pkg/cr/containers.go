@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -224,6 +223,13 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	createResp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+	if err != nil && len(containerConfig.MountsMap) > 0 && strings.Contains(err.Error(), "bind source path does not exist") {
+		if binds, ok := verifiedHostBinds(containerConfig.MountsMap); ok {
+			hostConfig.Mounts = nil
+			hostConfig.Binds = binds
+			createResp, err = cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+		}
+	}
 	if err != nil {
 		log.Errorf("Error while creating the container with name %s", containerName)
 		return "", err
@@ -240,6 +246,23 @@ func CreateContainerFromImage(containerConfig *CreateContainerConfig) (string, e
 	}
 
 	return containerId, nil
+}
+
+func verifiedHostBinds(mountsMap map[string]string) ([]string, bool) {
+	if len(mountsMap) == 0 {
+		return nil, false
+	}
+	binds := make([]string, 0, len(mountsMap))
+	for src, dest := range mountsMap {
+		if src == "" || dest == "" || strings.Contains(src, ":") || strings.Contains(dest, ":") {
+			return nil, false
+		}
+		if _, err := os.Stat(src); err != nil {
+			return nil, false
+		}
+		binds = append(binds, fmt.Sprintf("%s:%s", src, dest))
+	}
+	return binds, true
 }
 
 func GetContainerStdLogs(containerID string) (*Log, error) {
@@ -361,6 +384,40 @@ func RunCommandInContainer(containerID string, cmd []string) (ExecResult, error)
 	return result, nil
 }
 
+// HasExposedPort checks via the Docker SDK whether the container has the specified port
+// published/configured in NetworkSettings.Ports or Config.ExposedPorts.
+func HasExposedPort(containerID string, port uint32, traffic TrafficType) (bool, error) {
+	cli, err := newDockerClient()
+	if err != nil {
+		return false, err
+	}
+	inspect, err := cli.ContainerInspect(context.Background(), containerID)
+	if err != nil {
+		return false, err
+	}
+	proto := traffic.String()
+	if proto == "" {
+		proto = DefaultTraffic.String()
+	}
+	key := nat.Port(fmt.Sprintf("%d/%s", port, proto))
+	if inspect.NetworkSettings != nil {
+		if bindings, ok := inspect.NetworkSettings.Ports[key]; ok && len(bindings) > 0 {
+			return true, nil
+		}
+	}
+	if inspect.Config != nil {
+		if _, ok := inspect.Config.ExposedPorts[key]; ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// VerifyComposeProjectRunning verifies all services in a docker compose project are running.
+func VerifyComposeProjectRunning(projectName string) error {
+	return validateAllComposeServicesRunning(projectName, projectName)
+}
+
 func DeployContainerFromCompose(challengeName string, projectName string, stagedPath string, composeFileName string, ports map[string]uint32) (string, error) {
 	extractDir := filepath.Join(stagedPath, challengeName)
 	composeFile := filepath.Join(extractDir, composeFileName)
@@ -369,17 +426,17 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 
 	// Deploy with project name - Docker Compose automatically labels containers with
 	// com.docker.compose.project=<projectName>
-	upCmd := exec.Command("docker", "compose",
+	upCmd := newDockerCmd("compose",
 		"-f", composeFile,
 		"-p", projectName,
 		"up", "-d")
 
-	environment := os.Environ()
+	extraEnv := make([]string, 0, len(ports))
 	for variable, port := range ports {
-		environment = append(environment, fmt.Sprintf("%s=%s", variable, strconv.FormatUint(uint64(port), 10)))
+		extraEnv = append(extraEnv, fmt.Sprintf("%s=%s", variable, strconv.FormatUint(uint64(port), 10)))
 	}
 
-	upCmd.Env = environment
+	upCmd.Env = dockerCommandEnv(extraEnv...)
 
 	var upOutput bytes.Buffer
 	upCmd.Stdout = &upOutput
@@ -407,7 +464,7 @@ func DeployContainerFromCompose(challengeName string, projectName string, staged
 }
 
 func validateAllComposeServicesRunning(projectName, challengeName string) error {
-	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "--format", "json")
+	psCmd := newDockerCmd("compose", "-p", projectName, "ps", "--format", "json")
 	var psOutput bytes.Buffer
 	psCmd.Stdout = &psOutput
 	psCmd.Stderr = &psOutput
@@ -432,19 +489,27 @@ func validateAllComposeServicesRunning(projectName, challengeName string) error 
 	var services []ComposeService
 	var notRunningServices []string
 
-	for _, line := range strings.Split(output, "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
+	if strings.HasPrefix(output, "[") {
+		if err := json.Unmarshal([]byte(output), &services); err != nil {
+			return fmt.Errorf("failed to parse compose services JSON array for %s: %v", challengeName, err)
 		}
+	} else {
+		for _, line := range strings.Split(output, "\n") {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
 
-		var service ComposeService
-		if err := json.Unmarshal([]byte(line), &service); err != nil {
-			log.Warnf("Failed to parse compose service JSON: %v. Line: %s", err, line)
-			continue
+			var service ComposeService
+			if err := json.Unmarshal([]byte(line), &service); err != nil {
+				log.Warnf("Failed to parse compose service JSON: %v. Line: %s", err, line)
+				continue
+			}
+
+			services = append(services, service)
 		}
+	}
 
-		services = append(services, service)
-
+	for _, service := range services {
 		if service.State != "running" && !strings.HasPrefix(service.Status, "Up") {
 			notRunningServices = append(notRunningServices, service.Service)
 			log.Warnf("Service %s is not running. State: %s, Status: %s", service.Service, service.State, service.Status)
@@ -466,7 +531,7 @@ func validateAllComposeServicesRunning(projectName, challengeName string) error 
 }
 
 func getPrimaryComposeContainerId(projectName string) (string, error) {
-	psCmd := exec.Command("docker", "compose", "-p", projectName, "ps", "-q", core.SSH_CONTAINER_COMPOSE)
+	psCmd := newDockerCmd("compose", "-p", projectName, "ps", "-q", core.SSH_CONTAINER_COMPOSE)
 	var output bytes.Buffer
 	psCmd.Stdout = &output
 
@@ -490,7 +555,7 @@ func getPrimaryComposeContainerId(projectName string) (string, error) {
 func ComposeDownProject(projectName string) error {
 	log.Debugf("Stopping docker compose project %s", projectName)
 
-	downCmd := exec.Command("docker", "compose", "-p", projectName, "down")
+	downCmd := newDockerCmd("compose", "-p", projectName, "down")
 	var downOutput bytes.Buffer
 	downCmd.Stdout = &downOutput
 	downCmd.Stderr = &downOutput
@@ -507,7 +572,7 @@ func ComposeDownProject(projectName string) error {
 func ComposePurgeProject(projectName string) error {
 	log.Debugf("Purging docker compose project %s", projectName)
 
-	purgeCmd := exec.Command("docker", "compose", "-p", projectName,
+	purgeCmd := newDockerCmd("compose", "-p", projectName,
 		"down", "--remove-orphans", "--volumes", "--rmi", "all")
 
 	var purgeOutput bytes.Buffer

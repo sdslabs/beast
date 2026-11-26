@@ -5,11 +5,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"html/template"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/araddon/dateparse"
@@ -391,7 +391,7 @@ func GetRelatedTags(challenge *Challenge) ([]Tag, error) {
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	if err := Db.Model(challenge).Association("Tags").Error; err != nil {
+	if err := Db.Model(challenge).Association("Tags").Find(&tags); err != nil {
 		return tags, err
 	}
 
@@ -561,15 +561,11 @@ func SaveChallengeSubmission(user_challenges *UserChallenges) error {
 
 // hook after update of challenge
 func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
-	iFace, _ := tx.InstanceGet("gorm:update_attrs")
-	if iFace == nil {
-		return nil
-	}
-	updatedAttr := iFace.(map[string]interface{})
-	if _, ok := updatedAttr["container_id"]; ok {
+	if tx.Statement != nil && (tx.Statement.Changed("ContainerId") || tx.Statement.Changed("container_id")) {
 		var users []*User
-		Db.Model(challenge).Association("Users")
-		go updateScripts(users)
+		if err := Db.Model(challenge).Association("Users").Find(&users); err == nil && len(users) > 0 {
+			go updateScripts(users)
+		}
 	}
 	return nil
 }
@@ -577,8 +573,9 @@ func (challenge *Challenge) AfterUpdate(tx *gorm.DB) error {
 // hook after create of challenge
 func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
 	var users []*User
-	Db.Model(challenge).Association("Users")
-	go updateScripts(users)
+	if err := Db.Model(challenge).Association("Users").Find(&users); err == nil && len(users) > 0 {
+		go updateScripts(users)
+	}
 
 	return nil
 }
@@ -586,8 +583,9 @@ func (challenge *Challenge) AfterCreate(tx *gorm.DB) error {
 // hook after deleting the challenge
 func (challenge *Challenge) AfterDelete(tx *gorm.DB) error {
 	var users []*User
-	Db.Model(challenge).Association("Users")
-	go updateScripts(users)
+	if err := Db.Model(challenge).Association("Users").Find(&users); err == nil && len(users) > 0 {
+		go updateScripts(users)
+	}
 	return nil
 }
 

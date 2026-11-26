@@ -31,8 +31,24 @@ var generateTemplateCmd = &cobra.Command{
 			challName = ""
 		}
 
-		var config config.BeastChallengeConfig
-		config.PopulateDefaultValues()
+		var challengeCfg config.BeastChallengeConfig
+		challengeCfg.PopulateDefaultValues()
+		if challName != "" {
+			challengeCfg.Challenge.Metadata.Name = challName
+		} else {
+			challengeCfg.Challenge.Metadata.Name = "my-challenge"
+		}
+		challengeCfg.Author.Name = "Author"
+		challengeCfg.Author.Email = "author@example.com"
+		challengeCfg.Author.SSHKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleAuthorKeyPlaceholder author@example.com"
+		challengeCfg.Challenge.Metadata.Type = core.BARE_CHALLENGE_TYPE_NAME
+		challengeCfg.Challenge.Metadata.Flag = "beast{example_flag}"
+		challengeCfg.Challenge.Metadata.Difficulty = "medium"
+		challengeCfg.Challenge.Metadata.Description = "Describe the challenge here"
+		challengeCfg.Challenge.Metadata.Points = 100
+		challengeCfg.Challenge.Env.StaticContentDir = ""
+		challengeCfg.Challenge.Env.BaseImage = core.DEFAULT_BASE_IMAGE
+		challengeCfg.Challenge.Env.RunCmd = "sleep infinity"
 
 		var configfile bytes.Buffer
 		log.Debugf("Preparing Config template")
@@ -43,7 +59,7 @@ var generateTemplateCmd = &cobra.Command{
 		}
 
 		log.Debugf("Executing dockerfile template with challenge config")
-		err = configfileTemplate.Execute(&configfile, config)
+		err = configfileTemplate.Execute(&configfile, challengeCfg)
 		if err != nil {
 			log.Errorf("Error while executing configfile template :: %s", err)
 			return

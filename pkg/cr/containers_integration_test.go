@@ -17,6 +17,11 @@ func TestCreateSearchAndRemoveContainerIntegration(t *testing.T) {
 	image := os.Getenv("BEAST_TEST_DOCKER_IMAGE")
 	if image == "" {
 		image = "redis:7-alpine"
+		if exists, err := CheckIfImageExists(image); err != nil || !exists {
+			if fallbackExists, fallbackErr := CheckIfImageExists("redis:7"); fallbackErr == nil && fallbackExists {
+				image = "redis:7"
+			}
+		}
 	}
 
 	challengeName := fmt.Sprintf("beast-cr-integration-%d", time.Now().UnixNano())

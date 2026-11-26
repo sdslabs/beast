@@ -1,7 +1,11 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sdslabs/beastv4/core/cache"
@@ -26,6 +30,25 @@ const (
 )
 
 var BeastScheduler scheduler.Scheduler = scheduler.NewScheduler()
+
+var (
+	httpServerMu sync.Mutex
+	httpServer   *http.Server
+)
+
+func ShutdownHTTPServer(timeout time.Duration) {
+	httpServerMu.Lock()
+	srv := httpServer
+	httpServerMu.Unlock()
+	if srv == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Warnf("HTTP server shutdown error: %v", err)
+	}
+}
 
 func runBeastApiBootsteps(defaultauthorpassword string) error {
 	manager.RunBeastBootsteps(defaultauthorpassword)
@@ -95,6 +118,7 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 
 	log.Info("Starting beast scheduler")
 	BeastScheduler.Start()
+	startDynamicScoreWorker()
 
 	if periodicSync {
 		log.Infof("Scheduling periodic remote sync and auto update for beast with period: %v", config.Cfg.RemoteSyncPeriod)
@@ -112,5 +136,16 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	if noCache {
 		log.Infof("Starting Beast server in no cache mode")
 	}
-	router.Run(port)
+
+	srv := &http.Server{
+		Addr:    port,
+		Handler: router,
+	}
+	httpServerMu.Lock()
+	httpServer = srv
+	httpServerMu.Unlock()
+
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Errorf("HTTP server error: %v", err)
+	}
 }

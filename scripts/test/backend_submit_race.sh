@@ -55,11 +55,17 @@ json_field() {
 register_user() {
 	local username="$1"
 	local password="$2"
+	local key_file="$TEST_HOME/${username}_id_ed25519"
+	rm -f "$key_file" "$key_file.pub"
+	ssh-keygen -q -t ed25519 -N "" -C "$username@example.test" -f "$key_file"
+	local pub_key
+	pub_key="$(cat "$key_file.pub")"
 	curl -fsS -X POST "$BASE_URL/auth/register" \
 		-F "name=$username" \
 		-F "username=$username" \
 		-F "password=$password" \
-		-F "email=$username@example.test" >/dev/null
+		-F "email=$username@example.test" \
+		-F "ssh-key=$pub_key" >/dev/null
 }
 
 login_user() {
@@ -253,8 +259,15 @@ EOF
 
 (
 	cd "$ROOT_DIR"
-	HOME="$TEST_HOME" GOCACHE="${GOCACHE:-/tmp/beast-go-cache}" GOMODCACHE="${GOMODCACHE:-/tmp/beast-go-modcache}" \
-		go run ./cmd/beast run -p "$SERVER_PORT" -n >"$LOG_FILE" 2>&1
+	GOCACHE="${GOCACHE:-/tmp/beast-go-cache}" GOMODCACHE="${GOMODCACHE:-/tmp/beast-go-modcache}" \
+		go build -o "$TEST_HOME/beast" ./cmd/beast
+)
+(
+	cd "$TEST_HOME"
+	HOME="$TEST_HOME" \
+		POSTGRES_HOST="$PGHOST" POSTGRES_PORT="$PGPORT" POSTGRES_USER="$PGUSER" POSTGRES_PASSWORD="$PGPASSWORD" POSTGRES_DB="$PGDATABASE" POSTGRES_SSLMODE="disable" \
+		REDIS_HOST="$REDIS_HOST" REDIS_PORT="$REDIS_PORT" \
+		"$TEST_HOME/beast" run -p "$SERVER_PORT" -n >"$LOG_FILE" 2>&1
 ) &
 SERVER_PID=$!
 

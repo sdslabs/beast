@@ -132,13 +132,25 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 
+	srcAbs, err := filepath.Abs(src)
+	if err != nil {
+		return err
+	}
+	dstAbs, err := filepath.Abs(dst)
+	if err != nil {
+		return err
+	}
+	if srcAbs == dstAbs {
+		return nil
+	}
+
 	source, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer source.Close()
 
-	destination, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
+	destination, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return fmt.Errorf("error while creating destination file : %s", err)
 	}
@@ -149,6 +161,18 @@ func CopyFile(src, dst string) error {
 }
 
 func CopyDirectory(src, dst string) error {
+	srcAbs, err := filepath.Abs(src)
+	if err != nil {
+		return err
+	}
+	dstAbs, err := filepath.Abs(dst)
+	if err != nil {
+		return err
+	}
+	if rel, relErr := filepath.Rel(srcAbs, dstAbs); relErr == nil && (rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))) {
+		return fmt.Errorf("cannot copy directory %q into itself or subdirectory %q", src, dst)
+	}
+
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err

@@ -40,8 +40,8 @@ func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 	// We are trying to get the username for the request from JWT claims here
 	// Since upto this point the request is already authorized, we use a default
 	// username if any error occurs while getting the username.
-	username, err := coreUtils.GetUser(c.GetHeader("Authorization"))
-	if err == nil {
+	username, err := resolveRequestUsername(c)
+	if err != nil {
 		log.Warnf("Error while getting user from authorization header, using default user(since already authorized)")
 		username = core.DEFAULT_USER_NAME
 	}
@@ -92,9 +92,16 @@ func manageMultipleChallengeHandlerTagBased(c *gin.Context) {
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/challenge/ [post]
 func manageChallengeHandler(c *gin.Context) {
-	identifier := c.PostForm("name")
+	identifier := strings.TrimSpace(c.PostForm("name"))
 	action := c.PostForm("action")
 	authorization := c.GetHeader("Authorization")
+
+	if identifier == "" {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Challenge name cannot be empty",
+		})
+		return
+	}
 
 	log.Infof("Trying %s for challenge with identifier : %s", action, identifier)
 	if msgs := manager.LogTransaction(identifier, action, authorization); msgs != nil {
@@ -121,9 +128,7 @@ func manageChallengeHandler(c *gin.Context) {
 	}
 
 	if action == core.MANAGE_ACTION_PURGE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		invalidateLeaderboardCaches()
 	}
 
 	respStr := fmt.Sprintf("Your action %s on challenge %s has been triggered, check stats.", action, identifier)
@@ -138,8 +143,8 @@ func manageChallengeHandler(c *gin.Context) {
 // @NameBased manage
 // @Accept  json
 // @Produce json
-// @Param name query string true "Name of the challenge to be managed, here name is the unique identifier for challenges seperated by a comma"
-// @Param action query string true "Action for the challenge"
+// @Param names formData string true "Names of the challenges to be managed, separated by a comma"
+// @Param action formData string true "Action for the challenge"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Router /api/manage/challenge/multiple/ [post]
@@ -156,7 +161,21 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 		return
 	}
 
-	names := strings.Split(identifier, ",")
+	rawNames := strings.Split(identifier, ",")
+	names := make([]string, 0, len(rawNames))
+	for _, n := range rawNames {
+		n = strings.TrimSpace(n)
+		if n != "" {
+			names = append(names, n)
+		}
+	}
+	if len(names) == 0 {
+		c.JSON(http.StatusBadRequest, HTTPPlainResp{
+			Message: "Challenge names cannot be empty",
+		})
+		return
+	}
+
 	messages := make(map[string]string)
 	var respStr string
 	doesExist := make(map[string]bool)
@@ -184,9 +203,7 @@ func manageMultipleChallengeHandlerNameBased(c *gin.Context) {
 	}
 
 	if action == core.MANAGE_ACTION_PURGE {
-		leaderboardStale = true
-		graphCacheStale = true
-		adminLeaderboardStale = true
+		invalidateLeaderboardCaches()
 	}
 
 	c.JSON(http.StatusOK, HTTPPlainMapResp{
@@ -360,8 +377,8 @@ func manageScheduledAction(c *gin.Context) {
 	tag := c.PostForm("tag")
 
 	authorization := c.GetHeader("Authorization")
-	username, err := coreUtils.GetUser(authorization)
-	if err == nil {
+	username, err := resolveRequestUsername(c)
+	if err != nil {
 		log.Warn("Error while getting user from authorization header, using default user(since already authorized)")
 		username = core.DEFAULT_USER_NAME
 	}
@@ -456,10 +473,11 @@ func manageUploadHandler(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
 				Error: fmt.Sprintf("Could not create dir %s: %s", core.BEAST_TEMP_DIR, err),
 			})
+			return
 		}
 	}
 
-	zipContextPath := filepath.Join(core.BEAST_TEMP_DIR, file.Filename)
+	zipContextPath := filepath.Join(core.BEAST_TEMP_DIR, filepath.Base(file.Filename))
 
 	// The file is received, save it
 	if err := c.SaveUploadedFile(file, zipContextPath); err != nil {
@@ -484,9 +502,10 @@ func manageUploadHandler(c *gin.Context) {
 
 	err = manager.ValidateChallengeConfig(tempStageDir)
 	if err != nil {
-		c.JSON(http.StatusOK, HTTPErrorResp{
+		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: err.Error(),
 		})
+		return
 	}
 
 	challengeUploadDirectory := filepath.Join(

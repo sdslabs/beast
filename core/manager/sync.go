@@ -41,11 +41,13 @@ func SyncBeastRemote(defaultauthorpassword string) error {
 
 			log.Debugf("Pulling latest changes from the remote.")
 
-			err = utils.ValidateFileExists(gitRemote.Secret)
-			if err != nil {
-				errors := fmt.Errorf("error while validating file location : %s : %v", gitRemote.Secret, err)
-				errStrings = append(errStrings, errors.Error())
-				continue
+			if gitRemote.Secret != "" {
+				err = utils.ValidateFileExists(gitRemote.Secret)
+				if err != nil {
+					errors := fmt.Errorf("error while validating file location : %s : %v", gitRemote.Secret, err)
+					errStrings = append(errStrings, errors.Error())
+					continue
+				}
 			}
 			err = git.Pull(remote, gitRemote.Secret, gitRemote.Branch, core.GIT_DEFAULT_REMOTE)
 			if err != nil {
@@ -68,7 +70,10 @@ func SyncBeastRemote(defaultauthorpassword string) error {
 	}
 	log.Info("Beast git base synced with remote")
 	UpdateChallenges(defaultauthorpassword)
-	return fmt.Errorf("%s", strings.Join(errStrings, "\n"))
+	if len(errStrings) > 0 {
+		return fmt.Errorf("%s", strings.Join(errStrings, "\n"))
+	}
+	return nil
 }
 
 func ResetBeastRemote(defaultauthorpassword string) error {
@@ -77,20 +82,24 @@ func ResetBeastRemote(defaultauthorpassword string) error {
 	for _, gitRemote := range config.Cfg.GitRemotes {
 		if gitRemote.Active {
 			remoteDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_REMOTES_DIR, gitRemote.RemoteName)
-			err := utils.RemoveDirRecursively(remoteDir)
-			if err != nil {
-				e := fmt.Errorf("error while cloning repository : %s", err)
-				log.Error(e)
-				errStrings = append(errStrings, e.Error())
+			if err := utils.ValidateDirExists(remoteDir); err == nil {
+				if rmErr := utils.RemoveDirRecursively(remoteDir); rmErr != nil {
+					e := fmt.Errorf("error while removing repository directory : %s", rmErr)
+					log.Error(e)
+					errStrings = append(errStrings, e.Error())
+				}
 			}
 		}
 	}
 	err := SyncBeastRemote(defaultauthorpassword)
 	if err != nil {
 		log.Errorf("Error while syncing remote after clean : %s", err)
+		errStrings = append(errStrings, err.Error())
 	}
-	errors := strings.Join(errStrings, "\n") + err.Error()
-	return fmt.Errorf("%s", errors)
+	if len(errStrings) > 0 {
+		return fmt.Errorf("%s", strings.Join(errStrings, "\n"))
+	}
+	return nil
 }
 
 // IsAlreadySynced checks if the local repository is already synced
@@ -166,10 +175,12 @@ func SyncAndGetChangesFromRemote(defaultauthorpassword string) []string {
 
 			log.Debugf("Pulling latest changes from the remote.")
 
-			err = utils.ValidateFileExists(gitRemote.Secret)
-			if err != nil {
-				log.Errorf("Error while validating file location: %s: %s", gitRemote.Secret, err)
-				continue
+			if gitRemote.Secret != "" {
+				err = utils.ValidateFileExists(gitRemote.Secret)
+				if err != nil {
+					log.Errorf("Error while validating file location: %s: %s", gitRemote.Secret, err)
+					continue
+				}
 			}
 
 			filesChanged, err := git.PullAndGetChanges(remote, gitRemote.Secret, gitRemote.Branch, core.GIT_DEFAULT_REMOTE)

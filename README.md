@@ -83,23 +83,20 @@ Beast uses Docker as a container runtimes to run challenges in a sandboxed envir
 
 We use Swagger for automatic generation of API documentation and you can find the docs at `/api/docs/index.html` from beast server root.
 
-To save the state of the deployments and challenges beast uses SQLite as a database, all the information ranging from challenge deployment state to allocated ports and author information is stored in this database. This database is created automatically in the root of your beast configuration directory.
+To save the state of deployments, challenges, users, and submissions Beast uses PostgreSQL (`psql_config`) and Redis (`redis_config`) for caching and instanced-challenge state/port allocation.
 
 ## Development
 
-Beast go version is under development; follow the below instructions to get started.
+Beast go version is under active development; follow the below instructions to get started.
 
-- Make sure you have docker up and running.
-- Install go [1.18.X](https://golang.org/dl/) or above
-- Make sure that `GO111MODULES` environment variable should be set to `on`, or do `export GO111MODULES=on`
+- Make sure you have Docker, PostgreSQL, and Redis up and running.
+- Install Go 1.23+ (`go.mod` targets `go 1.23.0`)
 - Clone the repository.
-- Jump to `$GOPATH/src/github.com/sdslabs/beast/` and start hacking.
+- Run `make help` inside the repository root to inspect available targets.
 
 ```bash
 $ go version
-go version go1.18 linux/amd64
-
-$ export GO111MODULES=on
+go version go1.23.0 linux/amd64
 
 $ git clone git@github.com:sdslabs/beast.git
 
@@ -115,7 +112,7 @@ BEAST: An automated challenge deployment tool for backdoor
 * tools: Set up required tools for Beast which includes - docker-enter, importenv
 ```
 
-**All the dependencies are already vendored with the project, so no need to install any dependencies**. The project uses go modules from go 1.18.X of dependency management. Make sure you vendor any library used using `go mod vendor`
+**Dependencies are tracked in `go.mod` (with optional `vendor/` sync via `go mod vendor`).**
 
 ### Building
 
@@ -123,9 +120,9 @@ To build Beast from Source use the Makefile provided.
 
 - `make build`
 
-This will build Beast and place the binary in `$GOPATH/bin/` and copy the necessery tools to the desired place. To build this in production make sure you also have built the static-content docker image in `/extras/static-content`
+This will build Beast and place the binary in `$GOPATH/bin/` and copy the necessary tools to the desired place. To run static-content containers in production make sure you also have built the static-content docker image in `/extras/static-content`
 
-To run the API server for Beast, use the command `beast run -v`
+To run the API server for Beast, use the command `beast run -v` (or `beast run -nv` for local development without JWT authorization)
 
 ### Hot reloading support
 
@@ -140,8 +137,7 @@ curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh
 
 ### Testing
 
-To test use the sample challenges in the `_examples` directory. Use the challenge simple and try to deploy it using
-Beast. Follow the below instructions.
+To test use the sample challenges in the `_examples` directory. Use the challenge `simple` and try to deploy it using Beast. Follow the below instructions.
 
 You can find swagger API documentation here: http://localhost:5005/api/docs/index.html
 
@@ -149,11 +145,11 @@ You can find swagger API documentation here: http://localhost:5005/api/docs/inde
 # Build beast
 $ make build
 
-# Run beast server
-# Beast server will start running on port 5005 port by default
-$ beast run -v
+# Run beast server (use -n for no-auth local testing, or pass Authorization: Bearer <token>)
+# Beast server will start running on port 5005 by default
+$ beast run -nv
 
-# In another terminal Start the local deployment of the challenge, using the directory
+# In another terminal start the local deployment of the challenge, using the directory
 $ curl -X POST localhost:5005/api/manage/deploy/local/ --data "challenge_dir=<absolute_path_to_challenge_simple>"
 
 # Or you can directly deploy the challenge using name in the remote

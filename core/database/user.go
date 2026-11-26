@@ -5,12 +5,12 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"html/template"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"text/template"
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
@@ -278,12 +278,7 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 
 // hook after update
 func (user *User) AfterUpdate(tx *gorm.DB) error {
-	iFace, _ := tx.InstanceGet("gorm:update_attrs")
-	if iFace == nil {
-		return nil
-	}
-	updatedAttr := iFace.(map[string]interface{})
-	if _, ok := updatedAttr["ssh_key"]; ok {
+	if tx.Statement != nil && (tx.Statement.Changed("SshKey") || tx.Statement.Changed("ssh_key")) {
 		err := deleteFromAuthorizedKeys(user)
 		if err != nil {
 			return fmt.Errorf("Error while deleting from userized_keys : %s", err)
@@ -375,6 +370,9 @@ func deleteFromAuthorizedKeys(user *User) error {
 
 	keys, err := ioutil.ReadFile(config.Cfg.AuthorizedKeysFile)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("Error while reading auth file : %s", err)
 	}
 

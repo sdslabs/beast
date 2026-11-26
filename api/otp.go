@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -29,12 +30,16 @@ func generateOTP() string {
 	return fmt.Sprintf("%06d", r.Intn(1000000)) // 6-digit OTP
 }
 
-// sendEmail sends an OTP email using an SMTP client with TLS. Falls back to plain text if template is missing.
+// sendEmail sends an OTP email using an SMTP client (supports implicit TLS on port 465, STARTTLS, and plain SMTP with optional auth). Falls back to plain text if template is missing.
 func sendEmail(email, otp string) error {
 	from := config.Cfg.MailConfig.From
 	password := config.Cfg.MailConfig.Password
 	smtpHost := config.Cfg.MailConfig.SMTPHost
 	smtpPort := config.Cfg.MailConfig.SMTPPort
+
+	if from == "" {
+		from = "noreply@beast.local"
+	}
 
 	// Email subject
 	subject := "Your OTP Code"
@@ -79,7 +84,7 @@ func sendEmail(email, otp string) error {
 		"MIME-Version: 1.0\r\n"
 
 	// Set Content-Type based on template availability
-	if body.String()[0] == '<' {
+	if body.Len() > 0 && body.String()[0] == '<' {
 		message += "Content-Type: text/html; charset=\"utf-8\"\r\n\r\n"
 	} else {
 		message += "Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n"
@@ -87,31 +92,48 @@ func sendEmail(email, otp string) error {
 
 	message += body.String()
 
-	// Setup TLS connection
+	addr := net.JoinHostPort(smtpHost, smtpPort)
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true, // Set true only if SMTP server uses self-signed certs
 		ServerName:         smtpHost,
 	}
 
-	// Connect to SMTP server
-	conn, err := tls.Dial("tcp", smtpHost+":"+smtpPort, tlsConfig)
-	if err != nil {
-		log.Println("Failed to connect to SMTP server:", err)
-		return err
-	}
-
-	client, err := smtp.NewClient(conn, smtpHost)
-	if err != nil {
-		log.Println("Failed to create SMTP client:", err)
-		return err
+	var client *smtp.Client
+	if smtpPort == "465" {
+		conn, err := tls.Dial("tcp", addr, tlsConfig)
+		if err != nil {
+			log.Println("Failed to connect to SMTP server:", err)
+			return err
+		}
+		client, err = smtp.NewClient(conn, smtpHost)
+		if err != nil {
+			_ = conn.Close()
+			log.Println("Failed to create SMTP client:", err)
+			return err
+		}
+	} else {
+		client, err = smtp.Dial(addr)
+		if err != nil {
+			log.Println("Failed to connect to SMTP server:", err)
+			return err
+		}
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(tlsConfig); err != nil {
+				_ = client.Close()
+				log.Println("Failed to start TLS with SMTP server:", err)
+				return err
+			}
+		}
 	}
 	defer client.Close()
 
-	// Authenticate
-	auth := smtp.PlainAuth("", from, password, smtpHost)
-	if err := client.Auth(auth); err != nil {
-		log.Println("SMTP authentication failed:", err)
-		return err
+	// Authenticate only when credentials are configured
+	if password != "" {
+		auth := smtp.PlainAuth("", from, password, smtpHost)
+		if err := client.Auth(auth); err != nil {
+			log.Println("SMTP authentication failed:", err)
+			return err
+		}
 	}
 
 	// Set sender and recipient
@@ -156,6 +178,9 @@ func sendEmail(email, otp string) error {
 
 func sendOTPHandler(c *gin.Context) {
 	if config.SkipAuthorization {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "OTP verification skipped in no-auth mode",
+		})
 		return
 	}
 	email := c.PostForm("email")
@@ -282,13 +307,6 @@ func verifyOTPHandler(c *gin.Context) {
 			return
 		}
 
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, HTTPErrorResp{
-				Error: "Failed to verify OTP",
-			})
-			return
-		}
-
 		if otpEntry.Code != otp {
 			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 				Error: "Invalid OTP",
@@ -319,6 +337,9 @@ func verifyOTPHandler(c *gin.Context) {
 
 func sendOTPForForgetHandler(c *gin.Context) {
 	if config.SkipAuthorization {
+		c.JSON(http.StatusOK, HTTPPlainResp{
+			Message: "OTP verification skipped in no-auth mode",
+		})
 		return
 	}
 	email := c.PostForm("email")
@@ -429,7 +450,7 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 			return
 		}
 
-		if otpEntry.Code != otp {
+		if otpEntry.Code == "" || otpEntry.Code != otp {
 			c.JSON(http.StatusUnauthorized, HTTPErrorResp{
 				Error: "Invalid OTP",
 			})
@@ -442,11 +463,21 @@ func verifyOTPForForgetHandler(c *gin.Context) {
 			})
 			return
 		}
+
+		otpEntry.Code = ""
+		otpEntry.Expiry = time.Unix(0, 0)
+		_ = database.CreateOTPEntry(&otpEntry)
 	}
 	userEntry, err := database.QueryFirstUserEntry("email", email)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, HTTPErrorResp{
 			Error: err.Error(),
+		})
+		return
+	}
+	if userEntry.ID == 0 {
+		c.JSON(http.StatusNotFound, HTTPErrorResp{
+			Error: "User not found",
 		})
 		return
 	}

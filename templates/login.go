@@ -15,7 +15,7 @@ var SSH_LOGIN_SCRIPT_TEMPLATE string = `
 # This is an automatically generated shell script, don't edit this
 # this wraps the forced command for a ssh session.
 # $SSH_ORIGINAL_COMMAND recieves the original command sent by the user.
-# This script is generate for user : {{.Author}}
+# This script is generate for user : {{.User}}
 
 case "$SSH_ORIGINAL_COMMAND" in
 
@@ -40,7 +40,7 @@ var SSH_RESTRICT_LOGIN_SCRIPT_TEMPLATE string = `
 #
 # This is an automatically generated shell script, don't edit this
 # this disables the author to enter the docker container through ssh.
-# This script is generate for user : {{.Author}}
+# This script is generate for user : {{.User}}
 
 echo "SSH access has been disabled for all the current authors. Contact the admin."
 exit 1
