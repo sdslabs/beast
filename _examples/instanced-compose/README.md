@@ -28,12 +28,11 @@ instanced = true
 
 [challenge.env]
 docker_compose = "docker-compose.yml"
-default_port_var = "SSH_PORT"
 ```
 
 See `beast.toml` in this directory for full metadata (e.g. `instance_expiration`).
 
-`default_port_var` selects which env-backed **host** port Beast treats as the primary instance port in API responses. For hydra-net challenges this must be the SSH mapping on the `ssh` service.
+Beast reads the SSH host-port variable from the only published mapping on the `ssh` service. It returns the allocated host port in the first entry of the instance's `port` array.
 
 In `docker-compose.yml`, every published port must use an environment placeholder (no `${VAR:-default}` syntax). Example:
 
@@ -45,6 +44,8 @@ services:
     networks:
       - exposed
       - internal
+    volumes:
+      - challenge:/challenge
 
   db:
     networks:
@@ -57,6 +58,9 @@ networks:
   internal:
     driver: bridge
     internal: true
+
+volumes:
+  challenge: {}
 ```
 
 ## Challenge details
@@ -78,22 +82,24 @@ Or use UNION-based injection to extract data directly.
 
 ## Testing locally
 
+Provision `hydra-net` and its firewall rules on the Docker host using `scripts/provision/hydra-net-setup.sh` from the repository root before starting Compose.
+
 ```bash
 cd _examples/instanced-compose
 export SSH_PORT=2222
 docker compose up -d --build
 ```
 
-SSH matches `default_port_var`: `ssh -p 2222 beast@localhost` (adjust user/host as in your setup). The database is reachable only through the internal compose network.
+With the example host port above, connect over SSH using `ssh -p 2222 beast@localhost` (adjust user/host as in your setup). The database is reachable only through the internal compose network.
 
 ## Usage via Beast API
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/instances/instanced-compose/spawn
+  http://localhost:5005/api/instances/instanced-compose/spawn
 ```
 
-The returned `port` is the allocated host port for **`SSH_PORT`** (SSH), matching `default_port_var`.
+The first entry in the returned `port` array is the allocated SSH host port.
 
 ```bash
 ssh -p <port from response> beast@<hosted_address>

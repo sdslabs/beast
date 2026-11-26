@@ -24,7 +24,6 @@ points = 20
 [challenge.env]
 ports = [10002]
 web_root = "challenge"
-default_port = 10002
 
 [resource]
 cpu_shares = 1024

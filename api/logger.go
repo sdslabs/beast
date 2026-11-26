@@ -22,19 +22,72 @@ const (
 	ansiRed    = "\033[31m"        // Red for 5xx errors
 )
 
+const maxLoggedPayloadBytes = 4096
+
+type payloadPreview struct {
+	bytes.Buffer
+	truncated bool
+}
+
+func (preview *payloadPreview) Write(data []byte) (int, error) {
+	remaining := maxLoggedPayloadBytes - preview.Len()
+	if len(data) > remaining {
+		preview.truncated = true
+	}
+	_, _ = preview.Buffer.Write(data[:min(len(data), remaining)])
+	return len(data), nil
+}
+
+func (preview *payloadPreview) String() string {
+	if preview.truncated {
+		return preview.Buffer.String() + " ...[truncated]"
+	}
+	if preview.Len() == 0 {
+		return "<empty>"
+	}
+	return preview.Buffer.String()
+}
+
+type requestPreviewReader struct {
+	io.Reader
+	io.Closer
+}
+
 type bodyLogWriter struct {
 	gin.ResponseWriter
-	body *bytes.Buffer
+	body *payloadPreview
 }
 
 func (w bodyLogWriter) Write(b []byte) (int, error) {
-	w.body.Write(b)
+	if isTextPayload(w.Header().Get("Content-Type")) {
+		_, _ = w.body.Write(b)
+	}
 	return w.ResponseWriter.Write(b)
 }
 
 func (w bodyLogWriter) WriteString(s string) (int, error) {
-	w.body.WriteString(s)
+	if isTextPayload(w.Header().Get("Content-Type")) {
+		remaining := maxLoggedPayloadBytes - w.body.Len()
+		if len(s) > remaining {
+			w.body.truncated = true
+		}
+		_, _ = w.body.Buffer.WriteString(s[:min(len(s), remaining)])
+	}
 	return w.ResponseWriter.WriteString(s)
+}
+
+func isTextPayload(contentType string) bool {
+	mediaType, _, _ := strings.Cut(contentType, ";")
+	return mediaType == "application/json" || mediaType == "application/x-www-form-urlencoded" || mediaType == "text/plain"
+}
+
+func isSensitivePayloadPath(path string) bool {
+	for _, prefix := range []string{"/auth", "/api/check", "/api/submit", "/api/config", "/api/instances", "/api/admin", "/api/manage", "/api/remote", "/api/notification"} {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // isPayloadLoggingEnabled returns true if HTTP payload logging is enabled.
@@ -96,7 +149,7 @@ func ginLoggerMiddleware() gin.HandlerFunc {
 					param.Latency,
 					param.ClientIP,
 					param.Method,
-					param.Path,
+					param.Request.URL.Path,
 					ansiReset,
 					param.ErrorMessage,
 				)
@@ -109,7 +162,7 @@ func ginLoggerMiddleware() gin.HandlerFunc {
 				param.Latency,
 				param.ClientIP,
 				param.Method,
-				param.Path,
+				param.Request.URL.Path,
 				ansiReset,
 				param.ErrorMessage,
 			)
@@ -127,173 +180,67 @@ func ginLoggerMiddleware() gin.HandlerFunc {
 			param.Latency,
 			param.ClientIP,
 			methodColor, param.Method, resetColor,
-			param.Path,
+			param.Request.URL.Path,
 			param.ErrorMessage,
 		)
 	})
 }
 
-// requestResponseLogger logs detailed information about incoming HTTP requests and responses.
-// OPTIONS requests are dimmed.
-// Invalid requests (status >= 400 like 401, 403, 404, 500) always show up with highlighted status.
+// requestResponseLogger records errors and optional bounded previews of text payloads.
 func requestResponseLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
 		path := c.Request.URL.Path
-		rawQuery := c.Request.URL.RawQuery
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-
 		contentType := c.GetHeader("Content-Type")
-		isMultipart := strings.HasPrefix(contentType, "multipart/")
-
-		var reqBodyBytes []byte
-		if !isMultipart && c.Request.Body != nil {
-			var err error
-			reqBodyBytes, err = io.ReadAll(c.Request.Body)
-			if err == nil {
-				c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBodyBytes))
-			}
-		}
-
-		reqBodyStr := "<empty>"
-		if isMultipart {
-			reqBodyStr = "<multipart form data>"
-		} else if len(reqBodyBytes) > 0 {
-			reqBodyStr = string(reqBodyBytes)
-			if len(reqBodyStr) > 4096 {
-				reqBodyStr = reqBodyStr[:4096] + " ...[truncated]"
-			}
-		}
-
-		// Extract user if authorization header is present
-		userStr := ""
-		if authHeader := c.GetHeader("Authorization"); authHeader != "" {
-			if u, err := coreUtils.GetUser(authHeader); err == nil && u != "" {
-				userStr = fmt.Sprintf(" | User: %s", u)
-			}
-		}
-
-		isOptions := c.Request.Method == "OPTIONS"
 		payloadsEnabled := isPayloadLoggingEnabled()
+		capture := payloadsEnabled && !isSensitivePayloadPath(path)
 
-		// If payloads are enabled, log the incoming request immediately
-		if payloadsEnabled {
-			if isOptions {
-				log.Infof("%s[HTTP REQ] %s %s%s | ClientIP: %s | Content-Type: %s | Body: %s%s",
-					ansiDim,
-					c.Request.Method,
-					path,
-					userStr,
-					c.ClientIP(),
-					contentType,
-					reqBodyStr,
-					ansiReset,
-				)
-			} else {
-				log.Infof("[HTTP REQ] %s %s%s | ClientIP: %s | Content-Type: %s | Body: %s",
-					c.Request.Method,
-					path,
-					userStr,
-					c.ClientIP(),
-					contentType,
-					reqBodyStr,
-				)
+		var requestBody, responseBody payloadPreview
+		if capture {
+			if c.Request.Body != nil && isTextPayload(contentType) {
+				body := c.Request.Body
+				c.Request.Body = requestPreviewReader{Reader: io.TeeReader(body, &requestBody), Closer: body}
 			}
+			c.Writer = &bodyLogWriter{ResponseWriter: c.Writer, body: &responseBody}
 		}
-
-		blw := &bodyLogWriter{
-			body:           bytes.NewBufferString(""),
-			ResponseWriter: c.Writer,
-		}
-		c.Writer = blw
 
 		c.Next()
 
-		duration := time.Since(startTime)
-		statusCode := c.Writer.Status()
-		respContentType := c.Writer.Header().Get("Content-Type")
-
-		respBodyStr := "<empty>"
-		if strings.HasPrefix(respContentType, "image/") ||
-			strings.HasPrefix(respContentType, "application/octet-stream") ||
-			strings.HasPrefix(respContentType, "application/zip") {
-			respBodyStr = "<binary content>"
-		} else if blw.body.Len() > 0 {
-			respBodyStr = blw.body.String()
-			if len(respBodyStr) > 4096 {
-				respBodyStr = respBodyStr[:4096] + " ...[truncated]"
+		status := c.Writer.Status()
+		if !payloadsEnabled && status < 400 {
+			return
+		}
+		user := ""
+		if authHeader := c.GetHeader("Authorization"); authHeader != "" {
+			if username, err := coreUtils.GetUser(authHeader); err == nil && username != "" {
+				user = fmt.Sprintf(" | User: %q", username)
 			}
 		}
 
-		isError := statusCode >= 400
-
-		// If payload logging was disabled, but an error occurred, log the request now for context
-		if !payloadsEnabled && isError {
-			log.Warnf("%s[HTTP REQ] %s %s%s | ClientIP: %s | Content-Type: %s | Body: %s%s",
-				ansiYellow,
-				c.Request.Method,
-				path,
-				userStr,
-				c.ClientIP(),
-				contentType,
-				reqBodyStr,
-				ansiReset,
-			)
+		if capture {
+			log.Infof("[HTTP REQ] %s %s%s | ClientIP: %s | Content-Type: %s | Body: %q",
+				c.Request.Method, path, user, c.ClientIP(), contentType, requestBody.String())
 		}
 
-		// Determine how to log the response
-		if isError {
-			if statusCode >= 500 {
-				log.Errorf("%s[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s | Body: %s%s",
-					ansiRed,
-					c.Request.Method,
-					path,
-					userStr,
-					statusCode,
-					duration,
-					respContentType,
-					respBodyStr,
-					ansiReset,
-				)
-			} else {
-				log.Warnf("%s[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s | Body: %s%s",
-					ansiYellow,
-					c.Request.Method,
-					path,
-					userStr,
-					statusCode,
-					duration,
-					respContentType,
-					respBodyStr,
-					ansiReset,
-				)
-			}
-		} else if payloadsEnabled {
-			if isOptions {
-				log.Infof("%s[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s | Body: %s%s",
-					ansiDim,
-					c.Request.Method,
-					path,
-					userStr,
-					statusCode,
-					duration,
-					respContentType,
-					respBodyStr,
-					ansiReset,
-				)
-			} else {
-				log.Infof("[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s | Body: %s",
-					c.Request.Method,
-					path,
-					userStr,
-					statusCode,
-					duration,
-					respContentType,
-					respBodyStr,
-				)
-			}
+		level := log.InfoLevel
+		color := ""
+		switch {
+		case status >= 500:
+			level, color = log.ErrorLevel, ansiRed
+		case status >= 400:
+			level, color = log.WarnLevel, ansiYellow
+		case c.Request.Method == "OPTIONS":
+			color = ansiDim
 		}
+		payload := ""
+		if capture {
+			payload = fmt.Sprintf(" | Body: %q", responseBody.String())
+		}
+		reset := ""
+		if color != "" {
+			reset = ansiReset
+		}
+		log.StandardLogger().Logf(level, "%s[HTTP RESP] %s %s%s | Status: %d | Latency: %v | Content-Type: %s%s%s",
+			color, c.Request.Method, path, user, status, time.Since(startTime), c.Writer.Header().Get("Content-Type"), payload, reset)
 	}
 }

@@ -131,7 +131,7 @@ type Challenge struct {
 	PreviousTries   int        `json:"previousTries" example:"3"`
 	MaxAttemptLimit int        `json:"maxAttemptLimit" example:"5"`
 	DeployedLink    string     `json:"deployedLink" example:"beast.sdslabs.co or ip:port"`
-	Ports           []uint32   `json:"ports" example:"[10005]"`
+	Ports           []uint32   `json:"ports" example:"10005"`
 }
 
 // ChallengeDetails is an extended struct for admin use, containing additional fields.
@@ -149,7 +149,7 @@ type ChallengePreviewResp struct {
 	AdditionalLinks []string `json:"additionalLinks" example:"['http://link1.abc:8080','http://link2.abc:8081']"`
 	MaxAttemptLimit int      `json:"maxAttemptLimit" example:"5"`
 	PreReqs         []string `json:"preRequisite" example:"['web-php','simple']"`
-	Ports           []uint32 `json:"ports" example:"[3001, 3002]"`
+	Ports           []uint32 `json:"ports" example:"3001,3002"`
 	Desc            string   `json:"description" example:"A simple web challenge"`
 	Points          uint     `json:"points" example:"50"`
 	DeployedLink    string   `json:"deployedLink" example:"beast.sdslabs.co"`

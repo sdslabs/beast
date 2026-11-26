@@ -14,16 +14,15 @@ import (
 
 // Gets a challenge deployment status on the basis of name.
 // @Summary Returns challenge deployment status from the beast database.
-// @Description Returns challenge deployment status from the beast database, for those challenges which are not present a status value NA is returned.
+// @Description Returns challenge deployment status from the beast database, for those challenges which are not present the status is Not Available.
 // @Tags status
-// @Accept  json
 // @Produce json
-// @Param name query string true "Name of the challenge"
-// @Param Authorization header string true "Bearer"
+// @Param name path string true "Name of the challenge"
 // @Success 200 {object} api.ChallengeStatusResp
 // @Failure 500 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/status/challenge/:name [get]
+// @Security ApiKeyAuth
+// @Router /api/status/challenge/{name} [get]
 func challengeStatusHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
@@ -61,14 +60,13 @@ func challengeStatusHandler(c *gin.Context) {
 // @Summary Returns challenge deployment status from the beast database for the challenges which matches the stauts according to filter.
 // @Description This returns the challenges in the status provided, along with their name and last updated time.
 // @Tags status
-// @Accept  json
 // @Produce json
-// @Param filter query string true "Status type to filter with, if none specified then all"
-// @Param Authorization header string true "Bearer"
+// @Param filter path string true "Deployment status such as deployed or undeployed"
 // @Failure 500 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Success 200 {array} api.ChallengeStatusResp
-// @Router /api/status/all/:filter [get]
+// @Security ApiKeyAuth
+// @Router /api/status/all/{filter} [get]
 func statusHandler(c *gin.Context) {
 	filter := strings.ToLower(strings.TrimSpace(c.Param("filter")))
 

@@ -1,13 +1,7 @@
 package main
 
 const (
-	LONG_DESCRIPTION_BEAST = `
-                             Beast
-                       -----------------
-       Beast is an automatic challenge deployment and management
-       tool for backdoor an always online wargaming web platform.
-
-                     @SDSLabs IIT Roorkee`
+	LONG_DESCRIPTION_BEAST = "Beast deploys and manages Jeopardy-style CTF challenges and competitions."
 
 	DEFAULT_CMDREF_DIRECTORY string = "docs/cmdref/"
 )

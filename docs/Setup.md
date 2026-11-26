@@ -1,222 +1,63 @@
 # Setting up Beast
 
-Beast compiles to a single Golang binary which can be used anywhere.
+## Build and start
 
-## Build
+Run Beast on a Linux host with Docker, the Docker Compose plugin, and access to PostgreSQL and Redis. Building from source requires Go 1.23 or newer. Install the PostgreSQL client tools for database maintenance commands.
 
-To build beast from source follow the instruction below
+From the repository root, build Beast and start the development dependencies.
 
-- Make sure you have docker and golang installed in your system and have it in `$PATH`
-
-```bash
-$ mkdir -p $GOPATH/src/github.com/sdslabs/
-
-$ git clone https://github.com/sdslabs/beastv4 $GOPATH/src/github.com/sdslabs/beastv4
-
-$ cd $GOPATH/src/github.com/sdslabs/beastv4
-
-# Build beast
-$ make build
-
-# Build additional tooling required with beast.
-$ make tools
+```sh
+make build
+test -e .env || cp sample.env .env
+# Edit .env to set credentials and connection details before starting the services.
+make up NAME=myctf
 ```
 
-Building beast with above method will copy the beast binary to `$GOBIN` so make sure that it is in your `$PATH`
+The build installs `beast` in the directory reported by `go env GOBIN`, or in `bin` under the first entry reported by `go env GOPATH`. Add that directory to your `PATH`. The build also checks the host tools used for SSH to challenge containers.
 
-Run `beast version` to check if beast is build with the commit that you pulled the source code with.
-
-```bash
-[fristonio] $ ~/golang/src/github.com/sdslabs/beastv4 documentation
-❮❮ beast version
-
-        ****************** Beast ******************
-
-            Version    : 0.1
-            Revision   : 2b9cd25
-            Branch     : master
-            Build-User : fristonio@fristonio
-            Build-Date : 20190713-22:50:27
-            Go-Version : 1.11
-
-        *******************************************
+```sh
+beast config --non-interactive
+# Review ~/.beast/config.toml. Set jwt_secret and replace any $HOME path placeholders.
+beast init --non-interactive
+beast run
 ```
 
-## Configure
+`config` prepares the global config and the Beast authorized-keys file. `init` also prepares the data directories and checks Docker, PostgreSQL, and Redis. Non-interactive setup skips the administrative-user prompt. Use `beast create-admin` to create an administrator.
 
-All the beast related files lies in `$HOME/.beast` directory. Create this directory which will be used by beast.
+`make up` starts PostgreSQL and Redis. Use `make logs NAME=myctf` to see their logs and `make down NAME=myctf` to stop the Compose project. The API defaults to port 5005. Pass `beast run --port 5505` to change it.
 
-Create a configuration file for beast in the root of beast configuration directory(`$HOME/.beast`) named `config.toml`, an example configuration for the same is present in `/_examples/example.config.toml`.
+## Global configuration
 
-### Configuration file
+Start with the example config in `_examples/example.config.toml` or generate one with `beast config`. Beast reads `~/.beast/config.toml` and accepts environment overrides. It loads `.env` from the working directory and `~/.beast/.env`, in that order, for variables absent from the process environment.
 
-The structure of the configuration file used by beast is as follows
+| TOML setting | What it controls |
+| --- | --- |
+| `[psql_config]` | PostgreSQL host, port, user, password, database name, and SSL mode. Overrides use `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, and `POSTGRES_SSLMODE`. |
+| `[redis_config]` | Redis connection and ACL credentials. Overrides use `REDIS_HOST`, `REDIS_PORT`, `REDIS_USER`, `REDIS_PASSWORD`, `REDIS_DEFAULT_PASSWORD`, and `REDIS_DB`. |
+| `jwt_secret` | Secret used to sign API tokens. Set a unique value for each deployment. |
+| `[available_servers.<name>]` | Deployment host, SSH connection details for remote hosts, and a host `port_range` such as `10000:20000`. Ranges are inclusive and must stay within 10000–20000. |
+| `[[remote]]` | Git repository URL, name, branch, and SSH key path when needed. Set `active = true` to enable it. |
+| `[instance_config]` | Default expiration and maximum extension in seconds, plus the concurrent instance limit per user. |
+| `[competition_info]` | Competition name, schedule, presentation, and scoring mode. Use the date and timezone format shown in the example config. |
+| `[[notification_webhooks]]` | Active Slack or Discord webhooks for deployment events. |
+| `[mail_config]` | SMTP host, port, sender, and optional password for email verification and password reset. Overrides use `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, and `SMTP_PASSWORD`. SMTP TLS verifies the server certificate. |
+| `health_prober`, `ticker_frequency` | Enables periodic health checks and sets their interval in seconds. |
+| `remote_sync_period` | Duration between Git syncs when `beast run --periodic-sync` is enabled. |
+| `authorized_keys_file`, `scripts_dir` | Host authorized-keys file and directory for generated SSH scripts. |
+| `beast_static_url` | Base URL for the optional standalone static server. |
 
-```toml
-# Authorized key file used by ssh daemon running on the host
-# This is used for forwarding ssh connection to docker containers, the
-# access to a container is only given to the author of the challenge.
-authorized_keys_file = "/home/fristonio/.beast/beast_authorized_keys"
+For a host-installed Beast using the Compose dependencies, use `localhost` or `127.0.0.1` with their published ports. For Beast running on the same Compose network, use the service names `postgres` and `redis` with their container ports.
 
+`LOG_HTTP_PAYLOADS=true` enables bounded text payload previews on eligible routes. Sensitive routes omit payloads. HTTP error metadata is logged with payload logging disabled.
 
-# Directory which will contain all the autogenerated scripts by beast
-# These scripts are the heart to above authorized keys file. Each entry in authorized
-# keys file as a corresponding script which is executed during an SSH attempt.
-scripts_dir = "/home/fristonio/.beast/scripts"
+## Docker host and static server
 
+Local deployments use the Docker daemon selected by the environment or Docker context. When running Beast in a container, give it access to the daemon and set `BEAST_HOST_DIR` to the host path backing the mounted Beast data directory if the host and container paths differ.
 
-# Base OS image that beast allows the challenges to use.
-allowed_base_images = ["ubuntu:24.04", "ubuntu:22.04", "ubuntu:20.04", "ubuntu:18.04", "debian:bookworm"]
+Instanced Compose challenges require `hydra-net`. Run `scripts/provision/hydra-net-setup.sh` on the Docker host to provision the network and firewall rules. See the [challenge configuration reference](ChallConfig.md#instanced-compose-ssh).
 
+Beast can serve staged public assets through its API. You can also run the separate Nginx image built by `make requirements`. The standalone server serves assets at `/static/<challenge>/<asset>`.
 
-# For authentication purposes beast uses JWT based authentication, this is the
-# key used for encrypting the claims of a user. Keep this strong.
-jwt_secret = "beast_jwt_secret_SUPER_STRONG_0x100010000100"
+## Data and maintenance
 
-
-# To allow beast to send notification to a notification channel povide this webhook URL
-# We are also working on implmeneting notification using IRC.
-[[notification_webhooks]]
-
-# The webhook URL of notification channel where notification should be sent
-url = ""
-
-# The service name to be used. It can be `discord` and `slack`
-service_name = "discord"
-
-# Status of webhook URL to be used.
-# If it is false then notification will not be sent on this URL
-active = true
-
-
-# The frequency for any periodic event in beast, the value is provided in seconds.
-# This is currently only used for health check periodic duration.s
-ticker_frequency = 3000
-
-
-# Container default resource limits for each challenge, this can be
-# Overridden by challenge configuration beast.toml file.
-default_cpu_shares = 1024
-default_memory_limit = 1024
-default_pids_limit = 100
-
-
-# Configuration corresponding to the remote repository used by beast
-# We use ssh authentication mechanism for interacting with git repository.
-[[remote]]
-
-# URL of the remote git repository, this should be user@host:<git_repository> format
-url = "git@github.com:sdslabs/hack-test.git"
-
-# Name of the remote
-name = "hack-test"
-
-# Branch we are tracking the remote in beast.
-branch = "master"
-
-# Path to private SSH key for interacting with the git repository.
-ssh_key = "/home/fristonio/.beast/secrets/key.priv"
-
-# Status of remote git repository URL to be used
-# If it is set to false then that remote git repository will not be used
-active = true
-
-# The following fields are required only while hosting a competition on beast
-# This section contains information about the competition to be hosted
-# Structure of the sections with the acceptable fields are:
-
-# Required Fields
-
-# Name of the competition
-name = ""
-
-# About the competition
-about = ""
-
-# Starting time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
-starting_time = ""
-
-# Ending time of competition wrt time zone in `16:31:23 UTC: +05:30, 17th February 2021, Wednesday` format
-ending_time = ""
-
-# Time zone for reference in `Asia/Calcutta: UTC +05:30` format
-timezone = ""
-
-# Optional fields
-
-# Prizes for the competition winners
-prizes = ""
-
-# Absolute path of logo file. Default logo dir is in the "BEAST_GLOBAL_DIR/assets/"
-logo_url = ""
-```
-
-Along with this configuration file we also need one more configuration file which is used by beast static content provider
-and protects some routes for the same.
-
-The file is located at `$HOME/.beast/.static.beast.htpasswd` and is generated using `htpasswd` utility. To generate this file
-use the below command.
-
-```bash
-$ htpasswd -C 10 -c -B .static.beast.htpasswd <username>
-New Password: <Type the password>
-```
-
-### Configuration Directory Structure
-
-The configuration directory structure of beast(`$HOME/.beast`) look something as below:
-
-```
-.beast/
-├── assets
-│   └── logo.png
-├── authorized_keys_file
-├── beast.db
-├── config.toml
-├── hack-secrets
-│   ├── id_rsa
-│   └── id_rsa.pub
-├── remote
-│   └── hack-test
-│       └── challenges
-│           └── MIGHTY-PHP
-│               ├── beast.toml
-│               └── challenge
-│                   └── flag.php
-├── scripts
-│   └── 043a6aa3658c08c85d64321d986afbf69cb7ad345f16fe8aa0368ee6478f6e24
-├
-├── staging
-│   └── MIGHTY-PHP
-│       ├── beast.toml
-│       ├── Dockerfile
-│       ├── logs
-│       │   └── MIGHTY-PHP.20190609173618.log
-│       ├── MIGHTY-PHP.tar.gz
-│       └── static
-├── uploads
-│   └── MIGHTY-GO
-│       ├── beast.toml
-│       └── challenge
-│           └── flag.go
-```
-
-### Configuring frontend for competition hosting
-
-Clone the [frontend repository](https://github.com/sdslabs/beast-frontend) and follow the setup instructions mentioned in its `README.md` file.
-
-## Run
-
-Once the setup and configuration is done run the beast web server using the below command
-
-```bash
-beast run -v -p <PORT>
-```
-
-Follow the API Authentication flow to obtain a Token, use that token further to make any REST API call to the beast server.
-The whole swagger API documentation for the REST API can be found at the `http://localhost:5005/api/docs/index.html`
-
-## Note
-
-- Make sure all the secrets/passwords you are using are strong enough. Also, make sure that the static content provider endpoint
-  is HTTPS protected.
+PostgreSQL stores persistent competition and deployment data. Redis stores cache data, live instance state, and port reservations. Files under `~/.beast` include configuration, cloned remotes, staged challenges, public assets, and backups. Use the CLI to back up and restore PostgreSQL and Redis. Restore the matching staged files separately when you need to recover deployment artifacts.

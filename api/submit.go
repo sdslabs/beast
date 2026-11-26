@@ -26,7 +26,6 @@ var (
 // @Summary Verifies and creates an entry in the database for successful submission of flag for a challenge.
 // @Description Returns success or error response based on the flag submitted. Also, the flag will not be submitted if it was previously submitted
 // @Tags Submit
-// @Accept  json
 // @Produce json
 // @Param chall_id formData string true "ID of challenge"
 // @Param flag formData string true "Flag for the challenge"
@@ -34,6 +33,8 @@ var (
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 401 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/submit/challenge [post]
 func submitFlagHandler(c *gin.Context) {
 	startDynamicScoreWorker()

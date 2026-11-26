@@ -22,7 +22,6 @@ import (
 // @Summary Verifies and creates an entry in the database for successful submission of a challenge.
 // @Description Returns success or error response based on the status of completion.
 // @Tags Submit
-// @Accept  json
 // @Produce json
 // @Param chall_id formData string true "ID of challenge"
 // @Param instance_id formData string true "Instance ID for challenge"
@@ -31,6 +30,8 @@ import (
 // @Failure 401 {object} api.HTTPErrorResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/check/challenge [post]
 func checkFlagHandler(c *gin.Context) {
 	startDynamicScoreWorker()

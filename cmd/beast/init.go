@@ -59,11 +59,10 @@ func initDirectories() error {
 
 func checkDockerDaemon() error {
 	log.Infoln("Checking docker daemon...")
-	if err := cr.PingDaemon(); err == nil {
-		return nil
+	if err := cr.PingDaemon(); err != nil {
+		return fmt.Errorf("connect to Docker daemon: %w", err)
 	}
-	_, err := os.Stat(core.DOCKER_PID)
-	return err
+	return nil
 }
 
 func installAir() error {
@@ -418,21 +417,18 @@ func runBeastBootsteps() error {
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Run Beast initial setup bootsetps.",
-	Long:  "Initializes beast by setting up beast directory, checking for permission. It also configures the logger and local SQLite database to be used by beast",
+	Short: "Set up Beast and check its dependencies",
+	Long:  "Creates the Beast configuration and verifies Docker, PostgreSQL, Redis, and administrative settings.",
 
-	Run: func(cmd *cobra.Command, args []string) {
-		err := runBeastBootsteps()
-
-		if err != nil {
-			log.Errorln(err.Error())
-			log.Errorln("Failed to complete beast bootsteps... fix above errors and try again")
-			return
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := runBeastBootsteps(); err != nil {
+			return fmt.Errorf("initialize Beast: %w", err)
 		}
 
 		log.Infoln(COLOR_GREEN + "Please run beast server by following command:-" + RESET)
 		log.Infoln(COLOR_GREEN + "******************" + RESET)
 		log.Infoln(COLOR_GREEN + "*  " + BLINK_ON + "beast run -v" + BLINK_OFF + "  *" + RESET)
 		log.Infoln(COLOR_GREEN + "******************" + RESET)
+		return nil
 	},
 }

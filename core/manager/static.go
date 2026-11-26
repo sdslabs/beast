@@ -135,6 +135,17 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *datab
 		return nil
 	}
 
+	assetsSrcDir := challengeDir
+	if challConf.Challenge.Env.StaticContentDir != "" {
+		assetsSrcDir, err = utils.ResolvePathWithin(challengeDir, challConf.Challenge.Env.StaticContentDir)
+		if err != nil {
+			return fmt.Errorf("resolve static assets directory: %w", err)
+		}
+		if err := utils.ValidateDirExists(assetsSrcDir); err != nil {
+			return err
+		}
+	}
+
 	// Check if the challenge is already in staged state
 	// Remove the already staged challenge and then copy the new files.
 	err = utils.ValidateDirExists(challengeStagingRoot)
@@ -149,11 +160,6 @@ func DeployStaticChallenge(challConf *cfg.BeastChallengeConfig, challenge *datab
 	if err = utils.CreateIfNotExistDir(challengeStaticDir); err != nil {
 		log.Errorf("Error while creating staging directory: %s", err)
 		return err
-	}
-
-	assetsSrcDir := challengeDir
-	if challConf.Challenge.Env.StaticContentDir != "" {
-		assetsSrcDir = filepath.Join(challengeDir, challConf.Challenge.Env.StaticContentDir)
 	}
 
 	err = utils.CopyDirectory(assetsSrcDir, challengeStaticDir)

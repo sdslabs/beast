@@ -50,40 +50,21 @@ func GetAllocatedPorts(challenge Challenge) ([]Port, error) {
 }
 
 func UpdatePorts(challenge *Challenge) error {
-	var ports []Port
-
 	DBMux.Lock()
 	defer DBMux.Unlock()
-
-	tx := Db.Begin()
-
-	if err := tx.Model(&challenge).Association("Ports").Find(&ports); err != nil {
-		return fmt.Errorf("error while searching port for challenge : %s", err)
-	}
-	tx.Commit()
-
-	if err := Db.Unscoped().Where("challenge_id = ?", challenge.ID).Delete(&Port{}).Error; err != nil {
-		return err
-	}
-
-	return nil
+	return Db.Unscoped().Where("challenge_id = ?", challenge.ID).Delete(&Port{}).Error
 }
 
 func DeleteRelatedPorts(portList []Port) error {
-
+	if len(portList) == 0 {
+		return nil
+	}
 	DBMux.Lock()
 	defer DBMux.Unlock()
 
-	tx := Db.Begin()
-
-	if tx.Error != nil {
-		return fmt.Errorf("Error while starting transaction : %s", tx.Error)
+	ids := make([]uint, 0, len(portList))
+	for _, port := range portList {
+		ids = append(ids, port.ID)
 	}
-
-	if err := tx.Where("1 = 1").Unscoped().Delete(portList).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
+	return Db.Unscoped().Where("id IN ?", ids).Delete(&Port{}).Error
 }

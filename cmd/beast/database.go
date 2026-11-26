@@ -11,8 +11,8 @@ import (
 var resetDatabaseCmd = &cobra.Command{
 	Use:   "reset-database",
 	Short: "Backups the existing database and cleans up old db and remote/staging directories",
-	Run: func(cmd *cobra.Command, args []string) {
-		database.BackupAndReset()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return database.BackupAndReset()
 	},
 }
 

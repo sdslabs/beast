@@ -10,12 +10,13 @@ import (
 var logsCmd = &cobra.Command{
 	Use:   "logs CHALLNAME",
 	Short: "Provides live logs of a container",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ExactArgs(1),
 
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		config.InitConfig()
 		database.Init()
 
-		utils.GetLogs(args[0], true)
+		_, err := utils.GetLogs(args[0], true)
+		return err
 	},
 }

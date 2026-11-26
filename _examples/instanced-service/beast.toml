@@ -25,7 +25,6 @@ points = 50
 
 [challenge.env]
 ports = [9999]
-default_port = 9999
 apt_deps = ["gcc"]
 setup_scripts = ["setup.sh"]
 service_path = "pwn"

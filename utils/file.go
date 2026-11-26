@@ -32,6 +32,26 @@ func CheckPathValid(path string) (os.FileInfo, error) {
 	return pathInfo, nil
 }
 
+// ResolvePathWithin resolves name beneath root, including symbolic links.
+func ResolvePathWithin(root, name string) (string, error) {
+	if !filepath.IsLocal(name) {
+		return "", fmt.Errorf("path must be relative to %s", root)
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	resolvedPath, err := filepath.EvalSymlinks(filepath.Join(resolvedRoot, name))
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(resolvedRoot, resolvedPath)
+	if err != nil || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("path is outside %s", root)
+	}
+	return resolvedPath, nil
+}
+
 // Validates if the directory pointed by `dirPath` exists
 // If the directory does not exist or is not accessible it
 // will return an error. The path specified must also be a directory
@@ -189,6 +209,9 @@ func CopyDirectory(src, dst string) error {
 		return err
 	}
 	for _, fd := range fds {
+		if fd.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
 		srcn := path.Join(src, fd.Name())
 		dstn := path.Join(dst, fd.Name())
 

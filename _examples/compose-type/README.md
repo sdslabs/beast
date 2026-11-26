@@ -1,17 +1,16 @@
-# Docker Compose example (PHP + MySQL)
+# Shared Docker Compose example
 
-This example demonstrates a multi-container challenge deployed via Docker Compose.
+The `docker_compose` field in `beast.toml` points to the Compose project for this PHP and MySQL challenge. Beast supplies the host port to the app through the `APP_PORT` environment variable.
 
-- `beast.toml` enables Compose mode using `docker_compose = "docker-compose.yml"`.
-- `docker-compose.yml` defines an `app` container and a `mysql` container.
+From the repository root, deploy the definition using an author or administrator token.
 
-Deploy locally:
+```sh
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode "challenge_dir=$PWD/_examples/compose-type" \
+  http://localhost:5005/api/manage/deploy/local/
 
-```bash
-curl -X POST localhost:5005/api/manage/deploy/local/ \
-  --data "challenge_dir=$PWD/_examples/compose-type"
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5005/api/status/challenge/compose-type
 ```
 
-After deployment, open:
-
-- http://localhost:10020
+Once the status is `Deployed`, read `GET /api/info/challenge/compose-type` and open the host and allocated port returned in `deployedLink` and `ports`.

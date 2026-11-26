@@ -11,7 +11,7 @@ import (
 
 var backupDatabase = &cobra.Command{
 	Use:   "backup-database",
-	Short: "Backups the existing database and remote/staging directories",
+	Short: "Back up the PostgreSQL database",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := database.BackupDatabase(); err != nil {
 			log.Errorf("Error backing up database: %v", err)
@@ -22,7 +22,7 @@ var backupDatabase = &cobra.Command{
 
 var backupCache = &cobra.Command{
 	Use:   "backup-cache",
-	Short: "Backups the existing cache and remote/staging directories",
+	Short: "Back up the Redis cache",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := cache.BackupCache(); err != nil {
 			log.Errorf("Error backing up cache: %v", err)

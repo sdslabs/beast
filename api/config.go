@@ -20,12 +20,11 @@ import (
 // @Summary Reloads any changes in beast global configuration, located at ~/.beast/config.toml.
 // @Description Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
 // @Tags config
-// @Accept  json
 // @Produce json
-// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
-// @Router /api/config/reload/ [patch]
+// @Security ApiKeyAuth
+// @Router /api/config/reload [patch]
 func reloadBeastConfig(c *gin.Context) {
 	err := config.ReloadBeastConfig()
 	if err != nil {
@@ -45,18 +44,20 @@ func reloadBeastConfig(c *gin.Context) {
 // @Summary Updates competition info in the beast global configuration, located at ~/.beast/config.toml.
 // @Description Populates beast gobal config map by reparsing the config file $HOME/.beast/config.toml.
 // @Tags config
-// @Accept  json
 // @Produce json
-// @Param name formData string true "Competition Name"
-// @Param about formData string true "Some information about competition"
+// @Param name formData string false "Competition Name"
+// @Param about formData string false "Some information about competition"
 // @Param prizes formData string false "Competitions Prizes for the winners"
-// @Param starting_time formData string true "Competition's starting time"
-// @Param ending_time formData string true "Competition's ending time"
-// @Param timezone formData string true "Competition's timezone"
+// @Param starting_time formData string false "Competition's starting time"
+// @Param ending_time formData string false "Competition's ending time"
+// @Param timezone formData string false "Competition's timezone"
+// @Param dynamic_score formData bool false "Enable dynamic scoring"
 // @Param logo formData file false "Competition's logo"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/config/competition-info [post]
 func updateCompetitionInfoHandler(c *gin.Context) {
 	configInfo, err := config.GetCompetitionInfo()
@@ -152,18 +153,20 @@ func updateCompetitionInfoHandler(c *gin.Context) {
 // @Summary Updates challenge info in the database, located at ~/.beast/beast.db.
 // @Description Updates challenge info in the database, located at ~/.beast/beast.db.
 // @Tags config
-// @Accept  json
 // @Produce json
 // @Param name formData string true "Challenge Name"
-// @Param hints formData string true "Challenge's hints"
-// @Param desc formData string false "Challenge's description"
-// @Param points formData string true "Challenge's points"
-// @Param flag formData string true "Challenge's flag"
-// @Param tags formData string true "Challenge's tags"
-// @Param ports formData file false "Challenge's ports"
+// @Param desc formData string false "Challenge description. The description field is also accepted."
+// @Param points formData int false "Challenge's points"
+// @Param flag formData string false "Challenge's flag"
+// @Param tags formData string false "Challenge's tags"
+// @Param ports formData string false "Comma-separated allocated host ports"
+// @Param assets formData string false "Asset names separated by ::::"
+// @Param additionalLinks formData string false "Links separated by ::::"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/config/challenge-info [post]
 func updateChallengeInfoHandler(c *gin.Context) {
 	name, exist := c.GetPostForm("name")

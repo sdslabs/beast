@@ -1,55 +1,29 @@
 # Usage
 
-## Installation
+Follow [setup](Setup.md) to build and configure Beast, then start the API with `beast run`. The server defaults to port 5005 and serves Swagger at `/api/docs/index.html`.
 
-Before provisioning beast on your host, make sure you have the following dependencies installed.
+Use `--noauth` only for a local development server. On a server with authorization enabled, send a JWT in the `Authorization: Bearer <token>` header. See the [authentication guide](APIAuth.md).
 
-* [Docker for Linux](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
-* [GoLang for Linux](https://golang.org/doc/install#tarball)
-* [git](https://git-scm.com/)
+## Manage a challenge
 
-You can either build beast from source or download a latest realease binary from Github Relaeases.
-
-```bash
-$ export GO111MODULES=on
-
-$ git clone git@github.com:sdslabs/beastv4.git
-
-$ cd beastv4 && make build
->>> Building Beast
+```sh
+beast verify "$PWD/_examples/static-chall"
+beast challenge deploy --local-directory "$PWD/_examples/static-chall"
+beast chall-details --status deployed
+beast challenge undeploy static-chall
 ```
 
-This should build beast from source in `$GOPATH/bin/beast`, you can then use this binary to run beast API server. The `-n`
-flag tells beast to not use the authorization middleware.
+For queued API actions, use the status endpoint to check when work has finished. The following examples use an author or administrator token.
 
-```bash
-$ beast run -v -n
+```sh
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode "challenge_dir=$PWD/_examples/static-chall" \
+  http://localhost:5005/api/manage/deploy/local/
+
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5005/api/status/challenge/static-chall
 ```
 
-To interact with beast API server you can look at the swagger API documentation hosted on beast itself. Navigate to http://localhost:5005/api/docs/index.html to get a detail of available endpoints.
+Use `GET /api/info/challenge/{name}` to look up allocated host ports for a deployed service. For per-user deployments, use `POST /api/instances/{challenge_name}/spawn` and use the host and port array returned for that instance.
 
-To be able to interact with the REST API interface you should be authorized by beast, go to [Authentication Section](/APIAuth.md) to know about the flow of authentication.
-
-## Examples
-
-Some examples of API action triggers are given below
-
-```bash
-# Reloading a configuration change in beast global config
-$ curl -X PATCH localhost:5005/api/config/reload
-{"message":"CONFIG RELOAD SUCCESSFUL"}
-
-# Deploying a challenge named my-challenge using API.
-$  curl -X POST --data "action=deploy&name=my-challenge" localhost:5005/api/manage/challenge/
-{"message":"Deploy for challenge simple-web has been triggered, check stats"}
-
-# Purging the deployed challenge completely.
-$ curl -X POST --data "action=purge&name=my-challenge" localhost:5005/api/manage/challenge/
-{"message":"Your action purge on challenge simple-web was successful"}
-```
-
-For more examples and available API routes go to Swagger API documentation.
-
-## Note
-
-* You can even run beast on your local environment and still be able to configure and manage deployments, for this you will need a secure tunnel to reach your docker daemon, which will be used for container lifecycle management on the actual host.
+To reload global configuration, send `PATCH /api/config/reload` with an administrator token. See the [CLI reference](cmdref/beast.md) for deployment, logs, backups, and restore commands.

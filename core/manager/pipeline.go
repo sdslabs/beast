@@ -335,18 +335,24 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 	}
 
 	staticMount := make(map[string]string)
-	var staticMountDir string
-	if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
-		staticMountDir = filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
-		_ = utils.CreateIfNotExistDir(staticMountDir)
-	} else {
-		staticMountDir = filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, config.Challenge.Metadata.Name, core.BEAST_STATIC_FOLDER)
-	}
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
 		relativeStaticContentDir = core.PUBLIC
 	}
-	staticMount[staticMountDir] = filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir)
+	staticTarget := filepath.Join(core.BEAST_DOCKER_CHALLENGE_DIR, relativeStaticContentDir)
+	if cfg.Cfg.UseLocalDockerDaemon(challenge.ServerDeployed) {
+		relativePath := filepath.Join(core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
+		files, err := os.ReadDir(filepath.Join(core.BEAST_GLOBAL_DIR, relativePath))
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("read staged static assets: %w", err)
+		}
+		if len(files) > 0 {
+			staticMount[filepath.Join(core.BEAST_MOUNT_DIR, relativePath)] = staticTarget
+		}
+	} else {
+		staticMountDir := filepath.Join(core.BEAST_REMOTE_GLOBAL_DIR, core.BEAST_STAGING_DIR, challengeName, core.BEAST_STATIC_FOLDER)
+		staticMount[staticMountDir] = staticTarget
+	}
 	log.Debugf("Static mount config for deploy : %s", staticMount)
 
 	var containerEnv []string
@@ -382,6 +388,7 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		MountsMap:        staticMount,
 		ImageId:          challenge.ImageId,
 		ContainerName:    utils.ProjectNameNotInstanced(config.Challenge.Metadata.Name),
+		ChallengeName:    challengeName,
 		ContainerEnv:     containerEnv,
 		ContainerNetwork: containerNetwork,
 		Traffic:          config.Challenge.Env.TrafficType(),
@@ -390,7 +397,6 @@ func deployChallenge(challenge *database.Challenge, config cfg.BeastChallengeCon
 		Memory:           config.Resources.Memory,
 		PidsLimit:        config.Resources.PidsLimit,
 	}
-	log.Debugf("create container config for challenge(%s): %v", config.Challenge.Metadata.Name, containerConfig)
 	var containerId string
 	if cfg.Cfg.UseLocalDockerDaemon(host) {
 		containerId, err = cr.CreateContainerFromImage(&containerConfig)
@@ -503,6 +509,18 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 		err = config.ValidateRequiredFields(challengeDir)
 		if err != nil {
 			return fmt.Errorf("an error occured while validating the config file : %s, cannot continue with pipeline", err)
+		}
+	} else {
+		config.Resources.ValidateRequiredFields()
+		if config.Challenge.Env.DockerCompose != "" {
+			ports, err := utils.ExtractPortsFromCompose(filepath.Join(challengeDir, "docker-compose.yml"))
+			if err != nil {
+				return fmt.Errorf("read staged Compose ports: %w", err)
+			}
+			if len(ports) == 0 {
+				return fmt.Errorf("staged Compose file does not declare a port variable")
+			}
+			config.Challenge.Env.PortVariables = ports
 		}
 	}
 
@@ -655,7 +673,7 @@ func bootstrapDeployPipeline(challengeDir string, skipStage bool, skipCommit boo
 
 // This is just a decorator function over bootstrapDeployPipeline and generate
 // notifications to slack on the basis of the result of the deploy pipeline.
-func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) {
+func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, noCache bool) error {
 	challengeName := filepath.Base(challengeDir)
 	var sendNotificationError error
 
@@ -670,4 +688,8 @@ func StartDeployPipeline(challengeDir string, skipStage bool, skipCommit bool, n
 	if sendNotificationError == nil {
 		log.Debugf("%s: Notification sent", challengeName)
 	}
+	if err != nil {
+		log.Error(err)
+	}
+	return err
 }

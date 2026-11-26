@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:16
-    container_name: beast-postgres
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
@@ -14,7 +13,6 @@ services:
 
   redis:
     image: redis:7
-    container_name: beast-redis
     ports:
       - "${REDIS_PORT:-6379}:6379"
     environment:

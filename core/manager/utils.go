@@ -697,9 +697,13 @@ func GetStaticContentDir(configFile, contextDir string) (string, error) {
 	}
 	relativeStaticContentDir := config.Challenge.Env.StaticContentDir
 	if relativeStaticContentDir == "" {
+		defaultPath := filepath.Join(contextDir, core.PUBLIC)
+		if _, err := os.Lstat(defaultPath); os.IsNotExist(err) {
+			return defaultPath, nil
+		}
 		relativeStaticContentDir = core.PUBLIC
 	}
-	return filepath.Join(contextDir, relativeStaticContentDir), nil
+	return utils.ResolvePathWithin(contextDir, relativeStaticContentDir)
 }
 
 // Takes and save the data to transaction table

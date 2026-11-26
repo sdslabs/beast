@@ -28,7 +28,6 @@ setup_scripts = ["setup.sh"]
 xinetd_conf = "ctf.xinetd"
 service_path = "pwn"
 ports = [10003]
-default_port = 10003
 
 [resource]
 cpu_shares = 1024

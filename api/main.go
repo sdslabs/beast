@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -67,23 +68,17 @@ func runBeastApiBootsteps(defaultauthorpassword string) error {
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host playCTF.sdslabs.co
 // @BasePath /
 
 // @securityDefinitions.apikey ApiKeyAuth
 // @in header
 // @name Authorization
+// @description Paste the complete header value, including the Bearer prefix.
 
-func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) {
+func RunBeastApiServer(listener net.Listener, defaultauthorpassword string, autoDeploy, healthProbe, periodicSync bool, noCache bool) error {
 	log.Info("Bootstrapping Beast API server")
 
 	config.InitConfig()
-
-	if port != "" {
-		port = ":" + port
-	} else {
-		port = DEFAULT_BEAST_PORT
-	}
 
 	manager.Q = wpool.InitQueue(core.MAX_QUEUE_SIZE, nil)
 	manager.Q.StartWorkers(&manager.Worker{})
@@ -138,14 +133,15 @@ func RunBeastApiServer(port, defaultauthorpassword string, autoDeploy, healthPro
 	}
 
 	srv := &http.Server{
-		Addr:    port,
+		Addr:    listener.Addr().String(),
 		Handler: router,
 	}
 	httpServerMu.Lock()
 	httpServer = srv
 	httpServerMu.Unlock()
 
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Errorf("HTTP server error: %v", err)
+	if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
 	}
+	return nil
 }

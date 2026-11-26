@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sdslabs/beastv4/core/cache"
 	"math"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sdslabs/beastv4/core"
+	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/core/manager"
 	"github.com/sdslabs/beastv4/pkg/remoteManager"
@@ -109,11 +110,12 @@ func cleanupDatabaseConnections() {
 
 	log.Infoln("Terminating database connection...")
 
-	err = database.TerminateDatabaseConnections()
+	conn, err := database.Db.DB()
+	if err == nil {
+		err = conn.Close()
+	}
 	if err != nil {
-		log.Errorln("Unable to terminate database connections:", err)
-	} else {
-		log.Infoln("Database connections terminated successfully")
+		log.Errorln("Unable to close Beast database connections:", err)
 	}
 }
 
@@ -159,8 +161,8 @@ func stopSseNotificationHub() {
 func cleanup() {
 	log.Info("Starting graceful shutdown cleanup...")
 
-	api.ShutdownHTTPServer(5 * time.Second)
 	stopSseNotificationHub()
+	api.ShutdownHTTPServer(5 * time.Second)
 	stopApiScheduler()
 
 	cleanupRunningContainers()
@@ -186,13 +188,22 @@ var runCmd = &cobra.Command{
 	Short: "Run Beast API server",
 	Long:  "Run beast API server using beast/api/server, optionally an argument can be provided to specify the port to run the server on.",
 
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		addr := api.DEFAULT_BEAST_PORT
+		if Port != "" {
+			addr = ":" + Port
+		}
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("listen for Beast API: %w", err)
+		}
+		defer listener.Close()
+
 		if _, err := os.Stat(core.BEAST_GLOBAL_DIR); os.IsNotExist(err) {
 			log.Infof("%s directory not found... running Beast bootsteps...\n", core.BEAST_GLOBAL_DIR)
 
 			if err := runBeastBootsteps(); err != nil {
-				log.Error("Error while running Beast bootsteps.")
-				os.Exit(1)
+				return fmt.Errorf("run Beast bootsteps: %w", err)
 			}
 
 			log.Infoln("beast bootsteps complete... starting beast server")
@@ -200,12 +211,23 @@ var runCmd = &cobra.Command{
 
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		defer signal.Stop(sigChan)
 
-		go api.RunBeastApiServer(Port, DefaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
-		<-sigChan
-
-		log.Infoln("\nShutdown signal received.")
-		cleanup()
-		log.Infoln("Server stopped gracefully.")
+		serverDone := make(chan error, 1)
+		go func() {
+			serverDone <- api.RunBeastApiServer(listener, DefaultAuthorPassword, AutoDeploy, HealthProbe, PeriodicSync, NoCache)
+		}()
+		select {
+		case err := <-serverDone:
+			cleanup()
+			return err
+		case <-sigChan:
+			log.Info("Shutdown signal received.")
+			_ = listener.Close()
+			<-serverDone
+			cleanup()
+			log.Info("Server stopped gracefully.")
+			return nil
+		}
 	},
 }

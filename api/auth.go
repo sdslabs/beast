@@ -146,7 +146,6 @@ func adminAuthorize(c *gin.Context) {
 // @Summary Handles signin and token production
 // @Description JWT can be received by signing in
 // @Tags auth
-// @Accept json
 // @Produce json
 // @Param username formData string true "Username"
 // @Param password formData string true "Password"
@@ -154,6 +153,7 @@ func adminAuthorize(c *gin.Context) {
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 401 {object} api.HTTPPlainResp
 // @Failure 403 {object} api.HTTPPlainResp
+// @Accept x-www-form-urlencoded,mpfd
 // @Router /auth/login [post]
 func login(c *gin.Context) {
 	username := c.PostForm("username")
@@ -220,6 +220,7 @@ func login(c *gin.Context) {
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 406 {object} api.HTTPPlainResp
+// @Accept x-www-form-urlencoded,mpfd
 // @Router /auth/register [post]
 func register(c *gin.Context) {
 	name := c.PostForm("name")
@@ -324,6 +325,8 @@ func register(c *gin.Context) {
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 401 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /auth/reset-password [post]
 func resetPasswordHandler(c *gin.Context) {
 	newPass := strings.TrimSpace(c.PostForm("new_pass"))

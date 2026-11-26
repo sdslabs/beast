@@ -78,6 +78,18 @@ func extractTagNames(tags []*database.Tag) []string {
 	return result
 }
 
+// @Summary Inspect or unlock a hint
+// @Tags info
+// @Description GET shows hint metadata or an unlocked hint. POST unlocks a hint and deducts the configured points when applicable.
+// @Produce json
+// @Security ApiKeyAuth
+// @Param hintID path int true "Hint ID"
+// @Success 200 {object} api.HintResponse
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 401 {object} api.HTTPErrorResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Router /api/info/hint/{hintID} [get]
+// @Router /api/info/hint/{hintID} [post]
 func hintHandler(c *gin.Context) {
 	hintIDStr := c.Param("hintID")
 
@@ -199,17 +211,16 @@ func hintHandler(c *gin.Context) {
 
 // Returns information about a challenge
 // @Summary Returns all information about the challenges.
-// @Description Returns all information about the challenges by the challenge name.
+// @Description Returns challenge metadata and allocated host ports. For instanced challenges, the ports belong to the caller's active instance.
 // @Tags info
-// @Accept  json
 // @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param name query string true "Name of challenge"
-// @Success 200 {object} api.ChallengeInfoResp
+// @Param name path string true "Name of challenge"
+// @Success 200 {object} api.Challenge
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/challenge/info [get]
+// @Security ApiKeyAuth
+// @Router /api/info/challenge/{name} [get]
 func challengeInfoHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
@@ -362,14 +373,13 @@ func challengeInfoHandler(c *gin.Context) {
 // @Summary Returns metadata about all challenges with and without filters.
 // @Description Returns information about all the challenges present in the database with and without filters.
 // @Tags info
-// @Accept  json
 // @Produce json
 // @Param filter query string false "Filter parameter by which challenges are filtered"
 // @Param value query string false "Value of filtered parameter"
-// @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.ChallengeInfoResp
+// @Success 200 {array} api.ChallengeMetadata
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/info/challenges [get]
 func challengesMetadataHandler(c *gin.Context) {
 	filter := strings.TrimSpace(c.Query("filter"))
@@ -539,14 +549,6 @@ func challengesMetadataHandler(c *gin.Context) {
 }
 
 // Returns available base images.
-// @Summary Gives all the base images that can be used while creating a beast challenge, this is a constant specified in beast global config
-// @Description Returns all the available base images  which can be used for challenge creation as the base OS for challenge.
-// @Tags info
-// @Accept  json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.AvailableImagesResp
-// @Router /api/info/images/available [get]
 func availableImagesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, AvailableImagesResp{
 		Message: "Available base images are",
@@ -558,14 +560,13 @@ func availableImagesHandler(c *gin.Context) {
 // @Summary Handles route related to logs handling of container
 // @Description Gives container logs for a particular challenge, useful for debugging purposes.
 // @Tags info
-// @Accept  json
 // @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param challenge query string false "The name of the challenge to get the logs for."
+// @Param challenge query string true "The name of the challenge to get the logs for."
 // @Success 200 {object} api.LogsInfoResp
 // @Failure 400 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/info/logs [get]
+// @Security ApiKeyAuth
+// @Router /api/manage/logs [get]
 func challengeLogsHandler(c *gin.Context) {
 	chall := c.Query("challenge")
 	if chall == "" {
@@ -610,15 +611,14 @@ func canViewUserEmails(c *gin.Context, targetUsername string) bool {
 // @Summary Returns user info
 // @Description Returns user info based on userId
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param value formData string false "User's id"
-// @Param value query string false "username"
 // @Success 200 {object} api.UserResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/info/user [get]
+// @Param username path string true "Username"
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
+// @Router /api/info/user/{username} [get]
 func userInfoHandler(c *gin.Context) {
 	userId := c.PostForm("user_id")
 	username := c.Param("username")
@@ -724,13 +724,15 @@ func userInfoHandler(c *gin.Context) {
 // @Summary Returns all user's info
 // @Description Returns all available user's info
 // @Tags info
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param sort, order, filter
-// @Success 200 {object} api.UserResp
+// @Produce json,text/csv
+// @Param sort query string false "Sort field for administrators"
+// @Param order query string false "Sort order for administrators"
+// @Param filter query string false "Status filter for administrators"
+// @Param format query string false "Use csv to export as an administrator"
+// @Success 200 {array} api.UsersResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/info/users [get]
 func getAllUsersInfoHandler(c *gin.Context) {
 	users, err := database.QueryUserEntries("role", "contestant")
@@ -849,11 +851,12 @@ func getAllUsersInfoHandler(c *gin.Context) {
 // @Summary Handles submissions made by the user
 // @Description Handles submissions made by the user
 // @Tags info
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.SubmissionResp
+// @Produce json,text/csv
+// @Param page query int false "Page number"
+// @Param format query string false "Use csv to export"
+// @Success 200 {array} api.SubmissionResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/admin/submissions [get]
 func submissionsHandler(c *gin.Context) {
 	pageStr := c.Query("page")
@@ -935,12 +938,11 @@ func submissionsHandler(c *gin.Context) {
 // @Summary statistics of users in competition
 // @Description returns statistics of users in competition (currently limited to ban/unban status of users)
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.UsersStatisticsResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/admin/statistics [get]
 func getUsersStatisticsHandler(c *gin.Context) {
 	users, err := database.QueryAllUsers()
@@ -981,12 +983,10 @@ func getUsersStatisticsHandler(c *gin.Context) {
 // @Summary returns competition info
 // @Description returns various information about the competition which are used to control competition
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.CompetitionInfoResp
 // @Failure 400 {object} api.HTTPErrorResp
-// @Router /api/admin/statistics [get]
+// @Router /api/info/competition-info [get]
 func competitionInfoHandler(c *gin.Context) {
 	competitionInfo, err := config.GetCompetitionInfo()
 	if err != nil {
@@ -1012,12 +1012,11 @@ func competitionInfoHandler(c *gin.Context) {
 // @Summary returns all tags
 // @Description returns all unique tags
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.TagInfoResp
 // @Failure 400 {object} api.HTTPErrorResp
-// @Router /api/admin/statistics [get]
+// @Security ApiKeyAuth
+// @Router /api/info/tags [get]
 func tagHandler(c *gin.Context) {
 	// Optimized: Query unique tags directly from the database
 	tags, err := database.QueryAllUniqueTags()
@@ -1033,16 +1032,6 @@ func tagHandler(c *gin.Context) {
 	})
 }
 
-// @Tags info
-// @Accept  json
-// @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param challenge query string false "The name of the challenge to get the logs for."
-// @Param asset query string false "The name of the static asset requested."
-// @Success 200 {object} api.LogsInfoResp
-// @Failure 400 {object} api.HTTPPlainResp
-// @Failure 500 {object} api.HTTPPlainResp
-// @Router /api/info/download [get]
 func isSensitiveAssetPath(cleanAsset string) bool {
 	lowerPath := strings.ToLower(filepath.ToSlash(cleanAsset))
 	base := filepath.Base(lowerPath)
@@ -1058,6 +1047,15 @@ func isSensitiveAssetPath(cleanAsset string) bool {
 		strings.HasPrefix(base, ".env.")
 }
 
+// @Summary Download a published challenge asset
+// @Tags info
+// @Produce application/octet-stream
+// @Param challenge query string true "Challenge name"
+// @Param asset query string true "Relative asset path"
+// @Success 200 {file} file
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 403 {object} api.HTTPErrorResp
+// @Router /api/info/download [get]
 func serveAssets(c *gin.Context) {
 	challenge := filepath.Base(strings.TrimSpace(c.Query("challenge")))
 	rawAsset := strings.TrimSpace(c.Query("asset"))
@@ -1084,10 +1082,13 @@ func serveAssets(c *gin.Context) {
 
 	var targetPath string
 	for _, rootDir := range assetRoots {
-		candidate := filepath.Join(rootDir, cleanAsset)
-		rel, err := filepath.Rel(rootDir, candidate)
-		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		candidate, err := fileUtils.ResolvePathWithin(rootDir, cleanAsset)
+		if err != nil {
 			continue
+		}
+		if isSensitiveAssetPath(candidate) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
 		}
 		if fileUtils.ValidateFileExists(candidate) == nil {
 			targetPath = candidate
@@ -1105,11 +1106,10 @@ func serveAssets(c *gin.Context) {
 // @Summary Returns the number of users in the database with role=contestant
 // @Description Returns the number of users in the database with role=contestant
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
 // @Success 200 {object} api.UserCountResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/info/usercount [get]
 func getUserCountHandler(c *gin.Context) {
 	count, err := database.GetUserCount()
@@ -1128,13 +1128,12 @@ func getUserCountHandler(c *gin.Context) {
 // @Summary Returns leaderboard
 // @Description Returns leaderboard of all users
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param page query string false "Page number"
-// @Success 200 {object} api.UserResp
+// @Param page query int false "Page number"
+// @Success 200 {array} api.UserResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/info/leaderboard [get]
 func getLeaderboardHandler(c *gin.Context) {
 	pageStr := c.Query("page")
@@ -1299,13 +1298,12 @@ func getLeaderboardHandler(c *gin.Context) {
 // @Summary Returns admin leaderboard
 // @Description Returns admin leaderboard of all users
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
-// @Param page query string false "Page number"
-// @Success 200 {object} api.UserResp
+// @Param page query int false "Page number"
+// @Success 200 {array} api.UserResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/admin/leaderboard [get]
 func adminLeaderboardHandler(c *gin.Context) {
 	pageStr := c.Query("page")
@@ -1396,12 +1394,11 @@ func adminLeaderboardHandler(c *gin.Context) {
 // @Summary Freeze user leaderboard
 // @Description freezes the user leaderboard on demand.
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.UserResp
+// @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/admin/freezeLeaderboard [post]
 func freezeLeaderboardHandler(c *gin.Context) {
 	err := database.UpdateFrozenScores()
@@ -1422,12 +1419,11 @@ func freezeLeaderboardHandler(c *gin.Context) {
 // @Summary Unfreeze user leaderboard
 // @Description unfreezes the user leaderboard on demand.
 // @Tags info
-// @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer"
-// @Success 200 {object} api.UserResp
+// @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/admin/unfreezeLeaderboard [post]
 func unfreezeLeaderboardHandler(c *gin.Context) {
 	err := database.ResetFrozenScores()
@@ -1448,14 +1444,13 @@ func unfreezeLeaderboardHandler(c *gin.Context) {
 // @Summary Get challenge attempts
 // @Description Returns all user attempts for a given challenge.
 // @Tags info
-// @Accept json
 // @Produce json
 // @Param challenge_id path int true "Challenge ID"
-// @Param Authorization header string true "Bearer"
-// @Success 200 {array} api.UserSolveResp
+// @Success 200 {array} api.SubmissionResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/challenges/{challenge_id}/attempts [get]
+// @Security ApiKeyAuth
+// @Router /api/info/submissions/challenge/{challenge_id} [get]
 func getChallengeAttempts(c *gin.Context) {
 	username, err := resolveRequestUsername(c)
 	if err != nil {
@@ -1537,14 +1532,13 @@ func getChallengeAttempts(c *gin.Context) {
 // @Summary Get submissions by user
 // @Description Returns all submissions for a specific user
 // @Tags info
-// @Accept json
 // @Produce json
 // @Param user_id path int true "User ID"
-// @Param Authorization header string true "Bearer"
 // @Success 200 {array} api.SubmissionResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Security ApiKeyAuth
 // @Router /api/info/submissions/user/{user_id} [get]
 func getUserAttempts(c *gin.Context) {
 	username, err := resolveRequestUsername(c)
@@ -1634,6 +1628,12 @@ func getUserAttempts(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// @Summary Get leaderboard score history
+// @Tags info
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} database.UserLeaderboardResp
+// @Router /api/info/leaderboard-graph [get]
 func getLeaderboardGraphHandler(c *gin.Context) {
 	isLeaderboardFrozen, _ := database.IsFrozenScoreSet()
 

@@ -19,13 +19,14 @@ import (
 // @Summary Adds notifications
 // @Description Adds notifications
 // @Tags notification
-// @Accept  json
 // @Produce json
 // @Param title formData string true "Title of notification to be added"
-// @Param desc formData string true "Description for the notification to be added"
+// @Param desc formData string false "Description for the notification to be added"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/notification/add [post]
 func addNotification(c *gin.Context) {
 	title := c.PostForm("title")
@@ -61,7 +62,6 @@ func addNotification(c *gin.Context) {
 // @Summary Removes notifications
 // @Description Removes notifications
 // @Tags notification
-// @Accept  json
 // @Produce json
 // @Param id query string false "ID of notification"
 // @Param id formData string false "ID of notification"
@@ -69,6 +69,8 @@ func addNotification(c *gin.Context) {
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/notification/delete [delete]
 func removeNotification(c *gin.Context) {
 	id := strings.TrimSpace(c.Query("id"))
@@ -131,15 +133,16 @@ func removeNotification(c *gin.Context) {
 // @Summary Updates notifications
 // @Description Updates any changes in the notifications
 // @Tags notification
-// @Accept  json
 // @Produce json
 // @Param id formData string true "ID of notification"
-// @Param title formData string true "Title of notification"
-// @Param desc formData string true "Description for the notification to be changed"
+// @Param title formData string false "Title of notification"
+// @Param desc formData string false "Description for the notification to be changed"
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 400 {object} api.HTTPErrorResp
 // @Failure 404 {object} api.HTTPErrorResp
 // @Failure 500 {object} api.HTTPErrorResp
+// @Accept x-www-form-urlencoded,mpfd
+// @Security ApiKeyAuth
 // @Router /api/notification/update [put]
 func updateNotifications(c *gin.Context) {
 	id := strings.TrimSpace(c.PostForm("id"))
@@ -207,11 +210,11 @@ func updateNotifications(c *gin.Context) {
 // @Summary Fetch available notifications
 // @Description Fetch all the notifications from database
 // @Tags notification
-// @Accept  json
 // @Produce json
 // @Success 200 {object} api.HTTPPlainResp
 // @Failure 500 {object} api.HTTPErrorResp
-// @Router /api/notification/available [post]
+// @Security ApiKeyAuth
+// @Router /api/notification/available [get]
 func availableNotificationHandler(c *gin.Context) {
 	notifications, err := database.QueryAllNotification()
 	if err != nil {
@@ -245,6 +248,13 @@ func availableNotificationHandler(c *gin.Context) {
 	return
 }
 
+// @Summary Stream competition notifications
+// @Tags notification
+// @Description Streams user_connected, notification, and ping events over server-sent events.
+// @Produce text/event-stream
+// @Security ApiKeyAuth
+// @Success 200 {string} string
+// @Router /api/notification/stream [get]
 func streamNotification(c *gin.Context) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")

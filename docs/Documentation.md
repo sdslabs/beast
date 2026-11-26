@@ -1,16 +1,13 @@
-# Beast Documentation
+# Documentation index
 
-This directory contains documentation related to beast and will guide you through flow, architecture usage and gotchas of beast.
-
-Move over to any of the below pages to know more about beast.
-
-## Index
-
-* [Usage](./Usage.md)
-* [Setup](./Setup.md)
-* [Getting Started](./GettingStarted.md)
-* [Features](./Features.md)
-* [Architecture](./Architecture.md)
-* [Authentication Flow](./APIAuth.md)
-* [Challenge Configuration](./ChallConfig.md)
-* [Deployment](./Deployment.md)
+- [Getting started](GettingStarted.md)
+- [CLI and API usage](Usage.md)
+- [Setup and global configuration](Setup.md)
+- [Features](Features.md)
+- [Architecture](Architecture.md)
+- [Authentication](APIAuth.md)
+- [Challenge types](ChallTypes.md)
+- [Challenge configuration](ChallConfig.md)
+- [Sample challenges](SampleChallenges.md)
+- [Deployment](Deployment.md)
+- [CLI reference](cmdref/beast.md)

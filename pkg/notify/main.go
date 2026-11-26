@@ -1,9 +1,14 @@
 package notify
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/sdslabs/beastv4/core/config"
 	log "github.com/sirupsen/logrus"
@@ -58,8 +63,6 @@ const (
 // In the Discord notification provider it was using the same payload which was used for slack.
 // By writing "/slack" in the discord WebHookURL, it execute Slack-Compatible Webhook
 func NewNotifier(url *url.URL, ProviderType ProviderTypeEnum) Notifier {
-	log.Debug("Inside notifier: Webhook URL: " + url.String())
-
 	switch ProviderType {
 	case SlackProvider:
 		return &SlackNotificationProvider{
@@ -73,6 +76,27 @@ func NewNotifier(url *url.URL, ProviderType ProviderTypeEnum) Notifier {
 				WebHookURL: url.String() + "/slack",
 			},
 		}
+	}
+	return nil
+}
+
+func (req *Request) send() error {
+	payload, err := json.Marshal(req.PostPayload)
+	if err != nil {
+		return fmt.Errorf("encode webhook payload: %w", err)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Post(req.WebHookURL, "application/json", bytes.NewReader(payload))
+	if err != nil {
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return fmt.Errorf("deliver webhook notification: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("webhook returned %s", response.Status)
 	}
 	return nil
 }
@@ -96,7 +120,7 @@ func SendNotification(nType NotificationType, message string) error {
 			url, err := url.ParseRequestURI(webhook.URL)
 			if url == nil || err != nil {
 				log.Info("Invalid notification webhook URL")
-				errs = append(errs, fmt.Sprintf("Invalid URL for notifier webhook %s", webhook.URL))
+				errs = append(errs, fmt.Sprintf("invalid URL for %s webhook", webhook.ServiceName))
 				continue
 			}
 

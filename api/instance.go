@@ -59,6 +59,16 @@ func instanceToAdminResponse(instance *cache.Instance) AdminInstanceResponse {
 	}
 }
 
+// @Summary Spawn an instance for the caller
+// @Tags instances
+// @Produce json
+// @Security ApiKeyAuth
+// @Param challenge_name path string true "Challenge name"
+// @Success 200 {object} api.InstanceResponse
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 409 {object} api.HTTPErrorResp
+// @Router /api/instances/{challenge_name}/spawn [post]
 func spawnInstanceHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {
@@ -103,6 +113,15 @@ func spawnInstanceHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, instanceToResponse(instance))
 }
 
+// @Summary Get the caller's instance for a challenge
+// @Tags instances
+// @Produce json
+// @Security ApiKeyAuth
+// @Param challenge_name path string true "Challenge name"
+// @Success 200 {object} api.InstanceResponse
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Router /api/instances/{challenge_name} [get]
 func getUserInstanceHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {
@@ -141,6 +160,14 @@ func getUserInstanceHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, instanceToResponse(instance))
 }
 
+// @Summary List the caller's instances
+// @Tags instances
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} api.InstanceResponse
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/instances [get]
 func getUserInstancesHandler(ctx *gin.Context) {
 	username, err := resolveRequestUsername(ctx)
 	if err != nil {
@@ -180,6 +207,19 @@ func getUserInstancesHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
+// @Summary Extend the caller's instance lease
+// @Tags instances
+// @Accept x-www-form-urlencoded,mpfd
+// @Produce json
+// @Security ApiKeyAuth
+// @Param challenge_name path string true "Challenge name"
+// @Param seconds formData int false "Additional seconds, up to the configured maximum" default(300)
+// @Success 200 {object} api.InstanceResponse
+// @Failure 400 {object} api.HTTPErrorResp
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/instances/{challenge_name}/extend [post]
 func extendInstanceHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {
@@ -248,6 +288,16 @@ func extendInstanceHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, instanceToResponse(instance))
 }
 
+// @Summary Delete the caller's instance for a challenge
+// @Tags instances
+// @Produce json
+// @Security ApiKeyAuth
+// @Param challenge_name path string true "Challenge name"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/instances/{challenge_name} [delete]
 func killUserInstanceHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {
@@ -288,6 +338,14 @@ func killUserInstanceHandler(ctx *gin.Context) {
 	})
 }
 
+// @Summary List all instances as an administrator
+// @Tags admin
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} api.AdminInstanceResponse
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/admin/instances [get]
 func adminGetAllInstancesHandler(ctx *gin.Context) {
 	instances, err := manager.GetAllInstances()
 	if err != nil {
@@ -309,6 +367,15 @@ func adminGetAllInstancesHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
+// @Summary Get an instance by ID as an administrator
+// @Tags admin
+// @Produce json
+// @Security ApiKeyAuth
+// @Param instance_id path string true "Instance ID"
+// @Success 200 {object} api.AdminInstanceResponse
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Router /api/admin/instances/{instance_id} [get]
 func adminGetInstanceHandler(ctx *gin.Context) {
 	instanceID := ctx.Param("instance_id")
 	if instanceID == "" {
@@ -329,6 +396,15 @@ func adminGetInstanceHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, instanceToAdminResponse(instance))
 }
 
+// @Summary Delete an instance by ID as an administrator
+// @Tags admin
+// @Produce json
+// @Security ApiKeyAuth
+// @Param instance_id path string true "Instance ID"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 404 {object} api.HTTPErrorResp
+// @Router /api/admin/instances/{instance_id} [delete]
 func adminKillInstanceHandler(ctx *gin.Context) {
 	instanceID := ctx.Param("instance_id")
 	if instanceID == "" {
@@ -351,6 +427,15 @@ func adminKillInstanceHandler(ctx *gin.Context) {
 	})
 }
 
+// @Summary Delete a user's instances as an administrator
+// @Tags admin
+// @Produce json
+// @Security ApiKeyAuth
+// @Param user_id path string true "Beast user ID"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/admin/instances/user/{user_id} [delete]
 func adminKillUserInstancesHandler(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
 	if userID == "" {
@@ -381,6 +466,15 @@ func adminKillUserInstancesHandler(ctx *gin.Context) {
 	})
 }
 
+// @Summary Delete a challenge's instances as an administrator
+// @Tags admin
+// @Produce json
+// @Security ApiKeyAuth
+// @Param challenge_name path string true "Challenge name"
+// @Success 200 {object} api.HTTPPlainResp
+// @Failure 401 {object} api.HTTPPlainResp
+// @Failure 500 {object} api.HTTPErrorResp
+// @Router /api/admin/instances/challenge/{challenge_name} [delete]
 func adminKillChallengeInstancesHandler(ctx *gin.Context) {
 	challengeName := ctx.Param("challenge_name")
 	if challengeName == "" {

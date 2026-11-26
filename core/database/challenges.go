@@ -109,7 +109,7 @@ type UserLeaderboardResp struct {
 	TimeSeriesdata []TimeSeries `json:"timeSeriesData"`
 }
 type TimeSeries struct {
-	Timestamp time.Time `json:"timestamp" example:"2018-12-31T22:20:08"`
+	Timestamp time.Time `json:"timestamp" example:"2018-12-31T22:20:08.123+00:00"`
 	Score     uint      `json:"score" example:"750"`
 }
 

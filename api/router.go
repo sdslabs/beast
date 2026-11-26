@@ -17,6 +17,13 @@ func dummyHandler(c *gin.Context) {
 	})
 }
 
+// @Summary List challenges with their deployment status
+// @Tags status
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} api.ChallengeStatusResp
+// @Failure 500 {object} api.HTTPPlainResp
+// @Router /api/status/all [get]
 func initGinRouter() *gin.Engine {
 	router := gin.New()
 

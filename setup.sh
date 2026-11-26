@@ -17,12 +17,7 @@ setup_hydra_net() {
 
 echo -e "Setting up sample environment for beast..."
 
-# In container, HOME=/root; locally, use /home/$USER
-if [ "$IN_CONTAINER" = true ]; then
-    BEAST_HOME="$HOME"
-else
-    BEAST_HOME="/home/$USER"
-fi
+BEAST_HOME="$HOME"
 
 # Creating required directories
 mkdir -p \
@@ -76,7 +71,8 @@ if [ "$IN_CONTAINER" = true ]; then
         echo -e "\e[31mMount the host Docker socket and retry."
         exit 1
     fi
-    setup_hydra_net
+    # Hydra firewall rules belong on the Docker host. Provision them on the
+    # host before deploying instanced Compose challenges.
     echo -e "Docker socket available. Starting beast..."
     BEAST_FLAGS="${BEAST_FLAGS:--v}"
     echo -e "Running: beast run ${BEAST_FLAGS}"
@@ -88,23 +84,12 @@ echo -e "Building beast..."
 
 export GO111MODULES=on
 
-echo -e 'validating $GOPATH...'
-if [ -z "$GOPATH" ]; then
-    echo -e '\e[31m$GOPATH is not set...'
-    echo -e '\e[31mAborting...'
-    exit
-fi
-
 echo -e 'checking if docker is running...'
-# Checking if docker daemon is running or not by checking its PID
-DOCKER_PID_FILE=/var/run/docker.pid
-if [ -f "$DOCKER_PID_FILE" ]; then
+if docker info >/dev/null 2>&1; then
     echo -e "Docker is running."
 else
-    echo -e '\e[31mDocker daemon is not running'
-    echo -e '\e[31mAborting...'
-    echo -e "\e[31mPlease start docker daemon and restart again"
-    exit
+    echo "Cannot connect to the Docker daemon." >&2
+    exit 1
 fi
 setup_hydra_net
 

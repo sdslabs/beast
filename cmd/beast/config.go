@@ -72,8 +72,11 @@ func copySSHKey() error {
 func initAuthorizedKeysFile() error {
 	log.Infoln("Defaulting Authorized keys file:", AUTHORIZED_KEYS_FILE, "... can be changed later")
 
-	err := os.WriteFile(AUTHORIZED_KEYS_FILE, []byte{}, 0666)
+	file, err := os.OpenFile(AUTHORIZED_KEYS_FILE, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
 		return err
 	}
 
@@ -415,12 +418,17 @@ func tryCopyExampleConfig() error {
 }
 
 func initBeastConfig() error {
+	if err := os.MkdirAll(core.BEAST_GLOBAL_DIR, 0755); err != nil {
+		return err
+	}
 	if err := initAuthorizedKeysFile(); err != nil {
 		return err
 	}
 
 	if _, err := os.Stat(BEAST_GLOBAL_CONFIG); os.IsNotExist(err) {
 		return tryCopyExampleConfig()
+	} else if err != nil {
+		return err
 	}
 
 	log.Infoln("Found global config file:", BEAST_GLOBAL_CONFIG)
@@ -432,15 +440,12 @@ var configCmd = &cobra.Command{
 	Short: "Run interactive beast configuration setup",
 	Long:  "Creates the default Authorized Keys File and Global Beast Config file while prompting the user interactively whenever needed.",
 
-	Run: func(cmd *cobra.Command, args []string) {
-		err := initBeastConfig()
-
-		if err != nil {
-			log.Errorln(err.Error())
-			log.Errorln("Failed to create global beast config file... fix the above errors and try again")
-			return
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := initBeastConfig(); err != nil {
+			return fmt.Errorf("initialize Beast configuration: %w", err)
 		}
 
-		log.Infoln(fmt.Sprintf("Beast global config file initiliazed at %s", BEAST_GLOBAL_CONFIG))
+		log.Infof("Beast global config file initialized at %s", BEAST_GLOBAL_CONFIG)
+		return nil
 	},
 }

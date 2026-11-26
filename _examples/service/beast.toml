@@ -27,7 +27,6 @@ apt_deps = ["gcc"]
 setup_scripts = ["setup.sh"]
 service_path = "pwn"
 ports = [10004]
-default_port = 10004
 
 [resource]
 cpu_shares = 1024

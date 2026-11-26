@@ -52,7 +52,10 @@ func (q *Queue) Pop(ID string) {
 	shouldSignal := q.CompletionChannel != nil && len(q.InQueue) == 0
 	q.Mux.Unlock()
 	if shouldSignal {
-		q.CompletionChannel <- true
+		select {
+		case q.CompletionChannel <- true:
+		default:
+		}
 	}
 }
 
@@ -73,8 +76,17 @@ func (q *Queue) finishTask(id string, nextTask *Task) {
 	shouldSignal := q.CompletionChannel != nil && len(q.InQueue) == 0
 	q.Mux.Unlock()
 	if shouldSignal {
-		q.CompletionChannel <- true
+		select {
+		case q.CompletionChannel <- true:
+		default:
+		}
 	}
+}
+
+func (q *Queue) Pending() int {
+	q.Mux.RLock()
+	defer q.Mux.RUnlock()
+	return len(q.InQueue)
 }
 
 func (q *Queue) Drain(timeout time.Duration) bool {
@@ -83,10 +95,7 @@ func (q *Queue) Drain(timeout time.Duration) bool {
 	}
 	deadline := time.Now().Add(timeout)
 	for {
-		q.Mux.RLock()
-		pending := len(q.InQueue)
-		q.Mux.RUnlock()
-		if pending == 0 {
+		if q.Pending() == 0 {
 			return true
 		}
 		if time.Now().After(deadline) {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/sdslabs/beastv4/core"
 	"github.com/sdslabs/beastv4/core/cache"
 	"github.com/sdslabs/beastv4/core/database"
 	"github.com/sdslabs/beastv4/utils"
@@ -178,37 +179,29 @@ func PrintTableHeader(w *tabwriter.Writer) {
 
 // ShowFilteredChallengesInfo logs info of challenges filtered by provided status and tags
 func ShowFilteredChallengesInfo(cmd *cobra.Command, args []string) error {
+	status, _ := cmd.Flags().GetString("status")
+	status = strings.ToLower(strings.TrimSpace(status))
+	if _, valid := core.DEPLOY_STATUS[status]; status != "all" && !valid {
+		return fmt.Errorf("invalid deployment status %q", status)
+	}
+	tags, _ := cmd.Flags().GetString("tags")
 
 	challenges, err := database.QueryAllChallenges()
 	if err != nil {
 		return fmt.Errorf("Database query error : %v", err)
 	}
 
-	var filteredChallenges []database.Challenge
-
-	if len(challenges) > 0 {
-		status, _ := cmd.Flags().GetString("status")
-		status = strings.ToLower(status)
-		tags, _ := cmd.Flags().GetString("tags")
-		tags = strings.ToLower(tags)
-		var tagsArray []string
-		if len(tags) > 0 {
-			tagsArray = strings.Split(tags, ",")
-		}
-		filteredChallenges = filterChallenges(challenges, status, tagsArray)
-	} else {
-		return fmt.Errorf("No challenges present in the database.")
+	filteredChallenges := filterChallenges(challenges, status, utils.SplitDelimited(tags, ","))
+	if len(filteredChallenges) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No challenges match the selected filters.")
+		return nil
 	}
 
-	if len(filteredChallenges) > 0 {
-		header := []string{"Name", "Type", "Container ID", "Image ID", "Status", "Tagname", "Health Check", "Ports"}
-		border := utils.CreateBorder(true, false, true, false)
-		tConfigs := utils.CreateTableConfigs(border, header, "|")
-		tData := getTableDataFromChallenges(filteredChallenges)
-		utils.LogTable(tConfigs, tData)
-	} else {
-		return fmt.Errorf("No challenges found for the provided filters.")
-	}
+	header := []string{"Name", "Type", "Container ID", "Image ID", "Status", "Tagname", "Health Check", "Ports"}
+	border := utils.CreateBorder(true, false, true, false)
+	tConfigs := utils.CreateTableConfigs(border, header, "|")
+	tData := getTableDataFromChallenges(filteredChallenges)
+	utils.LogTable(tConfigs, tData)
 
 	return nil
 }

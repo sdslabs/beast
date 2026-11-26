@@ -2,11 +2,20 @@ site_name: Beast
 
 nav:
   - Home: README.md
+  - Getting started: GettingStarted.md
   - Usage: Usage.md
   - Setup: Setup.md
-  - Documentation: Documentation.md
+  - Documentation:
+      - Index: Documentation.md
+      - Authentication: APIAuth.md
+      - Features: Features.md
+      - Architecture: Architecture.md
+      - Challenge types: ChallTypes.md
+      - Challenge configuration: ChallConfig.md
+      - Deployment: Deployment.md
+      - Contributing: Contribution.md
   - Samples: SampleChallenges.md
-  - APIDocs: /apiDocs
+  - APIDocs: /apidocs.html
   - CmdRef: cmdref/beast.md
 
 theme: mkdocs

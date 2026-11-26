@@ -1,8 +1,11 @@
 package remoteManager
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -178,35 +181,44 @@ func VerifyComposeProjectRunningRemote(projectName string, server config.Availab
 	return validateAllComposeServicesRunningRemote(projectName, projectName, server)
 }
 
-// Get Containers stdout, stderr logs
+// GetContainerStdLogsRemote returns the separate stdout and stderr streams.
 func GetContainerStdLogsRemote(containerID string, server config.AvailableServer) (*cr.Log, error) {
-	stdoutCmd := fmt.Sprintf("docker logs --details --stdout %s", containerID)
-	stderrCmd := fmt.Sprintf("docker logs --details --stderr %s", containerID)
-
-	stdout, err := RunCommandOnServer(server, stdoutCmd)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching stdout logs: %w", err)
+	var stdout, stderr bytes.Buffer
+	if err := writeContainerLogsRemote(containerID, server, false, &stdout, &stderr); err != nil {
+		return nil, err
 	}
-
-	stderr, err := RunCommandOnServer(server, stderrCmd)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching stderr logs: %w", err)
-	}
-
-	return &cr.Log{Stdout: stdout, Stderr: stderr}, nil
+	return &cr.Log{Stdout: stdout.String(), Stderr: stderr.String()}, nil
 }
 
-// Get live logs of container
 func ShowLiveContainerLogsRemote(containerID string, server config.AvailableServer) error {
-	command := fmt.Sprintf("docker logs --details --follow %s", containerID)
+	return writeContainerLogsRemote(containerID, server, true, os.Stdout, os.Stderr)
+}
 
-	output, err := RunCommandOnServer(server, command)
-	if err != nil {
-		return fmt.Errorf("error streaming live logs: %w", err)
+func writeContainerLogsRemote(containerID string, server config.AvailableServer, follow bool, stdout, stderr io.Writer) error {
+	if !server.Active {
+		return fmt.Errorf("server is inactive in config.toml")
 	}
+	if !utils.IsShortID(containerID) && utils.ValidateID(containerID) != nil {
+		return fmt.Errorf("invalid container ID")
+	}
+	client, err := CreateSSHClient(server)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	session, err := client.NewSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+	session.Stdout = stdout
+	session.Stderr = stderr
 
-	fmt.Println(output)
-	return nil
+	command := "docker logs --details"
+	if follow {
+		command += " --follow"
+	}
+	return session.Run(command + " " + containerID)
 }
 
 // Commit container on remote server
@@ -239,8 +251,7 @@ func DeployContainerFromComposeRemote(challengeName string, projectName string, 
 
 	primaryContainerId, err := getPrimaryComposeContainerIdRemote(projectName, server)
 	if err != nil {
-		log.Warnf("Could not get primary container ID for challenge %s on remote: %v", challengeName, err)
-		return "", nil // Return empty string but success
+		return "", fmt.Errorf("get primary container for remote challenge %s: %w", challengeName, err)
 	}
 
 	log.Debugf("Verified challenge %s services are running on remote. Primary container: %s", challengeName, primaryContainerId)
@@ -306,15 +317,18 @@ func validateAllComposeServicesRunningRemote(projectName, challengeName string, 
 }
 
 func getPrimaryComposeContainerIdRemote(projectName string, server config.AvailableServer) (string, error) {
-	psCommand := fmt.Sprintf("docker compose -p %s ps -q %s", projectName, core.SSH_CONTAINER_COMPOSE)
+	psCommand := fmt.Sprintf("docker compose -p %s ps -q", projectName)
+	if _, instanced := utils.ExtractInstanceIDFromComposeProjectName(projectName); instanced {
+		psCommand += " " + core.SSH_CONTAINER_COMPOSE
+	}
 	output, err := RunCommandOnServer(server, psCommand)
 	if err != nil {
-		return "", fmt.Errorf("failed to get container ID for compose service %q on remote: %v", core.SSH_CONTAINER_COMPOSE, err)
+		return "", fmt.Errorf("list containers for remote Compose project %s: %w", projectName, err)
 	}
 
 	containerIds := strings.Fields(strings.TrimSpace(output))
 	if len(containerIds) == 0 {
-		return "", fmt.Errorf("no container found for compose service %q in project %s on remote", core.SSH_CONTAINER_COMPOSE, projectName)
+		return "", fmt.Errorf("no primary container found in remote Compose project %s", projectName)
 	}
 
 	containerId := containerIds[0]

@@ -35,6 +35,7 @@ var Q *wpool.Queue
 
 // a struct which implements the wpool.Worker interface for performing tasks
 type Worker struct {
+	OnError func(error)
 }
 
 var ChallengeActionHandlers = map[string]func(string) error{
@@ -79,21 +80,23 @@ func CommitChallengeContainer(challName string) error {
 
 // This function is used by the worker nodes or goroutines to perform the task which is pushed in the queue by the beast manager
 func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
+	var taskErr error
+	defer func() {
+		if taskErr != nil && worker.OnError != nil {
+			worker.OnError(fmt.Errorf("%s: %w", w.ID, taskErr))
+		}
+	}()
 	info := w.Info.(TaskInfo)
 	switch info.Action {
 	case core.MANAGE_ACTION_DEPLOY:
-		StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit, info.NoCache)
+		taskErr = StartDeployPipeline(info.ChallDir, info.SkipStage, info.SkipCommit, info.NoCache)
 
 	case core.MANAGE_ACTION_UNDEPLOY:
-		err := StartUndeployChallenge(w.ID, false)
-		if err != nil {
-			log.Errorf("Error while undeplying challenge(%s): %s", w.ID, err.Error())
-		}
+		taskErr = StartUndeployChallenge(w.ID, false)
 
 	case core.MANAGE_ACTION_REDEPLOY:
-		err := StartUndeployChallenge(w.ID, false)
-		if err != nil {
-			log.Errorf("Error while redeploying challenge(%s): %s", w.ID, err.Error())
+		taskErr = StartUndeployChallenge(w.ID, false)
+		if taskErr != nil {
 			return nil
 		}
 		stagingDir := filepath.Join(core.BEAST_GLOBAL_DIR, core.BEAST_STAGING_DIR, w.ID)
@@ -114,15 +117,13 @@ func (worker *Worker) PerformTask(w wpool.Task) *wpool.Task {
 		work, err := GetDeployWork(w.ID)
 		if err != nil {
 			log.Error(err)
+			taskErr = err
 			return nil
 		}
 		return work
 
 	case core.MANAGE_ACTION_PURGE:
-		err := StartUndeployChallenge(w.ID, true)
-		if err != nil {
-			log.Errorf("Error while purging challenge(%s): %s", w.ID, err.Error())
-		}
+		taskErr = StartUndeployChallenge(w.ID, true)
 
 	default:
 		chall, err := database.QueryFirstChallengeEntry("name", w.ID)
@@ -472,26 +473,22 @@ func HandleAll(action string, user string) []string {
 		challsNameList = deployChalls
 
 	case core.MANAGE_ACTION_UNDEPLOY:
-		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
+		var challenges []database.Challenge
+		challenges, err = database.QueryChallengeEntriesMap(map[string]interface{}{
 			"status": core.DEPLOY_STATUS["deployed"],
 		})
 		if err != nil {
 			break
-		}
-		for _, deployChallName := range challenges {
-			challsNameList = append(challsNameList, deployChallName.Name)
 		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 
 	case core.MANAGE_ACTION_REDEPLOY:
-		challenges, err := database.QueryChallengeEntriesMap(map[string]interface{}{
+		var challenges []database.Challenge
+		challenges, err = database.QueryChallengeEntriesMap(map[string]interface{}{
 			"status": core.DEPLOY_STATUS["deployed"],
 		})
 		if err != nil {
 			break
-		}
-		for _, deployChallName := range challenges {
-			challsNameList = append(challsNameList, deployChallName.Name)
 		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 
@@ -500,9 +497,6 @@ func HandleAll(action string, user string) []string {
 		challenges, err = database.QueryAllChallenges()
 		if err != nil {
 			break
-		}
-		for _, deployChallName := range challenges {
-			challsNameList = append(challsNameList, deployChallName.Name)
 		}
 		err = appendAndSaveTransaction(&challenges, &challsNameList, action, user)
 	}

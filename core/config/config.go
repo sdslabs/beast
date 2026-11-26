@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -628,9 +627,6 @@ func LoadBeastConfig(configPath string) (BeastConfig, error) {
 	config.RedisConf.ApplyEnvOverrides()
 	config.MailConfig.ApplyEnvOverrides()
 
-	prettyJSON, _ := json.MarshalIndent(config, "", "  ")
-	log.Debugf("Parsed beast global config file is : %s", string(prettyJSON))
-
 	err = config.ValidateConfig()
 	if err != nil {
 		return config, err
@@ -660,7 +656,7 @@ func InitConfig() {
 		os.Exit(1)
 	}
 
-	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
+	log.Debugf("Loaded Beast configuration from %s", configPath)
 	Cfg = &cfg
 }
 
@@ -675,6 +671,6 @@ func ReloadBeastConfig() error {
 	}
 
 	Cfg = &cfg
-	log.Debugf("CONFIG LOAD: New Config : %v", cfg)
+	log.Debugf("Loaded Beast configuration from %s", configPath)
 	return nil
 }

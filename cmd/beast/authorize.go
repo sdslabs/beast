@@ -1,8 +1,7 @@
 package main
 
 import (
-	"fmt"
-	"os"
+	"errors"
 
 	"github.com/sdslabs/beastv4/client"
 	"github.com/spf13/cobra"
@@ -10,20 +9,12 @@ import (
 
 var getAuthCmd = &cobra.Command{
 	Use:   "getauth",
-	Short: "Gets Auth token from beast server",
-	Long:  "Gets Auth Token from the beast server by completing the challenge from the server",
-	PreRun: func(cmd *cobra.Command, args []string) {
-		if Password == "" {
-			fmt.Printf("Password not provided")
-			os.Exit(1)
+	Short: "Gets an auth token from the Beast server",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if Password == "" || Username == "" {
+			return errors.New("username and password are required")
 		}
-
-		if Username == "" {
-			fmt.Printf("Username not provided")
-			os.Exit(1)
-		}
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		client.Authorize(Password, Host, Username)
+		return client.Authorize(Password, Host, Username)
 	},
 }
